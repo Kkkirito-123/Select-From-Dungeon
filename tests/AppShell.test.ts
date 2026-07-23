@@ -82,7 +82,7 @@ describe("answerReviewSummary", () => {
 describe("combatSettlementCopy", () => {
   const base: ExperienceSettlement = {
     monsterId: 101,
-    monsterName: "投影史莱姆 · 青页",
+    monsterName: "史莱姆",
     gained: 1,
     previousXp: 0,
     currentXp: 1,
@@ -92,17 +92,17 @@ describe("combatSettlementCopy", () => {
     currentMaxHp: 2,
   };
 
-  it("明确显示经验变化与课程宝箱", () => {
+  it("明确显示经验变化与战利品包", () => {
     expect(combatSettlementCopy(base, true)).toEqual({
-      title: "击败 投影史莱姆 · 青页",
+      title: "击败 史莱姆",
       xp: "+1 XP",
       progress: "LV.1 · 0 → 1 / 2 XP",
       levelUp: "距离下一等级又近了一步",
-      reward: "战利品宝箱已出现在怪物位置 · 靠近后按 E 打开",
+      reward: "战利品包已出现在怪物位置 · 靠近后按 E 打开",
     });
   });
 
-  it("升级时显示等级和生命上限变化，随机遭遇不伪造宝箱", () => {
+  it("升级时显示等级和生命上限变化，无掉落时给出直接反馈", () => {
     expect(combatSettlementCopy({
       ...base,
       previousXp: 1,
@@ -114,7 +114,7 @@ describe("combatSettlementCopy", () => {
     }, false)).toMatchObject({
       progress: "LV.2 · 1 → 2 / 4 XP",
       levelUp: "LEVEL UP · LV.1 → LV.2 · 生命上限 2 → 3",
-      reward: "随机遭遇只结算经验 · 不会掉落课程宝箱",
+      reward: "本次没有物品掉落 · 经验已正常结算",
     });
   });
 });

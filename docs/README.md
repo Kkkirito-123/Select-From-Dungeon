@@ -9,7 +9,7 @@
 |---|---|---|
 | [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | 规划蓝图；当前只实现前两层 | 课程顺序、题型、掌握标准 |
 | [楼层地图与美术蓝图](./FLOOR_THEMES.zh-CN.md) / [English](./FLOOR_THEMES.md) | 规划蓝图；当前只实现前两层 | 八层主题、地标与视觉边界 |
-| [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | 活跃路线图；`v0.2.0`、`v0.3.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
+| [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | 活跃路线图；`v0.2.0` 至 `v0.4.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
 | [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `v0.3.0` 已实现；仍保留未完成的专项视觉验收记录 | 三篝火、安全区、休息、死亡回归与复盘 |
 
 ## 后续候选设计
@@ -19,10 +19,10 @@
 - [怪物阶级与八层生物演化](./design/MONSTER_PROGRESSION_DESIGN.md)
 - [地图生态、探索密度与防具](./design/MAP_BIOME_AND_ARMOR_DESIGN.md)
 - [生态怪物与掉落](./design/BIOME_MONSTERS_AND_LOOT_DESIGN.md)
-- [装备背包、换装与独立多掉落](./design/INVENTORY_AND_MULTI_DROP_DESIGN.md)
+- [装备背包、换装与独立多掉落](./design/INVENTORY_AND_MULTI_DROP_DESIGN.md)（`v0.4.0` 已实现）
 
-当前边界：12 格背包、防具/护甲生命、通用随机装备掉落系统以及第三至八层均未实现。
-候选文档中的非关键装备概率已经减半，但课程关键宝箱、必需武器和钥匙仍保持 `100%` 确定获得。
+当前边界：12 格背包、防具/护甲生命与通用种子化掉落已实现；生态专属掉落、捷径与第三至八层
+仍未实现。非关键装备使用低概率独立判定，课程关键奖励、必需武器和钥匙保持 `100%` 确定获得。
 
 ## 历史报告
 

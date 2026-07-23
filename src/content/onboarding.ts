@@ -47,9 +47,9 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   },
   {
     id: "pickup",
-    title: "打开战利品宝箱",
-    body: "击败课程怪后，宝箱会出现在怪物位置。靠近宝箱按 E，领取其中的确定性奖励。",
-    shortcut: "靠近宝箱按 E",
+    title: "打开战利品包",
+    body: "击败课程怪后，战利品包会出现在怪物位置。靠近后按 E，处理确定奖励和可选掉落。",
+    shortcut: "靠近战利品包按 E",
   },
   {
     id: "complete",

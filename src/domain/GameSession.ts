@@ -19,6 +19,13 @@ import {
 } from "../content/gateChallenges";
 import { RELICS, rewardDetails, roomFlavor } from "../content/runContent";
 import {
+  CONSUMABLE_SLOT_CAPACITY,
+  CONSUMABLE_STACK_CAPACITY,
+  EQUIPMENT_CAPACITY,
+  WEAPONS,
+  lootCandidatesForFloor,
+} from "../content/inventoryCatalog";
+import {
   cloneMazeFloor,
   generateMazeFloor,
   isMazeWalkable,
@@ -55,6 +62,7 @@ import {
   safeZoneCellKeys,
 } from "./campfire";
 import { evaluateStage } from "./lessonEvaluator";
+import { rollLootItems } from "./lootDirector";
 import { MAX_ANSWER_HISTORY } from "./types";
 import type {
   AnswerAttemptRecord,
@@ -62,16 +70,22 @@ import type {
   ClaimableReward,
   CombatEvent,
   CombatState,
+  Consumable,
+  ConsumableStack,
+  EquipmentItem,
   ExperienceSettlement,
   GateChallengeId,
   GateChallengeResolution,
   GameSnapshot,
   GroundItem,
+  InventoryResolution,
   InteractionResolution,
   LessonDefinition,
   LessonId,
   LessonStageDefinition,
   LootDrop,
+  LootBundle,
+  LootItem,
   Monster,
   MoveResolution,
   PatrolBatchResolution,
@@ -160,6 +174,37 @@ function cloneItem(item: GroundItem): GroundItem {
   return {
     ...item,
     weapon: item.weapon ? { ...item.weapon } : undefined,
+  };
+}
+
+function cloneEquipment(item: EquipmentItem): EquipmentItem {
+  return {
+    ...item,
+    weapon: item.weapon ? { ...item.weapon } : undefined,
+    armor: item.armor ? { ...item.armor } : undefined,
+  };
+}
+
+function cloneConsumableStack(stack: ConsumableStack): ConsumableStack {
+  return {
+    item: { ...stack.item },
+    quantity: stack.quantity,
+  };
+}
+
+function cloneLootItem(item: LootItem): LootItem {
+  return {
+    ...item,
+    weapon: item.weapon ? { ...item.weapon } : undefined,
+    armor: item.armor ? { ...item.armor } : undefined,
+    consumable: item.consumable ? { ...item.consumable } : undefined,
+  };
+}
+
+function cloneLootBundle(bundle: LootBundle): LootBundle {
+  return {
+    ...bundle,
+    items: bundle.items.map(cloneLootItem),
   };
 }
 
@@ -268,12 +313,18 @@ export class GameSession {
   private campfires: Campfire[];
   private activeCampfireId: string | null = null;
   private respawnCampfireId: string | null = null;
+  private activeLootBundleId: string | null = null;
   private mode: GameSnapshot["mode"] = "explore";
   private currentRoomId: string;
   private player: PlayerState;
   private monsters = monstersForFloor(1);
   private worldActors: WorldActor[];
   private groundItems: GroundItem[];
+  private lootBundles: LootBundle[] = [];
+  private equipmentInventory: EquipmentItem[] = [];
+  private consumables: ConsumableStack[] = [];
+  private keyItems: string[] = [];
+  private acquiredUniqueItemIds = new Set<string>(["data-blade"]);
   private discoveredCells = new Set<string>();
   private combat: CombatState | null = null;
   private visitedRoomIds = new Set<string>();
@@ -315,6 +366,8 @@ export class GameSession {
       xp: 0,
       heat: 0,
       weapon: { ...DATA_BLADE },
+      armor: null,
+      armorHp: 0,
     };
     this.worldActors = initialActors(this.graph, this.mazeFloor, this.monsters);
     this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
@@ -322,7 +375,7 @@ export class GameSession {
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
 
-    if (savedRun?.version === 7 && savedRun.generatorVersion === 4) {
+    if (savedRun?.version === 8 && savedRun.generatorVersion === 4) {
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
       this.mazeFloor = cloneMazeFloor(savedRun.mazeFloor);
@@ -332,9 +385,14 @@ export class GameSession {
       }));
       this.activeCampfireId = savedRun.activeCampfireId;
       this.respawnCampfireId = savedRun.respawnCampfireId;
+      this.activeLootBundleId = savedRun.activeLootBundleId;
       this.mode = savedRun.mode;
       this.currentRoomId = savedRun.currentRoomId;
-      this.player = { ...savedRun.player, weapon: { ...savedRun.player.weapon } };
+      this.player = {
+        ...savedRun.player,
+        weapon: { ...savedRun.player.weapon },
+        armor: savedRun.player.armor ? { ...savedRun.player.armor } : null,
+      };
       this.monsters = restoredMonstersForFloor(savedRun.monsters, savedRun.floor);
       this.worldActors = savedRun.worldActors.map((savedActor) => {
         const actor = cloneWorldActor(savedActor);
@@ -342,6 +400,11 @@ export class GameSession {
         return { ...actor, x: actor.home.x, y: actor.home.y };
       });
       this.groundItems = savedRun.groundItems.map(cloneItem);
+      this.lootBundles = savedRun.lootBundles.map(cloneLootBundle);
+      this.equipmentInventory = savedRun.equipmentInventory.map(cloneEquipment);
+      this.consumables = savedRun.consumables.map(cloneConsumableStack);
+      this.keyItems = [...savedRun.keyItems];
+      this.acquiredUniqueItemIds = new Set(savedRun.acquiredUniqueItemIds);
       this.discoveredCells = new Set(savedRun.discoveredCells);
       this.combat = cloneCombat(savedRun.combat);
       this.visitedRoomIds = new Set(savedRun.visitedRoomIds);
@@ -405,6 +468,10 @@ export class GameSession {
           ? "死亡复盘 · RETURN TO CHECKPOINT"
         : this.mode === "campfire"
           ? "篝火休整 · CHECKPOINT"
+        : this.mode === "inventory"
+          ? "装备背包 · LOADOUT"
+        : this.mode === "loot"
+          ? "战利品包 · LOOT"
         : this.mode === "challenge" && activeGateChallenge
           ? activeGateChallenge.title
         : this.combat?.kind === "ambush"
@@ -422,6 +489,10 @@ export class GameSession {
           ? "生命已恢复。先复盘导致本次死亡的战斗，再重新出发。"
         : this.mode === "campfire"
           ? "选择在此休息恢复满生命并更新复活点，或查看当前楼层答案复盘。"
+        : this.mode === "inventory"
+          ? "管理 12 格装备背包、当前武器、防具和三格恢复品；战斗中不能换装。"
+        : this.mode === "loot"
+          ? "处理战利品包。背包已满时物品会留在包中，不会静默消失。"
         : this.mode === "challenge" && activeGateChallenge
           ? activeGateChallenge.objective
         : looseWeapon
@@ -441,7 +512,11 @@ export class GameSession {
       lessonId: lesson.id,
       lessonStageId: stage.id,
       lessonStageIndex: stageIndex,
-      player: { ...this.player, weapon: { ...this.player.weapon } },
+      player: {
+        ...this.player,
+        weapon: { ...this.player.weapon },
+        armor: this.player.armor ? { ...this.player.armor } : null,
+      },
       monsters: cloneMonsters(this.monsters),
       combat: cloneCombat(this.combat),
       focusMonsterId: this.combat?.targetId ?? this.selectedMonsterId ?? target?.id ?? null,
@@ -453,9 +528,15 @@ export class GameSession {
       })),
       activeCampfireId: this.activeCampfireId,
       respawnCampfireId: this.respawnCampfireId,
+      activeLootBundleId: this.activeLootBundleId,
       inSafeZone: isSafeZonePosition(this.mazeFloor, this.campfires, this.player),
       worldActors: this.worldActors.map(cloneWorldActor),
       groundItems: this.groundItems.map(cloneItem),
+      lootBundles: this.lootBundles.map(cloneLootBundle),
+      equipmentInventory: this.equipmentInventory.map(cloneEquipment),
+      consumables: this.consumables.map(cloneConsumableStack),
+      keyItems: [...this.keyItems],
+      acquiredUniqueItemIds: [...this.acquiredUniqueItemIds],
       discoveredCells: [...this.discoveredCells],
       currentRoomId: this.currentRoomId,
       currentRoomTitle: room.title,
@@ -504,7 +585,7 @@ export class GameSession {
 
   toSavedRun(): SavedRun {
     return {
-      version: 7,
+      version: 8,
       generatorVersion: 4,
       floor: this.floorNumber,
       graph: cloneGraph(this.graph),
@@ -515,12 +596,22 @@ export class GameSession {
       })),
       activeCampfireId: this.activeCampfireId,
       respawnCampfireId: this.respawnCampfireId,
+      activeLootBundleId: this.activeLootBundleId,
       worldActors: this.worldActors.map(cloneWorldActor),
       groundItems: this.groundItems.map(cloneItem),
+      lootBundles: this.lootBundles.map(cloneLootBundle),
+      equipmentInventory: this.equipmentInventory.map(cloneEquipment),
+      consumables: this.consumables.map(cloneConsumableStack),
+      keyItems: [...this.keyItems],
+      acquiredUniqueItemIds: [...this.acquiredUniqueItemIds],
       discoveredCells: [...this.discoveredCells],
       mode: this.mode,
       currentRoomId: this.currentRoomId,
-      player: { ...this.player, weapon: { ...this.player.weapon } },
+      player: {
+        ...this.player,
+        weapon: { ...this.player.weapon },
+        armor: this.player.armor ? { ...this.player.armor } : null,
+      },
       monsters: cloneMonsters(this.monsters),
       combat: cloneCombat(this.combat),
       visitedRoomIds: [...this.visitedRoomIds],
@@ -552,6 +643,8 @@ export class GameSession {
     const to = { x: from.x + dx, y: from.y + dy };
     if ([
       "campfire",
+      "inventory",
+      "loot",
       "death-review",
       "challenge",
       "combat",
@@ -650,6 +743,8 @@ export class GameSession {
   setPlayerPosition(x: number, y: number): boolean {
     if ([
       "campfire",
+      "inventory",
+      "loot",
       "death-review",
       "challenge",
       "combat",
@@ -684,6 +779,8 @@ export class GameSession {
   travelToRoom(roomId: string): TravelResolution {
     if ([
       "campfire",
+      "inventory",
+      "loot",
       "death-review",
       "challenge",
       "combat",
@@ -756,7 +853,7 @@ export class GameSession {
   }
 
   interact(): InteractionResolution {
-    if (["transition", "victory", "defeat", "death-review"].includes(this.mode)) {
+    if (["transition", "victory", "defeat", "death-review", "inventory", "loot"].includes(this.mode)) {
       if (this.mode === "transition") {
         return this.interactionFailure("传送门正在自动校准，无需按键。");
       }
@@ -765,6 +862,12 @@ export class GameSession {
       }
       if (this.mode === "defeat") {
         return this.interactionFailure("正在返回最近篝火。");
+      }
+      if (this.mode === "inventory") {
+        return this.interactionFailure("背包已经打开。先处理装备或关闭背包。");
+      }
+      if (this.mode === "loot") {
+        return this.interactionFailure("战利品包已经打开。先处理物品或返回探索。");
       }
       return this.interactionFailure("本轮已经结束。开始新 Run 可以再次挑战。");
     }
@@ -785,6 +888,16 @@ export class GameSession {
       this.emit();
       return { ok: true, kind: "campfire", message: this.banner };
     }
+    const lootBundle = this.lootBundles.find(
+      (entry) => distance(entry, this.player) <= 1,
+    );
+    if (lootBundle) {
+      this.activeLootBundleId = lootBundle.id;
+      this.mode = "loot";
+      this.banner = `打开战利品包：${lootBundle.items.length} 件物品等待处理。`;
+      this.emit();
+      return { ok: true, kind: "loot-bundle", message: this.banner };
+    }
     const item = this.groundItems.find(
       (entry) => entry.collection === "interact" && distance(entry, this.player) <= 1,
     );
@@ -794,7 +907,7 @@ export class GameSession {
       this.activeGateChallengeId = gateChallengeIdForFloor(this.floorNumber);
       this.mode = "challenge";
       const challenge = gateChallengeForFloor(this.floorNumber, challengeGate.id);
-      this.banner = `${challenge.title} 已接入。错误查询会损失 1 点生命；ESC 可无代价退出。`;
+      this.banner = `${challenge.title} 已接入。错误查询造成 1 点伤害（护甲优先）；ESC 可无代价退出。`;
       this.emit();
       return { ok: true, kind: "challenge", message: this.banner };
     }
@@ -809,11 +922,13 @@ export class GameSession {
     if (!campfire) return this.interactionFailure("当前篝火记录已经失效。");
     const previousHp = this.player.hp;
     this.player.hp = this.player.maxHp;
+    const previousArmor = this.player.armorHp;
+    this.player.armorHp = this.player.armor?.maxArmor ?? 0;
     this.respawnCampfireId = campfire.id;
     this.activeCampfireId = null;
     this.mode = "explore";
     this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
-    this.banner = `${this.campfirePhaseName(campfire)}休息完成：生命 ${previousHp} → ${this.player.hp}，这里已成为当前复活点。`;
+    this.banner = `${this.campfirePhaseName(campfire)}休息完成：生命 ${previousHp} → ${this.player.hp}，护甲 ${previousArmor} → ${this.player.armorHp}，这里已成为当前复活点。`;
     this.emit();
     return { ok: true, kind: "campfire", message: this.banner };
   }
@@ -827,6 +942,242 @@ export class GameSession {
     return true;
   }
 
+  openInventory(): boolean {
+    if (this.mode !== "explore" && this.mode !== "campfire") return false;
+    this.mode = "inventory";
+    this.banner = `背包已打开：装备 ${this.equipmentInventory.length}/${EQUIPMENT_CAPACITY}，恢复品 ${this.consumables.length}/${CONSUMABLE_SLOT_CAPACITY}。`;
+    this.emit();
+    return true;
+  }
+
+  closeInventory(): boolean {
+    if (this.mode !== "inventory") return false;
+    this.mode = this.activeCampfireId ? "campfire" : "explore";
+    this.banner = this.activeCampfireId ? "返回篝火菜单。" : "背包已关闭，继续探索。";
+    this.emit();
+    return true;
+  }
+
+  closeLootBundle(): boolean {
+    if (this.mode !== "loot") return false;
+    this.activeLootBundleId = null;
+    this.mode = "explore";
+    this.banner = "未处理物品仍保留在战利品包中。";
+    this.emit();
+    return true;
+  }
+
+  takeLootItem(
+    bundleId: string,
+    dropId: string,
+    action: "store" | "equip" | "claim",
+    replaceInstanceId?: string,
+  ): InventoryResolution {
+    if (this.mode !== "loot" || this.activeLootBundleId !== bundleId) {
+      return this.inventoryFailure("当前没有打开这个战利品包。");
+    }
+    const bundle = this.lootBundles.find((entry) => entry.id === bundleId);
+    const item = bundle?.items.find((entry) => entry.dropId === dropId);
+    if (!bundle || !item) return this.inventoryFailure("该物品已经处理或不存在。");
+    let message: string | null = null;
+    if (item.kind === "weapon" || item.kind === "armor") {
+      message = action === "equip"
+        ? this.equipLootEquipment(bundle, item, replaceInstanceId)
+        : this.storeLootEquipment(bundle, item, replaceInstanceId);
+    } else if (item.kind === "consumable" && item.consumable) {
+      message = this.storeConsumable(item.consumable)
+        ? `已将 ${item.name} 放入恢复品栏。`
+        : null;
+    } else if (item.kind === "reward" && item.rewardId) {
+      if (item.rewardId === "floor-key") {
+        message = this.claimFloorKey();
+      } else {
+        this.applyReward(item.rewardId);
+        message = `已领取 ${item.name}。${item.description}`;
+      }
+    }
+    if (!message) {
+      return this.inventoryFailure(
+        item.kind === "consumable"
+          ? "恢复品栏已满或该物品已达到 5 个堆叠上限。"
+          : "背包已满，请选择一件装备替换；物品会继续留在战利品包中。",
+      );
+    }
+
+    bundle.items = bundle.items.filter((entry) => entry.dropId !== dropId);
+    if (item.kind === "weapon" || item.kind === "armor") {
+      this.acquiredUniqueItemIds.add(item.itemId);
+    }
+    if ((["transition", "victory"] as GameSnapshot["mode"][]).includes(this.mode)) {
+      this.activeLootBundleId = null;
+    }
+    if (bundle.items.length === 0) {
+      this.lootBundles = this.lootBundles.filter((entry) => entry.id !== bundle.id);
+      this.activeLootBundleId = null;
+      if (this.mode === "loot") this.mode = "explore";
+    }
+    this.banner = message;
+    this.emit();
+    return {
+      ok: true,
+      message,
+      remainingItemIds: bundle.items.map((entry) => entry.dropId),
+    };
+  }
+
+  takeAllLoot(bundleId: string): InventoryResolution {
+    const bundle = this.lootBundles.find((entry) => entry.id === bundleId);
+    if (!bundle || this.mode !== "loot" || this.activeLootBundleId !== bundleId) {
+      return this.inventoryFailure("当前没有打开这个战利品包。");
+    }
+    const itemIds = [...bundle.items]
+      .sort((a, b) => Number(a.rewardId === "floor-key") - Number(b.rewardId === "floor-key"))
+      .map((item) => item.dropId);
+    let picked = 0;
+    itemIds.forEach((dropId) => {
+      const current = this.lootBundles
+        .find((entry) => entry.id === bundleId)
+        ?.items.find((entry) => entry.dropId === dropId);
+      if (!current) return;
+      const resolution = this.takeLootItem(
+        bundleId,
+        dropId,
+        current.kind === "reward" ? "claim" : "store",
+      );
+      if (resolution.ok) picked += 1;
+    });
+    const remaining = this.lootBundles.find((entry) => entry.id === bundleId)?.items ?? [];
+    if ((["transition", "victory"] as GameSnapshot["mode"][]).includes(this.mode)) {
+      return {
+        ok: picked > 0,
+        message: this.banner,
+        remainingItemIds: remaining.map((item) => item.dropId),
+      };
+    }
+    const message = remaining.length === 0
+      ? `已领取 ${picked} 件战利品。`
+      : `已领取 ${picked} 件；另有 ${remaining.length} 件因容量限制留在包中。`;
+    this.banner = message;
+    this.emit();
+    return {
+      ok: picked > 0,
+      message,
+      remainingItemIds: remaining.map((item) => item.dropId),
+    };
+  }
+
+  equipInventoryItem(instanceId: string): InventoryResolution {
+    if (this.mode !== "inventory") {
+      return this.inventoryFailure("只能在探索或篝火打开背包后换装。");
+    }
+    const index = this.equipmentInventory.findIndex((item) => item.instanceId === instanceId);
+    const item = this.equipmentInventory[index];
+    if (!item) return this.inventoryFailure("背包中没有这件装备。");
+    this.equipmentInventory.splice(index, 1);
+    if (item.kind === "weapon" && item.weapon) {
+      this.equipmentInventory.push(this.equippedWeaponItem());
+      const previous = this.player.weapon.name;
+      this.player.weapon = { ...item.weapon };
+      this.banner = `已装备 ${item.weapon.name}：${previous} → ${item.weapon.name}，伤害 ${item.weapon.damage}。`;
+    } else if (item.kind === "armor" && item.armor) {
+      if (this.player.armor) this.equipmentInventory.push(this.equippedArmorItem());
+      const previous = this.player.armor?.name ?? "无防具";
+      this.player.armor = { ...item.armor };
+      this.player.armorHp = Math.min(item.armor.maxArmor, item.armorHp ?? item.armor.maxArmor);
+      this.banner = `已装备 ${item.armor.name}：${previous} → ${item.armor.name}，护甲生命 ${this.player.armorHp}/${item.armor.maxArmor}。`;
+    } else {
+      this.equipmentInventory.splice(index, 0, item);
+      return this.inventoryFailure("装备数据不完整，未进行更换。");
+    }
+    this.emit();
+    return { ok: true, message: this.banner, remainingItemIds: [] };
+  }
+
+  discardInventoryItem(instanceId: string): InventoryResolution {
+    if (this.mode !== "inventory") {
+      return this.inventoryFailure("只能在背包中丢弃普通装备。");
+    }
+    const index = this.equipmentInventory.findIndex((item) => item.instanceId === instanceId);
+    const item = this.equipmentInventory[index];
+    if (!item) return this.inventoryFailure("背包中没有这件装备。");
+    if (item.protected) return this.inventoryFailure("基础武器和课程必需装备不能丢弃。");
+    this.equipmentInventory.splice(index, 1);
+    const bundleId = this.nextLootBundleId(
+      `discard:${this.floorNumber}:${item.instanceId}`,
+    );
+    this.lootBundles.push({
+      id: bundleId,
+      sourceMonsterId: null,
+      sourceRoomId: this.currentRoomId,
+      floor: this.floorNumber,
+      x: this.player.x,
+      y: this.player.y,
+      items: [this.lootItemFromEquipment(item, `${bundleId}:item`)],
+    });
+    this.banner = `${item.weapon?.name ?? item.armor?.name ?? "装备"} 已放到脚下，离开本层前仍可重新拾取。`;
+    this.emit();
+    return { ok: true, message: this.banner, remainingItemIds: [] };
+  }
+
+  discardConsumable(consumableId: Consumable["id"]): InventoryResolution {
+    if (this.mode !== "inventory") {
+      return this.inventoryFailure("只能在背包中丢弃普通恢复品。");
+    }
+    const stack = this.consumables.find((entry) => entry.item.id === consumableId);
+    if (!stack) return this.inventoryFailure("恢复品栏中没有该物品。");
+    stack.quantity -= 1;
+    if (stack.quantity <= 0) {
+      this.consumables = this.consumables.filter((entry) => entry !== stack);
+    }
+    const bundleId = this.nextLootBundleId(
+      `discard:${this.floorNumber}:${consumableId}:${this.queryCount}`,
+    );
+    const dropId = `${bundleId}:item`;
+    this.lootBundles.push({
+      id: bundleId,
+      sourceMonsterId: null,
+      sourceRoomId: this.currentRoomId,
+      floor: this.floorNumber,
+      x: this.player.x,
+      y: this.player.y,
+      items: [{
+        dropId,
+        itemId: consumableId,
+        kind: "consumable",
+        name: stack.item.name,
+        description: stack.item.description,
+        guaranteed: true,
+        probability: 1,
+        protected: false,
+        consumable: { ...stack.item },
+      }],
+    });
+    this.banner = `${stack.item.name} 已放到脚下，离开本层前仍可重新拾取。`;
+    this.emit();
+    return { ok: true, message: this.banner, remainingItemIds: [] };
+  }
+
+  useConsumable(consumableId: Consumable["id"]): InventoryResolution {
+    if (this.mode !== "inventory") {
+      return this.inventoryFailure("只能在背包中使用恢复品。");
+    }
+    const stack = this.consumables.find((entry) => entry.item.id === consumableId);
+    if (!stack) return this.inventoryFailure("恢复品栏中没有该物品。");
+    const previousHp = this.player.hp;
+    const previousArmor = this.player.armorHp;
+    this.applyConsumable(stack.item);
+    if (previousHp === this.player.hp && previousArmor === this.player.armorHp) {
+      return this.inventoryFailure("当前生命与护甲均不需要恢复。");
+    }
+    stack.quantity -= 1;
+    if (stack.quantity <= 0) {
+      this.consumables = this.consumables.filter((entry) => entry !== stack);
+    }
+    this.banner = `使用 ${stack.item.name}：生命 ${previousHp} → ${this.player.hp}，护甲 ${previousArmor} → ${this.player.armorHp}。`;
+    this.emit();
+    return { ok: true, message: this.banner, remainingItemIds: [] };
+  }
+
   respawnAfterDefeat(): boolean {
     if (this.mode !== "defeat") return false;
     const campfire = this.respawnCampfireId
@@ -838,6 +1189,8 @@ export class GameSession {
       ...destination,
       hp: this.player.maxHp,
       weapon: { ...this.player.weapon },
+      armor: this.player.armor ? { ...this.player.armor } : null,
+      armorHp: this.player.armor?.maxArmor ?? 0,
     };
     const zone = mazeZoneAt(this.mazeFloor, destination);
     this.currentRoomId = zone?.roomNodeId ?? this.graph.entryId;
@@ -883,6 +1236,7 @@ export class GameSession {
         gateId,
         message: "当前没有正在破解的机关门。",
         playerDamage: 0,
+        armorDamage: 0,
         mode: this.mode,
       };
     }
@@ -900,6 +1254,7 @@ export class GameSession {
         gateId,
         message: this.banner,
         playerDamage: 0,
+        armorDamage: 0,
         mode: this.mode,
       };
     }
@@ -914,6 +1269,7 @@ export class GameSession {
         gateId: this.challengeGateId(),
         message,
         playerDamage: 0,
+        armorDamage: 0,
         mode: this.mode,
       };
     }
@@ -926,6 +1282,7 @@ export class GameSession {
     const moves: PatrolBatchResolution["moves"] = [];
     const blocked = new Set([
       ...this.groundItems.map(positionKey),
+      ...this.lootBundles.map(positionKey),
       ...safeZoneCellKeys(this.mazeFloor, this.campfires),
       ...this.campfires.map(positionKey),
     ]);
@@ -1001,6 +1358,7 @@ export class GameSession {
     const hpUpdates: Array<{ id: number; hp: number }> = [];
     const killedIds: number[] = [];
     let playerDamage = 0;
+    let armorDamage = 0;
     let playerDefeated = false;
     let stageAdvanced = false;
     let lessonCompleted: LessonId | null = null;
@@ -1026,7 +1384,7 @@ export class GameSession {
           experience = this.awardExperience(target);
           const experienceMessage = this.describeExperience(experience);
           if (this.combat.kind === "ambush") {
-            this.completeAmbush(target, experienceMessage);
+            this.completeAmbush(target, events, experienceMessage);
           } else {
             lessonCompleted = lesson.id;
             this.completeLesson(lesson, events, experienceMessage);
@@ -1040,10 +1398,14 @@ export class GameSession {
       }
     } else {
       const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
-      playerDamage = 1;
-      this.player.hp = Math.max(0, this.player.hp - playerDamage);
-      events.push({ type: "enemy-hit", sourceId: target?.id, amount: playerDamage });
-      this.banner = `${evaluation.message} ${target?.name ?? "怪物"} 使用${target?.attackName ?? "反击"}，造成 ${playerDamage} 点伤害。`;
+      const damage = this.applyPlayerDamage(1);
+      playerDamage = damage.playerDamage;
+      armorDamage = damage.armorDamage;
+      events.push({ type: "enemy-hit", sourceId: target?.id, amount: 1 });
+      const damageMessage = armorDamage > 0
+        ? `护甲吸收 ${armorDamage} 点${playerDamage > 0 ? `，生命损失 ${playerDamage} 点` : ""}`
+        : `生命损失 ${playerDamage} 点`;
+      this.banner = `${evaluation.message} ${target?.name ?? "怪物"} 使用${target?.attackName ?? "反击"}，${damageMessage}。`;
       if (this.player.hp === 0) {
         playerDefeated = true;
         this.enterDefeat("combat");
@@ -1081,6 +1443,7 @@ export class GameSession {
       hpUpdates,
       killedIds,
       playerDamage,
+      armorDamage,
       heatAdded,
       locksBroken: evaluation.locksBroken,
       locksRemaining: evaluation.locksRemaining,
@@ -1105,10 +1468,14 @@ export class GameSession {
     this.profile.attempts[lesson.id] += 1;
     this.player.heat = Math.min(99, this.player.heat + 1);
     const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
-    const playerDamage = 1;
-    this.player.hp = Math.max(0, this.player.hp - playerDamage);
+    const damage = this.applyPlayerDamage(1);
+    const playerDamage = damage.playerDamage;
+    const armorDamage = damage.armorDamage;
     const playerDefeated = this.player.hp === 0;
-    this.banner = `${message} ${target?.name ?? "怪物"} 趁终端失稳反击，造成 ${playerDamage} 点伤害。`;
+    const damageMessage = armorDamage > 0
+      ? `护甲吸收 ${armorDamage} 点${playerDamage > 0 ? `，生命损失 ${playerDamage} 点` : ""}`
+      : `生命损失 ${playerDamage} 点`;
+    this.banner = `${message} ${target?.name ?? "怪物"} 趁终端失稳反击，${damageMessage}。`;
     if (playerDefeated) {
       this.enterDefeat("combat");
     } else {
@@ -1145,6 +1512,7 @@ export class GameSession {
       hpUpdates: [],
       killedIds: [],
       playerDamage,
+      armorDamage,
       heatAdded: 1,
       locksBroken: [],
       locksRemaining: [...stage.locks],
@@ -1173,10 +1541,13 @@ export class GameSession {
       hp: Math.min(this.player.maxHp, Math.max(this.player.hp, 3)),
       heat: Math.max(0, this.player.heat - 12),
       weapon: { ...this.player.weapon },
+      armor: this.player.armor ? { ...this.player.armor } : null,
     };
     this.monsters = monstersForFloor(2);
     this.worldActors = initialActors(this.graph, this.mazeFloor, this.monsters);
     this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.lootBundles = [];
+    this.activeLootBundleId = null;
     this.discoveredCells = new Set();
     this.combat = null;
     this.visitedRoomIds = new Set([this.currentRoomId]);
@@ -1214,10 +1585,18 @@ export class GameSession {
       xp: 0,
       heat: 0,
       weapon: { ...DATA_BLADE },
+      armor: null,
+      armorHp: 0,
     };
     this.monsters = monstersForFloor(1);
     this.worldActors = initialActors(this.graph, this.mazeFloor, this.monsters);
     this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.lootBundles = [];
+    this.equipmentInventory = [];
+    this.consumables = [];
+    this.keyItems = [];
+    this.acquiredUniqueItemIds = new Set(["data-blade"]);
+    this.activeLootBundleId = null;
     this.discoveredCells = new Set();
     this.combat = null;
     this.visitedRoomIds = new Set([this.currentRoomId]);
@@ -1450,13 +1829,228 @@ export class GameSession {
     return `获得 ${experience.gained} XP（${experience.currentXp} XP / LV.${experience.currentLevel}）。`;
   }
 
-  private completeAmbush(monster: Monster, experienceMessage: string): void {
+  private inventoryFailure(message: string): InventoryResolution {
+    this.banner = message;
+    this.emit();
+    return { ok: false, message, remainingItemIds: [] };
+  }
+
+  private equippedWeaponItem(): EquipmentItem {
+    return {
+      instanceId: `equipped:weapon:${this.player.weapon.id}`,
+      kind: "weapon",
+      protected: this.player.weapon.id !== "bone-blade",
+      weapon: { ...this.player.weapon },
+    };
+  }
+
+  private equippedArmorItem(): EquipmentItem {
+    const armor = this.player.armor;
+    if (!armor) {
+      throw new Error("Cannot store an empty armor slot.");
+    }
+    return {
+      instanceId: `equipped:armor:${armor.id}`,
+      kind: "armor",
+      protected: false,
+      armor: { ...armor },
+      armorHp: this.player.armorHp,
+    };
+  }
+
+  private equipmentFromLoot(item: LootItem): EquipmentItem | null {
+    if (item.kind === "weapon" && item.weapon) {
+      return {
+        instanceId: `loot:weapon:${item.dropId}`,
+        kind: "weapon",
+        protected: item.protected,
+        weapon: { ...item.weapon },
+      };
+    }
+    if (item.kind === "armor" && item.armor) {
+      return {
+        instanceId: `loot:armor:${item.dropId}`,
+        kind: "armor",
+        protected: item.protected,
+        armor: { ...item.armor },
+        armorHp: Math.min(item.armor.maxArmor, item.armorHp ?? item.armor.maxArmor),
+      };
+    }
+    return null;
+  }
+
+  private lootItemFromEquipment(item: EquipmentItem, dropId: string): LootItem {
+    const weapon = item.weapon ? { ...item.weapon } : undefined;
+    const armor = item.armor ? { ...item.armor } : undefined;
+    return {
+      dropId,
+      itemId: weapon?.id ?? armor?.id ?? item.instanceId,
+      kind: item.kind,
+      name: weapon?.name ?? armor?.name ?? "未知装备",
+      description: weapon?.description ?? armor?.description ?? "装备数据不完整。",
+      guaranteed: true,
+      probability: 1,
+      protected: item.protected,
+      weapon,
+      armor,
+      armorHp: armor
+        ? Math.min(armor.maxArmor, item.armorHp ?? armor.maxArmor)
+        : undefined,
+    };
+  }
+
+  private replaceInventoryItem(
+    bundle: LootBundle,
+    replaceInstanceId: string | undefined,
+  ): EquipmentItem | null {
+    if (!replaceInstanceId) return null;
+    const index = this.equipmentInventory.findIndex(
+      (item) => item.instanceId === replaceInstanceId,
+    );
+    const replaced = this.equipmentInventory[index];
+    if (!replaced || replaced.protected) return null;
+    this.equipmentInventory.splice(index, 1);
+    bundle.items.push(this.lootItemFromEquipment(
+      replaced,
+      `replaced:${bundle.id}:${replaced.instanceId}`,
+    ));
+    return replaced;
+  }
+
+  private storeLootEquipment(
+    bundle: LootBundle,
+    item: LootItem,
+    replaceInstanceId?: string,
+  ): string | null {
+    const equipment = this.equipmentFromLoot(item);
+    if (!equipment) return null;
+    let replaced: EquipmentItem | null = null;
+    if (this.equipmentInventory.length >= EQUIPMENT_CAPACITY) {
+      replaced = this.replaceInventoryItem(bundle, replaceInstanceId);
+      if (!replaced) return null;
+    }
+    this.equipmentInventory.push(equipment);
+    const replacedName = replaced?.weapon?.name ?? replaced?.armor?.name;
+    return replacedName
+      ? `已将 ${item.name} 放入装备背包；${replacedName} 留在当前战利品包中。`
+      : `已将 ${item.name} 放入装备背包。`;
+  }
+
+  private equipLootEquipment(
+    bundle: LootBundle,
+    item: LootItem,
+    replaceInstanceId?: string,
+  ): string | null {
+    const equipment = this.equipmentFromLoot(item);
+    if (!equipment) return null;
+    const displaced = equipment.kind === "weapon"
+      ? this.equippedWeaponItem()
+      : this.player.armor
+        ? this.equippedArmorItem()
+        : null;
+    let replaced: EquipmentItem | null = null;
+    if (displaced && this.equipmentInventory.length >= EQUIPMENT_CAPACITY) {
+      replaced = this.replaceInventoryItem(bundle, replaceInstanceId);
+      if (!replaced) return null;
+    }
+    if (displaced) this.equipmentInventory.push(displaced);
+
+    if (equipment.kind === "weapon" && equipment.weapon) {
+      const previous = this.player.weapon.name;
+      this.player.weapon = { ...equipment.weapon };
+      const replacedName = replaced?.weapon?.name ?? replaced?.armor?.name;
+      return `已装备 ${equipment.weapon.name}：${previous} 已收入背包${
+        replacedName ? `，${replacedName} 留在战利品包中` : ""
+      }。`;
+    }
+    if (equipment.kind === "armor" && equipment.armor) {
+      const previous = this.player.armor?.name ?? "无防具";
+      this.player.armor = { ...equipment.armor };
+      this.player.armorHp = Math.min(
+        equipment.armor.maxArmor,
+        equipment.armorHp ?? equipment.armor.maxArmor,
+      );
+      const replacedName = replaced?.weapon?.name ?? replaced?.armor?.name;
+      return `已装备 ${equipment.armor.name}：${previous} → ${equipment.armor.name}，护甲 ${this.player.armorHp}/${
+        equipment.armor.maxArmor
+      }${replacedName ? `；${replacedName} 留在战利品包中` : ""}。`;
+    }
+    return null;
+  }
+
+  private storeConsumable(consumable: Consumable): boolean {
+    const stack = this.consumables.find((entry) => entry.item.id === consumable.id);
+    if (stack) {
+      if (stack.quantity >= CONSUMABLE_STACK_CAPACITY) return false;
+      stack.quantity += 1;
+      return true;
+    }
+    if (this.consumables.length >= CONSUMABLE_SLOT_CAPACITY) return false;
+    this.consumables.push({ item: { ...consumable }, quantity: 1 });
+    return true;
+  }
+
+  private applyConsumable(consumable: Consumable): void {
+    if (consumable.effect === "heal-hp" || consumable.effect === "heal-both") {
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + consumable.amount);
+    }
+    if (
+      (consumable.effect === "heal-armor" || consumable.effect === "heal-both") &&
+      this.player.armor
+    ) {
+      const maxArmor = this.player.armor?.maxArmor ?? 0;
+      this.player.armorHp = Math.min(maxArmor, this.player.armorHp + consumable.amount);
+    }
+  }
+
+  private applyPlayerDamage(amount: number): {
+    playerDamage: number;
+    armorDamage: number;
+  } {
+    const incoming = Math.max(0, Math.floor(amount));
+    const armorDamage = Math.min(this.player.armorHp, incoming);
+    this.player.armorHp -= armorDamage;
+    const playerDamage = incoming - armorDamage;
+    this.player.hp = Math.max(0, this.player.hp - playerDamage);
+    return { playerDamage, armorDamage };
+  }
+
+  private claimFloorKey(): string {
+    const keyId = `floor-${this.floorNumber}-key`;
+    if (!this.keyItems.includes(keyId)) this.keyItems.push(keyId);
+    this.completedRoomIds.add(this.currentRoomId);
+    if (this.floorNumber === 1) {
+      this.mode = "transition";
+      return "第一层钥匙已接入传送门。无需按键，正在自动进入第二层。";
+    }
+    this.mode = "victory";
+    this.profile.victories += 1;
+    this.profile.bestRunQueries = this.profile.bestRunQueries === null
+      ? this.queryCount
+      : Math.min(this.profile.bestRunQueries, this.queryCount);
+    return "获得第二层钥匙。雷鸣主核已关闭，两层 SQL 图鉴均已永久更新。";
+  }
+
+  private completeAmbush(
+    monster: Monster,
+    events: CombatEvent[],
+    experienceMessage: string,
+  ): void {
+    const dropCount = this.spawnLootBundle(
+      monster,
+      this.currentRoomId,
+      { x: this.player.x, y: this.player.y },
+      [],
+    );
+    if (dropCount > 0) events.push({ type: "loot-drop", targetId: monster.id });
     this.combat = null;
     this.selectedMonsterId = null;
     this.mode = "explore";
     this.hintLevel = 0;
     this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
-    this.banner = `${monster.name} 已清除。${experienceMessage} 接下来 5 步不会再次遭遇。`;
+    this.banner = dropCount > 0
+      ? `${monster.name} 已清除。${experienceMessage} 掉落 1 个含 ${dropCount} 件物品的战利品包。`
+      : `${monster.name} 已清除。${experienceMessage} 本次没有物品掉落；接下来 5 步不会再次遭遇。`;
   }
 
   private completeLesson(
@@ -1477,41 +2071,109 @@ export class GameSession {
     this.hintLevel = 0;
     this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
 
+    const target = this.monsters.find((monster) => monster.id === lesson.primaryMonsterId);
+    if (target && dropPosition) {
+      const fixedItems = this.fixedLootItemsForLesson(lesson);
+      const dropCount = this.spawnLootBundle(
+        target,
+        this.currentRoomId,
+        dropPosition,
+        fixedItems,
+      );
+      if (dropCount > 0) {
+        events.push({ type: "loot-drop", targetId: lesson.primaryMonsterId });
+        this.banner = `${lesson.title} 完成，含 ${dropCount} 件物品的战利品包已掉落。${experienceMessage} 靠近后按 E 打开。`;
+        return;
+      }
+    }
+    this.banner = `${lesson.title} 已掌握。${experienceMessage} 本次没有额外物品掉落。`;
+  }
+
+  private fixedLootItemsForLesson(lesson: LessonDefinition): LootItem[] {
     const fixedLoot = LOOT_AFTER_LESSON[lesson.id];
-    if (fixedLoot && dropPosition) {
-      this.groundItems.push({
-        id: `lesson-drop:${lesson.id}`,
-        sourceRoomId: this.currentRoomId,
-        ...dropPosition,
+    if (fixedLoot) {
+      return [{
+        dropId: `${lesson.primaryMonsterId}:${fixedLoot.weapon.id}`,
+        itemId: fixedLoot.weapon.id,
+        kind: "weapon",
         name: fixedLoot.weapon.name,
         description: fixedLoot.weapon.description,
-        kind: "weapon",
-        collection: "interact",
-        rewardId: null,
+        guaranteed: true,
+        probability: 1,
+        protected: true,
         weapon: { ...fixedLoot.weapon },
-      });
-      events.push({ type: "loot-drop", targetId: lesson.primaryMonsterId });
-      this.banner = `${lesson.title} 完成，装有 ${fixedLoot.weapon.name} 的战利品宝箱已掉落。${experienceMessage} 靠近后按 E 打开。`;
-      return;
+      }];
     }
+    const rewardId = this.currentRoom().reward;
+    const reward = rewardDetails(rewardId);
+    if (!reward || !rewardId) return [];
+    const rewardWeapon = reward.kind === "weapon"
+      ? WEAPONS[rewardId as Weapon["id"]]
+      : undefined;
+    if (rewardWeapon) {
+      return [{
+        dropId: `${lesson.primaryMonsterId}:${rewardWeapon.id}`,
+        itemId: rewardWeapon.id,
+        kind: "weapon",
+        name: rewardWeapon.name,
+        description: rewardWeapon.description,
+        guaranteed: true,
+        probability: 1,
+        protected: true,
+        weapon: { ...rewardWeapon },
+      }];
+    }
+    return [{
+      dropId: `${lesson.primaryMonsterId}:${rewardId}`,
+      itemId: rewardId,
+      kind: "reward",
+      name: reward.name,
+      description: reward.description,
+      guaranteed: true,
+      probability: 1,
+      protected: reward.kind === "key",
+      rewardId,
+    }];
+  }
 
-    const roomReward = rewardDetails(this.currentRoom().reward);
-    if (roomReward && dropPosition) {
-      this.groundItems.push({
-        id: `lesson-drop:${lesson.id}`,
-        sourceRoomId: this.currentRoomId,
-        ...dropPosition,
-        name: roomReward.name,
-        description: roomReward.description,
-        kind: rewardItemKind(roomReward),
-        collection: "interact",
-        rewardId: this.currentRoom().reward,
-      });
-      events.push({ type: "loot-drop", targetId: lesson.primaryMonsterId });
-      this.banner = `${lesson.title} 完成，装有 ${roomReward.name} 的战利品宝箱已掉落。${experienceMessage} 靠近后按 E 打开。`;
-      return;
+  private spawnLootBundle(
+    monster: Monster,
+    sourceRoomId: string,
+    position: Position,
+    fixedItems: readonly LootItem[],
+  ): number {
+    const items = rollLootItems({
+      seed: this.graph.seed,
+      floor: this.floorNumber,
+      monster,
+      candidates: lootCandidatesForFloor(this.floorNumber),
+      fixedItems,
+      acquiredUniqueItemIds: this.acquiredUniqueItemIds,
+    });
+    if (items.length === 0) return 0;
+    const id = `loot:${this.floorNumber}:${monster.id}`;
+    if (this.lootBundles.some((bundle) => bundle.id === id)) {
+      return this.lootBundles.find((bundle) => bundle.id === id)?.items.length ?? 0;
     }
-    this.banner = `${lesson.title} 已掌握。${experienceMessage} 继续探索迷宫。`;
+    this.lootBundles.push({
+      id,
+      sourceMonsterId: monster.id,
+      sourceRoomId,
+      floor: this.floorNumber,
+      ...position,
+      items,
+    });
+    return items.length;
+  }
+
+  private nextLootBundleId(baseId: string): string {
+    let id = baseId;
+    let suffix = 2;
+    while (this.lootBundles.some((bundle) => bundle.id === id)) {
+      id = `${baseId}:${suffix}`;
+      suffix += 1;
+    }
+    return id;
   }
 
   private collectGroundItem(item: GroundItem, shouldEmit: boolean): InteractionResolution {
@@ -1521,6 +2183,7 @@ export class GameSession {
     const previousHp = this.player.hp;
     if (item.weapon) {
       this.player.weapon = { ...item.weapon };
+      this.acquiredUniqueItemIds.add(item.weapon.id);
     } else if (item.rewardId) {
       this.applyReward(item.rewardId);
     }
@@ -1583,16 +2246,22 @@ export class GameSession {
       this.player.heat = 0;
     } else if (rewardId === "aggregate-hammer") {
       this.player.weapon = { ...AGGREGATE_HAMMER };
+      this.acquiredUniqueItemIds.add(AGGREGATE_HAMMER.id);
     } else if (rewardId === "sort-saber") {
       this.player.weapon = { ...SORT_SABER };
+      this.acquiredUniqueItemIds.add(SORT_SABER.id);
     } else if (rewardId === "join-chain") {
       this.player.weapon = { ...JOIN_CHAIN };
+      this.acquiredUniqueItemIds.add(JOIN_CHAIN.id);
     } else if (rewardId === "filter-rune") {
       this.player.weapon = { ...FILTER_BOW };
+      this.acquiredUniqueItemIds.add(FILTER_BOW.id);
     } else if (rewardId === "null-lantern") {
       this.player.weapon = { ...NULL_LANTERN };
+      this.acquiredUniqueItemIds.add(NULL_LANTERN.id);
     } else if (rewardId === "data-blade") {
       this.player.weapon = { ...DATA_BLADE };
+      this.acquiredUniqueItemIds.add(DATA_BLADE.id);
     }
   }
 
@@ -1625,8 +2294,11 @@ export class GameSession {
     const monster = this.monsterForCurrentRoom();
     this.selectedMonsterId = monster && monster.hp > 0 ? monster.id : null;
     const item = this.groundItems.find((entry) => entry.sourceRoomId === zone.roomNodeId);
+    const lootBundle = this.lootBundles.find((entry) => entry.sourceRoomId === zone.roomNodeId);
     if (monster && monster.hp > 0) {
       this.banner = `${monster.name}（ID #${monster.id}）正在区域内巡逻。触碰才会开战。`;
+    } else if (lootBundle) {
+      this.banner = `这里留有一个含 ${lootBundle.items.length} 件物品的战利品包。靠近后按 E 打开。`;
     } else if (item) {
       this.banner = `${item.name} 在区域核心发光。靠近后${item.collection === "touch" ? "直接拾取" : "按 E 调查"}。`;
     } else {
@@ -1648,6 +2320,8 @@ export class GameSession {
 
   private interactionPrompt(): string {
     if (this.mode === "campfire") return "篝火休整中 · 选择在此休息或答案复盘";
+    if (this.mode === "inventory") return "背包管理中 · 换装、使用或丢弃 · ESC 关闭";
+    if (this.mode === "loot") return "战利品选择中 · 拾取、装备或保留 · ESC 关闭";
     if (this.mode === "death-review") return "完成本场复盘后重新出发";
     if (this.mode === "challenge") return "机关破解中 · Ctrl + Enter 提交 · ESC 安全退出";
     if (this.mode === "combat") return "Q + S  打开 SQL 战斗终端";
@@ -1660,6 +2334,8 @@ export class GameSession {
         ? "E  当前复活点 · 篝火"
         : `E  调查${this.campfirePhaseName(campfire)}`;
     }
+    const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
+    if (lootBundle) return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
     const interactItem = this.groundItems.find(
       (item) => item.collection === "interact" && distance(item, this.player) <= 1,
     );
@@ -1669,7 +2345,7 @@ export class GameSession {
         : `E  调查 ${interactItem.name}`;
     }
     const challengeGate = this.nearbyLockedChallengeGate();
-    if (challengeGate) return "E  接入高难 SQL 机关 · 错误会损失 1 点生命";
+    if (challengeGate) return "E  接入高难 SQL 机关 · 错误造成 1 点伤害";
     const touchItem = this.groundItems.find((item) => distance(item, this.player) <= 2);
     if (touchItem) return `走到 ${touchItem.name} 上自动拾取`;
     const actor = this.actorForRoom(this.currentRoomId);
@@ -1699,8 +2375,11 @@ export class GameSession {
 
   private failGateChallenge(message: string): GateChallengeResolution {
     const gateId = this.challengeGateId();
-    this.player.hp = Math.max(0, this.player.hp - 1);
-    this.banner = `${message} 机关反噬造成 1 点伤害。`;
+    const damage = this.applyPlayerDamage(1);
+    const damageMessage = damage.armorDamage > 0
+      ? `护甲吸收 ${damage.armorDamage} 点${damage.playerDamage > 0 ? `，生命损失 ${damage.playerDamage} 点` : ""}`
+      : `生命损失 ${damage.playerDamage} 点`;
+    this.banner = `${message} 机关反噬：${damageMessage}。`;
     if (this.player.hp === 0) {
       this.enterDefeat("gate");
     }
@@ -1710,7 +2389,8 @@ export class GameSession {
       opened: false,
       gateId,
       message: this.banner,
-      playerDamage: 1,
+      playerDamage: damage.playerDamage,
+      armorDamage: damage.armorDamage,
       mode: this.mode,
     };
   }
@@ -1721,6 +2401,7 @@ export class GameSession {
     this.selectedMonsterId = null;
     this.activeGateChallengeId = null;
     this.activeCampfireId = null;
+    this.activeLootBundleId = null;
     if (source === "gate") {
       // Gate challenges do not create battle answer records. Clearing this
       // prevents an unrelated previous battle from appearing after respawn.
@@ -1768,6 +2449,7 @@ export class GameSession {
       hpUpdates: [],
       killedIds: [],
       playerDamage: 0,
+      armorDamage: 0,
       heatAdded: 0,
       locksBroken: [],
       locksRemaining: [],

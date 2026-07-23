@@ -388,8 +388,8 @@ Implementations must ensure:
 - feedback distinguishes syntax, schema, result, missing concept, and unsafe
   statement failures;
 - normal lessons never require repeating meaningless SQL to drain HP;
-- every required curriculum monster leaves a deterministic reward chest, while
-  ambushes grant XP only;
+- every required curriculum reward stays deterministic inside a loot bundle,
+  while ambushes may add only optional low-probability loot;
 - data changes occur only in a disposable sandbox, and plan/transaction tests
   never mutate permanent progress.
 

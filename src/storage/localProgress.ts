@@ -26,13 +26,19 @@ import {
 import { MAX_ANSWER_HISTORY } from "../domain/types";
 import type {
   AnswerAttemptRecord,
+  Armor,
   Campfire,
   ClaimableReward,
   CombatState,
+  Consumable,
+  ConsumableStack,
+  EquipmentItem,
   GateChallengeId,
   GroundItem,
   LessonId,
   LootDrop,
+  LootBundle,
+  LootItem,
   Monster,
   PlayerState,
   ProfileProgress,
@@ -41,14 +47,15 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v7";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v8";
 export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
-const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
-const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
-const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
+const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
+const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
-// v6, v5 and v4 are read as compatible baselines and upgraded in memory.
-// Legacy keys are never deleted, so v7 recovery cannot mutate a previous Run.
+// v7, v6, v5 and v4 are read as compatible baselines and upgraded in memory.
+// Legacy keys are never deleted, so v8 recovery cannot mutate a previous Run.
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -72,6 +79,8 @@ const LESSON_IDS: readonly LessonId[] = [
 const PLAY_MODES = [
   "explore",
   "campfire",
+  "inventory",
+  "loot",
   "death-review",
   "challenge",
   "combat",
@@ -91,7 +100,17 @@ const WEAPON_IDS = [
   "aggregate-hammer",
   "sort-saber",
   "join-chain",
+  "bone-blade",
 ] as const;
+const ARMOR_IDS = ["slime-vest", "vine-armor"] as const;
+const CONSUMABLE_IDS = [
+  "slime-gel",
+  "water-drop",
+  "forest-fruit",
+  "whetstone",
+  "repair-shard",
+] as const;
+const CONSUMABLE_EFFECTS = ["heal-hp", "heal-armor", "heal-both"] as const;
 const MONSTER_KINDS = [
   "projection-slime",
   "filter-hound",
@@ -242,7 +261,31 @@ function isWeapon(value: unknown): value is Weapon {
   );
 }
 
-function isPlayer(value: unknown): value is PlayerState {
+function isArmor(value: unknown): value is Armor {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    ARMOR_IDS.includes(value.id as Armor["id"]) &&
+    typeof value.name === "string" &&
+    isPositiveInteger(value.maxArmor) &&
+    typeof value.description === "string"
+  );
+}
+
+function isConsumable(value: unknown): value is Consumable {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    CONSUMABLE_IDS.includes(value.id as Consumable["id"]) &&
+    typeof value.name === "string" &&
+    typeof value.description === "string" &&
+    typeof value.effect === "string" &&
+    CONSUMABLE_EFFECTS.includes(value.effect as Consumable["effect"]) &&
+    isPositiveInteger(value.amount)
+  );
+}
+
+function isPlayer(value: unknown, requireArmor: boolean): value is PlayerState {
   if (!isRecord(value) || !isNonNegativeInteger(value.xp)) return false;
   const xp = value.xp;
   const levelThresholds = [0, 2, 4, 6, 8, 12, 16, 20, 24] as const;
@@ -250,7 +293,7 @@ function isPlayer(value: unknown): value is PlayerState {
     (level, threshold, index) => xp >= threshold ? index + 1 : level,
     1,
   );
-  return (
+  const baseValid = (
     isPosition(value) &&
     isFiniteNumber(value.hp) &&
     isFiniteNumber(value.maxHp) &&
@@ -262,6 +305,14 @@ function isPlayer(value: unknown): value is PlayerState {
     value.heat >= 0 &&
     isWeapon(value.weapon)
   );
+  if (!baseValid || !requireArmor) return baseValid;
+  if (
+    !isNonNegativeInteger(value.armorHp) ||
+    !(value.armor === null || isArmor(value.armor))
+  ) return false;
+  return value.armor === null
+    ? value.armorHp === 0
+    : value.armorHp <= value.armor.maxArmor;
 }
 
 function isMonster(value: unknown): value is Monster {
@@ -335,6 +386,110 @@ function isReward(value: unknown): value is ClaimableReward | null {
     typeof value.description === "string" &&
     typeof value.kind === "string" &&
     REWARD_KINDS.includes(value.kind as ClaimableReward["kind"])
+  );
+}
+
+function isEquipmentItem(value: unknown): value is EquipmentItem {
+  if (
+    !isRecord(value) ||
+    typeof value.instanceId !== "string" ||
+    value.instanceId.length === 0 ||
+    (value.kind !== "weapon" && value.kind !== "armor") ||
+    typeof value.protected !== "boolean"
+  ) return false;
+  if (value.kind === "weapon") {
+    return isWeapon(value.weapon) &&
+      value.armor === undefined &&
+      value.armorHp === undefined;
+  }
+  return isArmor(value.armor) &&
+    value.weapon === undefined &&
+    isNonNegativeInteger(value.armorHp) &&
+    value.armorHp <= value.armor.maxArmor;
+}
+
+function isConsumableStack(value: unknown): value is ConsumableStack {
+  return (
+    isRecord(value) &&
+    isConsumable(value.item) &&
+    isPositiveInteger(value.quantity) &&
+    value.quantity <= 5
+  );
+}
+
+function isLootItem(value: unknown): value is LootItem {
+  if (
+    !isRecord(value) ||
+    typeof value.dropId !== "string" ||
+    value.dropId.length === 0 ||
+    typeof value.itemId !== "string" ||
+    value.itemId.length === 0 ||
+    !["weapon", "armor", "consumable", "reward"].includes(String(value.kind)) ||
+    typeof value.name !== "string" ||
+    typeof value.description !== "string" ||
+    typeof value.guaranteed !== "boolean" ||
+    !isFiniteNumber(value.probability) ||
+    value.probability < 0 ||
+    value.probability > 1 ||
+    typeof value.protected !== "boolean"
+  ) return false;
+  if (value.kind === "weapon") {
+    return isWeapon(value.weapon) &&
+      value.itemId === value.weapon.id &&
+      value.armor === undefined &&
+      value.consumable === undefined &&
+      value.rewardId === undefined;
+  }
+  if (value.kind === "armor") {
+    return isArmor(value.armor) &&
+      value.itemId === value.armor.id &&
+      (value.armorHp === undefined || (
+        isNonNegativeInteger(value.armorHp) &&
+        value.armorHp <= value.armor.maxArmor
+      )) &&
+      value.weapon === undefined &&
+      value.consumable === undefined &&
+      value.rewardId === undefined;
+  }
+  if (value.kind === "consumable") {
+    return isConsumable(value.consumable) &&
+      value.itemId === value.consumable.id &&
+      value.weapon === undefined &&
+      value.armor === undefined &&
+      value.rewardId === undefined;
+  }
+  return (
+    typeof value.rewardId === "string" &&
+    ROOM_REWARDS.includes(value.rewardId as RoomReward) &&
+    value.itemId === value.rewardId &&
+    value.weapon === undefined &&
+    value.armor === undefined &&
+    value.consumable === undefined
+  );
+}
+
+function isLootBundle(
+  value: unknown,
+  floor: MazeFloor,
+  graph: RoomGraph,
+  reachableCells: ReadonlySet<string>,
+): value is LootBundle {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    (value.sourceMonsterId === null || isNonNegativeInteger(value.sourceMonsterId)) &&
+    typeof value.sourceRoomId === "string" &&
+    graph.nodes.some((node) => node.id === value.sourceRoomId) &&
+    value.floor === graph.floor &&
+    isFloorCell(value, floor) &&
+    reachableCells.has(positionKey(value)) &&
+    Array.isArray(value.items) &&
+    value.items.length > 0 &&
+    value.items.length <= 4 &&
+    value.items.every(isLootItem) &&
+    hasUniqueValues(value.items.map((item) => item.dropId)) &&
+    value.items.filter((item) => item.rewardId !== "floor-key").length <= 3
   );
 }
 
@@ -646,7 +801,7 @@ function validatedCampfires(
   return JSON.stringify(campfires) === JSON.stringify(expected) ? campfires : null;
 }
 
-function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7): boolean {
+function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
   const candidateVersion: unknown = run.version;
@@ -669,19 +824,24 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7): boolean {
   const answerHistory = version >= 6 ? run.answerHistory : [];
   const battleSequence = version >= 6 ? run.battleSequence : 0;
   const reviewBattleId = version >= 6 ? run.reviewBattleId : null;
-  const campfires = version === 7
+  const campfires = version >= 7
     ? validatedCampfires(run.campfires, graph, mazeFloor)
     : [];
-  const activeCampfireId = version === 7 ? run.activeCampfireId : null;
-  const respawnCampfireId = version === 7 ? run.respawnCampfireId : null;
+  const activeCampfireId = version >= 7 ? run.activeCampfireId : null;
+  const respawnCampfireId = version >= 7 ? run.respawnCampfireId : null;
+  const activeLootBundleId = version === 8 ? run.activeLootBundleId : null;
   if (
     !PLAY_MODES.includes(run.mode as (typeof PLAY_MODES)[number]) ||
     (version === 4 && run.mode === "challenge") ||
     (version < 7 && (run.mode === "campfire" || run.mode === "death-review")) ||
-    (version === 7 && campfires === null) ||
+    (version < 8 && (run.mode === "inventory" || run.mode === "loot")) ||
+    (version >= 7 && campfires === null) ||
     !(activeCampfireId === null || typeof activeCampfireId === "string") ||
     !(respawnCampfireId === null || typeof respawnCampfireId === "string") ||
-    ((run.mode === "campfire") !== (activeCampfireId !== null)) ||
+    !(activeLootBundleId === null || typeof activeLootBundleId === "string") ||
+    (run.mode === "campfire" && activeCampfireId === null) ||
+    (activeCampfireId !== null && run.mode !== "campfire" && run.mode !== "inventory") ||
+    ((run.mode === "loot") !== (activeLootBundleId !== null)) ||
     (activeCampfireId !== null && !campfires?.some((entry) => entry.id === activeCampfireId)) ||
     (respawnCampfireId !== null && !campfires?.some((entry) => entry.id === respawnCampfireId)) ||
     !Array.isArray(openedGateIds) ||
@@ -696,7 +856,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7): boolean {
     (activeGateChallengeId !== null && openedGateIds.includes(challengeGateId)) ||
     typeof run.currentRoomId !== "string" ||
     !graph.nodes.some((node) => node.id === run.currentRoomId) ||
-    !isPlayer(run.player) ||
+    !isPlayer(run.player, version === 8) ||
     !Array.isArray(run.monsters) ||
     !run.monsters.every(isMonster) ||
     !hasUniqueValues(run.monsters.map((monster) => monster.id)) ||
@@ -788,7 +948,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7): boolean {
     const anchor = mazeFloor.anchors[roomId];
     return Boolean(anchor) && unlockedReachableCells.has(positionKey(anchor));
   })) return false;
-  if (version === 7) {
+  if (version >= 7) {
     const expectedCampfires = campfires ?? [];
     const activeCampfire = activeCampfireId
       ? expectedCampfires.find((entry) => entry.id === activeCampfireId) ?? null
@@ -820,13 +980,56 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7): boolean {
     )) ||
     !hasUniqueValues(run.groundItems.map((item) => item.id))
   ) return false;
-  if (version === 7) {
+  if (version >= 7) {
     const expectedCampfires = campfires ?? [];
     const fireCells = new Set(expectedCampfires.map(positionKey));
     const safeCells = safeZoneCellKeys(mazeFloor, expectedCampfires);
     if (
       run.worldActors.some((actor) => safeCells.has(positionKey(actor))) ||
       run.groundItems.some((item) => fireCells.has(positionKey(item)))
+    ) return false;
+  }
+  if (version === 8) {
+    if (
+      !Array.isArray(run.lootBundles) ||
+      !run.lootBundles.every((bundle) => isLootBundle(
+        bundle,
+        mazeFloor,
+        graph,
+        allReachableCells,
+      )) ||
+      !hasUniqueValues(run.lootBundles.map((bundle) => bundle.id)) ||
+      !Array.isArray(run.equipmentInventory) ||
+      run.equipmentInventory.length > 12 ||
+      !run.equipmentInventory.every(isEquipmentItem) ||
+      !hasUniqueValues(run.equipmentInventory.map((item) => item.instanceId)) ||
+      !Array.isArray(run.consumables) ||
+      run.consumables.length > 3 ||
+      !run.consumables.every(isConsumableStack) ||
+      !hasUniqueValues(run.consumables.map((stack) => stack.item.id)) ||
+      !Array.isArray(run.keyItems) ||
+      !run.keyItems.every((item) => typeof item === "string" && item.length > 0) ||
+      !hasUniqueValues(run.keyItems) ||
+      !Array.isArray(run.acquiredUniqueItemIds) ||
+      !run.acquiredUniqueItemIds.every((item) => typeof item === "string" && item.length > 0) ||
+      !hasUniqueValues(run.acquiredUniqueItemIds) ||
+      !run.acquiredUniqueItemIds.includes(player.weapon.id) ||
+      (player.armor !== null && !run.acquiredUniqueItemIds.includes(player.armor.id)) ||
+      run.equipmentInventory.some((item) => (
+        !run.acquiredUniqueItemIds?.includes(item.weapon?.id ?? item.armor?.id ?? "")
+      ))
+    ) return false;
+    const activeBundle = activeLootBundleId
+      ? run.lootBundles.find((bundle) => bundle.id === activeLootBundleId) ?? null
+      : null;
+    if (
+      (activeLootBundleId !== null && !activeBundle) ||
+      (activeBundle !== null && (
+        Math.abs(activeBundle.x - player.x) + Math.abs(activeBundle.y - player.y) > 1
+      )) ||
+      run.lootBundles.some((bundle) => campfires?.some(
+        (campfire) => positionKey(bundle) === positionKey(campfire),
+      ))
     ) return false;
   }
 
@@ -872,11 +1075,28 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7): boolean {
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 7);
+  return isSavedRunVersion(value, 8);
 }
 
-type SavedRunV6 = Omit<
+type LegacyPlayerState = Omit<PlayerState, "armor" | "armorHp">;
+
+type SavedRunV7 = Omit<
   SavedRun,
+  | "version"
+  | "player"
+  | "activeLootBundleId"
+  | "lootBundles"
+  | "equipmentInventory"
+  | "consumables"
+  | "keyItems"
+  | "acquiredUniqueItemIds"
+> & {
+  version: 7;
+  player: LegacyPlayerState;
+};
+
+type SavedRunV6 = Omit<
+  SavedRunV7,
   "version" | "campfires" | "activeCampfireId" | "respawnCampfireId"
 > & { version: 6 };
 
@@ -884,6 +1104,34 @@ type SavedRunV5 = Omit<
   SavedRunV6,
   "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
 > & { version: 5 };
+
+function migrateV7Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 7)) return null;
+  const legacy = value as SavedRunV7;
+  const acquiredUniqueItemIds = [...new Set([
+    "data-blade",
+    legacy.player.weapon.id,
+    ...legacy.groundItems.flatMap((item) => item.weapon ? [item.weapon.id] : []),
+  ])];
+  const migrated: SavedRun = {
+    ...legacy,
+    version: 8,
+    activeLootBundleId: null,
+    lootBundles: [],
+    equipmentInventory: [],
+    consumables: [],
+    keyItems: [],
+    acquiredUniqueItemIds,
+    player: {
+      ...legacy.player,
+      weapon: { ...legacy.player.weapon },
+      armor: null,
+      armorHp: 0,
+    },
+    banner: `${legacy.banner} 背包系统已升级，旧版装备与局内进度均已保留。`,
+  };
+  return isSavedRun(migrated) ? migrated : null;
+}
 
 function migrateV6Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 6)) return null;
@@ -941,7 +1189,7 @@ function migrateV6Run(value: unknown): SavedRun | null {
   const claimableReward = interactiveReward?.rewardId === legacy.claimableReward?.id
     ? legacy.claimableReward
     : null;
-  const migrated: SavedRun = {
+  const migrated: SavedRunV7 = {
     ...legacy,
     version: 7,
     campfires,
@@ -969,7 +1217,7 @@ function migrateV6Run(value: unknown): SavedRun | null {
         ? `${legacy.banner} 旧版站位与新增篝火重叠，已移至相邻安全格。`
         : legacy.banner,
   };
-  return isSavedRun(migrated) ? migrated : null;
+  return isSavedRunVersion(migrated, 7) ? migrateV7Run(migrated) : null;
 }
 
 function migrateV5RunToV6(value: unknown): SavedRunV6 | null {
@@ -1058,9 +1306,10 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
 export function loadRun(storage: StorageLike): SavedRun | null {
   const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
   if (isSavedRun(value)) return value;
-  return migrateV6Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
-    ?? migrateV5Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
-    ?? migrateV4Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)));
+  return migrateV7Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
+    ?? migrateV6Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
+    ?? migrateV5Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)))
+    ?? migrateV4Run(parseJson(safeGetItem(storage, ANCIENT_RUN_SAVE_KEY)));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {

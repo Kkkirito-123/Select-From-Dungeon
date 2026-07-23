@@ -63,6 +63,7 @@ async function bootstrap(): Promise<void> {
     mode: string;
     queryCount: number;
     itemIds: string;
+    inventoryState: string;
     topologyHash: number;
   } | null = null;
   const flushProgress = (): void => {
@@ -85,13 +86,29 @@ async function bootstrap(): Promise<void> {
     const current = {
       mode: snapshot.mode,
       queryCount: snapshot.queryCount,
-      itemIds: snapshot.groundItems.map((item) => item.id).sort().join("|"),
+      itemIds: [
+        ...snapshot.groundItems.map((item) => item.id),
+        ...snapshot.lootBundles.map((bundle) => (
+          `${bundle.id}:${bundle.items.map((item) => item.dropId).join(",")}`
+        )),
+      ].sort().join("|"),
+      inventoryState: JSON.stringify({
+        weapon: snapshot.player.weapon.id,
+        armor: snapshot.player.armor?.id ?? null,
+        armorHp: snapshot.player.armorHp,
+        equipment: snapshot.equipmentInventory.map((item) => item.instanceId),
+        consumables: snapshot.consumables.map((stack) => [
+          stack.item.id,
+          stack.quantity,
+        ]),
+      }),
       topologyHash: snapshot.mazeFloor.topologyHash,
     };
     const critical = previousPersistenceState === null ||
       current.mode !== previousPersistenceState.mode ||
       current.queryCount !== previousPersistenceState.queryCount ||
       current.itemIds !== previousPersistenceState.itemIds ||
+      current.inventoryState !== previousPersistenceState.inventoryState ||
       current.topologyHash !== previousPersistenceState.topologyHash;
     previousPersistenceState = current;
     if (critical) flushProgress();

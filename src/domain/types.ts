@@ -40,6 +40,8 @@ export type LessonStageId =
 export type PlayMode =
   | "explore"
   | "campfire"
+  | "inventory"
+  | "loot"
   | "death-review"
   | "challenge"
   | "combat"
@@ -119,11 +121,65 @@ export interface Weapon {
     | "null-lantern"
     | "aggregate-hammer"
     | "sort-saber"
-    | "join-chain";
+    | "join-chain"
+    | "bone-blade";
   name: string;
   damage: number;
   heatReduction: number;
   description: string;
+}
+
+export interface Armor {
+  id: "slime-vest" | "vine-armor";
+  name: string;
+  maxArmor: number;
+  description: string;
+}
+
+export interface EquipmentItem {
+  instanceId: string;
+  kind: "weapon" | "armor";
+  protected: boolean;
+  weapon?: Weapon;
+  armor?: Armor;
+  armorHp?: number;
+}
+
+export interface Consumable {
+  id: "slime-gel" | "water-drop" | "forest-fruit" | "whetstone" | "repair-shard";
+  name: string;
+  description: string;
+  effect: "heal-hp" | "heal-armor" | "heal-both";
+  amount: number;
+}
+
+export interface ConsumableStack {
+  item: Consumable;
+  quantity: number;
+}
+
+export interface LootItem {
+  dropId: string;
+  itemId: string;
+  kind: "weapon" | "armor" | "consumable" | "reward";
+  name: string;
+  description: string;
+  guaranteed: boolean;
+  probability: number;
+  protected: boolean;
+  weapon?: Weapon;
+  armor?: Armor;
+  armorHp?: number;
+  consumable?: Consumable;
+  rewardId?: RoomReward;
+}
+
+export interface LootBundle extends Position {
+  id: string;
+  sourceMonsterId: number | null;
+  sourceRoomId: string;
+  floor: FloorNumber;
+  items: LootItem[];
 }
 
 export interface Relic {
@@ -140,6 +196,8 @@ export interface PlayerState extends Position {
   xp: number;
   heat: number;
   weapon: Weapon;
+  armor: Armor | null;
+  armorHp: number;
 }
 
 export interface LessonStageDefinition {
@@ -256,9 +314,15 @@ export interface GameSnapshot {
   campfires: Campfire[];
   activeCampfireId: string | null;
   respawnCampfireId: string | null;
+  activeLootBundleId: string | null;
   inSafeZone: boolean;
   worldActors: WorldActor[];
   groundItems: GroundItem[];
+  lootBundles: LootBundle[];
+  equipmentInventory: EquipmentItem[];
+  consumables: ConsumableStack[];
+  keyItems: string[];
+  acquiredUniqueItemIds: string[];
   discoveredCells: string[];
   currentRoomId: string;
   currentRoomTitle: string;
@@ -295,7 +359,7 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 7;
+  version: 8;
   generatorVersion: 4;
   floor: FloorNumber;
   graph: RoomGraph;
@@ -303,8 +367,14 @@ export interface SavedRun {
   campfires: Campfire[];
   activeCampfireId: string | null;
   respawnCampfireId: string | null;
+  activeLootBundleId: string | null;
   worldActors: WorldActor[];
   groundItems: GroundItem[];
+  lootBundles: LootBundle[];
+  equipmentInventory: EquipmentItem[];
+  consumables: ConsumableStack[];
+  keyItems: string[];
+  acquiredUniqueItemIds: string[];
   discoveredCells: string[];
   mode: PlayMode;
   currentRoomId: string;
@@ -357,8 +427,14 @@ export interface PatrolBatchResolution {
 
 export interface InteractionResolution {
   ok: boolean;
-  kind: "none" | "campfire" | "challenge" | "combat" | "loot" | "reward";
+  kind: "none" | "campfire" | "challenge" | "combat" | "loot" | "reward" | "loot-bundle";
   message: string;
+}
+
+export interface InventoryResolution {
+  ok: boolean;
+  message: string;
+  remainingItemIds: string[];
 }
 
 export interface TravelResolution {
@@ -413,6 +489,7 @@ export interface TurnResolution {
   hpUpdates: Array<{ id: number; hp: number }>;
   killedIds: number[];
   playerDamage: number;
+  armorDamage: number;
   heatAdded: number;
   locksBroken: string[];
   locksRemaining: string[];
@@ -429,5 +506,6 @@ export interface GateChallengeResolution {
   gateId: string;
   message: string;
   playerDamage: number;
+  armorDamage: number;
   mode: PlayMode;
 }
