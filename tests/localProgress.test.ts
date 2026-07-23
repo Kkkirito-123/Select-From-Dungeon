@@ -71,7 +71,7 @@ function expectRunRejected(storage: MemoryStorage, run: SavedRun): void {
 }
 
 describe("localProgress", () => {
-  it("v5 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫状态", () => {
+  it("v6 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫和答题状态", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "storage-seed");
     const saved = session.toSavedRun();
@@ -81,7 +81,7 @@ describe("localProgress", () => {
     saveRun(storage, saved);
     saveProfile(storage, profile);
 
-    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v5");
+    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v6");
     expect(PROFILE_SAVE_KEY).toBe("select-from-dungeon:profile:v2");
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(true);
     expect(storage.values.has(PROFILE_SAVE_KEY)).toBe(true);
@@ -101,7 +101,7 @@ describe("localProgress", () => {
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
   });
 
-  it("旧 run:v1/v2 不读取，也不会被 v5 清理动作删除", () => {
+  it("旧 run:v1/v2 不读取，也不会被 v6 清理动作删除", () => {
     const storage = new MemoryStorage();
     const legacyKey = "select-from-dungeon:run:v1";
     const legacyRun = {
@@ -116,6 +116,7 @@ describe("localProgress", () => {
     expect(loadRun(storage)).toBeNull();
     expect(storage.readKeys).toEqual([
       RUN_SAVE_KEY,
+      "select-from-dungeon:run:v5",
       "select-from-dungeon:run:v4",
     ]);
     clearRun(storage);
@@ -125,7 +126,7 @@ describe("localProgress", () => {
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
 
-  it("战斗中的房间、玩家与 Actor 状态也能通过 v5 恢复", () => {
+  it("战斗中的房间、玩家与 Actor 状态也能通过 v6 恢复", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "combat-restore");
     const selectRoom = session.snapshot().roomGraph.nodes.find((node) => (
@@ -161,12 +162,41 @@ describe("localProgress", () => {
     expect(restored.monsters.find((monster) => monster.id === 101)?.name).toBe("史莱姆");
   });
 
-  it("当前 v4 Run 会迁移到 v5，且不会删除原始存档", () => {
+  it("当前 v5 Run 会迁移到 v6，且不会删除原始存档", () => {
+    const storage = new MemoryStorage();
+    const current = freshRun("migrate-run-v5");
+    const {
+      answerHistory: _answerHistory,
+      battleSequence: _battleSequence,
+      reviewBattleId: _reviewBattleId,
+      ...legacyFields
+    } = current;
+    storage.setItem("select-from-dungeon:run:v5", JSON.stringify({
+      ...legacyFields,
+      version: 5,
+    }));
+
+    const migrated = loadRun(storage);
+    expect(migrated).toMatchObject({
+      version: 6,
+      answerHistory: [],
+      battleSequence: 0,
+      reviewBattleId: null,
+      graph: { seed: "migrate-run-v5" },
+    });
+    expect(storage.values.has("select-from-dungeon:run:v5")).toBe(true);
+    expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
+  });
+
+  it("当前 v4 Run 会迁移到 v6，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v4");
     const {
       openedGateIds: _openedGateIds,
       activeGateChallengeId: _activeGateChallengeId,
+      answerHistory: _answerHistory,
+      battleSequence: _battleSequence,
+      reviewBattleId: _reviewBattleId,
       ...legacyFields
     } = current;
     const legacy = { ...legacyFields, version: 4 };
@@ -174,9 +204,12 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 5,
+      version: 6,
       openedGateIds: [],
       activeGateChallengeId: null,
+      answerHistory: [],
+      battleSequence: 0,
+      reviewBattleId: null,
       graph: { seed: "migrate-run-v4" },
     });
     expect(storage.values.has("select-from-dungeon:run:v4")).toBe(true);
@@ -273,6 +306,36 @@ describe("localProgress", () => {
       victories: -1,
     }));
     expect(loadProfile(storage)).toEqual(createEmptyProfile());
+  });
+
+  it("答题历史损坏或超出查询序号时拒绝恢复整个 Run", () => {
+    const storage = new MemoryStorage();
+    const run = freshRun("broken-answer-history");
+    run.queryCount = 1;
+    run.battleSequence = 1;
+    run.reviewBattleId = 1;
+    run.answerHistory = [{
+      id: 2,
+      battleId: 1,
+      floor: 1,
+      monsterId: 101,
+      monsterName: "史莱姆",
+      lessonId: "select",
+      stageId: "select-name",
+      stageObjective: "查询史莱姆名字",
+      round: 1,
+      sql: "SELECT name FROM monsters",
+      answerSql: "SELECT name FROM monsters WHERE id = 101;",
+      result: "wrong-result",
+      outcome: "countered",
+      feedback: "结果不匹配",
+      hintLevel: 0,
+    }];
+
+    expectRunRejected(storage, run);
+    run.answerHistory[0].id = 1;
+    run.answerHistory[0].answerSql = "";
+    expectRunRejected(storage, run);
   });
 
   it("64×48 迷宫结构损坏或拓扑不可达时拒绝恢复", () => {

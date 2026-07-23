@@ -18,7 +18,9 @@ import {
   type RoomReward,
   type RoomType,
 } from "../domain/runGraph";
+import { MAX_ANSWER_HISTORY } from "../domain/types";
 import type {
+  AnswerAttemptRecord,
   ClaimableReward,
   CombatState,
   GateChallengeId,
@@ -33,12 +35,13 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v6";
 export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
-const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
-// v4 is read once as a compatible baseline and upgraded in memory. Legacy keys
-// are never deleted, so v5 recovery cannot mutate a user's previous Run.
+// v5 and v4 are read as compatible baselines and upgraded in memory. Legacy
+// keys are never deleted, so v6 recovery cannot mutate a user's previous Run.
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -120,6 +123,13 @@ const ACTOR_BEHAVIORS = ["wander", "guard", "anchored"] as const;
 const ITEM_KINDS = ["weapon", "relic", "heal", "event", "key"] as const;
 const ITEM_COLLECTIONS = ["touch", "interact"] as const;
 const DECORATION_KINDS = ["torch", "rubble", "rune"] as const;
+const ANSWER_RESULTS = [
+  "correct",
+  "missing-concept",
+  "wrong-result",
+  "syntax-error",
+] as const;
+const BATTLE_OUTCOMES = ["hit", "countered", "victory", "defeat"] as const;
 
 export function createEmptyProfile(): ProfileProgress {
   return {
@@ -563,7 +573,34 @@ function isDiscoveredCell(value: unknown, floor: MazeFloor): value is string {
   return x < floor.width && y < floor.height;
 }
 
-function isSavedRunVersion(value: unknown, version: 4 | 5): boolean {
+function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
+  return (
+    isRecord(value) &&
+    isPositiveInteger(value.id) &&
+    isPositiveInteger(value.battleId) &&
+    (value.floor === 1 || value.floor === 2) &&
+    isNonNegativeInteger(value.monsterId) &&
+    typeof value.monsterName === "string" &&
+    value.monsterName.length > 0 &&
+    isLessonId(value.lessonId) &&
+    typeof value.stageId === "string" &&
+    value.stageId.length > 0 &&
+    typeof value.stageObjective === "string" &&
+    value.stageObjective.length > 0 &&
+    isPositiveInteger(value.round) &&
+    typeof value.sql === "string" &&
+    typeof value.answerSql === "string" &&
+    value.answerSql.length > 0 &&
+    typeof value.result === "string" &&
+    ANSWER_RESULTS.includes(value.result as AnswerAttemptRecord["result"]) &&
+    typeof value.outcome === "string" &&
+    BATTLE_OUTCOMES.includes(value.outcome as AnswerAttemptRecord["outcome"]) &&
+    typeof value.feedback === "string" &&
+    isNonNegativeInteger(value.hintLevel)
+  );
+}
+
+function isSavedRunVersion(value: unknown, version: 4 | 5 | 6): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
   const candidateVersion: unknown = run.version;
@@ -581,8 +618,11 @@ function isSavedRunVersion(value: unknown, version: 4 | 5): boolean {
   const expectedChallengeId: GateChallengeId = run.floor === 1
     ? "aggregate-breach"
     : "relation-breach";
-  const openedGateIds = version === 5 ? run.openedGateIds : [];
-  const activeGateChallengeId = version === 5 ? run.activeGateChallengeId : null;
+  const openedGateIds = version >= 5 ? run.openedGateIds : [];
+  const activeGateChallengeId = version >= 5 ? run.activeGateChallengeId : null;
+  const answerHistory = version === 6 ? run.answerHistory : [];
+  const battleSequence = version === 6 ? run.battleSequence : 0;
+  const reviewBattleId = version === 6 ? run.reviewBattleId : null;
   if (
     !PLAY_MODES.includes(run.mode as (typeof PLAY_MODES)[number]) ||
     (version === 4 && run.mode === "challenge") ||
@@ -628,6 +668,22 @@ function isSavedRunVersion(value: unknown, version: 4 | 5): boolean {
     !isNonNegativeInteger(run.stepsSinceEncounter) ||
     !isNonNegativeInteger(run.safeStepsRemaining) ||
     !isNonNegativeInteger(run.hintLevel) ||
+    !Array.isArray(answerHistory) ||
+    answerHistory.length > MAX_ANSWER_HISTORY ||
+    !answerHistory.every(isAnswerAttemptRecord) ||
+    !hasUniqueValues(answerHistory.map((record) => record.id)) ||
+    !isNonNegativeInteger(battleSequence) ||
+    !(reviewBattleId === null || (
+      isPositiveInteger(reviewBattleId) &&
+      reviewBattleId <= battleSequence
+    )) ||
+    (version === 6 && answerHistory.some((record) => (
+      record.battleId > battleSequence ||
+      record.id > Number(run.queryCount) ||
+      record.floor > Number(run.floor)
+    ))) ||
+    (version === 6 && answerHistory.length > 0 && reviewBattleId === null) ||
+    (version === 6 && run.mode === "combat" && reviewBattleId === null) ||
     typeof run.banner !== "string"
   ) return false;
   const player = run.player;
@@ -728,21 +784,42 @@ function isSavedRunVersion(value: unknown, version: 4 | 5): boolean {
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 5);
+  return isSavedRunVersion(value, 6);
 }
 
-function migrateLegacyRun(value: unknown): SavedRun | null {
+function migrateV5Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 5)) return null;
+  const legacy = value as Omit<
+    SavedRun,
+    "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
+  > & { version: 5 };
+  const hasActiveBattle = legacy.mode === "combat";
+  return {
+    ...legacy,
+    version: 6,
+    answerHistory: [],
+    battleSequence: hasActiveBattle ? 1 : 0,
+    reviewBattleId: hasActiveBattle ? 1 : null,
+  };
+}
+
+function migrateV4Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 4)) return null;
   const legacy = value as Omit<
     SavedRun,
-    "version" | "openedGateIds" | "activeGateChallengeId"
+    | "version"
+    | "openedGateIds"
+    | "activeGateChallengeId"
+    | "answerHistory"
+    | "battleSequence"
+    | "reviewBattleId"
   > & { version: 4 };
-  return {
+  return migrateV5Run({
     ...legacy,
     version: 5,
     openedGateIds: [],
     activeGateChallengeId: null,
-  };
+  });
 }
 
 export function isProfileProgress(value: unknown): value is ProfileProgress {
@@ -790,7 +867,8 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
 export function loadRun(storage: StorageLike): SavedRun | null {
   const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
   if (isSavedRun(value)) return value;
-  return migrateLegacyRun(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)));
+  return migrateV5Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
+    ?? migrateV4Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {

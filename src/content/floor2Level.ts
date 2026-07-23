@@ -230,6 +230,7 @@ export const FLOOR_TWO_PRACTICE_STAGES: Readonly<Record<number, LessonStageDefin
     id: "practice-order",
     objective: "突发练习：按 charge 从高到低，取出 monster_id = 1210 的最强 channel。",
     queryTemplate: "",
+    answerSql: "SELECT channel FROM monster_signals WHERE monster_id = 1210 ORDER BY charge DESC LIMIT 1;",
     hints: [
       "从 monster_signals 读取 channel。",
       "使用 ORDER BY charge DESC，再 LIMIT 1。",
@@ -243,6 +244,7 @@ export const FLOOR_TWO_PRACTICE_STAGES: Readonly<Record<number, LessonStageDefin
     id: "practice-distinct",
     objective: "突发练习：去重查询 monster_id = 1310 的 channel，并按 channel 排序。",
     queryTemplate: "",
+    answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1310 ORDER BY channel;",
     hints: [
       "SELECT 后加入 DISTINCT。",
       "从 monster_signals 读取 channel。",
@@ -256,6 +258,7 @@ export const FLOOR_TWO_PRACTICE_STAGES: Readonly<Record<number, LessonStageDefin
     id: "practice-inner-join",
     objective: "突发练习：连接 monsters 与 rooms，查询 id = 1410 的怪物名和 room_name。",
     queryTemplate: "",
+    answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1410;",
     hints: [
       "monsters.room_id 对应 rooms.id。",
       "把 rooms.name 命名为 room_name。",
@@ -269,6 +272,7 @@ export const FLOOR_TWO_PRACTICE_STAGES: Readonly<Record<number, LessonStageDefin
     id: "practice-left-join",
     objective: "精英练习：LEFT JOIN 装备表，找出 room_id = 34 且没有装备的怪物 id。",
     queryTemplate: "",
+    answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL;",
     hints: [
       "从 monsters m LEFT JOIN monster_gear g。",
       "连接条件是 m.id = g.monster_id。",
@@ -295,6 +299,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         id: "order-peak",
         objective: "第一击：查询 monster_id = 1200 的最高 charge 对应 channel。",
         queryTemplate: "",
+        answerSql: "SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 1;",
         hints: [
           "按 charge 降序排列。",
           "LIMIT 1 只保留最高值。",
@@ -308,6 +313,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         id: "order-top-two",
         objective: "第二击：按 charge 从高到低返回前两个 channel 与 charge。",
         queryTemplate: "",
+        answerSql: "SELECT channel, charge FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 2;",
         hints: [
           "SELECT channel, charge。",
           "仍然使用 ORDER BY charge DESC。",
@@ -331,6 +337,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
       id: "distinct-status",
       objective: "查询 monster_id = 1300 的不同 channel，并按 channel 升序排列。",
       queryTemplate: "",
+      answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1300 ORDER BY channel;",
       hints: [
         "SELECT 后加入 DISTINCT channel。",
         "WHERE 锁定 monster_id = 1300。",
@@ -353,6 +360,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         id: "inner-join-room",
         objective: "第一击：连接 monsters 与 rooms，查询 id = 1400 的 name 和 room_name。",
         queryTemplate: "",
+        answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400;",
         hints: [
           "给 monsters 起别名 m，rooms 起别名 r。",
           "ON m.room_id = r.id。",
@@ -367,6 +375,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         id: "inner-join-sector",
         objective: "第二击：连接两表，查询 id = 1400 的 name 与 sector。",
         queryTemplate: "",
+        answerSql: "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400;",
         hints: [
           "连接条件保持不变。",
           "这次读取 r.sector。",
@@ -389,6 +398,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
       id: "left-join-unarmed",
       objective: "LEFT JOIN 装备表，找出 room_id = 24 且没有装备记录的怪物 id。",
       queryTemplate: "",
+      answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 24 AND g.monster_id IS NULL;",
       hints: [
         "从 monsters m LEFT JOIN monster_gear g。",
         "ON m.id = g.monster_id。",
@@ -412,6 +422,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         id: "join-boss-groups",
         objective: "护盾阶段：统计第二层各 sector 的怪物数，只保留至少 2 只的组，并按 total 降序。",
         queryTemplate: "",
+        answerSql: "SELECT r.sector, COUNT(*) AS total FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 2 ORDER BY total DESC;",
         hints: [
           "连接 monsters m 与 rooms r。",
           "WHERE r.floor = 2，GROUP BY r.sector。",
@@ -426,6 +437,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         id: "join-boss-core",
         objective: "核心阶段：连接装备表，查询魔王最强装备对应的怪物 name 与 power。",
         queryTemplate: "",
+        answerSql: "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 1900 ORDER BY g.power DESC LIMIT 1;",
         hints: [
           "连接 monsters m 与 monster_gear g。",
           "WHERE m.id = 1900。",

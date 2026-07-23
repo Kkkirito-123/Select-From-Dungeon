@@ -47,6 +47,11 @@ exploration is active. Each floor's locked Boss gate also exposes one optional
 high-difficulty SQL breach: a correct composite query opens only that physical
 gate, while a wrong or invalid query costs one heart and never grants mastery,
 XP, or loot.
+The top-console `答题复盘` view reads a browser-local answer log for the latest
+battle and current floor. Each record contains the submitted SQL, explicit
+reference SQL, result category, hint level, and battle outcome. The log is
+capped at 200 SQL turns, never records movement or key presses, and is never
+uploaded.
 Authored monster display names stay direct and easy to type: two or three
 Chinese characters such as `史莱姆`, `幻影`, or `幼龙`, without middle-dot
 epithets or SQL-concept suffixes. Future floors must follow the same rule; SQL
@@ -66,10 +71,10 @@ interview curriculum.
 
 ```text
 index.html -> src/main.ts
-  -> AppShell (DOM HUD, discovery minimap, onboarding, SQL terminal, evidence)
+  -> AppShell (DOM HUD, discovery minimap, onboarding, SQL terminal, local review)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
-  -> GameSession (authoritative maze, actors, fog, combat, loot, profile)
+  -> GameSession (authoritative maze, combat, loot, answer log, profile)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
@@ -87,11 +92,11 @@ player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
-  -> debounced v5 Run save + permanent v2 profile save
+  -> debounced v6 Run save + permanent v2 profile save
 ```
 
 `GameSession` owns physical movement, encounter meter, lesson, actor, fog,
-combat, HP, XP, loot, and profile truth. `RunGraph` is the curriculum dependency graph; it is not the
+combat, HP, XP, loot, answer-history, and profile truth. `RunGraph` is the curriculum dependency graph; it is not the
 physical navigation model. `MazeFloor` is the saved physical world, including
 tiles, zones, gates, anchors, and decoration. `DungeonScene` renders that world,
 collects input, and schedules the roughly 1,100 ms patrol tick, while
@@ -140,6 +145,8 @@ src/storage/        Versioned maze Run/profile local-storage validation/recovery
 src/ui/             DOM shell, onboarding state, and SQL/game orchestration
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
                     onboarding, and query policy
+docs/               Current bilingual blueprints, one active roadmap, future
+                    candidate designs under docs/design/, and historical reports
 .agents/skills/     Requirement, bootstrap, delivery, implementation, guide-sync,
                     and explicit-publication workflows
 scripts/            Portable repository-rule validator and its regression tests
@@ -192,13 +199,15 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   SQLite evidence, not a MySQL execution plan. Future MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
 - Save data is browser-local and split between
-  `select-from-dungeon:run:v5` (current floor, maze, actors, ground items, fog,
-  encounter meter, level/XP, opened challenge gates, active gate challenge, and
-  disposable current Run state),
+  `select-from-dungeon:run:v6` (current floor, maze, actors, ground items, fog,
+  encounter meter, level/XP, opened challenge gates, active gate challenge,
+  at most 200 local answer records, and disposable current Run state),
   `select-from-dungeon:profile:v2` (ten mastered lessons, attempts, victories, best
   query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
-  state). A valid `select-from-dungeon:run:v4` is migrated in memory into v5
-  with no challenge gates opened; older Run keys remain unread and undeleted.
+  state). A valid `select-from-dungeon:run:v5` is migrated in memory into v6
+  with an empty answer history. A valid `run:v4` preserves its progress, starts
+  with no challenge gates opened, and then migrates into v6. Legacy keys remain
+  undeleted; older Run keys remain unread.
   A valid `select-from-dungeon:profile:v1` is migrated into v2. Snapshot-driven
   persistence is debounced in `src/main.ts`; changing a shape requires a
   version or recovery decision.

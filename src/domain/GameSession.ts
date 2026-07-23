@@ -48,7 +48,9 @@ import {
   type RoomReward,
 } from "./runGraph";
 import { evaluateStage } from "./lessonEvaluator";
+import { MAX_ANSWER_HISTORY } from "./types";
 import type {
+  AnswerAttemptRecord,
   ClaimableReward,
   CombatEvent,
   CombatState,
@@ -113,6 +115,10 @@ export function levelForXp(xp: number): number {
 
 function cloneMonsters(monsters: readonly Monster[]): Monster[] {
   return monsters.map((monster) => ({ ...monster }));
+}
+
+function cloneAnswerHistory(records: readonly AnswerAttemptRecord[]): AnswerAttemptRecord[] {
+  return records.map((record) => ({ ...record }));
 }
 
 function cloneCombat(combat: CombatState | null): CombatState | null {
@@ -273,6 +279,9 @@ export class GameSession {
     safeStepsRemaining: INITIAL_SAFE_STEPS,
   };
   private hintLevel = 0;
+  private answerHistory: AnswerAttemptRecord[] = [];
+  private battleSequence = 0;
+  private reviewBattleId: number | null = null;
   private banner = "迷宫已经生成。沿青色信标寻找 SELECT 数据石碑。";
   private profile: ProfileProgress;
   private readonly listeners = new Set<SessionListener>();
@@ -301,7 +310,7 @@ export class GameSession {
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
 
-    if (savedRun?.version === 5 && savedRun.generatorVersion === 4) {
+    if (savedRun?.version === 6 && savedRun.generatorVersion === 4) {
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
       this.mazeFloor = cloneMazeFloor(savedRun.mazeFloor);
@@ -335,6 +344,9 @@ export class GameSession {
         safeStepsRemaining: savedRun.safeStepsRemaining,
       };
       this.hintLevel = savedRun.hintLevel;
+      this.answerHistory = cloneAnswerHistory(savedRun.answerHistory);
+      this.battleSequence = savedRun.battleSequence;
+      this.reviewBattleId = savedRun.reviewBattleId;
       this.banner = savedRun.banner;
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
       this.revealAt(this.player);
@@ -432,6 +444,12 @@ export class GameSession {
       stepsSinceEncounter: this.encounterMeter.stepsSinceEncounter,
       safeStepsRemaining: this.encounterMeter.safeStepsRemaining,
       hintLevel: this.hintLevel,
+      battleReview: cloneAnswerHistory(this.answerHistory.filter(
+        (record) => record.battleId === this.reviewBattleId,
+      )),
+      floorReview: cloneAnswerHistory(this.answerHistory.filter(
+        (record) => record.floor === this.floorNumber,
+      )),
       missionTitle,
       missionBody,
       lessonIntro: activeGateChallenge
@@ -452,7 +470,7 @@ export class GameSession {
 
   toSavedRun(): SavedRun {
     return {
-      version: 5,
+      version: 6,
       generatorVersion: 4,
       floor: this.floorNumber,
       graph: cloneGraph(this.graph),
@@ -478,6 +496,9 @@ export class GameSession {
       stepsSinceEncounter: this.encounterMeter.stepsSinceEncounter,
       safeStepsRemaining: this.encounterMeter.safeStepsRemaining,
       hintLevel: this.hintLevel,
+      answerHistory: cloneAnswerHistory(this.answerHistory),
+      battleSequence: this.battleSequence,
+      reviewBattleId: this.reviewBattleId,
       banner: this.banner,
     };
   }
@@ -804,6 +825,9 @@ export class GameSession {
     const stageIndex = this.combat.successStep;
     const combatStages = this.currentCombatStages();
     const stage = combatStages[Math.min(stageIndex, combatStages.length - 1)];
+    const reviewTarget = this.monsters.find((entry) => entry.id === this.combat?.targetId);
+    const reviewRound = this.combat.round;
+    const reviewHintLevel = this.hintLevel;
     this.queryCount += 1;
     this.profile.attempts[lesson.id] += 1;
     const relicCooling = this.relics.reduce((total, relic) => total + relic.heatReduction, 0);
@@ -864,6 +888,27 @@ export class GameSession {
         this.combat.round += 1;
       }
     }
+    if (reviewTarget) {
+      this.appendAnswerRecord({
+        id: this.queryCount,
+        battleId: this.reviewBattleId ?? this.battleSequence,
+        floor: this.floorNumber,
+        monsterId: reviewTarget.id,
+        monsterName: reviewTarget.name,
+        lessonId: lesson.id,
+        stageId: stage.id,
+        stageObjective: stage.objective,
+        round: reviewRound,
+        sql: result.sql,
+        answerSql: stage.answerSql,
+        result: evaluation.kind === "exact" ? "correct" : evaluation.kind,
+        outcome: evaluation.accepted
+          ? experience ? "victory" : "hit"
+          : this.mode === "defeat" ? "defeat" : "countered",
+        feedback: evaluation.message,
+        hintLevel: reviewHintLevel,
+      });
+    }
     this.emit();
     return {
       accepted: evaluation.accepted,
@@ -884,11 +929,15 @@ export class GameSession {
     };
   }
 
-  registerQueryError(message: string): TurnResolution {
+  registerQueryError(message: string, sql = ""): TurnResolution {
     if (this.mode !== "combat" || !this.combat) {
       return this.emptyTurn(message, []);
     }
     const lesson = this.currentLesson();
+    const stage = this.currentStage();
+    const reviewTarget = this.monsters.find((entry) => entry.id === this.combat?.targetId);
+    const reviewRound = this.combat.round;
+    const reviewHintLevel = this.hintLevel;
     this.queryCount += 1;
     this.profile.attempts[lesson.id] += 1;
     this.player.heat = Math.min(99, this.player.heat + 1);
@@ -906,6 +955,25 @@ export class GameSession {
     const events: CombatEvent[] = [
       { type: "enemy-hit", sourceId: target?.id, amount: playerDamage },
     ];
+    if (reviewTarget) {
+      this.appendAnswerRecord({
+        id: this.queryCount,
+        battleId: this.reviewBattleId ?? this.battleSequence,
+        floor: this.floorNumber,
+        monsterId: reviewTarget.id,
+        monsterName: reviewTarget.name,
+        lessonId: lesson.id,
+        stageId: stage.id,
+        stageObjective: stage.objective,
+        round: reviewRound,
+        sql,
+        answerSql: stage.answerSql,
+        result: "syntax-error",
+        outcome: this.mode === "defeat" ? "defeat" : "countered",
+        feedback: message,
+        hintLevel: reviewHintLevel,
+      });
+    }
     this.emit();
     return {
       accepted: false,
@@ -998,6 +1066,9 @@ export class GameSession {
       safeStepsRemaining: INITIAL_SAFE_STEPS,
     };
     this.hintLevel = 0;
+    this.answerHistory = [];
+    this.battleSequence = 0;
+    this.reviewBattleId = null;
     this.banner = "新的种子迷宫已经生成。局内装备已清空，SQL 图鉴保持不变。";
     this.revealAt(this.player);
     this.emit();
@@ -1100,6 +1171,7 @@ export class GameSession {
     const stage = lesson.stages[0];
     this.currentRoomId = room.id;
     this.visitedRoomIds.add(room.id);
+    this.beginBattleReview();
     this.mode = "combat";
     this.combat = {
       targetId: monster.id,
@@ -1134,6 +1206,7 @@ export class GameSession {
     const stage = monster ? practiceStageFor(monster.id) : null;
     if (!monster || !stage) return null;
 
+    this.beginBattleReview();
     this.mode = "combat";
     this.combat = {
       targetId: monster.id,
@@ -1150,6 +1223,18 @@ export class GameSession {
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
     this.banner = `突发遭遇 ${monster.name}（ID #${monster.id}）！完成这条 ${lessonById(monster.lessonId).concept} 练习即可脱身。`;
     return monster.id;
+  }
+
+  private beginBattleReview(): void {
+    this.battleSequence += 1;
+    this.reviewBattleId = this.battleSequence;
+  }
+
+  private appendAnswerRecord(record: AnswerAttemptRecord): void {
+    this.answerHistory.push({ ...record });
+    if (this.answerHistory.length > MAX_ANSWER_HISTORY) {
+      this.answerHistory.splice(0, this.answerHistory.length - MAX_ANSWER_HISTORY);
+    }
   }
 
   private awardExperience(monster: Monster): ExperienceSettlement {

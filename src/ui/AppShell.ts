@@ -24,6 +24,7 @@ import { pickedItemsBetween } from "../game/snapshotFeedback";
 import { createRunSeed } from "../storage/localProgress";
 import { SqlEngine } from "../sql/SqlEngine";
 import type { OnboardingController, OnboardingSnapshot } from "./OnboardingController";
+import { AnswerReviewView } from "./AnswerReviewView";
 import { SqlAutocompleteController } from "./sqlAutocomplete";
 import { SqlChordTracker } from "./SqlChordTracker";
 
@@ -90,6 +91,7 @@ export class AppShell {
   private hintsRoot!: HTMLElement;
   private terminal!: HTMLElement;
   private gateTerminal!: HTMLElement;
+  private answerReview!: AnswerReviewView;
   private executeButton!: HTMLButtonElement;
   private gateExecuteButton!: HTMLButtonElement;
   private sqlButton!: HTMLButtonElement;
@@ -118,6 +120,11 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly keydownHandler = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.isReviewOpen()) {
+      event.preventDefault();
+      this.closeReview();
+      return;
+    }
     if (event.key === "Escape" && this.isGateTerminalOpen()) {
       event.preventDefault();
       this.closeGateTerminal();
@@ -128,10 +135,15 @@ export class AppShell {
       this.closeTerminal();
       return;
     }
-    if (event.key === "Tab" && (this.isTerminalOpen() || this.isGateTerminalOpen())) {
+    if (
+      event.key === "Tab" &&
+      (this.isReviewOpen() || this.isTerminalOpen() || this.isGateTerminalOpen())
+    ) {
       this.trapDialogFocus(
         event,
-        this.isGateTerminalOpen() ? this.gateTerminal : this.terminal,
+        this.isReviewOpen()
+          ? this.answerReview.element
+          : this.isGateTerminalOpen() ? this.gateTerminal : this.terminal,
       );
       return;
     }
@@ -233,6 +245,7 @@ export class AppShell {
           <div class="run-console">
             <div><span>FLOOR</span><strong id="floor-value">01</strong></div>
             <div><span>SEED</span><strong id="seed-value">—</strong></div>
+            <button id="open-review" type="button" class="review-toggle">▤ 答题复盘</button>
             <button id="audio-toggle" type="button" class="audio-toggle" aria-pressed="false">♪ 声音开启</button>
             <label class="volume-control"><span>音量</span><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.55"></label>
           </div>
@@ -473,6 +486,35 @@ export class AppShell {
           </aside>
         </main>
 
+        <section id="answer-review" class="answer-review" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="answer-review-title" inert>
+          <div class="answer-review__panel">
+            <header class="answer-review__header">
+              <div>
+                <span>LOCAL REVIEW / 本地记录</span>
+                <h2 id="answer-review-title">答题复盘</h2>
+                <p>只保存在本地：记录提交的 SQL 回合，不记录移动或按键，也不会上传。</p>
+              </div>
+              <button id="close-review" type="button" class="icon-action" aria-label="关闭答题复盘">ESC ×</button>
+            </header>
+            <div class="answer-review__columns">
+              <section class="answer-review__section" aria-labelledby="battle-review-title">
+                <div class="card-heading">
+                  <span id="battle-review-title">最近一场战斗</span>
+                  <span id="battle-review-summary">0 次作答</span>
+                </div>
+                <div id="battle-review-list" class="answer-review__list"></div>
+              </section>
+              <section class="answer-review__section" aria-labelledby="floor-review-title">
+                <div class="card-heading">
+                  <span id="floor-review-title">当前楼层</span>
+                  <span id="floor-review-summary">0 次作答</span>
+                </div>
+                <div id="floor-review-list" class="answer-review__list"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+
         <footer class="page-footer">
           <span>真实执行：SQLite WASM</span>
           <span>地图：64×48 Seeded 迷宫</span>
@@ -493,6 +535,7 @@ export class AppShell {
     this.hintsRoot = requiredElement(this.root, "#hint-list");
     this.terminal = requiredElement(this.root, "#combat-terminal");
     this.gateTerminal = requiredElement(this.root, "#gate-terminal");
+    this.answerReview = new AnswerReviewView(this.root);
     this.executeButton = requiredElement(this.root, "#execute-query");
     this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
     this.sqlButton = requiredElement(this.root, "#open-sql");
@@ -530,6 +573,8 @@ export class AppShell {
       listenerOptions,
     );
     requiredElement(this.root, "#request-hint").addEventListener("click", () => this.requestHint(), listenerOptions);
+    requiredElement(this.root, "#open-review").addEventListener("click", () => this.openReview(), listenerOptions);
+    requiredElement(this.root, "#close-review").addEventListener("click", () => this.closeReview(), listenerOptions);
     requiredElement(this.root, "#interact").addEventListener("click", dispatchInteract, listenerOptions);
     this.sqlButton.addEventListener("click", () => this.openTerminal(), listenerOptions);
     requiredElement(this.root, "#reset-game").addEventListener("click", () => this.reset(), listenerOptions);
@@ -620,7 +665,7 @@ export class AppShell {
     this.settlementTimer = null;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
     this.floorTransitionTimer = null;
-    this.root.classList.remove("terminal-active", "gate-terminal-active");
+    this.root.classList.remove("terminal-active", "gate-terminal-active", "review-active");
     void this.audio.dispose();
   }
 
@@ -662,7 +707,7 @@ export class AppShell {
         });
       } else {
         const message = queryError instanceof Error ? queryError.message : "查询执行失败。";
-        resolution = this.session.registerQueryError(message);
+        resolution = this.session.registerQueryError(message, this.textarea.value);
         this.queryStatus.textContent = resolution.message;
         this.queryStatus.dataset.kind = "error";
         this.showFeedbackNotice({ message: resolution.message, tone: "danger" });
@@ -763,6 +808,39 @@ export class AppShell {
       this.gateExecuteButton.disabled = false;
       requiredElement(this.root, ".game-stage").classList.remove("is-resolving");
     }
+  }
+
+  private openReview(): void {
+    if (this.busy || this.isGateTerminalOpen()) return;
+    if (this.isTerminalOpen()) this.closeTerminal(false);
+    if (!this.isReviewOpen()) {
+      this.focusBeforeTerminal = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    }
+    this.answerReview.render(this.lastSnapshot);
+    this.answerReview.setOpen(true);
+    this.root.classList.add("review-active");
+    this.answerReview.closeButton.focus({
+      preventScroll: true,
+    });
+  }
+
+  private closeReview(): void {
+    if (!this.isReviewOpen()) return;
+    this.answerReview.setOpen(false);
+    this.root.classList.remove("review-active");
+    const focusTarget = this.focusBeforeTerminal;
+    this.focusBeforeTerminal = null;
+    if (focusTarget?.isConnected && !focusTarget.matches(":disabled")) {
+      focusTarget.focus();
+    } else {
+      requiredElement<HTMLButtonElement>(this.root, "#open-review").focus();
+    }
+  }
+
+  private isReviewOpen(): boolean {
+    return this.answerReview?.isOpen() ?? false;
   }
 
   private openTerminal(): void {
@@ -1132,6 +1210,7 @@ export class AppShell {
       : "explore";
     this.audio.setFloor(snapshot.floor);
     this.audio.setMode(musicMode);
+    if (this.isReviewOpen()) this.answerReview.render(snapshot);
 
     this.lastStageId = snapshot.lessonStageId;
     this.lastMode = snapshot.mode;

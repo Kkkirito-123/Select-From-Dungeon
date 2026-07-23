@@ -135,6 +135,7 @@ export interface LessonStageDefinition {
   id: LessonStageId;
   objective: string;
   queryTemplate: string;
+  answerSql: string;
   hints: string[];
   locks: string[];
   requiredFeatures: QueryFeature[];
@@ -202,6 +203,34 @@ export interface GateChallengeBrief {
   hints: string[];
 }
 
+export type AnswerResult =
+  | "correct"
+  | "missing-concept"
+  | "wrong-result"
+  | "syntax-error";
+
+export type BattleOutcome = "hit" | "countered" | "victory" | "defeat";
+
+export const MAX_ANSWER_HISTORY = 200;
+
+export interface AnswerAttemptRecord {
+  id: number;
+  battleId: number;
+  floor: FloorNumber;
+  monsterId: number;
+  monsterName: string;
+  lessonId: LessonId;
+  stageId: LessonStageId;
+  stageObjective: string;
+  round: number;
+  sql: string;
+  answerSql: string;
+  result: AnswerResult;
+  outcome: BattleOutcome;
+  feedback: string;
+  hintLevel: number;
+}
+
 export interface GameSnapshot {
   mode: PlayMode;
   lessonId: LessonId;
@@ -236,6 +265,8 @@ export interface GameSnapshot {
   stepsSinceEncounter: number;
   safeStepsRemaining: number;
   hintLevel: number;
+  battleReview: AnswerAttemptRecord[];
+  floorReview: AnswerAttemptRecord[];
   missionTitle: string;
   missionBody: string;
   lessonIntro: string;
@@ -248,7 +279,7 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 5;
+  version: 6;
   generatorVersion: 4;
   floor: FloorNumber;
   graph: RoomGraph;
@@ -274,6 +305,9 @@ export interface SavedRun {
   stepsSinceEncounter: number;
   safeStepsRemaining: number;
   hintLevel: number;
+  answerHistory: AnswerAttemptRecord[];
+  battleSequence: number;
+  reviewBattleId: number | null;
   banner: string;
 }
 

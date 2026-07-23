@@ -272,6 +272,7 @@ export const PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> = 
     id: "practice-select",
     objective: "突发练习：查询 id = 111 的怪物名字 name。",
     queryTemplate: "",
+    answerSql: "SELECT name FROM monsters WHERE id = 111;",
     hints: [
       "SELECT 后写 name，FROM 后写 monsters。",
       "使用 WHERE id = 111 锁定余像。",
@@ -285,6 +286,7 @@ export const PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> = 
     id: "practice-where",
     objective: "突发练习：返回 room_id = 12 且 status = 'lurking' 的怪物 id。",
     queryTemplate: "",
+    answerSql: "SELECT id FROM monsters WHERE room_id = 12 AND status = 'lurking';",
     hints: [
       "用 WHERE 同时检查 room_id 与 status。",
       "两个条件之间使用 AND。",
@@ -298,6 +300,7 @@ export const PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> = 
     id: "practice-null",
     objective: "突发练习：查询 status = 'faded' 且 master_id 为空的怪物 name。",
     queryTemplate: "",
+    answerSql: "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'faded';",
     hints: [
       "NULL 需要使用 IS NULL，不能写 = NULL。",
       "再用 AND 检查 status = 'faded'。",
@@ -311,6 +314,7 @@ export const PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> = 
     id: "practice-group",
     objective: "精英练习：按 channel 统计 monster_id = 810 的信号数，别名为 total。",
     queryTemplate: "",
+    answerSql: "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 810 GROUP BY channel;",
     hints: [
       "SELECT channel 与 COUNT(*) AS total。",
       "WHERE 锁定 monster_id = 810，再按 channel 分组。",
@@ -345,6 +349,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "select-name",
         objective: "第一击：查询 id = 101 的怪物名字 name。",
         queryTemplate: "",
+        answerSql: "SELECT name FROM monsters WHERE id = 101;",
         hints: [
           "SELECT 后写想看到的列，FROM 后写数据表。",
           "目标列是 name，目标表是 monsters。",
@@ -359,6 +364,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "select-weakness",
         objective: "第二击：查询 id = 101 的 weakness，击穿史莱姆核心。",
         queryTemplate: "",
+        answerSql: "SELECT weakness FROM monsters WHERE id = 101;",
         hints: [
           "这次仍从 monsters 读取，但目标列发生了变化。",
           "SELECT 后应写 weakness。",
@@ -383,6 +389,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "where-target",
         objective: "第一击：返回 room_id = 2 且 status = 'escaped' 的怪物 id。",
         queryTemplate: "",
+        answerSql: "SELECT id FROM monsters WHERE room_id = 2 AND status = 'escaped';",
         hints: [
           "返回列：id。",
           "数据表：monsters。",
@@ -398,6 +405,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "where-weakness",
         objective: "第二击：返回 name = '猎犬' 且 status = 'escaped' 的 weakness。",
         queryTemplate: "",
+        answerSql: "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped';",
         hints: [
           "返回列：weakness。",
           "数据表：monsters。",
@@ -423,6 +431,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "null-target",
         objective: "第一击：返回 room_id = 3 且 master_id 为空的怪物 id。",
         queryTemplate: "",
+        answerSql: "SELECT id FROM monsters WHERE room_id = 3 AND master_id IS NULL;",
         hints: [
           "NULL 表示未知，不能写 = NULL。",
           "判断空值使用 IS NULL。",
@@ -437,6 +446,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "null-name",
         objective: "第二击：找出 master_id 为空且 status = 'cursed' 的怪物 name。",
         queryTemplate: "",
+        answerSql: "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed';",
         hints: [
           "这次返回 name，而不是 id。",
           "master_id 仍使用 IS NULL。",
@@ -464,6 +474,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "group-signals",
         objective: "按 channel 分组统计 monster_id = 800 的信号数，数量别名为 total。",
         queryTemplate: "",
+        answerSql: "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 800 GROUP BY channel;",
         hints: [
           "COUNT(*) 统计每组行数，GROUP BY 决定分组列。",
           "读取 channel 和 COUNT(*) AS total。",
@@ -491,6 +502,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "having-shield",
         objective: "第一阶段：只保留信号数不少于 2 的 channel，数量别名为 total。",
         queryTemplate: "",
+        answerSql: "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 900 GROUP BY channel HAVING COUNT(*) >= 2;",
         hints: [
           "WHERE 过滤原始行，HAVING 过滤已经形成的组。",
           "先按 channel 分组，再判断 COUNT(*)。",
@@ -505,6 +517,7 @@ export const LESSONS: readonly LessonDefinition[] = [
         id: "having-core",
         objective: "核心阶段：把阈值提高到至少 3，只留下最强的 echo 组。",
         queryTemplate: "",
+        answerSql: "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 900 GROUP BY channel HAVING COUNT(*) >= 3;",
         hints: [
           "保持相同分组，把 HAVING 阈值提高。",
           "需要只返回 total = 3 的 echo 组。",

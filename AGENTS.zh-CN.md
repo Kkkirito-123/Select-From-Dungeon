@@ -29,6 +29,9 @@
 地图普通怪约每 1,100 毫秒巡逻一步。每层锁定的 Boss 门还提供一个可选高难 SQL 越级机关：
 正确组合查询只打开当前物理门，错误结果或语法错误损失一颗心，且永远不会授予课程掌握、XP
 或战利品。
+顶栏 `答题复盘` 读取浏览器本地答案记录，分别展示最近一场战斗和当前楼层。每条记录包含玩家
+SQL、明确参考 SQL、结果分类、提示等级和战斗结果；最多保留 200 个 SQL 回合，不记录移动
+或按键，也不会上传。
 怪物显示名必须直白且容易输入：统一使用“史莱姆”“幻影”“幼龙”这类二到三个汉字，
 不得添加间隔点称号或 SQL 概念后缀。未来扩展楼层也遵守同一规则；SQL 含义放在字段、任务与
 遭遇机制中，不塞进显示名。
@@ -43,10 +46,10 @@ MySQL 面试八股范围。
 
 ```text
 index.html -> src/main.ts
-  -> AppShell（DOM HUD、发现式小地图、新手引导、SQL 终端与证据）
+  -> AppShell（DOM HUD、发现式小地图、新手引导、SQL 终端与本地复盘）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
   -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
-  -> GameSession（权威迷宫、演员、迷雾、战斗、掉落和永久档案）
+  -> GameSession（权威迷宫、战斗、掉落、答题记录和永久档案）
   -> RunGraph（课程依赖与兴趣点图）
   -> MazeGenerator/MazeValidation（确定性 64×48 物理世界）
   -> EncounterDirector（确定性步数计量、安全期与伏击选择）
@@ -63,10 +66,10 @@ index.html -> src/main.ts
 玩家 SQL -> 只读策略 -> SQLite 结果 + EXPLAIN QUERY PLAN
   -> 结果语义 + 关卡知识锁校验 -> 正确时自动攻击 / 错误时怪物反击
   -> 同步 GameSession 与 SQLite HP -> 刷新 Phaser/UI
-  -> 防抖写入 v5 Run 存档 + 永久 v2 Profile 存档
+  -> 防抖写入 v6 Run 存档 + 永久 v2 Profile 存档
 ```
 
-`GameSession` 是物理移动、遭遇计量、课程、演员、迷雾、战斗、生命、经验、掉落与档案的事实
+`GameSession` 是物理移动、遭遇计量、课程、演员、迷雾、战斗、生命、经验、掉落、答题记录与档案的事实
 权威。
 `RunGraph` 是课程依赖图，不是物理导航模型；`MazeFloor` 才是保存的物理世界，包括地块、区域、
 知识门、锚点和装饰。`DungeonScene` 负责渲染世界、收集输入和调度约 1,100 毫秒的巡逻 Tick，
@@ -101,6 +104,7 @@ src/sql/            SQLite WASM 初始化、Schema、执行和 HP 同步
 src/storage/        带版本的迷宫 Run/Profile 本地存储校验与恢复
 src/ui/             DOM 界面、新手引导状态及 SQL/游戏编排
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
+docs/               双语蓝图、活跃路线图、docs/design/ 后续候选设计与历史报告
 .agents/skills/     需求、初始化、交付、实现、指南同步和显式发布工作流
 scripts/            可移植规则验证器及其回归测试
 .github/workflows/  对规则、测试、类型和生产构建执行只读 CI
@@ -140,13 +144,15 @@ python3 scripts/validate-rules.py
   `EXCEPT`；支持表别名限定列，也支持在 `HAVING` 中使用题目要求的 `total` 别名。
 - 当前 I/O 热量使用 SQLite `EXPLAIN QUERY PLAN`。这是 SQLite 证据，不是 MySQL 执行计划。
   后续 MySQL/InnoDB 概念必须明确标记为模拟，或使用另行隔离的真实后端。
-- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v5`（当前楼层、迷宫、演员、地面物品、
-  迷雾、遭遇计量、等级/经验、已打开的挑战门、当前机关题与可丢弃的当前 Run 状态）、
+- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v6`（当前楼层、迷宫、演员、地面物品、
+  迷雾、遭遇计量、等级/经验、已打开的挑战门、当前机关题、最多 200 条本地作答记录与可丢弃
+  的当前 Run 状态）、
   `select-from-dungeon:profile:v2`
   （十项已掌握课程、练习次数、通关数、
   最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。有效的
-  `select-from-dungeon:run:v4` 会在内存中迁移为 v5，且默认没有已开启的挑战门；更旧 Run Key
-  不读取也不删除。有效的 `profile:v1` 会迁移为 v2。`src/main.ts` 对快照驱动的持久化进行
+  `select-from-dungeon:run:v5` 会在内存中迁移为 v6，并从空答题历史开始；有效 `run:v4`
+  保留进度、默认没有已开启的挑战门，再迁移到 v6。旧 Key 不删除；更旧 Run Key 不读取。
+  有效的 `profile:v1` 会迁移为 v2。`src/main.ts` 对快照驱动的持久化进行
   防抖；改变结构时必须处理版本或恢复。
 - 核心学习装备必须确定性掉落，随机性不得阻塞课程进度；战斗伤害保持确定，便于检查 SQL 锁定。
 - 新 Run 以两颗心开始。普通、精英、魔王胜利分别获得 1、3、5 经验；累计经验达到 2、4、6、8，
