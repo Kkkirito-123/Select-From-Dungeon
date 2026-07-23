@@ -7,9 +7,9 @@ import {
 import {
   INITIAL_MONSTERS,
   LESSONS,
-  PRACTICE_STAGES,
   practiceStageFor,
 } from "../src/content/mvpLevel";
+import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
 import type { SqlQueryResult } from "../src/domain/types";
 
 function makeResult(
@@ -58,9 +58,9 @@ describe("课程文案", () => {
   it("每个课程与突发练习都提供独立参考 SQL", () => {
     const stages = [
       ...LESSONS.flatMap((lesson) => lesson.stages),
-      ...Object.values(PRACTICE_STAGES),
+      ...BIOME_ENCOUNTERS.flatMap((encounter) => encounter.stages),
     ];
-    expect(stages).toHaveLength(25);
+    expect(stages).toHaveLength(34);
     stages.forEach((stage) => {
       expect(stage.answerSql).toMatch(/^SELECT\b/i);
       expect(stage.answerSql.endsWith(";")).toBe(true);
@@ -72,23 +72,27 @@ describe("课程文案", () => {
       INITIAL_MONSTERS.map((monster) => [monster.id, monster.name]),
     )).toEqual({
       101: "史莱姆",
-      111: "幻影",
-      201: "猎犬",
-      211: "暗影犬",
-      301: "幽灵",
-      311: "鬼火",
-      800: "石巨人",
-      810: "石像鬼",
-      900: "魔王",
-      1200: "飞龙",
-      1210: "幼龙",
-      1300: "宝箱怪",
-      1310: "分身",
-      1400: "蛛后",
-      1410: "幼蛛",
-      1500: "幽影",
-      1510: "怨灵",
-      1900: "雷王",
+      111: "软泥怪",
+      201: "水胶怪",
+      211: "水胶怪",
+      301: "毒胶怪",
+      311: "毒胶怪",
+      800: "铁胶怪",
+      810: "铁胶怪",
+      900: "泥王",
+      1200: "猎犬",
+      1210: "水怪",
+      1300: "水蛇",
+      1310: "水蛇",
+      1400: "树妖",
+      1410: "青蛙",
+      1500: "毒蛙",
+      1510: "毒蛙",
+      1610: "猎犬",
+      1710: "树妖",
+      1810: "湖怪",
+      1900: "丛林王",
+      1911: "蛙王",
     });
     expect(INITIAL_MONSTERS.every(
       (monster) => !monster.name.includes("·") && monster.name.length <= 3,
@@ -100,17 +104,17 @@ describe("课程文案", () => {
     const lesson = LESSONS.find((candidate) => candidate.id === "where");
     const secondStage = lesson?.stages[1];
 
-    expect(monster?.name).toBe("猎犬");
+    expect(monster?.name).toBe("水胶怪");
     expect(lesson?.stages.map((stage) => stage.hints.length)).toEqual([5, 5]);
     expect(secondStage?.objective).toBe(
-      "第二击：返回 name = '猎犬' 且 status = 'escaped' 的 weakness。",
+      "第二击：返回 name = '水胶怪' 且 status = 'escaped' 的 weakness。",
     );
     expect(secondStage?.hints).toEqual([
       "返回列：weakness。",
       "数据表：monsters。",
       "过滤字段：name 与 status，用 AND 连接。",
-      "精确值：name = '猎犬'，status = 'escaped'。",
-      "完整写法：SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped';",
+      "精确值：name = '水胶怪'，status = 'escaped'。",
+      "完整写法：SELECT weakness FROM monsters WHERE name = '水胶怪' AND status = 'escaped';",
     ]);
   });
 });
@@ -120,7 +124,7 @@ describe("evaluateLesson stages", () => {
     const stage = practiceStageFor(211);
     if (!stage) throw new Error("缺少 WHERE 突发遭遇题");
     const exact = makeResult(
-      "SELECT id FROM monsters WHERE room_id = 12 AND status = 'lurking'",
+      "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
       ["id"],
       [{ id: 211 }],
       [211],
@@ -199,7 +203,7 @@ describe("evaluateLesson stages", () => {
     const actual = makeResult(
       "SELECT weakness, name, status FROM monsters WHERE id = 201 AND 1 = 1",
       ["weakness", "name", "status"],
-      [{ weakness: "focus", name: "猎犬", status: "escaped" }],
+      [{ weakness: "focus", name: "水胶怪", status: "escaped" }],
       [201],
     );
     expect(evaluateLesson("where", 1, actual).accepted).toBe(false);
@@ -207,7 +211,7 @@ describe("evaluateLesson stages", () => {
 
   it("WHERE 第二阶段接受按怪物名与状态返回 weakness", () => {
     const actual = makeResult(
-      "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped'",
+      "SELECT weakness FROM monsters WHERE name = '水胶怪' AND status = 'escaped'",
       ["weakness"],
       [{ weakness: "focus" }],
     );
@@ -225,11 +229,11 @@ describe("evaluateLesson stages", () => {
     expect(evaluation.locksRemaining).toContain("IS NULL");
   });
 
-  it("IS NULL 第二阶段必须返回无主诅咒幽灵的名字", () => {
+  it("IS NULL 第二阶段必须返回无主诅咒毒胶怪的名字", () => {
     const actual = makeResult(
       "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
       ["name"],
-      [{ name: "幽灵" }],
+      [{ name: "毒胶怪" }],
     );
     expect(evaluateLesson("is-null", 1, actual).accepted).toBe(true);
   });
@@ -320,12 +324,12 @@ describe("evaluateLesson stages", () => {
     const exact = makeResult(
       "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 1400",
       ["name", "room_name"],
-      [{ name: "蛛后", room_name: "双表桥" }],
+      [{ name: "树妖", room_name: "古树桥" }],
     );
     const bypass = makeResult(
       "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON 1 = 1 WHERE m.id = 1400 AND r.id = 23",
       ["name", "room_name"],
-      [{ name: "蛛后", room_name: "双表桥" }],
+      [{ name: "树妖", room_name: "古树桥" }],
     );
     expect(evaluateLesson("inner-join", 0, exact).accepted).toBe(true);
     expect(evaluateLesson("inner-join", 0, bypass).accepted).toBe(false);

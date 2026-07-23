@@ -44,7 +44,7 @@ const WHERE_TARGET = result(
   [201],
 );
 const WHERE_WEAKNESS = result(
-  "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped'",
+  "SELECT weakness FROM monsters WHERE name = '水胶怪' AND status = 'escaped'",
   ["weakness"],
   [{ weakness: "focus" }],
 );
@@ -57,7 +57,7 @@ const NULL_TARGET = result(
 const NULL_NAME = result(
   "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
   ["name"],
-  [{ name: "幽灵" }],
+  [{ name: "毒胶怪" }],
 );
 const GROUP_RESULT = result(
   "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 800 GROUP BY channel",
@@ -79,6 +79,29 @@ const HAVING_CORE = result(
   "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 900 GROUP BY channel HAVING COUNT(*) >= 3",
   ["channel", "total"],
   [{ channel: "echo", total: 3 }],
+);
+const ORDER_PEAK = result(
+  "SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 1",
+  ["channel"],
+  [{ channel: "surge" }],
+);
+const ORDER_TOP_TWO = result(
+  "SELECT channel, charge FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 2",
+  ["channel", "charge"],
+  [
+    { channel: "surge", charge: 13 },
+    { channel: "arc", charge: 11 },
+  ],
+);
+const LAKE_BOSS_SCAN = result(
+  "SELECT name, status FROM monsters WHERE id = 1810",
+  ["name", "status"],
+  [{ name: "湖怪", status: "submerged" }],
+);
+const LAKE_BOSS_SORT = result(
+  "SELECT DISTINCT status FROM monsters WHERE id = 1810 ORDER BY status",
+  ["status"],
+  [{ status: "submerged" }],
 );
 const WRONG_SELECT_NAME = result(
   "SELECT name FROM monsters",
@@ -370,6 +393,14 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().floorReview).toEqual([]);
     expect(session.snapshot().battleReview).toEqual(beforePortal.battleReview);
     expect(session.snapshot().roomGraph.nodes.some((node) => node.lessonId === "order-by")).toBe(true);
+    expect(session.snapshot().biomePlan.regions.map((region) => region.name)).toEqual([
+      "月影湖泊",
+      "毒雾泥沼",
+      "古树森林",
+    ]);
+    expect(session.snapshot().worldActors.filter(
+      (actor) => actor.monsterId === 1810 || actor.monsterId === 1911,
+    )).toHaveLength(2);
     const floorTwoSave = session.toSavedRun();
     expect(isSavedRun(floorTwoSave)).toBe(true);
     expect(new GameSession(floorTwoSave).snapshot()).toMatchObject({
@@ -378,7 +409,60 @@ describe("GameSession SQL 魔王城 Run", () => {
       runSeed: floorTwoSave.graph.seed,
       player: floorTwoSave.player,
     });
+
+    enterLesson(session, "order-by");
+    expect(session.resolveQuery(ORDER_PEAK).accepted).toBe(true);
+    expect(session.resolveQuery(ORDER_TOP_TWO).lessonCompleted).toBe("order-by");
+    const areaBoss = session.snapshot().worldActors.find((actor) => actor.monsterId === 1810);
+    if (!areaBoss) throw new Error("第二层缺少湖怪区域首领");
+    expect(session.setPlayerPosition(areaBoss.x, areaBoss.y)).toBe(true);
+    expect(session.snapshot()).toMatchObject({
+      mode: "combat",
+      focusMonsterId: 1810,
+      lessonStageId: "lake-boss-scan",
+    });
+    expect(session.resolveQuery(LAKE_BOSS_SCAN)).toMatchObject({
+      accepted: true,
+      lessonCompleted: null,
+      mode: "combat",
+    });
+    const areaVictory = session.resolveQuery(LAKE_BOSS_SORT);
+    expect(areaVictory).toMatchObject({
+      accepted: true,
+      lessonCompleted: null,
+      mode: "explore",
+      experience: {
+        monsterId: 1810,
+        gained: 3,
+      },
+    });
+    expect(session.snapshot().completedLessons).toEqual(["order-by"]);
+    expect(session.snapshot().lootBundles.find(
+      (bundle) => bundle.sourceMonsterId === 1810,
+    )?.items.length).toBeGreaterThanOrEqual(2);
     expect(session.advanceFloor()).toBe(false);
+  });
+
+  it("旧 v9 存档缺少生态怪物时会按同一 seed 补全，而不会重置进度", () => {
+    const session = new GameSession(null, null, "legacy-biome-v9");
+    const saved = session.toSavedRun();
+    const legacyMonsterIds = new Set([101, 201, 301, 800, 900, 111, 211, 311]);
+    const legacy = {
+      ...saved,
+      monsters: saved.monsters
+        .filter((monster) => legacyMonsterIds.has(monster.id))
+        .map((monster) => monster.id === 201 ? { ...monster, name: "猎犬" } : monster),
+      worldActors: saved.worldActors.filter((actor) => legacyMonsterIds.has(actor.monsterId)),
+    };
+    expect(isSavedRun(legacy)).toBe(true);
+
+    const restored = new GameSession(legacy).snapshot();
+    expect(restored.runSeed).toBe(saved.graph.seed);
+    expect(restored.monsters.map((monster) => monster.id).sort((a, b) => a - b))
+      .toEqual(saved.monsters.map((monster) => monster.id).sort((a, b) => a - b));
+    expect(restored.monsters.find((monster) => monster.id === 201)?.name).toBe("水胶怪");
+    expect(restored.biomePlan).toEqual(session.snapshot().biomePlan);
+    expect(restored.player).toEqual(saved.player);
   });
 
   it("错误结果和语法错误各只结算一次确定性反击", () => {
@@ -523,7 +607,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     const firstHit = session.resolveQuery(WHERE_TARGET);
     expect(firstHit.accepted).toBe(true);
     const damagedMonster = session.snapshot().monsters.find((monster) => monster.id === 201);
-    if (!damagedMonster) throw new Error("测试楼层缺少猎犬");
+    if (!damagedMonster) throw new Error("测试楼层缺少水胶怪");
     expect(damagedMonster.hp).toBeGreaterThan(0);
     expect(damagedMonster.hp).toBeLessThan(damagedMonster.maxHp);
     expect(session.registerQueryError("条件缺失", "SELECT weakness FROM monsters").playerDamage).toBe(1);
@@ -681,8 +765,8 @@ describe("GameSession SQL 魔王城 Run", () => {
        ORDER BY total_charge DESC, m.id ASC`,
       ["id", "name", "echo_count", "total_charge"],
       [
-        { id: 800, name: "石巨人", echo_count: 3, total_charge: 24 },
-        { id: 900, name: "魔王", echo_count: 3, total_charge: 24 },
+        { id: 800, name: "铁胶怪", echo_count: 3, total_charge: 24 },
+        { id: 900, name: "泥王", echo_count: 3, total_charge: 24 },
       ],
     );
     expect(session.resolveGateChallenge(correct)).toMatchObject({

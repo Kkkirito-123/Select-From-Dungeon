@@ -9,6 +9,10 @@ import type { MazeFloor } from "./mazeGenerator";
 import type { GuidedMapPlan } from "./guidedMap";
 import type { WorldActor } from "./monsterRoaming";
 import type { CampaignProgress } from "./campaign";
+import type {
+  BiomeKind,
+} from "../content/biomeContent";
+import type { BiomePlan } from "./biome";
 
 export type LessonId = RunLessonId;
 
@@ -37,7 +41,16 @@ export type LessonStageId =
   | "practice-order"
   | "practice-distinct"
   | "practice-inner-join"
-  | "practice-left-join";
+  | "practice-left-join"
+  | "practice-group-core"
+  | "practice-left-core"
+  | "practice-forest-order"
+  | "practice-forest-join"
+  | "practice-forest-join-core"
+  | "lake-boss-scan"
+  | "lake-boss-sort"
+  | "frog-boss-left"
+  | "frog-boss-distinct";
 
 export type PlayMode =
   | "explore"
@@ -124,6 +137,8 @@ export interface Weapon {
     | "aggregate-hammer"
     | "sort-saber"
     | "join-chain"
+    | "slime-sword"
+    | "hunter-bow"
     | "bone-blade";
   name: string;
   damage: number;
@@ -148,7 +163,13 @@ export interface EquipmentItem {
 }
 
 export interface Consumable {
-  id: "slime-gel" | "water-drop" | "forest-fruit" | "whetstone" | "repair-shard";
+  id:
+    | "slime-gel"
+    | "water-drop"
+    | "frog-potion"
+    | "forest-fruit"
+    | "whetstone"
+    | "repair-shard";
   name: string;
   description: string;
   effect: "heal-hp" | "heal-armor" | "heal-both";
@@ -305,6 +326,8 @@ export interface AnswerAttemptRecord {
 export interface GameSnapshot {
   mode: PlayMode;
   campaign: CampaignProgress;
+  biomePlan: BiomePlan;
+  currentBiome: BiomeKind;
   lessonId: LessonId;
   lessonStageId: LessonStageId;
   lessonStageIndex: number;

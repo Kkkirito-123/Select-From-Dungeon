@@ -6,6 +6,7 @@ import {
   type MazeZone,
 } from "../domain/mazeGenerator";
 import { safeZoneCellKeys } from "../domain/campfire";
+import { biomeRegionAt } from "../domain/biome";
 import { GameSession } from "../domain/GameSession";
 import type {
   GameSnapshot,
@@ -96,6 +97,15 @@ const FLOOR_TWO_ZONE_COLORS: Record<MazeZone["type"], number> = {
   boss: 0x411b48,
 };
 
+const BIOME_COLORS = {
+  drainage: { floor: 0x203138, wall: 0x364a50, accent: 0x6d9da5 },
+  "slime-pool": { floor: 0x21372f, wall: 0x344b3d, accent: 0x70c489 },
+  "ember-cellar": { floor: 0x3a2922, wall: 0x56352a, accent: 0xd78a4b },
+  lake: { floor: 0x173b52, wall: 0x244e62, accent: 0x66c9e8 },
+  swamp: { floor: 0x303b27, wall: 0x475136, accent: 0x91ad57 },
+  forest: { floor: 0x17352b, wall: 0x284b39, accent: 0x62bd78 },
+} as const;
+
 const KEY_TO_DIRECTION: Record<string, Position> = {
   KeyW: { x: 0, y: -1 },
   ArrowUp: { x: 0, y: -1 },
@@ -116,6 +126,14 @@ function gridToPixels(position: Position): Position {
 
 function positionKey(position: Position): string {
   return `${position.x}:${position.y}`;
+}
+
+function mixColor(left: number, right: number, ratio: number): number {
+  const mix = (shift: number) => Math.round(
+    ((left >> shift) & 0xff) * (1 - ratio) +
+    ((right >> shift) & 0xff) * ratio,
+  );
+  return (mix(16) << 16) | (mix(8) << 8) | mix(0);
 }
 
 function emitMilestone(type: string): void {
@@ -407,16 +425,19 @@ export class DungeonScene extends Phaser.Scene {
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
         const tile = floor.tiles[y][x];
+        const biome = biomeRegionAt(this.snapshot.biomePlan, { x, y });
+        const biomeColors = BIOME_COLORS[biome.kind];
         if (tile === "#") {
-          this.terrain.fillStyle(colors.wall, 1);
+          this.terrain.fillStyle(mixColor(colors.wall, biomeColors.wall, 0.56), 1);
           this.terrain.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          this.terrain.fillStyle(colors.wallTop, 0.52);
+          this.terrain.fillStyle(mixColor(colors.wallTop, biomeColors.accent, 0.36), 0.52);
           this.terrain.fillRect(px + 2, py + 2, TILE_SIZE - 4, 4);
         } else {
           const zone = mazeZoneAt(floor, { x, y });
-          const color = zone
+          const baseColor = zone
             ? zoneColors[zone.type]
             : (x + y) % 2 === 0 ? colors.floor : colors.floorAlt;
+          const color = mixColor(baseColor, biomeColors.floor, zone ? 0.38 : 0.72);
           this.terrain.fillStyle(color, 1);
           this.terrain.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           this.terrain.lineStyle(1, colors.line, 0.48);
@@ -485,9 +506,67 @@ export class DungeonScene extends Phaser.Scene {
       marker.setData("cell", positionKey(routeMarker));
       this.entityLayer.add(marker);
     });
+    this.snapshot.biomePlan.features.forEach((feature) => {
+      const pixel = gridToPixels(feature);
+      const parts: Phaser.GameObjects.GameObject[] = [];
+      if (feature.kind === "water") {
+        parts.push(
+          this.add.ellipse(pixel.x, pixel.y + 3, 22, 10, 0x4b9fbe, 0.7)
+            .setStrokeStyle(1, 0x8bd9eb, 0.72),
+          this.add.rectangle(pixel.x + 2, pixel.y, 10, 2, 0xb5eff7, 0.55),
+        );
+      } else if (feature.kind === "reeds") {
+        parts.push(
+          this.add.rectangle(pixel.x - 5, pixel.y + 2, 3, 15, 0x718d43).setAngle(-14),
+          this.add.rectangle(pixel.x + 2, pixel.y, 3, 18, 0x92ad58).setAngle(9),
+          this.add.rectangle(pixel.x + 7, pixel.y + 3, 3, 13, 0x5b7739).setAngle(18),
+        );
+      } else if (feature.kind === "tree") {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y + 6, 5, 14, 0x765035),
+          this.add.rectangle(pixel.x - 6, pixel.y - 2, 13, 13, 0x356a43),
+          this.add.rectangle(pixel.x + 6, pixel.y - 4, 15, 14, 0x468351),
+        );
+      } else if (feature.kind === "slime") {
+        parts.push(
+          this.add.ellipse(pixel.x, pixel.y + 4, 19, 10, 0x5ead75, 0.72)
+            .setStrokeStyle(1, 0x8cdda0, 0.7),
+          this.add.rectangle(pixel.x + 3, pixel.y + 1, 4, 3, 0xd5f2c9, 0.72),
+        );
+      } else if (feature.kind === "ember") {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y + 4, 13, 4, 0x6a4932),
+          this.add.triangle(pixel.x, pixel.y - 4, -5, 8, 0, -7, 5, 8, 0xd87b3f, 0.82),
+        );
+      } else {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y, 18, 8, 0x385563, 0.56)
+            .setStrokeStyle(1, 0x6b909c, 0.65),
+          this.add.rectangle(pixel.x, pixel.y, 3, 8, 0x101820, 0.8),
+        );
+      }
+      parts.forEach((part) => {
+        part.setData("cell", positionKey(feature));
+        this.entityLayer.add(part);
+      });
+    });
   }
 
   private drawZoneLabels(): void {
+    this.snapshot.biomePlan.regions.forEach((region) => {
+      const pixel = gridToPixels(region.anchor);
+      const boss = region.areaBossId === null ? "" : " · 可选首领";
+      const label = this.add.text(pixel.x, pixel.y + 28, `${region.name}${boss}`, {
+        color: "#d9f0cf",
+        fontFamily: "monospace",
+        fontSize: "8px",
+        fontStyle: "bold",
+        backgroundColor: "#07100bdd",
+        padding: { x: 4, y: 2 },
+      }).setOrigin(0.5).setDepth(14);
+      label.setData("cell", positionKey(region.anchor));
+      this.entityLayer.add(label);
+    });
     this.snapshot.mazeFloor.zones.forEach((zone) => {
       const room = this.snapshot.roomGraph.nodes.find((node) => node.id === zone.roomNodeId);
       const pixel = gridToPixels({ x: zone.center.x, y: zone.y + 1 });
@@ -719,12 +798,66 @@ export class DungeonScene extends Phaser.Scene {
 
   private createMonsterBody(monster: Monster): Phaser.GameObjects.GameObject[] {
     if (monster.kind === "projection-slime") {
+      const bodyColor = monster.species.includes("poison")
+        ? 0x8b5aa3
+        : monster.species.includes("water")
+          ? 0x4d9db5
+          : monster.species.includes("iron")
+            ? 0x7d8589
+            : monster.species.includes("king") ? 0xb6974d : 0x4f9a8f;
+      const crown = monster.species.includes("king")
+        ? [this.add.triangle(0, -21, -13, 8, 0, -9, 13, 8, 0xe0bd59)]
+        : [];
       return [
-        this.add.rectangle(0, 5, 34, 22, 0x4f9a8f),
-        this.add.rectangle(-9, -7, 18, 15, 0x70c4b3),
-        this.add.rectangle(9, -8, 20, 16, 0x84d2be),
+        this.add.rectangle(0, 5, 34, 22, bodyColor),
+        this.add.rectangle(-9, -7, 18, 15, mixColor(bodyColor, 0xffffff, 0.18)),
+        this.add.rectangle(9, -8, 20, 16, mixColor(bodyColor, 0xffffff, 0.3)),
         this.add.rectangle(-6, 1, 4, 4, 0x10141b),
         this.add.rectangle(7, 0, 4, 4, 0x10141b),
+        ...crown,
+      ];
+    }
+    if (monster.species.includes("frog")) {
+      const poison = monster.species.includes("poison") || monster.species.includes("boss");
+      const body = poison ? 0x778b3b : 0x62a95e;
+      return [
+        this.add.rectangle(0, 6, 34, 21, body).setStrokeStyle(2, 0x2d4d2b),
+        this.add.rectangle(-10, -7, 13, 12, mixColor(body, 0xffffff, 0.22)),
+        this.add.rectangle(10, -7, 13, 12, mixColor(body, 0xffffff, 0.22)),
+        this.add.rectangle(-10, -8, 4, 4, 0x10141b),
+        this.add.rectangle(10, -8, 4, 4, 0x10141b),
+        this.add.rectangle(0, 12, 14, 3, poison ? 0xd6ce63 : 0x244429),
+      ];
+    }
+    if (monster.species.includes("treant")) {
+      return [
+        this.add.rectangle(0, 4, 24, 35, 0x745037).setStrokeStyle(2, 0x35271e),
+        this.add.rectangle(-15, -8, 22, 22, 0x3d7849),
+        this.add.rectangle(14, -11, 24, 23, 0x4d8c57),
+        this.add.rectangle(-6, 1, 4, 4, 0xe2c76b),
+        this.add.rectangle(6, 1, 4, 4, 0xe2c76b),
+      ];
+    }
+    if (
+      monster.species.includes("lake") ||
+      monster.species.includes("water_snake")
+    ) {
+      return [
+        this.add.ellipse(0, 5, 39, 24, 0x397e9d).setStrokeStyle(2, 0x194c68),
+        this.add.triangle(-23, 6, 0, 10, 15, 0, 15, 20, 0x5fb2c7),
+        this.add.rectangle(-7, -3, 4, 4, 0xd9f7f2),
+        this.add.rectangle(7, -3, 4, 4, 0xd9f7f2),
+        this.add.rectangle(0, 13, 16, 3, 0x183a4b),
+      ];
+    }
+    if (monster.species.includes("jungle_king")) {
+      return [
+        this.add.rectangle(0, 5, 49, 43, 0x69543a).setStrokeStyle(4, 0x2e261d),
+        this.add.rectangle(-18, -20, 19, 14, 0x3f7645),
+        this.add.rectangle(18, -20, 19, 14, 0x3f7645),
+        this.add.rectangle(-10, -4, 6, 6, 0xe4c15c),
+        this.add.rectangle(10, -4, 6, 6, 0xe4c15c),
+        this.add.triangle(0, -34, -17, 10, 0, -10, 17, 10, 0xd0a640),
       ];
     }
     if (monster.kind === "filter-hound") {

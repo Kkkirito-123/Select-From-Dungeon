@@ -53,8 +53,8 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "name", "echo_count", "total_charge"],
   expectedRows: [
-    { id: 800, name: "石巨人", echo_count: 3, total_charge: 24 },
-    { id: 900, name: "魔王", echo_count: 3, total_charge: 24 },
+    { id: 800, name: "铁胶怪", echo_count: 3, total_charge: 24 },
+    { id: 900, name: "泥王", echo_count: 3, total_charge: 24 },
   ],
 };
 
@@ -88,8 +88,8 @@ const FLOOR_TWO_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "room_name", "monster_count", "total_power"],
   expectedRows: [
-    { id: 25, room_name: "雷鸣主核", monster_count: 1, total_power: 38 },
-    { id: 23, room_name: "双表桥", monster_count: 1, total_power: 15 },
+    { id: 25, room_name: "丛林王庭", monster_count: 1, total_power: 38 },
+    { id: 23, room_name: "古树桥", monster_count: 1, total_power: 15 },
   ],
 };
 

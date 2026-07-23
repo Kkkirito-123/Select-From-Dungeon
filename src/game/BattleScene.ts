@@ -1,5 +1,9 @@
 import Phaser from "phaser";
 import { ArcadeAudio } from "../audio/ArcadeAudio";
+import {
+  biomeEncounterFor,
+  type BiomeKind,
+} from "../content/biomeContent";
 import { GameSession } from "../domain/GameSession";
 import type { GameSnapshot, Monster, TurnResolution } from "../domain/types";
 
@@ -18,6 +22,78 @@ const IMPACT_DELAY_MS = 190;
 const LOCAL_HIT_STOP_MS = 55;
 const PLAYER_REST_X = 150;
 const MONSTER_REST_X = 470;
+
+const BIOME_ARENA: Readonly<Record<BiomeKind, {
+  void: number;
+  line: number;
+  platform: number;
+  edge: number;
+  upperA: number;
+  upperB: number;
+  floor: number;
+  accent: string;
+}>> = {
+  drainage: {
+    void: 0x070b0e,
+    line: 0x568491,
+    platform: 0x26343a,
+    edge: 0x668b95,
+    upperA: 0x11191d,
+    upperB: 0x172227,
+    floor: 0x1d292e,
+    accent: "#8dc5cf",
+  },
+  "slime-pool": {
+    void: 0x07100c,
+    line: 0x58a77c,
+    platform: 0x20382c,
+    edge: 0x70b58d,
+    upperA: 0x102019,
+    upperB: 0x152a20,
+    floor: 0x1c3328,
+    accent: "#91d7aa",
+  },
+  "ember-cellar": {
+    void: 0x110907,
+    line: 0xb06b43,
+    platform: 0x3b2921,
+    edge: 0xb77c55,
+    upperA: 0x251510,
+    upperB: 0x301a13,
+    floor: 0x3a241b,
+    accent: "#e3aa72",
+  },
+  lake: {
+    void: 0x040b13,
+    line: 0x4b9fbe,
+    platform: 0x17384a,
+    edge: 0x6ab9cf,
+    upperA: 0x0a1b29,
+    upperB: 0x0e2637,
+    floor: 0x143247,
+    accent: "#8bd9eb",
+  },
+  swamp: {
+    void: 0x090c07,
+    line: 0x85974d,
+    platform: 0x2d3420,
+    edge: 0x9cac5e,
+    upperA: 0x161b10,
+    upperB: 0x202615,
+    floor: 0x292f1c,
+    accent: "#bdcc7a",
+  },
+  forest: {
+    void: 0x050a07,
+    line: 0x438358,
+    platform: 0x1e3527,
+    edge: 0x62a373,
+    upperA: 0x0d1811,
+    upperB: 0x132219,
+    floor: 0x1b2d21,
+    accent: "#8bc99a",
+  },
+};
 
 export class BattleScene extends Phaser.Scene {
   private snapshot: GameSnapshot;
@@ -182,13 +258,13 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawArena(): void {
-    const floorTwo = this.snapshot.floor === 2;
-    const voidColor = floorTwo ? 0x050714 : COLORS.void;
-    const lineColor = floorTwo ? 0x6551a5 : COLORS.plum;
-    const platformColor = floorTwo ? 0x20295a : COLORS.stone;
-    const platformEdge = floorTwo ? 0x526bb0 : COLORS.stoneLight;
-    this.cameras.main.setBackgroundColor(voidColor);
-    this.add.rectangle(320, 208, 640, 416, voidColor);
+    const target = this.targetMonster();
+    const biome = target
+      ? biomeEncounterFor(target.id)?.biome ?? this.snapshot.currentBiome
+      : this.snapshot.currentBiome;
+    const palette = BIOME_ARENA[biome];
+    this.cameras.main.setBackgroundColor(palette.void);
+    this.add.rectangle(320, 208, 640, 416, palette.void);
     for (let y = 0; y < 13; y += 1) {
       for (let x = 0; x < 20; x += 1) {
         this.add.rectangle(
@@ -196,27 +272,24 @@ export class BattleScene extends Phaser.Scene {
           y * 32 + 16,
           32,
           32,
-          floorTwo
-            ? y < 7
-              ? ((x + y) % 2 === 0 ? 0x101637 : 0x161d47)
-              : 0x171d3f
-            : y < 7
-              ? ((x + y) % 2 === 0 ? 0x171a22 : 0x1c1f29)
-              : 0x20232b,
+          y < 7
+            ? ((x + y) % 2 === 0 ? palette.upperA : palette.upperB)
+            : palette.floor,
         ).setStrokeStyle(1, 0x0e1016, 0.55);
       }
     }
-    this.add.rectangle(320, 198, 610, 5, lineColor, 0.65);
-    this.add.rectangle(470, 270, 240, 34, platformColor, 0.96)
-      .setStrokeStyle(3, platformEdge);
+    this.drawBiomeSilhouette(biome, palette.line);
+    this.add.rectangle(320, 198, 610, 5, palette.line, 0.65);
+    this.add.rectangle(470, 270, 240, 34, palette.platform, 0.96)
+      .setStrokeStyle(3, palette.edge);
     this.add.ellipse(470, 253, 214, 46, 0x12151b, 0.82);
-    this.add.rectangle(150, 345, 220, 31, platformColor, 0.96)
-      .setStrokeStyle(3, platformEdge);
+    this.add.rectangle(150, 345, 220, 31, palette.platform, 0.96)
+      .setStrokeStyle(3, palette.edge);
     this.add.ellipse(150, 329, 192, 40, 0x12151b, 0.82);
 
     const lesson = this.snapshot.lessonId.toUpperCase();
-    this.add.text(22, 18, `ENCOUNTER / ${lesson}`, {
-      color: floorTwo ? "#68e8ee" : "#78c9b8",
+    this.add.text(22, 18, `ENCOUNTER / ${lesson} / ${biome.toUpperCase()}`, {
+      color: palette.accent,
       fontFamily: "monospace",
       fontSize: "10px",
       fontStyle: "bold",
@@ -224,7 +297,7 @@ export class BattleScene extends Phaser.Scene {
       padding: { x: 6, y: 4 },
     });
     this.roundText = this.add.text(618, 18, "ROUND 1", {
-      color: floorTwo ? "#d9a1ff" : "#d7ad55",
+      color: palette.accent,
       fontFamily: "monospace",
       fontSize: "10px",
       fontStyle: "bold",
@@ -232,7 +305,6 @@ export class BattleScene extends Phaser.Scene {
       padding: { x: 6, y: 4 },
     }).setOrigin(1, 0);
 
-    const target = this.targetMonster();
     this.add.text(352, 64, target ? `${target.name}  ·  ID #${target.id}` : "未知怪物", {
       color: "#e8dfc7",
       fontFamily: "Georgia, serif",
@@ -281,6 +353,45 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5);
   }
 
+  private drawBiomeSilhouette(biome: BiomeKind, color: number): void {
+    if (biome === "lake") {
+      [82, 118, 154].forEach((y, index) => {
+        this.add.rectangle(320 + (index % 2 === 0 ? -28 : 34), y, 520, 3, color, 0.22);
+      });
+      return;
+    }
+    if (biome === "swamp") {
+      for (let x = 44; x < 620; x += 48) {
+        this.add.rectangle(x, 157, 4, 58 + (x % 3) * 5, color, 0.22)
+          .setOrigin(0.5, 1)
+          .setAngle(x % 2 === 0 ? -7 : 9);
+      }
+      return;
+    }
+    if (biome === "forest") {
+      for (let x = 46; x < 620; x += 72) {
+        this.add.rectangle(x, 160, 13, 104, color, 0.18).setOrigin(0.5, 1);
+        this.add.rectangle(x - 12, 77, 34, 34, color, 0.13);
+        this.add.rectangle(x + 13, 67, 38, 38, color, 0.13);
+      }
+      return;
+    }
+    if (biome === "slime-pool") {
+      for (let x = 70; x < 620; x += 82) {
+        this.add.ellipse(x, 171, 50, 14, color, 0.18);
+      }
+      return;
+    }
+    if (biome === "ember-cellar") {
+      for (let x = 76; x < 620; x += 112) {
+        this.add.triangle(x, 165, -8, 12, 0, -16, 8, 12, color, 0.22);
+      }
+      return;
+    }
+    this.add.rectangle(320, 142, 536, 22, color, 0.11)
+      .setStrokeStyle(3, color, 0.22);
+  }
+
   private createPlayer(): void {
     this.playerContainer = this.add.container(PLAYER_REST_X, 312).setDepth(8);
     this.playerContainer.add([
@@ -299,15 +410,71 @@ export class BattleScene extends Phaser.Scene {
     const monster = this.targetMonster();
     this.monsterContainer = this.add.container(MONSTER_REST_X, 222).setDepth(8);
     if (!monster) return;
-    const scale = monster.isBoss ? 1.35 : 1;
+    const encounterRole = biomeEncounterFor(monster.id)?.role;
+    const scale = monster.isBoss
+      ? 1.35
+      : encounterRole === "area-boss" ? 1.28 : encounterRole === "mini-elite" ? 1.12 : 1;
     const parts: Phaser.GameObjects.GameObject[] = [];
     if (monster.kind === "projection-slime") {
+      const bodyColor = monster.species.includes("poison")
+        ? 0x8d5aa2
+        : monster.species.includes("water")
+          ? 0x448faa
+          : monster.species.includes("iron")
+            ? 0x737d82
+            : monster.species.includes("king") ? 0xae8d3f : 0x4f9a8f;
       parts.push(
-        this.add.rectangle(0, 12, 68, 42, 0x4f9a8f),
-        this.add.rectangle(-19, -15, 35, 32, 0x70c4b3),
-        this.add.rectangle(18, -17, 38, 36, 0x84d2be),
+        this.add.rectangle(0, 12, 68, 42, bodyColor),
+        this.add.rectangle(-19, -15, 35, 32, bodyColor + 0x101010),
+        this.add.rectangle(18, -17, 38, 36, bodyColor + 0x181818),
         this.add.rectangle(-12, 0, 8, 8, 0x10141b),
         this.add.rectangle(15, -2, 8, 8, 0x10141b),
+      );
+      if (monster.species.includes("iron")) {
+        parts.push(this.add.rectangle(0, 14, 72, 9, 0xb3babd, 0.7));
+      }
+      if (monster.species.includes("king")) {
+        parts.push(this.add.triangle(0, -48, -24, 16, 0, -15, 24, 16, COLORS.gold));
+      }
+    } else if (monster.species.includes("frog")) {
+      const poison = monster.species.includes("poison") || monster.species.includes("boss");
+      const body = poison ? 0x78893b : 0x5da05c;
+      parts.push(
+        this.add.rectangle(0, 13, 73, 43, body).setStrokeStyle(6, 0x2b4929),
+        this.add.rectangle(-23, -17, 27, 25, body + 0x151515),
+        this.add.rectangle(23, -17, 27, 25, body + 0x151515),
+        this.add.rectangle(-23, -19, 8, 8, 0x0b120d),
+        this.add.rectangle(23, -19, 8, 8, 0x0b120d),
+        this.add.rectangle(0, 26, 29, 6, poison ? 0xd2c85d : 0x254128),
+      );
+    } else if (monster.species.includes("treant")) {
+      parts.push(
+        this.add.rectangle(0, 9, 52, 76, 0x745037).setStrokeStyle(6, 0x35271e),
+        this.add.rectangle(-35, -25, 47, 43, 0x3d7849),
+        this.add.rectangle(32, -31, 52, 48, 0x4d8c57),
+        this.add.rectangle(-14, 1, 9, 9, 0xe2c76b),
+        this.add.rectangle(14, 1, 9, 9, 0xe2c76b),
+        this.add.rectangle(0, 25, 25, 6, 0x2d221a),
+      );
+    } else if (
+      monster.species.includes("lake") ||
+      monster.species.includes("water_snake")
+    ) {
+      parts.push(
+        this.add.ellipse(0, 8, 84, 52, 0x397e9d).setStrokeStyle(6, 0x194c68),
+        this.add.triangle(-51, 10, 0, 20, 31, 0, 31, 40, 0x5fb2c7),
+        this.add.rectangle(-16, -9, 9, 9, 0xd9f7f2),
+        this.add.rectangle(16, -9, 9, 9, 0xd9f7f2),
+        this.add.rectangle(0, 31, 34, 6, 0x183a4b),
+      );
+    } else if (monster.species.includes("jungle_king")) {
+      parts.push(
+        this.add.rectangle(0, 9, 100, 88, 0x69543a).setStrokeStyle(8, 0x2e261d),
+        this.add.rectangle(-39, -45, 39, 29, 0x3f7645),
+        this.add.rectangle(39, -45, 39, 29, 0x3f7645),
+        this.add.rectangle(-21, -9, 13, 13, 0xe4c15c),
+        this.add.rectangle(21, -9, 13, 13, 0xe4c15c),
+        this.add.triangle(0, -72, -34, 20, 0, -20, 34, 20, 0xd0a640),
       );
     } else if (monster.kind === "filter-hound") {
       parts.push(

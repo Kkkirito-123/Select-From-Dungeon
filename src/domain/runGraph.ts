@@ -187,7 +187,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: ENTRY_ID,
       type: "entry",
-      title: "魔王城门",
+      title: "余烬地窖入口",
       depth: 0,
       lane: 0,
       required: true,
@@ -197,7 +197,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: HUB_ID,
       type: "tutorial",
-      title: "SELECT 数据石碑",
+      title: "SELECT 排水石碑",
       depth: 1,
       lane: 0,
       required: true,
@@ -208,7 +208,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: WHERE_ID,
       type: "lesson",
-      title: "WHERE 猎犬廊",
+      title: "WHERE 软泥水池",
       depth: 2,
       lane: laneById.get(WHERE_ID) ?? -2,
       required: true,
@@ -220,7 +220,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: NULL_ID,
       type: "lesson",
-      title: "IS NULL 无主墓室",
+      title: "IS NULL 毒泥仓窖",
       depth: 2,
       lane: laneById.get(NULL_ID) ?? -1,
       required: true,
@@ -232,7 +232,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: REST_ID,
       type: "rest",
-      title: "回滚篝火",
+      title: "余烬篝火室",
       depth: 2,
       lane: laneById.get(REST_ID) ?? 0,
       required: false,
@@ -243,7 +243,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: TREASURE_ID,
       type: "treasure",
-      title: "索引秘藏",
+      title: "旧仓库宝箱",
       depth: 2,
       lane: laneById.get(TREASURE_ID) ?? 1,
       required: false,
@@ -254,7 +254,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: EVENT_ID,
       type: "event",
-      title: "未知事务",
+      title: "苔藓排水井",
       depth: 2,
       lane: laneById.get(EVENT_ID) ?? 2,
       required: false,
@@ -265,7 +265,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: GROUP_ID,
       type: "event",
-      title: "聚合战锤祭坛",
+      title: "铁泥祭坛",
       depth: 3,
       lane: groupLane,
       required: true,
@@ -276,7 +276,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: ELITE_ID,
       type: "elite",
-      title: "GROUP BY 石巨人",
+      title: "GROUP BY 铁胶怪",
       depth: 4,
       lane: -groupLane,
       required: true,
@@ -288,7 +288,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: BOSS_ID,
       type: "boss",
-      title: "HAVING 魔王",
+      title: "HAVING 泥王",
       depth: 5,
       lane: 0,
       required: true,
@@ -309,7 +309,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
 }
 
 function generateFloorTwoGraph(rawSeed: string): RoomGraph {
-  const seed = rawSeed.trim() || "雷鸣奏鸣塔-第二层";
+  const seed = rawSeed.trim() || "湖沼森林-第二层";
   const random = createSeededRandom(`select-from-dungeon:run-graph:v2:floor-2:${seed}`);
   const sideIds = [
     FLOOR_2_DISTINCT_ID,
@@ -325,7 +325,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_ENTRY_ID,
       type: "entry",
-      title: "雷鸣传送台",
+      title: "森林传送台",
       depth: 0,
       lane: 0,
       required: true,
@@ -335,7 +335,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_ORDER_ID,
       type: "tutorial",
-      title: "ORDER BY 雷序回廊",
+      title: "ORDER BY 森林入口",
       depth: 1,
       lane: 0,
       required: true,
@@ -346,7 +346,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_DISTINCT_ID,
       type: "lesson",
-      title: "DISTINCT 镜像阵列",
+      title: "DISTINCT 湖心石台",
       depth: 2,
       lane: laneById.get(FLOOR_2_DISTINCT_ID) ?? -1.5,
       required: true,
@@ -358,7 +358,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_REST_ID,
       type: "rest",
-      title: "静电回滚站",
+      title: "湖畔篝火",
       depth: 2,
       lane: laneById.get(FLOOR_2_REST_ID) ?? -0.5,
       required: false,
@@ -369,7 +369,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_TREASURE_ID,
       type: "treasure",
-      title: "覆盖索引仓",
+      title: "林中猎具仓",
       depth: 2,
       lane: laneById.get(FLOOR_2_TREASURE_ID) ?? 0.5,
       required: false,
@@ -380,7 +380,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_EVENT_ID,
       type: "event",
-      title: "电弧事务井",
+      title: "泥沼古井",
       depth: 2,
       lane: laneById.get(FLOOR_2_EVENT_ID) ?? 1.5,
       required: false,
@@ -391,7 +391,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_JOIN_ID,
       type: "lesson",
-      title: "INNER JOIN 双表桥",
+      title: "INNER JOIN 古树桥",
       depth: 3,
       lane: -0.8,
       required: true,
@@ -403,7 +403,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_LEFT_ID,
       type: "lesson",
-      title: "LEFT JOIN 缺口层",
+      title: "LEFT JOIN 毒雾泥沼",
       depth: 4,
       lane: 0.8,
       required: true,
@@ -415,7 +415,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_ELITE_ID,
       type: "elite",
-      title: "关系链校验场",
+      title: "树妖校验场",
       depth: 5,
       lane: -0.5,
       required: true,
@@ -426,7 +426,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_BOSS_ID,
       type: "boss",
-      title: "雷王",
+      title: "丛林王",
       depth: 6,
       lane: 0,
       required: true,

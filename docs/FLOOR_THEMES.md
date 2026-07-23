@@ -1,7 +1,7 @@
 # SQL Demon Castle Eight-Floor Map and Art Direction
 
-Status: **the eight-floor theme/topology data contract is implemented in
-v0.6.0; biome tiles and floors three through eight are not yet implemented**
+Status: **the eight-floor theme/topology contract and the first two floors'
+biome tiles are implemented in v0.7.0; floors three through eight are not**
 Related curriculum: [Eight-floor curriculum blueprint](CURRICULUM.md)
 Primary users: players, level designers, pixel artists, and frontend implementers
 

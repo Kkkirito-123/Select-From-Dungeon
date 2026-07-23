@@ -19,6 +19,11 @@ import {
   validateGuidedMapPlan,
 } from "../domain/guidedMap";
 import {
+  generateBiomePlan,
+  validateBiomePlan,
+  type BiomePlan,
+} from "../domain/biome";
+import {
   createCampaignProgress,
   isCampaignProgress,
 } from "../domain/campaign";
@@ -109,12 +114,15 @@ const WEAPON_IDS = [
   "aggregate-hammer",
   "sort-saber",
   "join-chain",
+  "slime-sword",
+  "hunter-bow",
   "bone-blade",
 ] as const;
 const ARMOR_IDS = ["slime-vest", "vine-armor"] as const;
 const CONSUMABLE_IDS = [
   "slime-gel",
   "water-drop",
+  "frog-potion",
   "forest-fruit",
   "whetstone",
   "repair-shard",
@@ -684,6 +692,7 @@ function isWorldActor(
   graph: RoomGraph,
   monstersById: ReadonlyMap<number, Monster>,
   reachableCells: ReadonlySet<string>,
+  biomePlan: BiomePlan | null,
 ): value is WorldActor {
   if (
     !isRecord(value) ||
@@ -701,10 +710,22 @@ function isWorldActor(
   const monster = monstersById.get(value.monsterId);
   const room = graph.nodes.find((node) => node.id === value.roomNodeId);
   const anchor = floor.anchors[value.roomNodeId];
-  return Boolean(monster && room && anchor) &&
-    room?.lessonId === monster?.lessonId &&
-    value.home.x === anchor?.x &&
-    value.home.y === anchor?.y &&
+  if (!monster || !room || !anchor || room.lessonId !== monster.lessonId) return false;
+  const areaBossRegion = biomePlan?.regions.find(
+    (region) => region.areaBossId === monster.id,
+  );
+  if (areaBossRegion) {
+    const expected = areaBossRegion.areaBossPosition;
+    return Boolean(expected) &&
+      value.behavior === "anchored" &&
+      value.roamRadius === 0 &&
+      value.x === expected?.x &&
+      value.y === expected?.y &&
+      value.home.x === expected?.x &&
+      value.home.y === expected?.y;
+  }
+  return value.home.x === anchor.x &&
+    value.home.y === anchor.y &&
     Math.abs(value.x - value.home.x) + Math.abs(value.y - value.home.y) <= value.roamRadius;
 }
 
@@ -846,10 +867,24 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
   const guidedMap = version >= 7 && campfires
     ? generateGuidedMapPlan(graph, mazeFloor, campfires)
     : null;
+  const biomePlan = version >= 7 && campfires && guidedMap
+    ? generateBiomePlan(graph, mazeFloor, campfires, guidedMap)
+    : null;
   if (
     version >= 7 &&
     guidedMap &&
     !validateGuidedMapPlan(graph, mazeFloor, campfires ?? [], guidedMap).valid
+  ) return false;
+  if (
+    version >= 7 &&
+    biomePlan &&
+    !validateBiomePlan(
+      biomePlan,
+      graph,
+      mazeFloor,
+      campfires ?? [],
+      guidedMap as NonNullable<typeof guidedMap>,
+    ).valid
   ) return false;
   const activeCampfireId = version >= 7 ? run.activeCampfireId : null;
   const respawnCampfireId = version >= 7 ? run.respawnCampfireId : null;
@@ -997,7 +1032,14 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
   const monstersById = new Map(run.monsters.map((monster) => [monster.id, monster]));
   if (
     !run.worldActors.every((actor) => (
-      isWorldActor(actor, mazeFloor, graph, monstersById, allReachableCells)
+      isWorldActor(
+        actor,
+        mazeFloor,
+        graph,
+        monstersById,
+        allReachableCells,
+        biomePlan,
+      )
     )) ||
     !hasUniqueValues(run.worldActors.map((actor) => actor.monsterId)) ||
     !run.monsters

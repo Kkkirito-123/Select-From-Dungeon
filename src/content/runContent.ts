@@ -263,14 +263,14 @@ export function rewardDetails(reward: RoomReward | null): ClaimableReward | null
 export function roomFlavor(type: RoomType, floor = 1): string {
   if (floor === 2) {
     const floorTwoCopy: Record<RoomType, string> = {
-      entry: "传送残响正在退去。雷鸣奏鸣塔的电路会沿另一套路径重排。",
-      tutorial: "雷序刻度不断交换位置，只有排序后的结果能够稳定电流。",
-      lesson: "两张数据表在紫色电弧间靠近，等待一条明确的连接条件。",
-      rest: "静电回滚站可以恢复生命；靠近后按 E 结算。",
-      treasure: "覆盖索引仓只增强本轮构筑，不改变必修课程。",
-      event: "事务井在电弧中等待调查，结果只影响当前 Run。",
-      elite: "关系校验场会放大每一条错误连接。",
-      boss: "雷鸣主核正在同时调度房间、怪物与装备三张表。",
+      entry: "传送残响正在湖岸退去。森林、湖泊和泥沼会沿同一 Seed 重新分布。",
+      tutorial: "林间足迹不断交换位置，只有排序后的结果能够锁定猎犬。",
+      lesson: "怪物档案和区域记录分散在不同数据表，等待明确的连接条件。",
+      rest: "湖畔篝火可以恢复生命；靠近后按 E 休息或复盘。",
+      treasure: "猎具仓只增强本轮构筑，不改变必修课程。",
+      event: "泥沼古井等待调查，结果只影响当前 Run。",
+      elite: "树妖校验场会放大每一条错误连接。",
+      boss: "丛林王正在同时控制房间、怪物与装备三张表。",
     };
     return floorTwoCopy[type];
   }
