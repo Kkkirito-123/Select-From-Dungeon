@@ -14,6 +14,10 @@ import {
   nearbyCampfire,
   safeZoneCellKeys,
 } from "../domain/campfire";
+import {
+  generateGuidedMapPlan,
+  validateGuidedMapPlan,
+} from "../domain/guidedMap";
 import type { WorldActor } from "../domain/monsterRoaming";
 import {
   lessonsForFloor,
@@ -827,6 +831,14 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
   const campfires = version >= 7
     ? validatedCampfires(run.campfires, graph, mazeFloor)
     : [];
+  const guidedMap = version >= 7 && campfires
+    ? generateGuidedMapPlan(graph, mazeFloor, campfires)
+    : null;
+  if (
+    version >= 7 &&
+    guidedMap &&
+    !validateGuidedMapPlan(graph, mazeFloor, campfires ?? [], guidedMap).valid
+  ) return false;
   const activeCampfireId = version >= 7 ? run.activeCampfireId : null;
   const respawnCampfireId = version >= 7 ? run.respawnCampfireId : null;
   const activeLootBundleId = version === 8 ? run.activeLootBundleId : null;
@@ -845,7 +857,11 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
     (activeCampfireId !== null && !campfires?.some((entry) => entry.id === activeCampfireId)) ||
     (respawnCampfireId !== null && !campfires?.some((entry) => entry.id === respawnCampfireId)) ||
     !Array.isArray(openedGateIds) ||
-    !openedGateIds.every((id) => id === challengeGateId) ||
+    !openedGateIds.every((id) => (
+      id === challengeGateId ||
+      guidedMap?.shortcuts.some((shortcut) => shortcut.id === id) ||
+      guidedMap?.deadEndCaches.some((cache) => cache.id === id)
+    )) ||
     !hasUniqueValues(openedGateIds) ||
     !(activeGateChallengeId === null || (
       typeof activeGateChallengeId === "string" &&
@@ -1017,6 +1033,13 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
       (player.armor !== null && !run.acquiredUniqueItemIds.includes(player.armor.id)) ||
       run.equipmentInventory.some((item) => (
         !run.acquiredUniqueItemIds?.includes(item.weapon?.id ?? item.armor?.id ?? "")
+      )) ||
+      guidedMap?.shortcuts.some((shortcut) => (
+        openedGateIds.includes(shortcut.id) &&
+        (
+          !run.keyItems?.includes(shortcut.keyId) ||
+          shortcut.requires.some((lesson) => !run.completedLessons?.includes(lesson))
+        )
       ))
     ) return false;
     const activeBundle = activeLootBundleId

@@ -133,6 +133,7 @@ export class DungeonScene extends Phaser.Scene {
   private readonly monsterViews = new Map<number, MonsterView>();
   private readonly itemViews = new Map<string, ItemView>();
   private readonly gateViews = new Map<string, GateView>();
+  private readonly shortcutViews = new Map<string, GateView[]>();
   private readonly campfireViews = new Map<string, CampfireView>();
   private readonly pressedDirections = new Map<string, Position>();
   private renderedTopology = -1;
@@ -316,6 +317,43 @@ export class DungeonScene extends Phaser.Scene {
           : "聚合战锤已共鸣，GROUP BY 知识门开启。",
       });
     }
+    const shortcutKey = snapshot.guidedMap.shortcuts.find((shortcut) => (
+      !previous.keyItems.includes(shortcut.keyId) &&
+      snapshot.keyItems.includes(shortcut.keyId)
+    ));
+    if (shortcutKey) {
+      this.feedback.dispatch({
+        type: "item-pickup",
+        itemName: "捷径钥匙",
+        kind: "key",
+        message: snapshot.banner,
+      });
+      emitMilestone("item-pickup");
+    }
+    const openedGuidedId = snapshot.openedGateIds.find(
+      (id) => !previous.openedGateIds.includes(id),
+    );
+    const openedShortcut = snapshot.guidedMap.shortcuts.find(
+      (shortcut) => shortcut.id === openedGuidedId,
+    );
+    if (openedShortcut) {
+      this.feedback.dispatch({
+        type: "gate-open",
+        message: `${openedShortcut.name}已永久开启。`,
+      });
+    }
+    const openedCache = snapshot.guidedMap.deadEndCaches.find(
+      (cache) => cache.id === openedGuidedId,
+    );
+    if (openedCache) {
+      this.feedback.dispatch({
+        type: "item-pickup",
+        itemName: "死路补给",
+        kind: "event",
+        message: snapshot.banner,
+      });
+      emitMilestone("item-pickup");
+    }
     pickedItemsBetween(previous, snapshot)
       .forEach((item) => this.playPickupFeedback(item, snapshot.banner));
   }
@@ -335,6 +373,7 @@ export class DungeonScene extends Phaser.Scene {
     this.itemViews.forEach((view) => view.tween?.destroy());
     this.itemViews.clear();
     this.gateViews.clear();
+    this.shortcutViews.clear();
 
     const floor = this.snapshot.mazeFloor;
     const worldWidth = floor.width * TILE_SIZE;
@@ -344,11 +383,15 @@ export class DungeonScene extends Phaser.Scene {
     this.drawDecorations();
     this.drawZoneLabels();
     this.createGates();
+    this.createShortcutViews();
     this.createCampfireViews();
     this.createPlayer();
     this.createMonsterViews();
     this.createObjectiveBeacon();
     this.syncItemViews();
+    this.syncGateViews();
+    this.syncShortcutViews();
+    this.syncCampfireViews();
     this.drawFog();
     this.cameras.main.startFollow(this.playerView, true, 0.18, 0.18);
     this.cameras.main.centerOn(this.playerView.x, this.playerView.y);
@@ -430,6 +473,18 @@ export class DungeonScene extends Phaser.Scene {
       if (decoration.kind === "rune") marker.setAngle(45);
       this.entityLayer.add(marker);
     });
+    this.snapshot.guidedMap.routeMarkers.forEach((routeMarker) => {
+      const pixel = gridToPixels(routeMarker);
+      const marker = this.add.polygon(
+        pixel.x,
+        pixel.y,
+        [0, -8, 7, 0, 0, 8, -7, 0],
+        colors.query,
+        0.26,
+      ).setStrokeStyle(1, colors.query, 0.78);
+      marker.setData("cell", positionKey(routeMarker));
+      this.entityLayer.add(marker);
+    });
   }
 
   private drawZoneLabels(): void {
@@ -464,6 +519,33 @@ export class DungeonScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(19);
       this.entityLayer.add([block, label]);
       this.gateViews.set(gate.id, { block, label });
+    });
+  }
+
+  private createShortcutViews(): void {
+    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
+      const views = [shortcut.entry, shortcut.exit].map((position) => {
+        const pixel = gridToPixels(position);
+        const block = this.add.rectangle(
+          pixel.x,
+          pixel.y,
+          TILE_SIZE - 6,
+          TILE_SIZE - 6,
+          colors.plum,
+          0.76,
+        ).setStrokeStyle(2, colors.gold, 0.9).setDepth(18);
+        const label = this.add.text(pixel.x, pixel.y - 22, "E · LOCKED", {
+          color: "#f1d28b",
+          fontFamily: "monospace",
+          fontSize: "7px",
+          backgroundColor: "#08090cdd",
+          padding: { x: 3, y: 2 },
+        }).setOrigin(0.5).setDepth(19);
+        this.entityLayer.add([block, label]);
+        return { block, label };
+      });
+      this.shortcutViews.set(shortcut.id, views);
     });
   }
 
@@ -753,6 +835,7 @@ export class DungeonScene extends Phaser.Scene {
     });
     this.syncItemViews();
     this.syncGateViews();
+    this.syncShortcutViews();
     this.syncCampfireViews();
     this.drawFog();
   }
@@ -784,9 +867,58 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  private syncShortcutViews(): void {
+    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    const discovered = new Set(this.snapshot.discoveredCells);
+    this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
+      const views = this.shortcutViews.get(shortcut.id);
+      if (!views) return;
+      const open = this.snapshot.openedGateIds.includes(shortcut.id);
+      const hasKey = this.snapshot.keyItems.includes(shortcut.keyId);
+      [shortcut.entry, shortcut.exit].forEach((position, index) => {
+        const view = views[index];
+        if (!view) return;
+        view.block.setFillStyle(open ? colors.query : colors.plum, open ? 0.28 : 0.76);
+        view.block.setStrokeStyle(2, open ? colors.query : colors.gold, 0.9);
+        view.label.setText(open ? "E · SHORTCUT" : hasKey ? "E · UNLOCK" : "E · LOCKED");
+        const visible = discovered.has(positionKey(position));
+        view.block.setVisible(visible);
+        view.label.setVisible(visible);
+      });
+    });
+  }
+
   private syncItemViews(): void {
+    const guidedItems: GroundItem[] = [
+      ...this.snapshot.guidedMap.shortcuts
+        .filter((shortcut) => !this.snapshot.keyItems.includes(shortcut.keyId))
+        .map((shortcut) => ({
+          id: shortcut.keyId,
+          sourceRoomId: shortcut.keyRoomNodeId,
+          ...shortcut.keyPosition,
+          name: "捷径钥匙",
+          description: `保证开启${shortcut.name}，不依赖随机掉落。`,
+          kind: "key" as const,
+          collection: "interact" as const,
+          rewardId: null,
+        })),
+      ...this.snapshot.guidedMap.deadEndCaches
+        .filter((cache) => !this.snapshot.openedGateIds.includes(cache.id))
+        .map((cache) => ({
+          id: cache.id,
+          sourceRoomId: cache.sourceRoomId,
+          x: cache.x,
+          y: cache.y,
+          name: "死路补给",
+          description: "空支路改为可选探索收益。",
+          kind: "event" as const,
+          collection: "interact" as const,
+          rewardId: cache.rewardId,
+        })),
+    ];
     const currentIds = new Set([
       ...this.snapshot.groundItems.map((item) => item.id),
+      ...guidedItems.map((item) => item.id),
       ...this.snapshot.lootBundles.map((bundle) => `loot-bundle:${bundle.id}`),
     ]);
     this.itemViews.forEach((view, id) => {
@@ -795,7 +927,7 @@ export class DungeonScene extends Phaser.Scene {
       view.container.destroy(true);
       this.itemViews.delete(id);
     });
-    this.snapshot.groundItems.forEach((item) => {
+    [...this.snapshot.groundItems, ...guidedItems].forEach((item) => {
       let view = this.itemViews.get(item.id);
       if (!view) {
         const pixel = gridToPixels(item);
@@ -804,7 +936,9 @@ export class DungeonScene extends Phaser.Scene {
           (room) => room.id === item.sourceRoomId,
         );
         const isChest = item.collection === "interact" && (
-          item.id.startsWith("lesson-drop:") || sourceRoom?.type === "treasure"
+          item.id.startsWith("lesson-drop:") ||
+          item.id.startsWith("guided-cache:") ||
+          sourceRoom?.type === "treasure"
         );
         const parts: Phaser.GameObjects.GameObject[] = [];
         if (isChest) {

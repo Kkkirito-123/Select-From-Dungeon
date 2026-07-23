@@ -25,6 +25,15 @@ and turn the correct result into an animated attack.
   or menu choice. Level, XP, weapon, relics, and query count carry across.
 - Reveal the discovery minimap by walking through fog. It records explored
   regions and course gates; it is not clickable and never teleports the player.
+- The same seed deterministically rebuilds course-route beacons, distance-based
+  front/middle/rear campfires, dead-end caches, and one two-way shortcut.
+  Visible route interests stay within 18 steps on the main course route. Every
+  remaining corridor dead end contains a one-use cache. The shortcut key is
+  guaranteed in a middle/rear area, consumes no inventory slot, and never
+  depends on random monster loot. Use `E` to collect the key, unlock the
+  shortcut permanently for the Run, and travel through it. Because the player
+  must first reach the key physically, the shortcut reduces repeat walking
+  without skipping required SQL.
 - Move into a living curriculum monster's tile or trigger a step-based ambush to
   start a Pokémon-like single-target battle. Outside safe zones, eligible
   successful steps use a 2% base ambush chance after the safe window and
@@ -187,6 +196,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ MazeGenerator/MazeFloor ── seeded 64x48 physical maze
   ├─ MazeValidation ── topology, reachability, and save invariants
   ├─ CampfireDomain ── seeded checkpoints and shared visible safe-cell masks
+  ├─ GuidedMap ── route beacons, dead-end caches, guaranteed key, shortcut
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
   ├─ MonsterRoaming ── deterministic slow patrol decisions
   ├─ LootDirector ── independent candidates, rank minimums, deduplication
@@ -207,10 +217,13 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
 exploration, while movement, same-tile encounters, pickups, and gates are
 resolved by `GameSession` against the maze.
 
-The maze generator currently isolates `topology` and `decor` random streams.
-Actors and fixed curriculum drops are derived deterministically from course
-anchors; optional loot uses independent stable hashes, but there are no separate
-`theme` or `spawn` streams and no independent content-version field in this MVP.
+The maze generator isolates `topology` and `decor` random streams. `GuidedMap`
+then derives route beacons, dead-end caches, and the keyed shortcut from the
+fixed maze, curriculum graph, and campfires, so decoration density cannot move
+courses, keys, or shortcuts. Actors and fixed curriculum drops derive from
+course anchors and optional loot uses independent stable hashes. Separate
+`theme` and `spawn` streams and an independent content-version field are still
+outside this MVP.
 
 The terminal accepts one `SELECT` statement and displays at most 50 rows. DML,
 DDL, `PRAGMA`, `ATTACH`, and multiple statements are rejected. Query plans and
@@ -223,7 +236,9 @@ Browser-local storage is split into:
   equipment inventory, armor/armor HP, consumables, unique-item history, key
   items, discovered fog cells, three campfires, the active checkpoint, HP,
   level/XP, encounter meter, relics, combat progress, opened challenge gates,
-  the active gate challenge, and up to 200 local SQL answer records.
+  opened shortcut/cache state, the active gate challenge, and up to 200 local
+  SQL answer records. The guided plan itself is rebuilt from the seed instead
+  of storing a duplicate copy.
 - `select-from-dungeon:profile:v2`: ten mastered lessons, attempts, victories, and
   best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
@@ -288,7 +303,15 @@ controls while inventory is active, and no functional console error. Full-bag
 replacement, armor absorption, recoverable discards, and stable loot are covered
 by domain/storage tests. At 390×844 the inventory stayed inside the safe viewport
 with no horizontal overflow; a populated loot bundle still needs a manual
-browser pass. Earlier evidence covered startup,
+browser pass. The v0.5.0 browser pass then verified the route/shortcut legend,
+revealed one route beacon and one shortcut endpoint through successful physical
+movement, and kept the minimap at `348 / 348 px` scroll/client width. At 390×844,
+the inventory exposed the separate non-slot key section, the document stayed at
+`390 / 390 px`, and the dialog remained within `7–383 px`; the console reported
+zero warnings and errors. Guaranteed-key pickup, permanent opening, two-way
+travel, reload restoration, zero empty dead ends, and the 18-step marker bound
+are covered by domain/storage automation rather than a complete manual Run.
+Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
 Reduced Motion, subjective audio/timing, and the 10-second
