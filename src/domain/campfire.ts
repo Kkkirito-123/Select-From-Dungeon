@@ -50,9 +50,9 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
 
 /**
  * The current two-floor graph always has at least three non-combat side rooms.
- * The authored rest room is always the first checkpoint, the deepest
- * non-combat room becomes the rear checkpoint, and the middle host is chosen
- * deterministically from the remaining side rooms. Exact corners stay seeded.
+ * Hosts are selected by their real walking distance from spawn so the three
+ * checkpoints form front, middle, and rear route segments instead of merely
+ * following authored room types. Exact corners remain seeded.
  */
 export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[] {
   const candidates = floor.zones
@@ -65,46 +65,46 @@ export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[
         !room.lessonId,
       );
     })
-    .map((zone) => ({
-      zone,
-      depth: graph.nodes.find((node) => node.id === zone.roomNodeId)?.depth ?? 0,
-      distance: pathDistance(floor, zone.center),
-    }))
+    .map((zone) => {
+      const position = campfirePosition(floor, zone);
+      return {
+        zone,
+        position,
+        depth: graph.nodes.find((node) => node.id === zone.roomNodeId)?.depth ?? 0,
+        distance: pathDistance(floor, position),
+      };
+    })
     .sort((left, right) => (
-      left.depth - right.depth ||
       left.distance - right.distance ||
+      left.depth - right.depth ||
       left.zone.roomNodeId.localeCompare(right.zone.roomNodeId)
-    ))
-    .map(({ zone }) => zone);
+    ));
 
   if (candidates.length < 3) {
     throw new Error(`第 ${graph.floor} 层缺少前、中、后三个篝火候选区域。`);
   }
-  const front = candidates.find((zone) => (
-    graph.nodes.find((node) => node.id === zone.roomNodeId)?.type === "rest"
-  )) ?? candidates[0];
-  const rear = [...candidates]
-    .filter((zone) => zone.roomNodeId !== front.roomNodeId)
-    .at(-1);
-  if (!rear) {
+  const front = candidates[0];
+  const rear = candidates.at(-1);
+  if (!front || !rear || front.zone.roomNodeId === rear.zone.roomNodeId) {
     throw new Error(`第 ${graph.floor} 层缺少后段篝火候选区域。`);
   }
+  const midpoint = front.distance + (rear.distance - front.distance) / 2;
   const middlePool = candidates
-    .filter((zone) => (
-      zone.roomNodeId !== front.roomNodeId &&
-      zone.roomNodeId !== rear.roomNodeId
+    .filter(({ zone }) => (
+      zone.roomNodeId !== front.zone.roomNodeId &&
+      zone.roomNodeId !== rear.zone.roomNodeId
     ))
     .sort((left, right) => (
-      stableStringHash(`${floor.seed}:campfire:middle:${left.roomNodeId}`) -
-      stableStringHash(`${floor.seed}:campfire:middle:${right.roomNodeId}`)
+      Math.abs(left.distance - midpoint) - Math.abs(right.distance - midpoint) ||
+      stableStringHash(`${floor.seed}:campfire:middle:${left.zone.roomNodeId}`) -
+        stableStringHash(`${floor.seed}:campfire:middle:${right.zone.roomNodeId}`)
     ));
   const middle = middlePool[0];
   if (!middle) {
     throw new Error(`第 ${graph.floor} 层缺少中段篝火候选区域。`);
   }
   const selected = [front, middle, rear];
-  return selected.map((zone, index) => {
-    const position = campfirePosition(floor, zone);
+  return selected.map(({ zone, position }, index) => {
     return {
       id: `campfire:${graph.floor}:${PHASES[index]}`,
       phase: PHASES[index],

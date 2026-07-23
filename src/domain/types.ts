@@ -6,6 +6,7 @@ import type {
   RunLessonId,
 } from "./runGraph";
 import type { MazeFloor } from "./mazeGenerator";
+import type { GuidedMapPlan } from "./guidedMap";
 import type { WorldActor } from "./monsterRoaming";
 
 export type LessonId = RunLessonId;
@@ -311,6 +312,7 @@ export interface GameSnapshot {
   focusMonsterId: number | null;
   roomGraph: RoomGraph;
   mazeFloor: MazeFloor;
+  guidedMap: GuidedMapPlan;
   campfires: Campfire[];
   activeCampfireId: string | null;
   respawnCampfireId: string | null;
@@ -427,7 +429,15 @@ export interface PatrolBatchResolution {
 
 export interface InteractionResolution {
   ok: boolean;
-  kind: "none" | "campfire" | "challenge" | "combat" | "loot" | "reward" | "loot-bundle";
+  kind:
+    | "none"
+    | "campfire"
+    | "challenge"
+    | "combat"
+    | "loot"
+    | "reward"
+    | "loot-bundle"
+    | "shortcut";
   message: string;
 }
 

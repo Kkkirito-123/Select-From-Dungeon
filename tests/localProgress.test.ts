@@ -262,6 +262,21 @@ describe("localProgress", () => {
     expect(new GameSession(deathReviewRun).snapshot().battleReview).toHaveLength(2);
   }, 15_000);
 
+  it("v8 能恢复由迷宫派生的死路补给状态而无需重复保存引导方案", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "guided-cache-roundtrip");
+    const cache = session.snapshot().guidedMap.deadEndCaches[0];
+    if (!cache) throw new Error("测试迷宫缺少死路补给");
+    const saved = session.toSavedRun();
+    saved.openedGateIds.push(cache.id);
+
+    saveRun(storage, saved);
+    const loaded = loadRun(storage);
+
+    expect(loaded?.openedGateIds).toContain(cache.id);
+    expect(new GameSession(loaded).snapshot().guidedMap.deadEndCaches).toContainEqual(cache);
+  });
+
   it("恢复旧存档时使用当前内容中的简短怪物名", () => {
     const saved = freshRun("canonical-monster-names");
     const slime = saved.monsters.find((monster) => monster.id === 101);

@@ -754,6 +754,24 @@ h1 span {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.key-inventory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.key-inventory span {
+  border: 1px solid var(--gold);
+  padding: 6px 8px;
+  background: rgba(215, 173, 85, 0.09);
+  color: var(--gold-light);
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
 .inventory-item,
 .loot-item {
   display: grid;
@@ -2053,6 +2071,31 @@ h1 span {
   fill: var(--gold);
 }
 
+.minimap-route {
+  fill: var(--query);
+  opacity: 0.78;
+}
+
+.minimap-route.is-middle {
+  fill: var(--gold-light);
+}
+
+.minimap-route.is-rear {
+  fill: #d79af2;
+}
+
+.minimap-shortcut {
+  fill: #7f5a87;
+  stroke: var(--gold-light);
+  stroke-width: 0.22;
+  vector-effect: non-scaling-stroke;
+}
+
+.minimap-shortcut.is-open {
+  fill: var(--query);
+  stroke: var(--paper);
+}
+
 .minimap-player {
   fill: var(--paper);
   stroke: var(--query);
@@ -2103,6 +2146,13 @@ h1 span {
   vector-effect: non-scaling-stroke;
 }
 
+.minimap-item.is-guided-cache {
+  fill: #b88745;
+  stroke: var(--query);
+  stroke-width: 0.18;
+  vector-effect: non-scaling-stroke;
+}
+
 .map-legend {
   display: flex;
   flex-wrap: wrap;
@@ -2114,7 +2164,9 @@ h1 span {
 }
 
 .legend-player { color: var(--paper); }
+.legend-route { color: var(--query); }
 .legend-campfire { color: #ffad58; }
+.legend-shortcut { color: #d79af2; }
 .legend-gate { color: var(--gold); }
 .legend-monster { color: #ff8178; }
 .legend-item { color: var(--gold-light); }

@@ -46,7 +46,14 @@ may produce only optional low-probability loot. Outside safe zones, each
 eligible successful step has a 2% base ambush chance and the meter guarantees an
 encounter after 30 eligible quiet steps; reloads do not reroll the result.
 Each floor also contains three seeded physical campfires across the front,
-middle, and rear learning phases. Their visible safe zones, plus the entrance
+middle, and rear learning phases. The same seed also derives main-course route
+beacons, one-use supplies in every remaining dead end, and one guaranteed-key
+two-way shortcut. Route points stay at most 18 walking steps apart; the key sits
+in the middle or rear phase, does not consume inventory capacity, and never
+depends on random loot. The player must physically reach the key, then press
+`E` beside the shortcut to open it permanently and travel through it, so the
+shortcut reduces repeat walking without bypassing required SQL.
+Campfire visible safe zones, plus the entrance
 zone, suppress ambushes and patrol entry. Pressing `E` beside a campfire offers
 `在此休息` and `答案复盘`; resting restores maximum HP and makes that fire the
 checkpoint. Death keeps Run progress and the enemy's remaining HP, shows
@@ -100,6 +107,7 @@ index.html -> src/main.ts
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
   -> CampfireDomain (three seeded checkpoints and shared safe-cell masks)
+  -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates, rank minimums, deduplication)
@@ -119,7 +127,8 @@ player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> debounced v8 Run save + permanent v2 profile save
 ```
 
-`GameSession` owns physical movement, campfires/checkpoints, safe zones,
+`GameSession` owns physical movement, campfires/checkpoints, guided-map
+interaction state, safe zones,
 encounter meter, lesson, actor, fog, combat, HP, armor, inventory, seeded loot,
 answer-history, and profile truth. `RunGraph` is the curriculum dependency
 graph; it is not the physical navigation model. `MazeFloor` is the saved
@@ -232,8 +241,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   `select-from-dungeon:run:v8` (current floor, maze, actors, ground items, loot
   bundles, inventory, armor, consumables, unique-item history, key items, fog,
   three campfires, the active checkpoint, encounter meter, level/XP, opened
-  challenge gates, active gate challenge, at most 200 local answer records, and
-  disposable current Run state),
+  challenge gates/shortcuts/dead-end caches, active gate challenge, at most 200
+  local answer records, and disposable current Run state),
   `select-from-dungeon:profile:v2` (ten mastered lessons, attempts, victories, best
   query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
   state). A valid `select-from-dungeon:run:v7` is migrated in memory into v8
@@ -273,6 +282,13 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   campfire safe zones never advance this encounter risk, never spawn enemies,
   and reject patrol entry. Ordinary world monsters patrol slowly; the Boss
   remains anchored.
+- `GuidedMap` is derived deterministically from the curriculum graph, saved
+  `MazeFloor`, and three campfires rather than duplicated in save data. Route
+  beacons appear about every 14 steps with no gap above 18, and every remaining
+  corridor dead end contains a one-use supply. Each floor currently has exactly
+  one two-way shortcut and one guaranteed middle/rear key that consumes no
+  inventory slot. Opening requires both the key and the shortcut's course
+  prerequisites; opening, rest, and death never reroll or relock it.
 - Collecting the first-floor key enters `transition` mode. AppShell displays the
   gold `FLOOR 01 CLEARED / CONGRATULATIONS!!` feedback and calls
   `GameSession.advanceFloor()` after about 1.5 seconds without requiring

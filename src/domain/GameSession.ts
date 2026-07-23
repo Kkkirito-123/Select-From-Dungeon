@@ -62,6 +62,13 @@ import {
   safeZoneCellKeys,
 } from "./campfire";
 import { evaluateStage } from "./lessonEvaluator";
+import {
+  cloneGuidedMapPlan,
+  generateGuidedMapPlan,
+  nearbyShortcut,
+  shortcutDestination,
+  type GuidedMapPlan,
+} from "./guidedMap";
 import { rollLootItems } from "./lootDirector";
 import { MAX_ANSWER_HISTORY } from "./types";
 import type {
@@ -311,6 +318,7 @@ export class GameSession {
   private graph: RoomGraph;
   private mazeFloor: MazeFloor;
   private campfires: Campfire[];
+  private guidedMap: GuidedMapPlan;
   private activeCampfireId: string | null = null;
   private respawnCampfireId: string | null = null;
   private activeLootBundleId: string | null = null;
@@ -357,6 +365,11 @@ export class GameSession {
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);
     this.campfires = generateCampfires(this.graph, this.mazeFloor);
+    this.guidedMap = generateGuidedMapPlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+    );
     this.currentRoomId = this.graph.entryId;
     this.player = {
       ...this.mazeFloor.spawn,
@@ -383,6 +396,11 @@ export class GameSession {
         ...campfire,
         restPosition: { ...campfire.restPosition },
       }));
+      this.guidedMap = generateGuidedMapPlan(
+        this.graph,
+        this.mazeFloor,
+        this.campfires,
+      );
       this.activeCampfireId = savedRun.activeCampfireId;
       this.respawnCampfireId = savedRun.respawnCampfireId;
       this.activeLootBundleId = savedRun.activeLootBundleId;
@@ -522,6 +540,7 @@ export class GameSession {
       focusMonsterId: this.combat?.targetId ?? this.selectedMonsterId ?? target?.id ?? null,
       roomGraph: cloneGraph(this.graph),
       mazeFloor: cloneMazeFloor(this.mazeFloor),
+      guidedMap: cloneGuidedMapPlan(this.guidedMap),
       campfires: this.campfires.map((campfire) => ({
         ...campfire,
         restPosition: { ...campfire.restPosition },
@@ -888,20 +907,73 @@ export class GameSession {
       this.emit();
       return { ok: true, kind: "campfire", message: this.banner };
     }
-    const lootBundle = this.lootBundles.find(
+    const nearbyLootBundle = this.lootBundles.find(
       (entry) => distance(entry, this.player) <= 1,
     );
-    if (lootBundle) {
-      this.activeLootBundleId = lootBundle.id;
-      this.mode = "loot";
-      this.banner = `打开战利品包：${lootBundle.items.length} 件物品等待处理。`;
-      this.emit();
-      return { ok: true, kind: "loot-bundle", message: this.banner };
-    }
-    const item = this.groundItems.find(
+    const nearbyGroundItem = this.groundItems.find(
       (entry) => entry.collection === "interact" && distance(entry, this.player) <= 1,
     );
-    if (item) return this.collectGroundItem(item, true);
+    if (nearbyLootBundle && distance(nearbyLootBundle, this.player) === 0) {
+      return this.openLootBundle(nearbyLootBundle);
+    }
+    if (nearbyGroundItem && distance(nearbyGroundItem, this.player) === 0) {
+      return this.collectGroundItem(nearbyGroundItem, true);
+    }
+    const shortcutKey = this.guidedMap.shortcuts.find((shortcut) => (
+      !this.keyItems.includes(shortcut.keyId) &&
+      distance(shortcut.keyPosition, this.player) <= 1
+    ));
+    if (shortcutKey) {
+      this.keyItems.push(shortcutKey.keyId);
+      this.banner = `获得捷径钥匙：${shortcutKey.name}。回到任一捷径门旁按 E，即可永久开启本层往返通道。`;
+      this.emit();
+      return { ok: true, kind: "shortcut", message: this.banner };
+    }
+    const deadEndCache = this.guidedMap.deadEndCaches.find((cache) => (
+      !this.openedGateIds.has(cache.id) &&
+      distance(cache, this.player) <= 1
+    ));
+    if (deadEndCache) {
+      const reward = rewardDetails(deadEndCache.rewardId);
+      this.applyReward(deadEndCache.rewardId);
+      this.openedGateIds.add(deadEndCache.id);
+      this.banner = `打开死路补给：${reward?.name ?? "补给"}。${reward?.description ?? "本层探索收益已结算。"}`;
+      this.emit();
+      return { ok: true, kind: "reward", message: this.banner };
+    }
+    const nearbyGuidedShortcut = nearbyShortcut(this.guidedMap, this.player);
+    if (nearbyGuidedShortcut) {
+      const { shortcut, side } = nearbyGuidedShortcut;
+      if (!this.openedGateIds.has(shortcut.id)) {
+        if (!this.keyItems.includes(shortcut.keyId)) {
+          return this.interactionFailure(
+            `${shortcut.name} 已锁定。捷径钥匙保证出现在本层中后段，不依赖怪物随机掉落。`,
+          );
+        }
+        const missingLessons = shortcut.requires.filter(
+          (lesson) => !this.completedLessons.has(lesson),
+        );
+        if (missingLessons.length > 0) {
+          return this.interactionFailure(
+            `捷径机关尚未稳定：先完成 ${missingLessons.map((lesson) => lessonById(lesson).concept).join("、")}。`,
+          );
+        }
+        this.openedGateIds.add(shortcut.id);
+        this.banner = `${shortcut.name} 已永久开启。本 Run 中死亡或休息都不会重新上锁；再次按 E 可快速往返。`;
+        this.emit();
+        return { ok: true, kind: "shortcut", message: this.banner };
+      }
+      const destination = shortcutDestination(shortcut, side);
+      this.player.x = destination.x;
+      this.player.y = destination.y;
+      this.revealAt(destination);
+      this.updateCurrentRoom(destination);
+      this.banner = `穿过${shortcut.name}，跳过 ${shortcut.detourDistance} 格已探索折返路。`;
+      this.emit();
+      return { ok: true, kind: "shortcut", message: this.banner };
+    }
+    if (nearbyLootBundle) return this.openLootBundle(nearbyLootBundle);
+    if (nearbyGroundItem) return this.collectGroundItem(nearbyGroundItem, true);
     const challengeGate = this.nearbyLockedChallengeGate();
     if (challengeGate) {
       this.activeGateChallengeId = gateChallengeIdForFloor(this.floorNumber);
@@ -1285,6 +1357,14 @@ export class GameSession {
       ...this.lootBundles.map(positionKey),
       ...safeZoneCellKeys(this.mazeFloor, this.campfires),
       ...this.campfires.map(positionKey),
+      ...this.guidedMap.shortcuts.flatMap((shortcut) => [
+        positionKey(shortcut.entry),
+        positionKey(shortcut.exit),
+        positionKey(shortcut.keyPosition),
+      ]),
+      ...this.guidedMap.deadEndCaches
+        .filter((cache) => !this.openedGateIds.has(cache.id))
+        .map(positionKey),
     ]);
     const occupied = new Set(
       this.worldActors
@@ -1531,6 +1611,11 @@ export class GameSession {
     this.graph = generateRoomGraph(nextSeed, 2);
     this.mazeFloor = generateMazeFloor(this.graph);
     this.campfires = generateCampfires(this.graph, this.mazeFloor);
+    this.guidedMap = generateGuidedMapPlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+    );
     this.activeCampfireId = null;
     this.respawnCampfireId = null;
     this.mode = "explore";
@@ -1573,6 +1658,11 @@ export class GameSession {
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);
     this.campfires = generateCampfires(this.graph, this.mazeFloor);
+    this.guidedMap = generateGuidedMapPlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+    );
     this.activeCampfireId = null;
     this.respawnCampfireId = null;
     this.mode = "explore";
@@ -2222,6 +2312,14 @@ export class GameSession {
     };
   }
 
+  private openLootBundle(bundle: LootBundle): InteractionResolution {
+    this.activeLootBundleId = bundle.id;
+    this.mode = "loot";
+    this.banner = `打开战利品包：${bundle.items.length} 件物品等待处理。`;
+    this.emit();
+    return { ok: true, kind: "loot-bundle", message: this.banner };
+  }
+
   private applyReward(rewardId: RoomReward): void {
     if (rewardId === "restore-12-hp") {
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 1);
@@ -2333,6 +2431,24 @@ export class GameSession {
       return this.respawnCampfireId === campfire.id
         ? "E  当前复活点 · 篝火"
         : `E  调查${this.campfirePhaseName(campfire)}`;
+    }
+    const shortcutKey = this.guidedMap.shortcuts.find((shortcut) => (
+      !this.keyItems.includes(shortcut.keyId) &&
+      distance(shortcut.keyPosition, this.player) <= 1
+    ));
+    if (shortcutKey) return `E  拾取捷径钥匙 · ${shortcutKey.name}`;
+    const deadEndCache = this.guidedMap.deadEndCaches.find((cache) => (
+      !this.openedGateIds.has(cache.id) &&
+      distance(cache, this.player) <= 1
+    ));
+    if (deadEndCache) return "E  打开死路补给 · 支路不会空手而归";
+    const guidedShortcut = nearbyShortcut(this.guidedMap, this.player);
+    if (guidedShortcut) {
+      return this.openedGateIds.has(guidedShortcut.shortcut.id)
+        ? `E  穿过${guidedShortcut.shortcut.name}`
+        : this.keyItems.includes(guidedShortcut.shortcut.keyId)
+          ? `E  使用捷径钥匙 · ${guidedShortcut.shortcut.name}`
+          : `E  检查锁住的${guidedShortcut.shortcut.name}`;
     }
     const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
     if (lootBundle) return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;

@@ -9,6 +9,7 @@ import {
   spawnSafeCellKeys,
 } from "../src/domain/campfire";
 import { generateMazeFloor, mazeTileAt } from "../src/domain/mazeGenerator";
+import { findGridPath } from "../src/domain/pathfinding";
 import { generateRoomGraph, type FloorNumber } from "../src/domain/runGraph";
 
 describe("campfire generation", () => {
@@ -31,9 +32,14 @@ describe("campfire generation", () => {
         `campfire:${floorNumber}:rear`,
       ]);
       expect(new Set(campfires.map((campfire) => campfire.roomNodeId)).size).toBe(3);
-      expect(
-        graph.nodes.find((room) => room.id === campfires[0].roomNodeId)?.type,
-      ).toBe("rest");
+      const distances = campfires.map((campfire) => (
+        findGridPath(
+          floor.spawn,
+          campfire,
+          (x, y) => mazeTileAt(floor, x, y) === ".",
+        ).length
+      ));
+      expect(distances).toEqual([...distances].sort((left, right) => left - right));
 
       campfires.forEach((campfire) => {
         expect(graph.nodes.some((room) => room.id === campfire.roomNodeId)).toBe(true);

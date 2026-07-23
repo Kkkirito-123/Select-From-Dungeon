@@ -387,6 +387,10 @@ export class AppShell {
                   <div class="card-heading"><span>恢复品</span><span id="consumable-capacity">0 / 3</span></div>
                   <div id="consumable-inventory" class="inventory-grid inventory-grid--consumables"></div>
                 </div>
+                <div class="loadout-menu__section">
+                  <div class="card-heading"><span>关键物品</span><span>不占背包</span></div>
+                  <div id="key-inventory" class="key-inventory"></div>
+                </div>
                 <p class="loadout-menu__note">战斗中不能换装。丢弃的普通物品会留在脚下，本层结束后消失。</p>
               </section>
 
@@ -558,7 +562,7 @@ export class AppShell {
             <section class="castle-map-card" aria-label="魔王城发现式迷宫地图">
               <div class="card-heading"><span>迷宫勘测</span><span id="map-explored">探索后显形</span></div>
               <div id="castle-map" class="castle-map"></div>
-              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-campfire">♨ 篝火</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
+              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-route">◇ 路标</span><span class="legend-campfire">♨ 篝火</span><span class="legend-shortcut">▣ 捷径</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
             </section>
 
             <section class="mastery-card">
@@ -582,7 +586,7 @@ export class AppShell {
             <section class="control-card">
               <div class="card-heading"><span>行动规则</span><span>无倒计时</span></div>
               <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　随机遭遇可能掉落低概率物品</p>
-              <p><kbd>E</kbd> 打开战利品包，或调查祭坛、篝火；靠近 Boss 机关门时可接入高难越级查询。</p>
+              <p><kbd>E</kbd> 打开补给与战利品、使用钥匙捷径，或调查祭坛、篝火和高难 SQL 机关。</p>
               <p><kbd>B</kbd> 在探索或篝火处打开背包；战斗中不能换装。</p>
               <p><kbd>Q + S</kbd> 打开终端　<kbd>Ctrl + Enter</kbd> 执行完整 SQL</p>
               <p>死亡后返回最近休息的篝火；未记录篝火时返回本层出生安全区，局内进度保留。</p>
@@ -1265,6 +1269,22 @@ export class AppShell {
       consumableRoot.append(article);
     });
 
+    const keyRoot = requiredElement(this.inventoryMenu, "#key-inventory");
+    keyRoot.replaceChildren();
+    if (snapshot.keyItems.length === 0) {
+      keyRoot.textContent = "尚未获得本层钥匙。捷径钥匙位于中后段，楼层钥匙由层主掉落。";
+    } else {
+      snapshot.keyItems.forEach((keyId) => {
+        const chip = document.createElement("span");
+        chip.textContent = keyId.startsWith("shortcut-key:")
+          ? `捷径钥匙 · 第 ${snapshot.floor} 层`
+          : keyId.startsWith("floor-")
+            ? `楼层钥匙 · ${keyId.match(/\d+/)?.[0] ?? snapshot.floor}`
+            : keyId;
+        keyRoot.append(chip);
+      });
+    }
+
     if (entered) {
       requiredElement<HTMLButtonElement>(this.inventoryMenu, "#close-inventory")
         .focus({ preventScroll: true });
@@ -1722,6 +1742,9 @@ export class AppShell {
     const pickedItems = this.lastSnapshot
       ? pickedItemsBetween(this.lastSnapshot, snapshot)
       : [];
+    const guidedPickup = this.lastSnapshot
+      ? this.guidedPickupBetween(this.lastSnapshot, snapshot)
+      : null;
     const room = snapshot.roomGraph.nodes.find((node) => node.id === snapshot.currentRoomId);
     const roomLesson = room?.lessonId
       ? LESSONS.find((lesson) => lesson.id === room.lessonId)
@@ -1811,7 +1834,7 @@ export class AppShell {
     this.renderMastery(snapshot);
     this.renderRelics(snapshot);
     this.renderGateChallenge(snapshot, enteredChallenge);
-    const latestPickup = pickedItems.at(-1);
+    const latestPickup = pickedItems.at(-1) ?? guidedPickup;
     if (latestPickup) {
       this.showPickupCard(latestPickup, snapshot.banner, snapshot.totalMoves);
     }
@@ -1841,6 +1864,45 @@ export class AppShell {
 
     this.lastStageId = snapshot.lessonStageId;
     this.lastMode = snapshot.mode;
+  }
+
+  private guidedPickupBetween(
+    previous: GameSnapshot,
+    next: GameSnapshot,
+  ): GroundItem | null {
+    if (previous.runSeed !== next.runSeed || previous.floor !== next.floor) return null;
+    const shortcut = next.guidedMap.shortcuts.find((entry) => (
+      !previous.keyItems.includes(entry.keyId) &&
+      next.keyItems.includes(entry.keyId)
+    ));
+    if (shortcut) {
+      return {
+        id: shortcut.keyId,
+        sourceRoomId: shortcut.keyRoomNodeId,
+        ...shortcut.keyPosition,
+        name: "捷径钥匙",
+        description: `保证开启${shortcut.name}；不会占用背包，也不依赖随机掉落。`,
+        kind: "key",
+        collection: "interact",
+        rewardId: null,
+      };
+    }
+    const cache = next.guidedMap.deadEndCaches.find((entry) => (
+      !previous.openedGateIds.includes(entry.id) &&
+      next.openedGateIds.includes(entry.id)
+    ));
+    if (!cache) return null;
+    return {
+      id: cache.id,
+      sourceRoomId: cache.sourceRoomId,
+      x: cache.x,
+      y: cache.y,
+      name: "死路补给",
+      description: "空死路已替换为可选收益；打开后本 Run 不会重复刷新。",
+      kind: "event",
+      collection: "interact",
+      rewardId: cache.rewardId,
+    };
   }
 
   private renderGateChallenge(snapshot: GameSnapshot, entered: boolean): void {
@@ -2157,7 +2219,11 @@ export class AppShell {
       paths.setAttribute("d", floorCommands.join(""));
       svg.append(paths);
     }
-    requiredElement(this.root, "#map-explored").textContent = `${floorCommands.length} 格已显形`;
+    const revealedMarkers = snapshot.guidedMap.routeMarkers.filter(
+      (marker) => discovered.has(`${marker.x}:${marker.y}`),
+    ).length;
+    requiredElement(this.root, "#map-explored").textContent =
+      `${floorCommands.length} 格 · ${revealedMarkers} 信标`;
 
     floor.gates.forEach((gate) => {
       if (!discovered.has(`${gate.x}:${gate.y}`)) return;
@@ -2170,6 +2236,29 @@ export class AppShell {
       marker.setAttribute("width", "0.7");
       marker.setAttribute("height", "0.9");
       svg.append(marker);
+    });
+
+    snapshot.guidedMap.routeMarkers.forEach((routeMarker) => {
+      if (!discovered.has(`${routeMarker.x}:${routeMarker.y}`)) return;
+      const marker = document.createElementNS(SVG_NS, "circle");
+      marker.classList.add("minimap-route", `is-${routeMarker.phase}`);
+      marker.setAttribute("cx", String(routeMarker.x + 0.5));
+      marker.setAttribute("cy", String(routeMarker.y + 0.5));
+      marker.setAttribute("r", "0.26");
+      svg.append(marker);
+    });
+    snapshot.guidedMap.shortcuts.forEach((shortcut) => {
+      const open = snapshot.openedGateIds.includes(shortcut.id);
+      [shortcut.entry, shortcut.exit].forEach((position) => {
+        if (!discovered.has(`${position.x}:${position.y}`)) return;
+        const marker = document.createElementNS(SVG_NS, "rect");
+        marker.classList.add("minimap-shortcut", open ? "is-open" : "is-locked");
+        marker.setAttribute("x", String(position.x + 0.14));
+        marker.setAttribute("y", String(position.y + 0.14));
+        marker.setAttribute("width", "0.72");
+        marker.setAttribute("height", "0.72");
+        svg.append(marker);
+      });
     });
 
     snapshot.campfires.forEach((campfire) => {
@@ -2214,6 +2303,34 @@ export class AppShell {
       marker.setAttribute("transform", `rotate(45 ${item.x + 0.5} ${item.y + 0.5})`);
       svg.append(marker);
     });
+    snapshot.guidedMap.shortcuts
+      .filter((shortcut) => !snapshot.keyItems.includes(shortcut.keyId))
+      .forEach((shortcut) => {
+        if (!discovered.has(`${shortcut.keyPosition.x}:${shortcut.keyPosition.y}`)) return;
+        const marker = document.createElementNS(SVG_NS, "rect");
+        marker.classList.add("minimap-item", "is-key");
+        marker.setAttribute("x", String(shortcut.keyPosition.x + 0.22));
+        marker.setAttribute("y", String(shortcut.keyPosition.y + 0.22));
+        marker.setAttribute("width", "0.56");
+        marker.setAttribute("height", "0.56");
+        marker.setAttribute(
+          "transform",
+          `rotate(45 ${shortcut.keyPosition.x + 0.5} ${shortcut.keyPosition.y + 0.5})`,
+        );
+        svg.append(marker);
+      });
+    snapshot.guidedMap.deadEndCaches
+      .filter((cache) => !snapshot.openedGateIds.includes(cache.id))
+      .forEach((cache) => {
+        if (!discovered.has(`${cache.x}:${cache.y}`)) return;
+        const marker = document.createElementNS(SVG_NS, "rect");
+        marker.classList.add("minimap-item", "is-guided-cache");
+        marker.setAttribute("x", String(cache.x + 0.18));
+        marker.setAttribute("y", String(cache.y + 0.22));
+        marker.setAttribute("width", "0.64");
+        marker.setAttribute("height", "0.56");
+        svg.append(marker);
+      });
     snapshot.lootBundles.forEach((bundle) => {
       if (!discovered.has(`${bundle.x}:${bundle.y}`)) return;
       const marker = document.createElementNS(SVG_NS, "rect");

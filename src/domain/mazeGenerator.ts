@@ -508,7 +508,7 @@ export function generateMazeFloor(
     grid,
     zoneMask,
     topologyRandom,
-    clamp(options.braidRatio ?? 0.82, 0, 1),
+    clamp(options.braidRatio ?? 1, 0, 1),
   );
   const tiles = grid.map((row) => row.join(""));
   const anchors = Object.fromEntries(
