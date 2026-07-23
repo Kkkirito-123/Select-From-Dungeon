@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+import { FLOOR_FIVE_LESSON_DEFINITIONS } from "../src/content/floor5Level";
+import { FLOOR_SIX_LESSON_DEFINITIONS } from "../src/content/floor6Level";
 import { evaluateLesson } from "../src/domain/lessonEvaluator";
 import { SqlEngine } from "../src/sql/SqlEngine";
 
@@ -58,5 +60,57 @@ describe("SqlEngine floor-two schema", () => {
         `${lessonId} stage ${stageIndex}`,
       ).toMatchObject({ accepted: true });
     });
+  });
+
+  it("第五层窗口查询在真实 HP 回写后仍稳定，第六层脚本使用一次性沙箱", async () => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+
+    for (const lesson of FLOOR_FIVE_LESSON_DEFINITIONS) {
+      lesson.stages.forEach((stage, stageIndex) => {
+        const result = engine.execute(stage.answerSql, 5);
+        const evaluation = evaluateLesson(lesson.id, stageIndex, result);
+        expect(
+          evaluation.accepted,
+          `${lesson.id} stage ${stageIndex}: ${evaluation.message}`,
+        ).toBe(true);
+        engine.updateMonsterHp(stage.attackTargetIds.map((id) => ({ id, hp: 0 })));
+      });
+    }
+
+    for (const lesson of FLOOR_SIX_LESSON_DEFINITIONS) {
+      lesson.stages.forEach((stage, stageIndex) => {
+        const result = engine.execute(stage.answerSql, 6);
+        const evaluation = evaluateLesson(lesson.id, stageIndex, result);
+        expect(
+          evaluation.accepted,
+          `${lesson.id} stage ${stageIndex}: ${evaluation.message}; ${JSON.stringify(result)}`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  it("第六层每次执行都从同一份初始 repair_queue 开始", async () => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    const inserted = engine.execute(
+      "INSERT INTO repair_queue(id, item, quantity, status) VALUES (6, 'claw', 2, 'ready');",
+      6,
+    );
+    expect(inserted.rows.some((row) => row.id === 6)).toBe(true);
+
+    const fresh = engine.execute(
+      "SELECT id, item, quantity, status FROM repair_queue ORDER BY id;",
+      6,
+    );
+    expect(fresh.rows).toHaveLength(5);
+    expect(fresh.rows.some((row) => row.id === 6)).toBe(false);
+    expect(fresh.plan).toContain("DISCARD sandbox after this turn");
   });
 });

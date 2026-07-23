@@ -103,6 +103,18 @@ const LESSON_IDS: readonly LessonId[] = [
   "f4-correlated",
   "f4-cte",
   "f4-recursive",
+  "f5-over",
+  "f5-row-number",
+  "f5-rank",
+  "f5-lag-lead",
+  "f5-frame",
+  "f5-top-n",
+  "f6-insert",
+  "f6-update",
+  "f6-delete",
+  "f6-constraint",
+  "f6-transaction",
+  "f6-savepoint",
 ];
 const PRE_V08_LESSON_IDS: readonly LessonId[] = LESSON_IDS.slice(0, 10);
 
@@ -124,6 +136,8 @@ const GATE_CHALLENGE_IDS: readonly GateChallengeId[] = [
   "relation-breach",
   "grave-breach",
   "forge-breach",
+  "iron-breach",
+  "dragon-breach",
 ];
 const WEAPON_IDS = [
   "data-blade",
@@ -136,8 +150,17 @@ const WEAPON_IDS = [
   "hunter-bow",
   "bone-blade",
   "rune-staff",
+  "iron-axe",
+  "dragon-spear",
 ] as const;
-const ARMOR_IDS = ["slime-vest", "vine-armor", "bone-armor", "rune-armor"] as const;
+const ARMOR_IDS = [
+  "slime-vest",
+  "vine-armor",
+  "bone-armor",
+  "rune-armor",
+  "iron-armor",
+  "dragon-armor",
+] as const;
 const CONSUMABLE_IDS = [
   "slime-gel",
   "water-drop",
@@ -146,6 +169,8 @@ const CONSUMABLE_IDS = [
   "holy-water",
   "fire-crystal",
   "ice-crystal",
+  "repair-plate",
+  "dragon-potion",
   "whetstone",
   "repair-shard",
 ] as const;
@@ -168,6 +193,15 @@ const MONSTER_KINDS = [
   "ice-spirit",
   "thunder-spirit",
   "elemental-king",
+  "goblin",
+  "orc",
+  "knight",
+  "troll",
+  "castle-lord",
+  "hatchling",
+  "wyvern",
+  "dragon",
+  "dragon-king",
 ] as const;
 const MONSTER_RANKS = ["normal", "elite", "boss"] as const;
 const ENCOUNTER_TYPES = ["curriculum", "ambush"] as const;
@@ -184,6 +218,8 @@ const ROOM_REWARDS = [
   "join-chain",
   "bone-blade",
   "rune-staff",
+  "iron-axe",
+  "dragon-spear",
   "restore-12-hp",
   "restore-20-hp",
   "cool-8-heat",
@@ -235,6 +271,18 @@ export function createEmptyProfile(): ProfileProgress {
       "f4-correlated": 0,
       "f4-cte": 0,
       "f4-recursive": 0,
+      "f5-over": 0,
+      "f5-row-number": 0,
+      "f5-rank": 0,
+      "f5-lag-lead": 0,
+      "f5-frame": 0,
+      "f5-top-n": 0,
+      "f6-insert": 0,
+      "f6-update": 0,
+      "f6-delete": 0,
+      "f6-constraint": 0,
+      "f6-transaction": 0,
+      "f6-savepoint": 0,
     },
     victories: 0,
     bestRunQueries: null,
@@ -379,7 +427,14 @@ function isPlayer(value: unknown, requireArmor: boolean): value is PlayerState {
 function isMonster(value: unknown): value is Monster {
   return (
     isPosition(value) &&
-    (value.floor === 1 || value.floor === 2 || value.floor === 3 || value.floor === 4) &&
+    (
+      value.floor === 1 ||
+      value.floor === 2 ||
+      value.floor === 3 ||
+      value.floor === 4 ||
+      value.floor === 5 ||
+      value.floor === 6
+    ) &&
     isNonNegativeInteger(value.id) &&
     isLessonId(value.lessonId) &&
     isNonNegativeInteger(value.roomId) &&
@@ -558,7 +613,14 @@ function isValidGraph(value: unknown): value is RoomGraph {
   if (
     !isRecord(value) ||
     value.version !== 2 ||
-    (value.floor !== 1 && value.floor !== 2 && value.floor !== 3 && value.floor !== 4) ||
+    (
+      value.floor !== 1 &&
+      value.floor !== 2 &&
+      value.floor !== 3 &&
+      value.floor !== 4 &&
+      value.floor !== 5 &&
+      value.floor !== 6
+    ) ||
     typeof value.seed !== "string" ||
     value.seed.length === 0 ||
     typeof value.entryId !== "string" ||
@@ -816,7 +878,14 @@ function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
     isRecord(value) &&
     isPositiveInteger(value.id) &&
     isPositiveInteger(value.battleId) &&
-    (value.floor === 1 || value.floor === 2 || value.floor === 3 || value.floor === 4) &&
+    (
+      value.floor === 1 ||
+      value.floor === 2 ||
+      value.floor === 3 ||
+      value.floor === 4 ||
+      value.floor === 5 ||
+      value.floor === 6
+    ) &&
     isNonNegativeInteger(value.monsterId) &&
     typeof value.monsterName === "string" &&
     value.monsterName.length > 0 &&
@@ -882,7 +951,14 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
   if (
     candidateVersion !== version ||
     run.generatorVersion !== 4 ||
-    (run.floor !== 1 && run.floor !== 2 && run.floor !== 3 && run.floor !== 4) ||
+    (
+      run.floor !== 1 &&
+      run.floor !== 2 &&
+      run.floor !== 3 &&
+      run.floor !== 4 &&
+      run.floor !== 5 &&
+      run.floor !== 6
+    ) ||
     !isValidGraph(run.graph)
   ) return false;
   const graph = run.graph;

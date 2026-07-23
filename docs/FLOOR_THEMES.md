@@ -1,7 +1,7 @@
 # SQL Demon Castle Eight-Floor Map and Art Direction
 
-Status: **v0.8.0 implements the eight-floor theme/topology contract and biome
-tiles for floors one through four; floors five through eight are not implemented**
+Status: **v0.9.0 implements the eight-floor theme/topology contract and biome
+tiles for floors one through six; floors seven and eight are not implemented**
 Related curriculum: [Eight-floor curriculum blueprint](CURRICULUM.md)
 Primary users: players, level designers, pixel artists, and frontend implementers
 
@@ -28,10 +28,10 @@ Map variation must support learning:
 
 ### 2.1 Every floor changes five dimensions
 
-1. **Element**: fire, lake/swamp life, undead ghost flame, fire/frost/storm, astral time, magma, data
-   life, and royal void.
-2. **Material**: stone, wetland vegetation, graves and bones, lava and ice, observatory metal,
-   black iron, roots and crystals, obsidian and gold.
+1. **Element**: fire, lake/swamp life, undead ghost flame, fire/frost/storm,
+   military iron, magma/dragon crystal, data life, and royal void.
+2. **Material**: stone, wetland vegetation, graves and bones, lava and ice,
+   riveted iron, volcanic dragon bone, roots and crystals, obsidian and gold.
 3. **Macro topology**: looped keep, wetland forest, grave-city paths,
    elemental forge, partition rings, rollback factory, B+ tree branches, and
    throne ascent.
@@ -83,8 +83,8 @@ persists without giving every floor the same meaning.
 | 2 | Aggregate Clocktower | brass, gears, steam | central shaft and converging spokes | circular clock core |
 | 3 | Undead Grave City | bones, grave mire, ghost flame | grave-path loops | necromancer court |
 | 4 | Elemental Forge | lava, frost, storm crystal | three elemental regions | elemental throne |
-| 5 | Window Observatory | stars, wind, time rings | partitioned ring corridors | circular star chart |
-| 6 | Rollback Foundry | magma, black iron, coolant | production loops and savepoints | dual-state furnace |
+| 5 | Black-Iron Window Fortress | iron, banners, battlements | partitioned military loops | black-iron throne |
+| 6 | Dragon Transaction Nest | magma, crystal, dragon bone | hatchery and savepoint caves | ancient dragon throne |
 | 7 | Crystal Index Grove | roots, crystals, data flow | B+ tree branches | ancient root core |
 | 8 | Obsidian Data Throne | obsidian, gold, royal flame | seven wings and a throne axis | stepped throne hall |
 
@@ -171,46 +171,43 @@ arena uses a purple-red throne palette for the Element King. v0.8.0 adds no
 real-time lighting, heat distortion, reflections, blur, post-processing, or
 larger map.
 
-### Floor 5: Window Observatory
+### Floor 5: Black-Iron Window Fortress
 
 **Curriculum**: window functions.
 **Experience**: express partitions, order, neighboring rows, and frames through
-astral rings.
+distinct military formations and fortress districts.
 
 | Dimension | Direction |
 |---|---|
-| Palette | midnight blue, indigo, ice blue, pale gold, starlight white |
-| Materials | observatory metal, glass panes, star-chart tiles, rails, wind stone |
-| Topology | partition rings surround a central shaft with short cross-links |
-| Ambient | discrete stars, stepped time-ring rotation, slow distant cloud bands |
-| Landmarks | PARTITION hall, rank steps, LAG/LEAD towers, cumulative track |
-| Shortcut | the shaft lift returns directly to each cleared ring |
-| Preview | the star chart becomes a transaction diagram above Floor 6 |
+| Palette | black-iron gray, cool cyan, banner red, old gold, paper white |
+| Materials | riveted iron, old stone, banners, battlements, weapon racks |
+| Topology | iron yard, barracks, and inner citadel form three looped partitions |
+| Ambient | static crossed iron, banners, and battlements with one cheap beacon animation |
+| Landmarks | OVER formation, ROW_NUMBER tower, RANK arena, cumulative wall |
+| Shortcut | the middle/rear key opens a fixed two-way fortress gate |
+| Preview | eggs and magma light appear behind the dragon gate |
 
-The Boss room is a large star chart with clear sectors. Rank, ties, and
-cumulative values light tile segments without replacing the SQL result table.
+The Boss room is a black-iron throne hall. Battlements and a gold crown
+silhouette establish the floor ruler; SQL results remain the only proof.
 
-All stars share one low-frequency clock instead of one Tween per star.
-
-### Floor 6: Rollback Foundry
+### Floor 6: Dragon Transaction Nest
 
 **Curriculum**: data changes and transactions.
 **Experience**: show visible before, failed, rolled-back, and committed states.
 
 | Dimension | Direction |
 |---|---|
-| Palette | black iron, magma orange, warning red, coolant cyan, slag gray |
-| Materials | iron plate, conveyors, furnace brick, cooling pipes, check valves |
-| Topology | a production loop where every savepoint reconnects to the main route |
-| Ambient | three-frame lava, stepped hammers, event steam, warning-light swaps |
-| Landmarks | INSERT intake, UPDATE bench, DELETE chute, constraint gate |
-| Shortcut | a correct rollback reverses a waste pipe into a savepoint route |
+| Palette | volcanic black, magma orange, warning red, crystal cyan, bone gold |
+| Materials | volcanic rock, dragon eggs, magma pools, crystal, ancient bones |
+| Topology | magma hatchery, crystal cavern, and dragon throne form three loops |
+| Ambient | static eggs, magma, crystals, and bones; no continuous particles |
+| Landmarks | INSERT hatchery, UPDATE scale forge, DELETE nest, SAVEPOINT throne |
+| Shortcut | the middle/rear key opens a fixed two-way bone gate |
 | Preview | green index roots grow through the furnace wall toward Floor 7 |
 
-The Boss arena contains parallel “before transaction” and “after transaction”
-strips with a savepoint console between them. Failed sandbox operations mark the
-after strip, while rollback restores its tiles without mutating the permanent
-world.
+The Boss arena uses ancient dragon bones and a crown silhouette. Each script is
+graded in a temporary SQLite copy, and the result table shows final-state
+differences without mutating the permanent world.
 
 Lava is tile animation without heat distortion. It deals no passive damage in
 the initial implementation.

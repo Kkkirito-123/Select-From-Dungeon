@@ -124,6 +124,25 @@ export function detectQueryFeatures(sql: string): QueryFeature[] {
   if (/\bexists\s*\(\s*select\b/i.test(normalized)) features.push("exists");
   if (/^with\b/i.test(normalized)) features.push("cte");
   if (/^with\s+recursive\b/i.test(normalized)) features.push("recursive");
+  if (/\bover\s*\(/i.test(normalized)) features.push("over");
+  if (/\bpartition\s+by\b/i.test(normalized)) features.push("partition-by");
+  if (/\brow_number\s*\(/i.test(normalized)) features.push("row-number");
+  if (/\brank\s*\(/i.test(normalized)) features.push("rank");
+  if (/\bdense_rank\s*\(/i.test(normalized)) features.push("dense-rank");
+  if (/\blag\s*\(/i.test(normalized)) features.push("lag");
+  if (/\blead\s*\(/i.test(normalized)) features.push("lead");
+  if (
+    /\brows\s+between\s+(?:unbounded\s+preceding|\d+\s+preceding)\s+and\s+(?:current\s+row|\d+\s+following)\b/i
+      .test(normalized)
+  ) features.push("window-frame");
+  if (/(?:^|;)\s*insert\b/i.test(normalized)) features.push("insert");
+  if (/(?:^|;)\s*update\b/i.test(normalized)) features.push("update");
+  if (/(?:^|;)\s*delete\b/i.test(normalized)) features.push("delete");
+  if (/\binsert\s+or\s+ignore\b/i.test(normalized)) features.push("constraint");
+  if (/(?:^|;)\s*begin\b/i.test(normalized)) features.push("transaction");
+  if (/\bsavepoint\s+[a-z_]\w*\b/i.test(normalized)) features.push("savepoint");
+  if (/\brollback(?:\s+to)?\b/i.test(normalized)) features.push("rollback");
+  if (/\bcommit\b/i.test(normalized)) features.push("commit");
   return features;
 }
 
@@ -215,7 +234,52 @@ const NON_FLAT_STAGES = new Set<LessonStageId>([
   "practice-spark",
   "forge-boss-scan",
   "forge-boss-core",
+  "f5-over-count",
+  "f5-row-number-order",
+  "f5-rank-ties",
+  "f5-lag-lead-delta",
+  "f5-frame-running",
+  "f5-top-n-groups",
+  "f5-top-n-core",
+  "practice-goblin",
+  "practice-orc",
+  "practice-knight",
+  "practice-troll",
+  "iron-boss-scan",
+  "iron-boss-core",
+  "f6-insert-row",
+  "f6-update-target",
+  "f6-delete-duplicate",
+  "f6-constraint-ignore",
+  "f6-transaction-rollback",
+  "f6-savepoint-rollback",
+  "f6-savepoint-commit",
+  "practice-hatchling",
+  "practice-wyvern",
+  "practice-thunder-drake",
+  "practice-crystal-drake",
+  "dragon-boss-scan",
+  "dragon-boss-core",
 ]);
+
+const SANDBOX_BASE_ROWS: unknown[][] = [
+  [1, "ore", 2, "ready"],
+  [2, "scale", 1, "damaged"],
+  [3, "fang", 1, "duplicate"],
+  [4, "fang", 1, "duplicate"],
+  [5, "core", 1, "ready"],
+];
+
+function hasSandboxRows(
+  result: SqlQueryResult,
+  expectedRows: unknown[][],
+): boolean {
+  return hasExactOrderedRows(
+    result,
+    ["id", "item", "quantity", "status"],
+    expectedRows,
+  );
+}
 
 function joinsTables(
   sql: string,
@@ -668,6 +732,129 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "forge-boss-core":
       return columnEqualsNumber(whereClause, "id", 22) &&
         hasSingleValue(result, "name", "炉主");
+    case "f5-over-count":
+      return hasExactOrderedRows(result, ["name", "guard_total"], [
+        ["哥布林", 3],
+        ["兽人", 3],
+        ["骑士", 3],
+      ]);
+    case "f5-row-number-order":
+      return hasExactOrderedRows(result, ["name", "sector", "pos"], [
+        ["铁骑", "arena", 1],
+        ["骑士", "arena", 2],
+        ["兽人", "outer", 1],
+        ["哥布林", "outer", 2],
+      ]);
+    case "f5-rank-ties":
+      return hasExactOrderedRows(result, ["name", "power", "rank_no", "dense_no"], [
+        ["铁骑", 22, 1, 1],
+        ["兽人", 20, 2, 2],
+        ["骑士", 20, 2, 2],
+      ]);
+    case "f5-lag-lead-delta":
+      return hasExactOrderedRows(result, ["name", "power", "prev_power", "next_power"], [
+        ["哥布林", 18, null, 20],
+        ["兽人", 20, 18, 20],
+        ["骑士", 20, 20, 22],
+        ["铁骑", 22, 20, 24],
+        ["巨魔", 24, 22, null],
+      ]);
+    case "f5-frame-running":
+      return hasExactOrderedRows(result, ["name", "running_power"], [
+        ["哥布林", 18],
+        ["兽人", 38],
+        ["骑士", 58],
+        ["铁骑", 80],
+        ["巨魔", 104],
+      ]);
+    case "f5-top-n-groups":
+      return hasExactOrderedRows(result, ["sector", "name", "power"], [
+        ["arena", "铁骑", 22],
+        ["core", "城主", 28],
+        ["outer", "兽人", 20],
+        ["wall", "巨魔", 24],
+      ]);
+    case "f5-top-n-core":
+      return hasExactOrderedRows(result, ["sector", "name", "rn"], [
+        ["arena", "铁骑", 1],
+        ["arena", "骑士", 2],
+        ["outer", "兽人", 1],
+        ["outer", "哥布林", 2],
+      ]);
+    case "practice-goblin":
+      return hasExactOrderedRows(result, ["name", "guard_total"], [
+        ["小妖", 2],
+        ["战兽", 2],
+      ]);
+    case "practice-orc":
+      return hasExactOrderedRows(result, ["name", "pos"], [
+        ["战兽", 1],
+        ["小妖", 2],
+      ]);
+    case "practice-knight":
+      return hasExactOrderedRows(result, ["name", "power", "rank_no"], [
+        ["铁卫", 24, 1],
+        ["战兽", 20, 2],
+      ]);
+    case "practice-troll":
+      return hasExactOrderedRows(result, ["name", "running_power"], [
+        ["小妖", 18],
+        ["战兽", 38],
+        ["铁卫", 62],
+        ["巨魔", 84],
+      ]);
+    case "iron-boss-scan":
+      return hasExactOrderedRows(result, ["name", "power"], [["铁卫", 24]]);
+    case "iron-boss-core":
+      return hasExactOrderedRows(result, ["name", "prev_power"], [
+        ["小妖", null],
+        ["战兽", 18],
+        ["铁卫", 20],
+        ["巨魔", 24],
+      ]);
+    case "f6-insert-row":
+      return hasSandboxRows(result, [
+        ...SANDBOX_BASE_ROWS,
+        [6, "claw", 2, "ready"],
+      ]);
+    case "f6-update-target":
+      return hasSandboxRows(result, [
+        SANDBOX_BASE_ROWS[0],
+        [2, "scale", 1, "fixed"],
+        ...SANDBOX_BASE_ROWS.slice(2),
+      ]);
+    case "f6-delete-duplicate":
+      return hasSandboxRows(result, SANDBOX_BASE_ROWS.filter((row) => row[0] !== 4));
+    case "f6-constraint-ignore":
+    case "f6-transaction-rollback":
+    case "practice-thunder-drake":
+    case "practice-crystal-drake":
+      return hasSandboxRows(result, SANDBOX_BASE_ROWS);
+    case "f6-savepoint-rollback":
+    case "dragon-boss-scan":
+      return hasSandboxRows(result, [
+        SANDBOX_BASE_ROWS[0],
+        [2, "scale", 1, "fixed"],
+        ...SANDBOX_BASE_ROWS.slice(2),
+      ]);
+    case "f6-savepoint-commit":
+      return hasSandboxRows(result, [
+        SANDBOX_BASE_ROWS[0],
+        [2, "scale", 1, "fixed"],
+        ...SANDBOX_BASE_ROWS.slice(2).filter((row) => row[0] !== 4),
+      ]);
+    case "practice-hatchling":
+      return hasSandboxRows(result, [
+        ...SANDBOX_BASE_ROWS,
+        [7, "ember", 1, "ready"],
+      ]);
+    case "practice-wyvern":
+      return hasSandboxRows(result, [
+        [1, "ore", 3, "ready"],
+        ...SANDBOX_BASE_ROWS.slice(1),
+      ]);
+    case "dragon-boss-core":
+      return hasSandboxRows(result, SANDBOX_BASE_ROWS.filter((row) => row[0] !== 4));
   }
 }
 
@@ -734,6 +921,32 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-spark": "EXISTS 没有验证电球的装备记录。",
   "forge-boss-scan": "CTE 没有返回拥有高 power 装备的炉主。",
   "forge-boss-core": "EXISTS 没有验证炉主的装备记录。",
+  "f5-over-count": "分区计数应保留哥布林、兽人、骑士三行，并让 guard_total 均为 3。",
+  "f5-row-number-order": "区域编号顺序不正确；检查 sector 分区、power DESC 和 id 稳定排序。",
+  "f5-rank-ties": "并列排名不正确；兽人与骑士应共享 rank_no = 2、dense_no = 2。",
+  "f5-lag-lead-delta": "前后行 power 不正确；检查 LAG、LEAD 与 id 顺序。",
+  "f5-frame-running": "累计 power 应依次为 18、38、58、80、104。",
+  "f5-top-n-groups": "没有返回 arena、core、outer、wall 各自装备 power 最高的守军。",
+  "f5-top-n-core": "outer 与 arena 应各保留 rn 1、2 两名守军。",
+  "practice-goblin": "小妖与战兽应各显示 guard_total = 2。",
+  "practice-orc": "ROW_NUMBER 应先返回战兽，再返回小妖。",
+  "practice-knight": "排名结果应为铁卫第一、战兽第二。",
+  "practice-troll": "累计结果应依次为 18、38、62、84。",
+  "iron-boss-scan": "CTE 没有找出 hp = 24 的铁卫。",
+  "iron-boss-core": "LAG 结果没有按 id 返回正确的上一行 hp。",
+  "f6-insert-row": "沙箱最终状态缺少 id = 6 的 claw 记录，或修改了其他行。",
+  "f6-update-target": "只应把 id = 2 的 status 改为 fixed。",
+  "f6-delete-duplicate": "只应删除 id = 4，id = 3 的重复证据必须保留。",
+  "f6-constraint-ignore": "违反 CHECK 的行不应进入沙箱，其他初始行必须保持不变。",
+  "f6-transaction-rollback": "ROLLBACK 后沙箱必须完全恢复进入事务前的五行。",
+  "f6-savepoint-rollback": "局部回滚后 id = 2 应保持 fixed，id = 3 必须恢复。",
+  "f6-savepoint-commit": "提交后应保留 id = 2 的修复，并只删除 id = 4。",
+  "practice-hatchling": "沙箱最终状态缺少 id = 7 的 ember 记录。",
+  "practice-wyvern": "只应把 id = 1 的 quantity 更新为 3。",
+  "practice-thunder-drake": "ROLLBACK 后沙箱必须恢复原始五行。",
+  "practice-crystal-drake": "无效 quantity 不应写入沙箱。",
+  "dragon-boss-scan": "保存点局部回滚后，修复必须保留且被删行必须恢复。",
+  "dragon-boss-core": "提交后只应删除 id = 4。",
 };
 
 function stageFor(lessonId: LessonId, stageIndex: number): LessonStageDefinition {

@@ -12,9 +12,13 @@ import {
 import { generateCampfires, isSafeZonePosition } from "../src/domain/campfire";
 import { generateGuidedMapPlan } from "../src/domain/guidedMap";
 import { generateMazeFloor } from "../src/domain/mazeGenerator";
-import { generateRoomGraph, lessonsForFloor } from "../src/domain/runGraph";
+import {
+  generateRoomGraph,
+  lessonsForFloor,
+  type FloorNumber,
+} from "../src/domain/runGraph";
 
-function fixture(seed: string, floorNumber: 1 | 2 | 3 | 4) {
+function fixture(seed: string, floorNumber: FloorNumber) {
   const graph = generateRoomGraph(seed, floorNumber);
   const maze = generateMazeFloor(graph);
   const campfires = generateCampfires(graph, maze);
@@ -24,8 +28,8 @@ function fixture(seed: string, floorNumber: 1 | 2 | 3 | 4) {
 }
 
 describe("seeded biome plan", () => {
-  it("前四层生态方案可复现、每区 14 个地标且不侵入安全区", () => {
-    for (const floorNumber of [1, 2, 3, 4] as const) {
+  it("前六层生态方案可复现、每区 14 个地标且不侵入安全区", () => {
+    for (const floorNumber of [1, 2, 3, 4, 5, 6] as const) {
       for (let index = 0; index < 30; index += 1) {
         const seed = `biome-contract-${floorNumber}-${index}`;
         const first = fixture(seed, floorNumber);

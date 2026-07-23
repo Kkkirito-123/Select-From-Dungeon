@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { validateReadOnlyQuery } from "../src/domain/queryPolicy";
+import {
+  validateReadOnlyQuery,
+  validateSandboxScript,
+} from "../src/domain/queryPolicy";
 
 describe("validateReadOnlyQuery", () => {
   it("接受单条 SELECT 和结尾分号", () => {
@@ -34,5 +37,46 @@ describe("validateReadOnlyQuery", () => {
     expect(
       validateReadOnlyQuery("SELECT id FROM monsters; SELECT id FROM weaknesses"),
     ).toMatchObject({ ok: false });
+  });
+});
+
+describe("validateSandboxScript", () => {
+  it("只接受 repair_queue 上受控且带 WHERE 的写操作", () => {
+    expect(validateSandboxScript(
+      "BEGIN; UPDATE repair_queue SET status = 'fixed' WHERE id = 2; COMMIT;",
+    )).toMatchObject({ ok: true });
+    expect(validateSandboxScript(
+      "DELETE FROM repair_queue WHERE id = 4;",
+    )).toMatchObject({ ok: true });
+  });
+
+  it("拒绝全表修改、永久课程表和 DDL", () => {
+    expect(validateSandboxScript(
+      "UPDATE repair_queue SET status = 'fixed';",
+    )).toMatchObject({ ok: false });
+    expect(validateSandboxScript(
+      "DELETE FROM monsters WHERE id = 1;",
+    )).toMatchObject({ ok: false });
+    expect(validateSandboxScript(
+      "DROP TABLE repair_queue;",
+    )).toMatchObject({ ok: false });
+    expect(validateSandboxScript(
+      "UPDATE repair_queue SET status = 'where';",
+    )).toMatchObject({ ok: false });
+    expect(validateSandboxScript(
+      "UPDATE repair_queue SET status = 'fixed' WHERE 1 = 1;",
+    )).toMatchObject({ ok: false });
+  });
+
+  it("正确忽略字符串中的分号并限制脚本条数", () => {
+    expect(validateSandboxScript(
+      "INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'semi;colon', 1, 'ready');",
+    )).toMatchObject({ ok: true });
+    expect(validateSandboxScript(
+      "BEGIN; SAVEPOINT a; SAVEPOINT b; SAVEPOINT c; SAVEPOINT d; SAVEPOINT e; SAVEPOINT f; SAVEPOINT g; COMMIT;",
+    )).toMatchObject({ ok: false });
+    expect(validateSandboxScript(
+      "INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'drop monsters', 1, 'ready');",
+    )).toMatchObject({ ok: true });
   });
 });

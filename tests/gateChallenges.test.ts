@@ -102,4 +102,60 @@ describe("high-difficulty gate challenges", () => {
     `);
     expect(evaluateGateChallenge(4, forge)).toMatchObject({ accepted: true });
   });
+
+  it("第五、六层越级门按不可变装备 power 排名，战斗 HP 回写不改变答案", async () => {
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    engine.updateMonsterHp([
+      { id: 28, hp: 0 },
+      { id: 33, hp: 0 },
+      { id: 39, hp: 0 },
+      { id: 44, hp: 0 },
+    ]);
+
+    const iron = engine.executeSelect(`
+      WITH ranked AS (
+        SELECT
+          r.sector,
+          m.name,
+          g.power,
+          ROW_NUMBER() OVER (
+            PARTITION BY r.sector
+            ORDER BY g.power DESC, m.id ASC
+          ) AS rn
+        FROM monsters m
+        INNER JOIN rooms r ON m.room_id = r.id
+        INNER JOIN monster_gear g ON g.monster_id = m.id
+        WHERE r.floor = 5
+      )
+      SELECT sector, name, power, rn
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY power DESC, sector ASC
+      LIMIT 3
+    `);
+    expect(evaluateGateChallenge(5, iron)).toMatchObject({ accepted: true });
+
+    const dragon = engine.executeSelect(`
+      WITH ranked AS (
+        SELECT
+          m.id,
+          m.name,
+          g.power,
+          ROW_NUMBER() OVER (
+            PARTITION BY r.sector
+            ORDER BY g.power DESC, m.id ASC
+          ) AS rn
+        FROM monsters m
+        INNER JOIN rooms r ON m.room_id = r.id
+        INNER JOIN monster_gear g ON g.monster_id = m.id
+        WHERE r.floor = 6
+      )
+      SELECT id, name, power
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY power DESC, id ASC
+      LIMIT 3
+    `);
+    expect(evaluateGateChallenge(6, dragon)).toMatchObject({ accepted: true });
+  });
 });

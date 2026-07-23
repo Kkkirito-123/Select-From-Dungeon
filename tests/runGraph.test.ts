@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   createSeededRandom,
+  FLOOR_FIVE_LESSONS,
   FLOOR_FOUR_LESSONS,
   FLOOR_ONE_LESSONS,
+  FLOOR_SIX_LESSONS,
   FLOOR_THREE_LESSONS,
   FLOOR_TWO_LESSONS,
   generateRoomGraph,
@@ -85,18 +87,29 @@ describe("generateRoomGraph", () => {
     expect(byLesson.get("join-boss")?.prerequisiteLessons).toEqual(["left-join"]);
   });
 
-  it("第三、四层分别装入六组高级课程并保持独立种子图", () => {
+  it("第三到六层分别装入六组高级课程并保持独立种子图", () => {
     const floorThree = generateRoomGraph("advanced-safe", 3);
     const floorFour = generateRoomGraph("advanced-safe", 4);
+    const floorFive = generateRoomGraph("advanced-safe", 5);
+    const floorSix = generateRoomGraph("advanced-safe", 6);
     expect(floorThree.nodes).toHaveLength(10);
     expect(floorFour.nodes).toHaveLength(10);
+    expect(floorFive.nodes).toHaveLength(10);
+    expect(floorSix.nodes).toHaveLength(10);
     expect(floorThree.nodes.map((node) => node.lessonId).filter(Boolean).sort())
       .toEqual([...FLOOR_THREE_LESSONS].sort());
     expect(floorFour.nodes.map((node) => node.lessonId).filter(Boolean).sort())
       .toEqual([...FLOOR_FOUR_LESSONS].sort());
+    expect(floorFive.nodes.map((node) => node.lessonId).filter(Boolean).sort())
+      .toEqual([...FLOOR_FIVE_LESSONS].sort());
+    expect(floorSix.nodes.map((node) => node.lessonId).filter(Boolean).sort())
+      .toEqual([...FLOOR_SIX_LESSONS].sort());
     expect(floorThree.seed).toBe("advanced-safe");
     expect(floorFour.seed).toBe("advanced-safe");
+    expect(floorFive.seed).toBe("advanced-safe");
+    expect(floorSix.seed).toBe("advanced-safe");
     expect(floorThree.entryId).not.toBe(floorFour.entryId);
+    expect(floorFive.entryId).not.toBe(floorSix.entryId);
   });
 
   it("WHERE 与 IS NULL 可自由选择，完成后才解锁 GROUP BY", () => {
@@ -134,6 +147,14 @@ describe("generateRoomGraph", () => {
         errors: [],
       });
       expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 4))).toEqual({
+        valid: true,
+        errors: [],
+      });
+      expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 5))).toEqual({
+        valid: true,
+        errors: [],
+      });
+      expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 6))).toEqual({
         valid: true,
         errors: [],
       });

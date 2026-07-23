@@ -35,6 +35,21 @@ const KEYWORD_SUGGESTIONS: SqlSuggestion[] = [
   keyword("EXISTS", "判断相关子查询是否返回记录"),
   keyword("WITH", "命名一个公共表表达式"),
   keyword("WITH RECURSIVE", "定义递归公共表表达式"),
+  keyword("OVER", "定义窗口函数的分区与顺序"),
+  keyword("PARTITION BY", "在窗口内分区"),
+  keyword("ROWS BETWEEN", "声明窗口行范围"),
+  keyword("UNBOUNDED PRECEDING", "从分区第一行开始"),
+  keyword("CURRENT ROW", "窗口范围结束于当前行"),
+  keyword("INSERT INTO", "向第六层一次性沙箱写入"),
+  keyword("UPDATE", "更新第六层一次性沙箱"),
+  keyword("SET", "设置更新后的字段值"),
+  keyword("DELETE FROM", "从第六层一次性沙箱删除"),
+  keyword("BEGIN", "开始一次沙箱事务"),
+  keyword("COMMIT", "提交沙箱事务"),
+  keyword("ROLLBACK", "回滚沙箱事务"),
+  keyword("ROLLBACK TO", "回滚到沙箱保存点"),
+  keyword("SAVEPOINT", "建立沙箱保存点"),
+  keyword("RELEASE", "接受并释放保存点"),
   keyword("GROUP BY", "按字段聚合分组"),
   keyword("HAVING", "过滤聚合结果"),
   keyword("ORDER BY", "指定结果排序"),
@@ -50,6 +65,11 @@ const FUNCTION_SUGGESTIONS: SqlSuggestion[] = [
   sqlFunction("MIN()", "取得最小值"),
   sqlFunction("MAX()", "取得最大值"),
   sqlFunction("COALESCE()", "为空值提供备用值"),
+  sqlFunction("ROW_NUMBER()", "为窗口中的行生成唯一序号"),
+  sqlFunction("RANK()", "生成允许并列和排名空档的名次"),
+  sqlFunction("DENSE_RANK()", "生成允许并列但无空档的名次"),
+  sqlFunction("LAG()", "读取窗口中的上一行"),
+  sqlFunction("LEAD()", "读取窗口中的下一行"),
 ];
 
 const RESERVED_WORDS = new Set([
@@ -143,9 +163,9 @@ function normalized(value: string): string {
 function contextBefore(sql: string, tokenStart: number): "table" | "value" | "start" | "any" {
   const before = sql.slice(0, tokenStart).trimEnd();
   if (!before) return "start";
-  if (/\b(?:FROM|JOIN)\s*$/i.test(before)) return "table";
+  if (/\b(?:FROM|JOIN|INTO|UPDATE)\s*$/i.test(before)) return "table";
   if (
-    /\b(?:SELECT|WHERE|AND|ON|BY|HAVING|ORDER BY|GROUP BY)\s*$/i.test(before) ||
+    /\b(?:SELECT|WHERE|AND|ON|BY|HAVING|ORDER BY|GROUP BY|SET)\s*$/i.test(before) ||
     /,\s*$/.test(before)
   ) return "value";
   return "any";

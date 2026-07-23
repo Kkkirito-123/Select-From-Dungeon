@@ -865,7 +865,9 @@ export class AppShell {
   private async executeQuery(): Promise<void> {
     if (this.busy) return;
     if (!this.textarea.value.trim()) {
-      const message = "先写一条完整的只读 SELECT / WITH 查询；空输入不会消耗回合。";
+      const message = this.lastSnapshot?.floor === 6
+        ? "先写出本回合完整的沙箱 SQL；空输入不会消耗回合。"
+        : "先写一条完整的只读 SELECT / WITH 查询；空输入不会消耗回合。";
       this.queryStatus.textContent = message;
       this.queryStatus.dataset.kind = "warning";
       this.showFeedbackNotice({ message, tone: "info" });
@@ -882,7 +884,10 @@ export class AppShell {
       let result: SqlQueryResult | null = null;
       let queryError: unknown = null;
       try {
-        result = this.sql.executeSelect(this.textarea.value);
+        result = this.sql.execute(
+          this.textarea.value,
+          this.lastSnapshot?.floor ?? 1,
+        );
       } catch (error) {
         queryError = error;
       }
@@ -1782,6 +1787,9 @@ export class AppShell {
       `${String(snapshot.campaign.currentFloor).padStart(2, "0")} / 08`;
     this.root.dataset.floor = String(snapshot.floor);
     this.root.dataset.biome = snapshot.currentBiome;
+    this.textarea.placeholder = snapshot.floor === 6
+      ? "在这里写出完整的 INSERT / UPDATE / DELETE 或事务脚本；每次执行都使用一次性沙箱。"
+      : "在这里完整写出 SELECT / WITH 查询；支持 Ctrl + Space 补全。";
     requiredElement(this.root, "#hp-value").textContent = `${snapshot.player.hp} / ${snapshot.player.maxHp}`;
     this.renderProgress(
       "#player-hp-progress",
@@ -1849,7 +1857,9 @@ export class AppShell {
       this.textarea.value = "";
       this.clearQueryArtifacts();
       this.queryStatus.textContent = enteredCombat
-        ? "怪物行动已预告。请完整写出本回合只读 SQL；第四层允许从 WITH 开始。"
+        ? snapshot.floor === 6
+          ? "怪物行动已预告。请写出完整沙箱脚本；支持 INSERT、UPDATE、DELETE 与事务控制。"
+          : "怪物行动已预告。请完整写出本回合只读 SQL；第四层起允许从 WITH 开始。"
         : "目标已经变化，请重新写一条完整 SQL。";
       this.queryStatus.dataset.kind = "";
     }
@@ -1953,7 +1963,7 @@ export class AppShell {
 
   private renderFloorTransition(snapshot: GameSnapshot): void {
     const portal = requiredElement<HTMLElement>(this.root, "#floor-portal");
-    const transitioning = snapshot.mode === "transition" && snapshot.floor < 4;
+    const transitioning = snapshot.mode === "transition" && snapshot.floor < 6;
     const dungeonCleared = snapshot.mode === "victory";
     portal.hidden = !transitioning && !dungeonCleared;
     if (transitioning) {
@@ -1983,7 +1993,7 @@ export class AppShell {
     this.floorTransitionTimer = window.setTimeout(() => {
       this.floorTransitionTimer = null;
       const current = this.session.snapshot();
-      if (current.mode !== "transition" || current.floor >= 4) return;
+      if (current.mode !== "transition" || current.floor >= 6) return;
       if (!this.session.advanceFloor()) return;
       const nextSnapshot = this.session.snapshot();
       this.sql.reset(nextSnapshot.monsters);

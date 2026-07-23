@@ -113,4 +113,35 @@ describe("SQL autocomplete", () => {
     expect(getSqlCompletions("rec", 3, 3, SCHEMA).suggestions[0]?.label).toBe("WITH RECURSIVE");
     expect(getSqlCompletions("max", 3, 3, SCHEMA).suggestions[0]?.label).toBe("MAX()");
   });
+
+  it("提示第五、六层需要的窗口函数与事务词汇", () => {
+    expect(getSqlCompletions("row_", 4, 4, SCHEMA).suggestions[0]?.label)
+      .toBe("ROW_NUMBER()");
+    expect(getSqlCompletions("part", 4, 4, SCHEMA).suggestions[0]?.label)
+      .toBe("PARTITION BY");
+    expect(getSqlCompletions("save", 4, 4, SCHEMA).suggestions[0]?.label)
+      .toBe("SAVEPOINT");
+    expect(getSqlCompletions("roll", 4, 4, SCHEMA).suggestions[0]?.label)
+      .toBe("ROLLBACK");
+  });
+
+  it("在 INSERT INTO 与 UPDATE 后优先提示可写沙箱表", () => {
+    const sandboxSchema = ["repair_queue(id, item, quantity, status)"];
+    const insert = "INSERT INTO ";
+    const update = "UPDATE ";
+    expect(getSqlCompletions(
+      insert,
+      insert.length,
+      insert.length,
+      sandboxSchema,
+      true,
+    ).suggestions[0]?.label).toBe("repair_queue");
+    expect(getSqlCompletions(
+      update,
+      update.length,
+      update.length,
+      sandboxSchema,
+      true,
+    ).suggestions[0]?.label).toBe("repair_queue");
+  });
 });
