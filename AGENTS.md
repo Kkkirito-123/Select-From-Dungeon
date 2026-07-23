@@ -41,7 +41,16 @@ XP with a visible post-battle settlement, turns every curriculum victory into a
 deterministic `E`-opened reward chest, explains acquired loot, automatically
 opens a short non-interactive portal after the first-floor `HAVING` Boss, and
 ends at a second-floor composite `JOIN` Boss. Step-meter ambushes award XP but
-do not create curriculum chests.
+do not create curriculum chests. Outside safe zones, each eligible successful
+step has a 2% base ambush chance and the meter guarantees an encounter after 30
+eligible quiet steps; reloads do not reroll the result.
+Each floor also contains three seeded physical campfires across the front,
+middle, and rear learning phases. Their visible safe zones, plus the entrance
+zone, suppress ambushes and patrol entry. Pressing `E` beside a campfire offers
+`在此休息` and `答案复盘`; resting restores maximum HP and makes that fire the
+checkpoint. Death keeps Run progress and the enemy's remaining HP, shows
+`YOU DIED`, returns to the last rested campfire (or the floor entrance), restores
+HP, and opens the latest-battle review.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
 exploration is active. Each floor's locked Boss gate also exposes one optional
 high-difficulty SQL breach: a correct composite query opens only that physical
@@ -60,12 +69,14 @@ display name.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
-optimizer/InnoDB runtime. The seed randomizes the physical maze and non-critical
-rewards, but not required SQL data, prerequisite lessons, or key weapons. The
-first floor teaches `SELECT` through `HAVING`; the harder second floor teaches
-`ORDER BY / LIMIT`, `DISTINCT`, `INNER JOIN`, `LEFT JOIN`, and a composite
-`JOIN` query. These ten lesson groups are not the complete SQL or MySQL
-interview curriculum.
+optimizer/InnoDB runtime. The planned 12-slot equipment inventory, armor HP,
+generic randomized equipment drops, biome-specific loot pools, and floors three
+through eight are also not implemented. The seed randomizes the physical maze
+and existing non-critical room rewards, but not required SQL data, prerequisite
+lessons, or key weapons. The first floor teaches `SELECT` through `HAVING`; the
+harder second floor teaches `ORDER BY / LIMIT`, `DISTINCT`, `INNER JOIN`,
+`LEFT JOIN`, and a composite `JOIN` query. These ten lesson groups are not the
+complete SQL or MySQL interview curriculum.
 
 ## Architecture and Execution Flow
 
@@ -77,6 +88,7 @@ index.html -> src/main.ts
   -> GameSession (authoritative maze, combat, loot, answer log, profile)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
+  -> CampfireDomain (three seeded checkpoints and shared safe-cell masks)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> SqlEngine (in-memory SQLite WASM, seed data, SELECT execution, HP sync)
@@ -92,11 +104,12 @@ player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
-  -> debounced v6 Run save + permanent v2 profile save
+  -> debounced v7 Run save + permanent v2 profile save
 ```
 
-`GameSession` owns physical movement, encounter meter, lesson, actor, fog,
-combat, HP, XP, loot, answer-history, and profile truth. `RunGraph` is the curriculum dependency graph; it is not the
+`GameSession` owns physical movement, campfires/checkpoints, safe zones,
+encounter meter, lesson, actor, fog, combat, HP, XP, loot, answer-history, and
+profile truth. `RunGraph` is the curriculum dependency graph; it is not the
 physical navigation model. `MazeFloor` is the saved physical world, including
 tiles, zones, gates, anchors, and decoration. `DungeonScene` renders that world,
 collects input, and schedules the roughly 1,100 ms patrol tick, while
@@ -199,15 +212,16 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   SQLite evidence, not a MySQL execution plan. Future MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
 - Save data is browser-local and split between
-  `select-from-dungeon:run:v6` (current floor, maze, actors, ground items, fog,
-  encounter meter, level/XP, opened challenge gates, active gate challenge,
-  at most 200 local answer records, and disposable current Run state),
+  `select-from-dungeon:run:v7` (current floor, maze, actors, ground items, fog,
+  three campfires, the active checkpoint, encounter meter, level/XP, opened
+  challenge gates, active gate challenge, at most 200 local answer records, and
+  disposable current Run state),
   `select-from-dungeon:profile:v2` (ten mastered lessons, attempts, victories, best
   query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
-  state). A valid `select-from-dungeon:run:v5` is migrated in memory into v6
-  with an empty answer history. A valid `run:v4` preserves its progress, starts
-  with no challenge gates opened, and then migrates into v6. Legacy keys remain
-  undeleted; older Run keys remain unread.
+  state). A valid `select-from-dungeon:run:v6` is migrated in memory into v7
+  with generated stable campfires and no rested checkpoint. Valid `run:v5` and
+  `run:v4` data continue through the existing migrations before v7. Legacy keys
+  remain undeleted; older Run keys remain unread.
   A valid `select-from-dungeon:profile:v1` is migrated into v2. Snapshot-driven
   persistence is debounced in `src/main.ts`; changing a shape requires a
   version or recovery decision.
@@ -231,20 +245,33 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   loops after carving to reduce dead ends. Players must walk through the
   continuous world; the discovery minimap is not a navigation control. Moving
   into the same tile as a living curriculum monster or triggering the
-  successful-step encounter meter starts the separate battle scene. Safe steps
-  prevent immediate ambush chains. Ordinary world monsters patrol slowly; the
-  Boss remains anchored.
+  successful-step encounter meter starts the separate battle scene. After its
+  safe window, the meter applies a 2% base chance on each eligible successful
+  step and guarantees a battle at 30 eligible quiet steps. Entrance and
+  campfire safe zones never advance this encounter risk, never spawn enemies,
+  and reject patrol entry. Ordinary world monsters patrol slowly; the Boss
+  remains anchored.
 - Collecting the first-floor key enters `transition` mode. AppShell displays the
-  portal and calls `GameSession.advanceFloor()` after about 1.2 seconds without
-  requiring movement or `E`; level, XP, weapon, relics, and query count carry
-  into a newly generated harder floor while per-floor maze and lesson state reset.
+  gold `FLOOR 01 CLEARED / CONGRATULATIONS!!` feedback and calls
+  `GameSession.advanceFloor()` after about 1.5 seconds without requiring
+  movement or `E`; level, XP, weapon, relics, and query count carry into a newly
+  generated harder floor while per-floor maze and lesson state reset.
 - Every curriculum victory shows an explicit XP settlement and leaves a
   deterministic reward chest on the defeated monster's tile. The player
   approaches it and presses `E`; a non-blocking acquisition card then names the
-  item and explains its exact effect. Step-meter ambushes award XP without a
-  chest. Legacy loose drops remain touch-collectable, while altars, treasure
-  rooms, and campfires also use `E`. Critical curriculum gear remains
-  deterministic and reachable.
+  item and explains its exact effect. Settlement and acquisition cards dismiss
+  after three later successful movement steps, so they remain readable without
+  blocking exploration. Step-meter ambushes award XP without a chest. Legacy
+  loose drops remain touch-collectable, while altars, treasure rooms, and
+  campfires also use `E`. Critical curriculum gear remains deterministic and
+  reachable.
+- A physical campfire blocks its center tile and opens its two-action menu from
+  an adjacent tile. `在此休息` restores maximum HP and updates the checkpoint;
+  `答案复盘` shows the current floor. Defeat is a short state transition, not a
+  Run reset: after about 1.2 seconds the player respawns at the checkpoint or
+  entrance with full HP, while mastery, XP, gear, doors, defeated enemies, and
+  the surviving enemy's current HP remain intact. The automatically opened
+  review is scoped to the battle that caused death.
 - Web Audio music and event cues are authored in project code. First-floor
   exploration rotates four lyrical electronic-classical patterns; second-floor
   exploration rotates three in-code chiptune arrangements of public-domain

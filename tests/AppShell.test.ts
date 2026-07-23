@@ -4,6 +4,7 @@ import { answerReviewSummary } from "../src/ui/AnswerReviewView";
 import {
   canOpenCombatTerminal,
   combatSettlementCopy,
+  shouldDismissTransientCard,
 } from "../src/ui/AppShell";
 
 describe("canOpenCombatTerminal", () => {
@@ -12,6 +13,16 @@ describe("canOpenCombatTerminal", () => {
     expect(canOpenCombatTerminal("combat", true)).toBe(false);
     expect(canOpenCombatTerminal("explore", false)).toBe(false);
     expect(canOpenCombatTerminal(undefined, false)).toBe(false);
+  });
+});
+
+describe("shouldDismissTransientCard", () => {
+  it("只在展示后的第 3 次成功移动关闭，碰墙不会改变 totalMoves", () => {
+    expect(shouldDismissTransientCard(null, 9)).toBe(false);
+    expect(shouldDismissTransientCard(9, 9)).toBe(false);
+    expect(shouldDismissTransientCard(9, 10)).toBe(false);
+    expect(shouldDismissTransientCard(9, 11)).toBe(false);
+    expect(shouldDismissTransientCard(9, 12)).toBe(true);
   });
 });
 

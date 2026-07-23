@@ -5,6 +5,7 @@ import {
   type MazeDecorationKind,
   type MazeZone,
 } from "../domain/mazeGenerator";
+import { safeZoneCellKeys } from "../domain/campfire";
 import { GameSession } from "../domain/GameSession";
 import type {
   GameSnapshot,
@@ -34,6 +35,13 @@ interface ItemView {
 interface GateView {
   block: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
+}
+
+interface CampfireView {
+  container: Phaser.GameObjects.Container;
+  checkpointRing: Phaser.GameObjects.Ellipse;
+  label: Phaser.GameObjects.Text;
+  frameTimer?: Phaser.Time.TimerEvent;
 }
 
 const COLORS = {
@@ -125,6 +133,7 @@ export class DungeonScene extends Phaser.Scene {
   private readonly monsterViews = new Map<number, MonsterView>();
   private readonly itemViews = new Map<string, ItemView>();
   private readonly gateViews = new Map<string, GateView>();
+  private readonly campfireViews = new Map<string, CampfireView>();
   private readonly pressedDirections = new Map<string, Position>();
   private renderedTopology = -1;
   private moveLocked = false;
@@ -262,6 +271,7 @@ export class DungeonScene extends Phaser.Scene {
     this.unsubscribe = null;
     this.patrolTimer?.destroy();
     this.patrolTimer = null;
+    this.clearCampfireViews();
     this.pressedDirections.clear();
   }
 
@@ -319,6 +329,7 @@ export class DungeonScene extends Phaser.Scene {
       this.objectiveBeacon.destroy(true);
     }
     this.objectiveBeacon = null;
+    this.clearCampfireViews();
     this.entityLayer?.removeAll(true);
     this.monsterViews.clear();
     this.itemViews.forEach((view) => view.tween?.destroy());
@@ -333,6 +344,7 @@ export class DungeonScene extends Phaser.Scene {
     this.drawDecorations();
     this.drawZoneLabels();
     this.createGates();
+    this.createCampfireViews();
     this.createPlayer();
     this.createMonsterViews();
     this.createObjectiveBeacon();
@@ -383,6 +395,25 @@ export class DungeonScene extends Phaser.Scene {
       const y = chunkY * floor.chunkSize * TILE_SIZE;
       this.terrain.lineBetween(0, y, floor.width * TILE_SIZE, y);
     }
+    this.drawSafeZones();
+  }
+
+  private drawSafeZones(): void {
+    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    safeZoneCellKeys(this.snapshot.mazeFloor, this.snapshot.campfires)
+      .forEach((cell) => {
+        const [x, y] = cell.split(":").map(Number);
+        if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+        const px = x * TILE_SIZE;
+        const py = y * TILE_SIZE;
+        this.terrain.fillStyle(
+          colors.query,
+          this.snapshot.floor === 2 ? 0.1 : 0.075,
+        );
+        this.terrain.fillRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+        this.terrain.lineStyle(1, colors.query, 0.14);
+        this.terrain.strokeRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+      });
   }
 
   private drawDecorations(): void {
@@ -434,6 +465,100 @@ export class DungeonScene extends Phaser.Scene {
       this.entityLayer.add([block, label]);
       this.gateViews.set(gate.id, { block, label });
     });
+  }
+
+  private createCampfireViews(): void {
+    this.snapshot.campfires.forEach((campfire) => {
+      const pixel = gridToPixels(campfire);
+      const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+      const container = this.add.container(pixel.x, pixel.y).setDepth(23);
+      const checkpointRing = this.add.ellipse(
+        0,
+        7,
+        38,
+        23,
+        colors.query,
+        0.06,
+      ).setStrokeStyle(2, colors.query, 0.95);
+      const stoneRing = this.add.ellipse(0, 8, 31, 17, 0x5a5d62, 1)
+        .setStrokeStyle(2, 0xb3b0a3, 0.84);
+      const coal = this.add.ellipse(0, 7, 21, 10, 0x17100e, 1);
+      const logLeft = this.add.rectangle(0, 7, 23, 5, 0x74442d)
+        .setStrokeStyle(1, 0x2f1a12)
+        .setAngle(27);
+      const logRight = this.add.rectangle(0, 7, 23, 5, 0x8f5735)
+        .setStrokeStyle(1, 0x2f1a12)
+        .setAngle(-27);
+      const flameFrameOne = this.add.container(0, -4, [
+        this.add.triangle(0, 0, -7, 8, 0, -12, 7, 8, 0xe85a35),
+        this.add.triangle(1, 2, -4, 7, 1, -7, 5, 7, 0xffb84a),
+      ]);
+      const flameFrameTwo = this.add.container(0, -3, [
+        this.add.triangle(-1, 0, -6, 7, 3, -13, 7, 7, 0xd9412f),
+        this.add.triangle(-1, 2, -4, 7, -2, -6, 4, 7, 0xffca58),
+      ]).setVisible(false);
+      const label = this.add.text(0, -31, "E · 篝火", {
+        color: "#f1d28b",
+        fontFamily: "monospace",
+        fontSize: "7px",
+        fontStyle: "bold",
+        backgroundColor: "#08090cdd",
+        padding: { x: 4, y: 2 },
+      }).setOrigin(0.5);
+      container.add([
+        checkpointRing,
+        stoneRing,
+        coal,
+        logLeft,
+        logRight,
+        flameFrameOne,
+        flameFrameTwo,
+        label,
+      ]);
+      this.entityLayer.add(container);
+
+      let frameTimer: Phaser.Time.TimerEvent | undefined;
+      if (!this.reducedMotion) {
+        let firstFrame = true;
+        frameTimer = this.time.addEvent({
+          delay: 230,
+          loop: true,
+          callback: () => {
+            firstFrame = !firstFrame;
+            flameFrameOne.setVisible(firstFrame);
+            flameFrameTwo.setVisible(!firstFrame);
+          },
+        });
+      }
+      this.campfireViews.set(campfire.id, {
+        container,
+        checkpointRing,
+        label,
+        frameTimer,
+      });
+    });
+    this.syncCampfireViews();
+  }
+
+  private syncCampfireViews(): void {
+    const discovered = new Set(this.snapshot.discoveredCells);
+    this.snapshot.campfires.forEach((campfire) => {
+      const view = this.campfireViews.get(campfire.id);
+      if (!view) return;
+      const checkpoint = this.snapshot.respawnCampfireId === campfire.id;
+      view.container.setVisible(discovered.has(positionKey(campfire)));
+      view.checkpointRing.setVisible(checkpoint);
+      view.label.setText(checkpoint ? "复活点 · 篝火" : "E · 篝火");
+      view.label.setColor(checkpoint ? "#8ff5e1" : "#f1d28b");
+    });
+  }
+
+  private clearCampfireViews(): void {
+    this.campfireViews.forEach((view) => {
+      view.frameTimer?.remove(false);
+      if (view.container.active) view.container.destroy(true);
+    });
+    this.campfireViews.clear();
   }
 
   private createPlayer(): void {
@@ -628,6 +753,7 @@ export class DungeonScene extends Phaser.Scene {
     });
     this.syncItemViews();
     this.syncGateViews();
+    this.syncCampfireViews();
     this.drawFog();
   }
 

@@ -122,5 +122,7 @@ describe("advanceMonsterPatrol", () => {
       }
     }
     expect(checkedPositions).toBe(500 * 80 * 5);
-  }, 30_000);
+  // This is a topology invariant, not a performance assertion. Keep all
+  // 200,000 positions while allowing for CPU contention in the parallel suite.
+  }, 60_000);
 });

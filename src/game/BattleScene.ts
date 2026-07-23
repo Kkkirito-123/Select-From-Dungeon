@@ -726,7 +726,7 @@ export class BattleScene extends Phaser.Scene {
   private playOutcome(mode: "victory" | "defeat"): void {
     this.playSound(mode);
     this.showCenterBanner(
-      mode === "victory" ? "FLOOR CLEARED" : "RUN FAILED",
+      mode === "victory" ? "FLOOR CLEARED" : "YOU DIED",
       mode === "victory" ? "#91e3d1" : "#ff8279",
     );
   }

@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  AMBUSH_CHANCE,
   AMBUSH_GUARANTEE_AT,
   INITIAL_SAFE_STEPS,
   POST_BATTLE_SAFE_STEPS,
   advanceEncounterMeter,
+  recordSafeZoneMovement,
 } from "../src/domain/encounterDirector";
 
 describe("seeded ambush meter", () => {
-  it("开局安全步内不遭遇，并在上限步数前必定抽到一张遭遇牌", () => {
+  it("基础遭遇率为 2%，开局 5 步安全且第 30 个可遭遇步强制触发", () => {
+    expect(AMBUSH_CHANCE).toBe(0.02);
+    expect(INITIAL_SAFE_STEPS).toBe(5);
+    expect(POST_BATTLE_SAFE_STEPS).toBe(5);
+    expect(AMBUSH_GUARANTEE_AT).toBe(30);
+
     let meter = {
       totalMoves: 0,
       stepsSinceEncounter: 0,
@@ -31,11 +38,73 @@ describe("seeded ambush meter", () => {
     expect(meter.safeStepsRemaining).toBe(POST_BATTLE_SAFE_STEPS);
   });
 
+  it("达到第 30 个可遭遇步时不再依赖 2% 随机值", () => {
+    const advance = advanceEncounterMeter(
+      {
+        totalMoves: 91,
+        stepsSinceEncounter: AMBUSH_GUARANTEE_AT - 1,
+        safeStepsRemaining: 0,
+      },
+      "guaranteed-ambush",
+      [301, 101, 201],
+    );
+
+    expect(advance.targetId).not.toBeNull();
+    expect([101, 201, 301]).toContain(advance.targetId);
+    expect(advance.meter).toEqual({
+      totalMoves: 92,
+      stepsSinceEncounter: 0,
+      safeStepsRemaining: POST_BATTLE_SAFE_STEPS,
+    });
+  });
+
+  it("能在第 30 步保底前通过 2% 分支触发遭遇", () => {
+    const beforeHit = {
+      totalMoves: 16,
+      stepsSinceEncounter: 10,
+      safeStepsRemaining: 0,
+    };
+    expect(advanceEncounterMeter(beforeHit, "chance-3", [201]).targetId).toBeNull();
+
+    const hit = advanceEncounterMeter(
+      { ...beforeHit, totalMoves: 17 },
+      "chance-3",
+      [201],
+    );
+    expect(hit).toEqual({
+      meter: {
+        totalMoves: 18,
+        stepsSinceEncounter: 0,
+        safeStepsRemaining: POST_BATTLE_SAFE_STEPS,
+      },
+      targetId: 201,
+    });
+  });
+
   it("同一 Seed、移动计数和候选牌得到相同结果，且没有候选时不触发", () => {
     const meter = { totalMoves: 42, stepsSinceEncounter: 13, safeStepsRemaining: 0 };
     expect(advanceEncounterMeter(meter, "repeatable", [311, 111, 211])).toEqual(
       advanceEncounterMeter(meter, "repeatable", [211, 311, 111]),
     );
     expect(advanceEncounterMeter(meter, "repeatable", []).targetId).toBeNull();
+  });
+
+  it("安全区移动只累计成功移动总数，不消耗安全步也不推进保底计数", () => {
+    const meter = {
+      totalMoves: 27,
+      stepsSinceEncounter: 18,
+      safeStepsRemaining: 3,
+    };
+
+    expect(recordSafeZoneMovement(meter)).toEqual({
+      totalMoves: 28,
+      stepsSinceEncounter: 18,
+      safeStepsRemaining: 3,
+    });
+    expect(meter).toEqual({
+      totalMoves: 27,
+      stepsSinceEncounter: 18,
+      safeStepsRemaining: 3,
+    });
   });
 });

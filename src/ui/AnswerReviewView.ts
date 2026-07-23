@@ -1,5 +1,7 @@
 import type { AnswerAttemptRecord, GameSnapshot } from "../domain/types";
 
+export type AnswerReviewScope = "all" | "battle" | "floor";
+
 export interface AnswerReviewSummary {
   total: number;
   correct: number;
@@ -37,6 +39,7 @@ function reviewSummaryCopy(summary: AnswerReviewSummary): string {
 export class AnswerReviewView {
   readonly element: HTMLElement;
   readonly closeButton: HTMLButtonElement;
+  private scope: AnswerReviewScope = "all";
 
   constructor(root: HTMLElement) {
     this.element = requiredElement(root, "#answer-review");
@@ -53,9 +56,45 @@ export class AnswerReviewView {
     this.element.setAttribute("aria-hidden", String(!open));
   }
 
-  render(snapshot: GameSnapshot): void {
+  render(snapshot: GameSnapshot, scope: AnswerReviewScope = this.scope): void {
+    this.scope = scope;
     const battleSummary = answerReviewSummary(snapshot.battleReview);
     const floorSummary = answerReviewSummary(snapshot.floorReview);
+    const battleSection = requiredElement<HTMLElement>(
+      this.element,
+      '[data-review-section="battle"]',
+    );
+    const floorSection = requiredElement<HTMLElement>(
+      this.element,
+      '[data-review-section="floor"]',
+    );
+    const columns = requiredElement<HTMLElement>(this.element, ".answer-review__columns");
+    battleSection.hidden = scope === "floor";
+    floorSection.hidden = scope === "battle";
+    columns.dataset.scope = scope;
+
+    const title = requiredElement(this.element, "#answer-review-title");
+    const description = requiredElement(this.element, "#answer-review-description");
+    if (scope === "battle") {
+      title.textContent = battleSummary.total === 0
+        ? "机关失败复盘"
+        : "本场死亡复盘";
+      description.textContent = battleSummary.total === 0
+        ? "本次死亡来自可选机关破解；机关查询不混入怪物战斗记录，请根据终端反馈调整后再尝试。"
+        : "先看清本场 SQL 的命中与反击，再从最近的篝火重新出发。";
+      this.closeButton.textContent = "复盘完成";
+      this.closeButton.setAttribute("aria-label", "完成本场死亡复盘");
+    } else if (scope === "floor") {
+      title.textContent = `第 ${snapshot.floor} 层答案复盘`;
+      description.textContent = "只查看本层已经提交的 SQL；关闭后返回篝火菜单。";
+      this.closeButton.textContent = "返回篝火";
+      this.closeButton.setAttribute("aria-label", "返回篝火菜单");
+    } else {
+      title.textContent = "答题复盘";
+      description.textContent = "只保存在本地：记录提交的 SQL 回合，不记录移动或按键，也不会上传。";
+      this.closeButton.textContent = "ESC ×";
+      this.closeButton.setAttribute("aria-label", "关闭答题复盘");
+    }
     requiredElement(this.element, "#battle-review-summary").textContent =
       reviewSummaryCopy(battleSummary);
     requiredElement(this.element, "#floor-review-title").textContent =
@@ -65,7 +104,9 @@ export class AnswerReviewView {
     this.renderRecords(
       requiredElement(this.element, "#battle-review-list"),
       snapshot.battleReview,
-      "还没有可复盘的战斗。触碰怪物并提交 SQL 后，这里会显示本场记录。",
+      scope === "battle"
+        ? "本次没有怪物战斗记录。关闭复盘后可重新挑战机关。"
+        : "还没有可复盘的战斗。触碰怪物并提交 SQL 后，这里会显示本场记录。",
     );
     this.renderRecords(
       requiredElement(this.element, "#floor-review-list"),
