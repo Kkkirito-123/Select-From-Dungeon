@@ -6,6 +6,9 @@ Primary users: SQL beginners, interview reviewers, level designers, and content 
 
 **English** | [简体中文](CURRICULUM.zh-CN.md)
 
+[Floor map and art direction](FLOOR_THEMES.md) |
+[中文地图蓝图](FLOOR_THEMES.zh-CN.md)
+
 ## 1. Goal
 
 Evolve SQL Demon Castle from a sequence of increasingly difficult questions
@@ -61,14 +64,14 @@ every SQL dialect, DBA command, or production incident skill.
 
 | Floor | Theme | Required abilities | Primary battle | Boss acceptance |
 |---|---|---|---|---|
-| 1 | Stone Query Keep | Single-table projection, filters, nulls, ordering, and limits | Query | One complete single-table query |
+| 1 | Emberstone Keep | Single-table projection, filters, nulls, ordering, and limits | Query | One complete single-table query |
 | 2 | Aggregate Clocktower | Aggregate functions, grouping, group filters, and conditional aggregation | Query | Produce a grouped ranking |
 | 3 | Relational Bridgeworks | Inner, left, self, multi-table joins, and set operations | Query | Join rooms, monsters, and gear |
-| 4 | Subquery Catacombs | Scalar, `IN`, `EXISTS`, correlated subqueries, and CTEs | Query | Find targets above a group baseline |
+| 4 | Mirrorveil Catacombs | Scalar, `IN`, `EXISTS`, correlated subqueries, and CTEs | Query | Find targets above a group baseline |
 | 5 | Window Observatory | Partitions, ranks, neighboring rows, and rolling windows | Query | Per-group Top-N and trend analysis |
-| 6 | Transaction Foundry | Data changes, constraints, transactions, savepoints, and ACID | Disposable sandbox | Repair data and roll back safely |
-| 7 | Index Labyrinth | B+ trees, composite and covering indexes, invalidation, and plans | Query + plan | Reduce the cost of a composite query |
-| 8 | Database Throne | MVCC, locks, anomalies, modeling, replication, sharding, and safety | Incident diagnosis | Multi-stage database interview finale |
+| 6 | Rollback Foundry | Data changes, constraints, transactions, savepoints, and ACID | Disposable sandbox | Repair data and roll back safely |
+| 7 | Crystal Index Grove | B+ trees, composite and covering indexes, invalidation, and plans | Query + plan | Reduce the cost of a composite query |
+| 8 | Obsidian Data Throne | MVCC, locks, anomalies, modeling, replication, sharding, and safety | Incident diagnosis | Multi-stage database interview finale |
 
 Each floor should contain five or six required monsters, one optional elite, one
 Boss, and random encounters that review older knowledge. Target duration is
@@ -76,7 +79,7 @@ Boss, and random encounters that review older knowledge. Target duration is
 
 ## 5. Floor Definitions
 
-### Floor 1: Stone Query Keep
+### Floor 1: Emberstone Keep
 
 **Goal**: independently write a reliable single-table query.
 **Prerequisite**: none.
@@ -157,7 +160,7 @@ equivalent query or an explicitly labeled concept demonstration.
 **Guaranteed reward**: Relation Chain and Alias Charm.
 **Preview breach**: use `EXISTS` to find monsters with qualifying gear.
 
-### Floor 4: Subquery Catacombs
+### Floor 4: Mirrorveil Catacombs
 
 **Goal**: express a query whose answer depends on another query.
 **Prerequisite**: Floor 3 joins and aggregation.
@@ -211,7 +214,7 @@ sector.
 **Preview breach**: complete five writes in a disposable copy, then restore the
 original state with `ROLLBACK`.
 
-### Floor 6: Transaction Foundry
+### Floor 6: Rollback Foundry
 
 **Goal**: modify data safely and understand transaction boundaries and recovery.
 **Prerequisite**: Floors 1–5 query skills.
@@ -239,7 +242,7 @@ failure, and reload must never mutate permanent curriculum data.
 **Guaranteed reward**: Rollback Shield and Constraint Armor.
 **Preview breach**: read query plans and select five effective index options.
 
-### Floor 7: Index Labyrinth
+### Floor 7: Crystal Index Grove
 
 **Goal**: choose indexes from query patterns and verify decisions through query
 plans instead of memorizing “add an index.”
@@ -268,7 +271,7 @@ replace device wall-clock time as the primary score.
 **Guaranteed reward**: Index Eye and Plan Lens.
 **Preview breach**: diagnose an incident involving MVCC, lock waits, and retry.
 
-### Floor 8: Database Throne
+### Floor 8: Obsidian Data Throne
 
 **Goal**: connect SQL skill to common database interview topics and incident
 reasoning.

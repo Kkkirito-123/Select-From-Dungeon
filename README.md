@@ -3,7 +3,9 @@
 [简体中文](README.zh-CN.md) | **English**
 
 [Eight-floor curriculum blueprint](docs/CURRICULUM.md) |
-[中文课程蓝图](docs/CURRICULUM.zh-CN.md)
+[Floor map and art direction](docs/FLOOR_THEMES.md) |
+[中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
+[中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
 
 A Chinese browser roguelite for SQL beginners and interview review. SQL is the
 combat action: physically explore a continuous seeded pixel maze, move into a
