@@ -60,7 +60,7 @@ describe("课程文案", () => {
       ...LESSONS.flatMap((lesson) => lesson.stages),
       ...BIOME_ENCOUNTERS.flatMap((encounter) => encounter.stages),
     ];
-    expect(stages).toHaveLength(88);
+    expect(stages).toHaveLength(118);
     stages.forEach((stage) => {
       expect(stage.answerSql).toMatch(/^(?:SELECT|WITH|INSERT|UPDATE|DELETE|BEGIN)\b/i);
       expect(stage.answerSql.endsWith(";")).toBe(true);
@@ -137,20 +137,43 @@ describe("课程文案", () => {
       42: "雷龙",
       43: "晶龙",
       44: "古龙",
+      45: "树卫",
+      46: "根兽",
+      47: "镜灵",
+      48: "藤巫",
+      49: "眼魔",
+      50: "古树",
+      51: "枝妖",
+      52: "根兽",
+      53: "晶灵",
+      54: "树魔",
+      55: "林王",
+      56: "幽魂",
+      57: "锁骑",
+      58: "巫妖",
+      59: "魔像",
+      60: "双子",
+      61: "巨兽",
+      62: "魔王",
+      63: "魔兵",
+      64: "黑骑",
+      65: "魔将",
+      66: "石像",
+      67: "王兽",
     });
     expect(INITIAL_MONSTERS.every(
       (monster) => !monster.name.includes("·") && monster.name.length <= 3,
     )).toBe(true);
   });
 
-  it("第三到六层面向玩家的怪物编号从 1 连续到 44", () => {
+  it("第三到八层面向玩家的怪物编号从 1 连续到 67", () => {
     const advancedIds = INITIAL_MONSTERS
       .filter((monster) => monster.floor >= 3)
       .map((monster) => monster.id)
       .sort((left, right) => left - right);
 
     expect(advancedIds).toEqual(
-      Array.from({ length: 44 }, (_, index) => index + 1),
+      Array.from({ length: 67 }, (_, index) => index + 1),
     );
   });
 

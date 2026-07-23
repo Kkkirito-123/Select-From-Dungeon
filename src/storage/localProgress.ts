@@ -63,16 +63,17 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v9";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v10";
 export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
-const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
-const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
-const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
-const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
-const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v9";
+const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
+const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
+const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
+const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+const PRIMITIVE_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
-// v8 through v4 are read as compatible baselines and upgraded in memory.
-// Legacy keys are never deleted, so v9 recovery cannot mutate a previous Run.
+// v9 through v4 are read as compatible baselines and upgraded in memory.
+// Legacy keys are never deleted, so v10 recovery cannot mutate a previous Run.
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -115,6 +116,19 @@ const LESSON_IDS: readonly LessonId[] = [
   "f6-constraint",
   "f6-transaction",
   "f6-savepoint",
+  "f7-btree",
+  "f7-composite",
+  "f7-covering",
+  "f7-invalid",
+  "f7-plan",
+  "f7-optimize",
+  "f8-mvcc",
+  "f8-lock",
+  "f8-isolation",
+  "f8-modeling",
+  "f8-replication",
+  "f8-sharding",
+  "f8-security",
 ];
 const PRE_V08_LESSON_IDS: readonly LessonId[] = LESSON_IDS.slice(0, 10);
 
@@ -138,6 +152,8 @@ const GATE_CHALLENGE_IDS: readonly GateChallengeId[] = [
   "forge-breach",
   "iron-breach",
   "dragon-breach",
+  "index-breach",
+  "throne-breach",
 ];
 const WEAPON_IDS = [
   "data-blade",
@@ -152,6 +168,8 @@ const WEAPON_IDS = [
   "rune-staff",
   "iron-axe",
   "dragon-spear",
+  "crystal-blade",
+  "royal-sword",
 ] as const;
 const ARMOR_IDS = [
   "slime-vest",
@@ -160,6 +178,8 @@ const ARMOR_IDS = [
   "rune-armor",
   "iron-armor",
   "dragon-armor",
+  "crystal-armor",
+  "royal-armor",
 ] as const;
 const CONSUMABLE_IDS = [
   "slime-gel",
@@ -171,6 +191,9 @@ const CONSUMABLE_IDS = [
   "ice-crystal",
   "repair-plate",
   "dragon-potion",
+  "crystal-fruit",
+  "black-potion",
+  "full-potion",
   "whetstone",
   "repair-shard",
 ] as const;
@@ -202,6 +225,19 @@ const MONSTER_KINDS = [
   "wyvern",
   "dragon",
   "dragon-king",
+  "index-guard",
+  "root-beast",
+  "crystal-spirit",
+  "vine-witch",
+  "index-eye",
+  "index-tree",
+  "demon-soldier",
+  "dark-knight",
+  "lich",
+  "obsidian-golem",
+  "replica-twin",
+  "shard-beast",
+  "demon-king",
 ] as const;
 const MONSTER_RANKS = ["normal", "elite", "boss"] as const;
 const ENCOUNTER_TYPES = ["curriculum", "ambush"] as const;
@@ -220,6 +256,8 @@ const ROOM_REWARDS = [
   "rune-staff",
   "iron-axe",
   "dragon-spear",
+  "crystal-blade",
+  "royal-sword",
   "restore-12-hp",
   "restore-20-hp",
   "cool-8-heat",
@@ -283,6 +321,19 @@ export function createEmptyProfile(): ProfileProgress {
       "f6-constraint": 0,
       "f6-transaction": 0,
       "f6-savepoint": 0,
+      "f7-btree": 0,
+      "f7-composite": 0,
+      "f7-covering": 0,
+      "f7-invalid": 0,
+      "f7-plan": 0,
+      "f7-optimize": 0,
+      "f8-mvcc": 0,
+      "f8-lock": 0,
+      "f8-isolation": 0,
+      "f8-modeling": 0,
+      "f8-replication": 0,
+      "f8-sharding": 0,
+      "f8-security": 0,
     },
     victories: 0,
     bestRunQueries: null,
@@ -433,7 +484,9 @@ function isMonster(value: unknown): value is Monster {
       value.floor === 3 ||
       value.floor === 4 ||
       value.floor === 5 ||
-      value.floor === 6
+      value.floor === 6 ||
+      value.floor === 7 ||
+      value.floor === 8
     ) &&
     isNonNegativeInteger(value.id) &&
     isLessonId(value.lessonId) &&
@@ -619,7 +672,9 @@ function isValidGraph(value: unknown): value is RoomGraph {
       value.floor !== 3 &&
       value.floor !== 4 &&
       value.floor !== 5 &&
-      value.floor !== 6
+      value.floor !== 6 &&
+      value.floor !== 7 &&
+      value.floor !== 8
     ) ||
     typeof value.seed !== "string" ||
     value.seed.length === 0 ||
@@ -884,7 +939,9 @@ function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
       value.floor === 3 ||
       value.floor === 4 ||
       value.floor === 5 ||
-      value.floor === 6
+      value.floor === 6 ||
+      value.floor === 7 ||
+      value.floor === 8
     ) &&
     isNonNegativeInteger(value.monsterId) &&
     typeof value.monsterName === "string" &&
@@ -944,7 +1001,10 @@ function validatedCampfires(
   return JSON.stringify(campfires) === JSON.stringify(expected) ? campfires : null;
 }
 
-function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): boolean {
+function isSavedRunVersion(
+  value: unknown,
+  version: 4 | 5 | 6 | 7 | 8 | 9 | 10,
+): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
   const candidateVersion: unknown = run.version;
@@ -957,7 +1017,8 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
       run.floor !== 3 &&
       run.floor !== 4 &&
       run.floor !== 5 &&
-      run.floor !== 6
+      run.floor !== 6 &&
+      (version < 10 || (run.floor !== 7 && run.floor !== 8))
     ) ||
     !isValidGraph(run.graph)
   ) return false;
@@ -1270,12 +1331,16 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 9);
+  return isSavedRunVersion(value, 10);
 }
 
 type LegacyPlayerState = Omit<PlayerState, "armor" | "armorHp">;
 
-type SavedRunV8 = Omit<SavedRun, "version" | "campaign"> & {
+type SavedRunV9 = Omit<SavedRun, "version"> & {
+  version: 9;
+};
+
+type SavedRunV8 = Omit<SavedRunV9, "version" | "campaign"> & {
   version: 8;
 };
 
@@ -1304,16 +1369,27 @@ type SavedRunV5 = Omit<
   "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
 > & { version: 5 };
 
+function migrateV9Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 9)) return null;
+  const legacy = value as SavedRunV9;
+  const migrated: SavedRun = {
+    ...legacy,
+    version: 10,
+    banner: `${legacy.banner} 第七、八层课程已开放，当前进度完整保留。`,
+  };
+  return isSavedRun(migrated) ? migrated : null;
+}
+
 function migrateV8Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 8)) return null;
   const legacy = value as SavedRunV8;
-  const migrated: SavedRun = {
+  const migrated: SavedRunV9 = {
     ...legacy,
     version: 9,
     campaign: createCampaignProgress(legacy.graph.seed, legacy.floor),
     banner: `${legacy.banner} 八层课程框架已接入，当前双层进度保持不变。`,
   };
-  return isSavedRun(migrated) ? migrated : null;
+  return isSavedRunVersion(migrated, 9) ? migrateV9Run(migrated) : null;
 }
 
 function migrateV7Run(value: unknown): SavedRun | null {
@@ -1541,11 +1617,12 @@ function migratePreV08Profile(value: unknown): ProfileProgress | null {
 export function loadRun(storage: StorageLike): SavedRun | null {
   const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
   if (isSavedRun(value)) return value;
-  return migrateV8Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
-    ?? migrateV7Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
-    ?? migrateV6Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)))
-    ?? migrateV5Run(parseJson(safeGetItem(storage, ANCIENT_RUN_SAVE_KEY)))
-    ?? migrateV4Run(parseJson(safeGetItem(storage, ARCHAIC_RUN_SAVE_KEY)));
+  return migrateV9Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
+    ?? migrateV8Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
+    ?? migrateV7Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)))
+    ?? migrateV6Run(parseJson(safeGetItem(storage, ANCIENT_RUN_SAVE_KEY)))
+    ?? migrateV5Run(parseJson(safeGetItem(storage, ARCHAIC_RUN_SAVE_KEY)))
+    ?? migrateV4Run(parseJson(safeGetItem(storage, PRIMITIVE_RUN_SAVE_KEY)));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {

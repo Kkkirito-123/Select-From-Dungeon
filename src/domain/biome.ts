@@ -35,7 +35,13 @@ export type BiomeFeatureKind =
   | "battlement"
   | "egg"
   | "magma"
-  | "dragon-bone";
+  | "dragon-bone"
+  | "crystal-tree"
+  | "root"
+  | "index-rune"
+  | "obsidian"
+  | "void-flame"
+  | "gold-throne";
 
 export interface BiomeRegion {
   id: string;
@@ -104,6 +110,18 @@ const FLOOR_SIX_TEMPLATES: readonly RegionTemplate[] = [
   { kind: "dragon-throne", name: "古龙王巢", lessonId: "f6-savepoint", feature: "dragon-bone" },
 ];
 
+const FLOOR_SEVEN_TEMPLATES: readonly RegionTemplate[] = [
+  { kind: "crystal-grove", name: "水晶林地", lessonId: "f7-btree", feature: "crystal-tree" },
+  { kind: "root-maze", name: "盘根迷宫", lessonId: "f7-composite", feature: "root" },
+  { kind: "index-heart", name: "索引树心", lessonId: "f7-optimize", feature: "index-rune" },
+];
+
+const FLOOR_EIGHT_TEMPLATES: readonly RegionTemplate[] = [
+  { kind: "obsidian-hall", name: "黑曜长厅", lessonId: "f8-mvcc", feature: "obsidian" },
+  { kind: "void-court", name: "虚空王庭", lessonId: "f8-lock", feature: "void-flame" },
+  { kind: "data-throne", name: "数据王座", lessonId: "f8-security", feature: "gold-throne" },
+];
+
 const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTemplate[]>> = {
   1: FLOOR_ONE_TEMPLATES,
   2: FLOOR_TWO_TEMPLATES,
@@ -111,6 +129,8 @@ const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTem
   4: FLOOR_FOUR_TEMPLATES,
   5: FLOOR_FIVE_TEMPLATES,
   6: FLOOR_SIX_TEMPLATES,
+  7: FLOOR_SEVEN_TEMPLATES,
+  8: FLOOR_EIGHT_TEMPLATES,
 };
 
 function positionKey(position: Position): string {

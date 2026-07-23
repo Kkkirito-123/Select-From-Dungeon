@@ -20,8 +20,17 @@ import { BONE_BLADE } from "./floor3Level";
 import { RUNE_STAFF } from "./floor4Level";
 import { IRON_AXE } from "./floor5Level";
 import { DRAGON_SPEAR } from "./floor6Level";
+import { CRYSTAL_BLADE } from "./floor7Level";
+import { ROYAL_SWORD } from "./floor8Level";
 
-export { BONE_BLADE, RUNE_STAFF, IRON_AXE, DRAGON_SPEAR };
+export {
+  BONE_BLADE,
+  RUNE_STAFF,
+  IRON_AXE,
+  DRAGON_SPEAR,
+  CRYSTAL_BLADE,
+  ROYAL_SWORD,
+};
 
 export const EQUIPMENT_CAPACITY = 12;
 export const CONSUMABLE_SLOT_CAPACITY = 3;
@@ -79,6 +88,18 @@ export const ARMORS: Readonly<Record<Armor["id"], Armor>> = {
     name: "龙鳞甲",
     maxArmor: 3,
     description: "巨龙鳞片编成的护甲，提供 3 点护甲生命。",
+  },
+  "crystal-armor": {
+    id: "crystal-armor",
+    name: "水晶甲",
+    maxArmor: 4,
+    description: "索引林水晶编成的护甲，提供 4 点护甲生命。",
+  },
+  "royal-armor": {
+    id: "royal-armor",
+    name: "王者甲",
+    maxArmor: 5,
+    description: "黑曜王城的最终护甲，提供 5 点护甲生命。",
   },
 };
 
@@ -146,6 +167,27 @@ export const CONSUMABLES: Readonly<Record<Consumable["id"], Consumable>> = {
     effect: "heal-both",
     amount: 2,
   },
+  "crystal-fruit": {
+    id: "crystal-fruit",
+    name: "晶果",
+    description: "索引林结出的晶果，恢复 2 点基础生命。",
+    effect: "heal-hp",
+    amount: 2,
+  },
+  "black-potion": {
+    id: "black-potion",
+    name: "黑药",
+    description: "黑曜王城的药剂，恢复 2 点基础生命与护甲生命。",
+    effect: "heal-both",
+    amount: 2,
+  },
+  "full-potion": {
+    id: "full-potion",
+    name: "全药",
+    description: "最终补给，恢复 5 点基础生命与护甲生命。",
+    effect: "heal-both",
+    amount: 5,
+  },
   whetstone: {
     id: "whetstone",
     name: "磨刀石",
@@ -175,6 +217,8 @@ export const WEAPONS: Readonly<Record<Weapon["id"], Weapon>> = {
   "rune-staff": RUNE_STAFF,
   "iron-axe": IRON_AXE,
   "dragon-spear": DRAGON_SPEAR,
+  "crystal-blade": CRYSTAL_BLADE,
+  "royal-sword": ROYAL_SWORD,
 };
 
 export interface LootCandidate {
@@ -262,6 +306,12 @@ const BIOME_CONSUMABLE: Readonly<Record<BiomeKind, Consumable>> = {
   "magma-nest": CONSUMABLES["dragon-potion"],
   "crystal-cavern": CONSUMABLES["ice-crystal"],
   "dragon-throne": CONSUMABLES["dragon-potion"],
+  "crystal-grove": CONSUMABLES["crystal-fruit"],
+  "root-maze": CONSUMABLES["crystal-fruit"],
+  "index-heart": CONSUMABLES["repair-shard"],
+  "obsidian-hall": CONSUMABLES["black-potion"],
+  "void-court": CONSUMABLES["black-potion"],
+  "data-throne": CONSUMABLES["full-potion"],
 };
 
 function roleProbability(
@@ -286,16 +336,19 @@ export function lootCandidatesForBiome(
   const weapon = floor === 1
     ? SLIME_SWORD
     : floor === 2 ? HUNTER_BOW : floor === 3 ? BONE_BLADE : floor === 4
-      ? RUNE_STAFF : floor === 5 ? IRON_AXE : DRAGON_SPEAR;
+      ? RUNE_STAFF : floor === 5 ? IRON_AXE : floor === 6
+        ? DRAGON_SPEAR : floor === 7 ? CRYSTAL_BLADE : ROYAL_SWORD;
   const armor = floor === 1
     ? ARMORS["slime-vest"]
     : floor === 2 ? ARMORS["vine-armor"] : floor === 3
       ? ARMORS["bone-armor"] : floor === 4 ? ARMORS["rune-armor"] : floor === 5
-        ? ARMORS["iron-armor"] : ARMORS["dragon-armor"];
+        ? ARMORS["iron-armor"] : floor === 6 ? ARMORS["dragon-armor"] : floor === 7
+          ? ARMORS["crystal-armor"] : ARMORS["royal-armor"];
   const nextWeapon = floor === 1
     ? SORT_SABER
     : floor === 2 ? BONE_BLADE : floor === 3 ? RUNE_STAFF : floor === 4
-      ? IRON_AXE : floor === 5 ? DRAGON_SPEAR : null;
+      ? IRON_AXE : floor === 5 ? DRAGON_SPEAR : floor === 6
+        ? CRYSTAL_BLADE : floor === 7 ? ROYAL_SWORD : null;
   const candidates = [
     consumableCandidate(consumable, roleProbability(role, 0.06, 0.12, 0.24, 0.24)),
     consumableCandidate(
@@ -333,7 +386,8 @@ export function lootCandidatesForFloor(floor: FloorNumber): LootCandidate[] {
         floor,
         floor === 3
           ? "bone-yard"
-          : floor === 4 ? "fire-forge" : floor === 5 ? "iron-yard" : "magma-nest",
+          : floor === 4 ? "fire-forge" : floor === 5 ? "iron-yard" : floor === 6
+            ? "magma-nest" : floor === 7 ? "crystal-grove" : "obsidian-hall",
         "normal",
       );
   return candidates.map((candidate) => ({

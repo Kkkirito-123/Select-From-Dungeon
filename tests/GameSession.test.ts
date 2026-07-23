@@ -688,7 +688,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
     expect(restored.toSavedRun()).toMatchObject({
-      version: 9,
+      version: 10,
       generatorVersion: 4,
       floor: 1,
       campaign: { currentFloor: 1, status: "active" },

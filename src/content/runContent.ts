@@ -270,6 +270,18 @@ const REWARD_CATALOG: Partial<Record<RoomReward, ClaimableReward>> = {
     description: "领取第六层必修武器，在一次性事务沙箱中稳定破甲。",
     kind: "weapon",
   },
+  "crystal-blade": {
+    id: "crystal-blade",
+    name: "水晶剑",
+    description: "领取第七层必修武器，用真实 SQLite 执行计划击穿索引守卫。",
+    kind: "weapon",
+  },
+  "royal-sword": {
+    id: "royal-sword",
+    name: "王者剑",
+    description: "领取第八层最终武器，把事故证据查询转化为王座重击。",
+    kind: "weapon",
+  },
   "floor-key": {
     id: "floor-key",
     name: "本层钥匙",
@@ -285,6 +297,32 @@ export function rewardDetails(reward: RoomReward | null): ClaimableReward | null
 }
 
 export function roomFlavor(type: RoomType, floor = 1): string {
+  if (floor === 8) {
+    const floorEightCopy: Record<RoomType, string> = {
+      entry: "黑曜王城只接受可验证的事故证据；复制与分片均使用明确标注的教学记录。",
+      tutorial: "版本厅保存创建与过期事务号，用查询重建事务 12 的快照。",
+      lesson: "锁、隔离、模型与路由事故都固定在本轮 SQLite 夹具中。",
+      rest: "王城篝火隔离战斗。靠近后按 E 休息或复盘本层。",
+      treasure: "黑曜宝库只提供构筑奖励，不改变事故证据。",
+      event: "事故碑廊解释边界：这里训练推理，不模拟生产分布式数据库。",
+      elite: "巨兽桥要求先验证路由和副本状态，再作取舍。",
+      boss: "魔王拥有五阶段事故链；每一击都必须给出可复现结果。",
+    };
+    return floorEightCopy[type];
+  }
+  if (floor === 7) {
+    const floorSevenCopy: Record<RoomType, string> = {
+      entry: "水晶林门记录真实 SQLite EXPLAIN QUERY PLAN，不伪装成其他数据库。",
+      tutorial: "枝径用主键 SEARCH 展示从根到叶的点查路径。",
+      lesson: "联合、覆盖与范围改写同时接受结果和计划证据。",
+      rest: "晶火篝火稳定索引林。靠近后按 E 休息或复盘。",
+      treasure: "索引宝库只增强构筑，不替代查询计划判断。",
+      event: "计划石碑记录 SCAN、SEARCH 与临时 B-Tree 的差异。",
+      elite: "晶眼会放大一次无效索引或额外排序。",
+      boss: "古树要求结果正确、索引路径合理且没有不必要的临时排序。",
+    };
+    return floorSevenCopy[type];
+  }
   if (floor === 6) {
     const floorSixCopy: Record<RoomType, string> = {
       entry: "熔巢石门已闭合。所有写操作只进入本场一次性 SQLite 副本。",

@@ -260,6 +260,9 @@ const NON_FLAT_STAGES = new Set<LessonStageId>([
   "practice-crystal-drake",
   "dragon-boss-scan",
   "dragon-boss-core",
+  "f8-mvcc-visible",
+  "f8-final-snapshot",
+  "practice-demon",
 ]);
 
 const SANDBOX_BASE_ROWS: unknown[][] = [
@@ -279,6 +282,14 @@ function hasSandboxRows(
     ["id", "item", "quantity", "status"],
     expectedRows,
   );
+}
+
+function planContains(
+  result: SqlQueryResult,
+  ...fragments: string[]
+): boolean {
+  const plan = result.plan.join(" ").toUpperCase();
+  return fragments.every((fragment) => plan.includes(fragment.toUpperCase()));
 }
 
 function joinsTables(
@@ -855,6 +866,119 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       ]);
     case "dragon-boss-core":
       return hasSandboxRows(result, SANDBOX_BASE_ROWS.filter((row) => row[0] !== 4));
+    case "f7-btree-search":
+      return hasExactOrderedRows(result, ["code", "score"], [["CRY-103", 72]]) &&
+        planContains(result, "SEARCH", "INTEGER PRIMARY KEY");
+    case "f7-composite-prefix":
+      return hasExactOrderedRows(result, ["code", "score"], [
+        ["CRY-106", 95],
+        ["CRY-104", 88],
+        ["CRY-102", 84],
+        ["CRY-107", 82],
+      ]) && planContains(result, "SEARCH", "idx_index_records_realm_score");
+    case "f7-covering-read":
+      return hasExactOrderedRows(result, ["category", "code"], [
+        ["guard", "CRY-101"],
+        ["guard", "CRY-102"],
+        ["guard", "CRY-104"],
+        ["guard", "EMB-201"],
+        ["guard", "VOI-301"],
+      ]) && planContains(result, "COVERING INDEX", "idx_index_records_category_code");
+    case "f7-invalid-rewrite":
+      return hasExactOrderedRows(result, ["code"], [
+        ["CRY-105"],
+        ["CRY-106"],
+        ["CRY-107"],
+      ]) && planContains(result, "SEARCH", "idx_index_records_code");
+    case "f7-plan-audit":
+      return hasExactOrderedRows(result, ["realm", "peak"], [["ember", 92]]) &&
+        planContains(result, "SEARCH", "idx_index_records_realm_score");
+    case "f7-optimize-top":
+      return hasExactOrderedRows(result, ["code", "score"], [
+        ["CRY-106", 95],
+        ["CRY-104", 88],
+      ]) &&
+        planContains(result, "SEARCH", "idx_index_records_realm_score") &&
+        !planContains(result, "USE TEMP B-TREE");
+    case "f7-optimize-core":
+      return hasExactOrderedRows(result, ["code"], [
+        ["CRY-106"],
+        ["CRY-107"],
+        ["EMB-203"],
+        ["VOI-302"],
+      ]) && planContains(result, "COVERING INDEX", "idx_index_records_category_code");
+    case "practice-branch":
+      return hasExactOrderedRows(result, ["code"], [["CRY-101"]]) &&
+        planContains(result, "SEARCH");
+    case "practice-root":
+      return hasExactOrderedRows(result, ["code", "score"], [
+        ["CRY-106", 95],
+        ["CRY-104", 88],
+      ]) && planContains(result, "idx_index_records_realm_score");
+    case "practice-crystal":
+      return hasExactOrderedRows(result, ["category", "code"], [
+        ["charm", "CRY-105"],
+        ["charm", "EMB-202"],
+      ]) && planContains(result, "COVERING INDEX");
+    case "practice-vine":
+      return hasExactOrderedRows(result, ["code"], [
+        ["CRY-101"],
+        ["CRY-102"],
+      ]) && planContains(result, "idx_index_records_code");
+    case "index-boss-scan":
+      return hasExactOrderedRows(result, ["code", "score"], [
+        ["VOI-302", 86],
+        ["VOI-301", 68],
+      ]) && planContains(result, "idx_index_records_realm_score");
+    case "index-boss-core":
+      return hasExactOrderedRows(result, ["code"], [["VOI-302"]]) &&
+        planContains(result, "SEARCH");
+    case "f8-mvcc-visible":
+      return hasExactOrderedRows(result, ["row_id", "value"], [
+        [1, "crystal"],
+        [2, "locked"],
+        [3, "safe"],
+      ]);
+    case "f8-lock-cycle":
+      return hasExactOrderedRows(result, ["waiter_tx", "blocker_tx"], [["T1", "T2"]]);
+    case "f8-isolation-phantom":
+      return hasExactOrderedRows(result, ["phenomenon", "prevented_by"], [
+        ["phantom_read", "SERIALIZABLE"],
+      ]);
+    case "f8-modeling-safe":
+      return hasExactOrderedRows(result, ["model"], [["normalized"]]);
+    case "f8-replication-fresh":
+      return hasExactOrderedRows(result, ["node", "lag_ms"], [["replica-b", 18]]);
+    case "f8-sharding-balance":
+      return hasExactOrderedRows(result, ["shard_id", "total"], [
+        [0, 2],
+        [2, 3],
+      ]);
+    case "f8-final-snapshot":
+      return hasExactOrderedRows(result, ["value"], [["locked"]]);
+    case "f8-final-deadlock":
+      return hasExactOrderedRows(result, ["waiter_tx", "resource"], [
+        ["T1", "account:7"],
+        ["T3", "log:2"],
+      ]);
+    case "f8-final-anomaly":
+      return hasExactOrderedRows(result, ["prevented_by"], [["SERIALIZABLE"]]);
+    case "f8-final-route":
+      return hasExactOrderedRows(result, ["node", "lag_ms"], [["replica-a", 120]]);
+    case "f8-final-security":
+      return hasExactOrderedRows(result, ["method"], [["prepared-select"]]);
+    case "practice-demon":
+      return hasExactOrderedRows(result, ["value"], [["safe"]]);
+    case "practice-dark-knight":
+      return hasExactOrderedRows(result, ["blocker_tx", "resource"], [["T2", "log:2"]]);
+    case "practice-lich":
+      return hasExactOrderedRows(result, ["first_count", "second_count"], [[2, 4]]);
+    case "practice-golem":
+      return hasExactOrderedRows(result, ["model", "score"], [["normalized", 95]]);
+    case "throne-boss-scan":
+      return hasExactOrderedRows(result, ["account_id", "shard_id"], [[107, 9]]);
+    case "throne-boss-core":
+      return hasExactOrderedRows(result, ["method"], [["prepared-select"]]);
   }
 }
 
@@ -947,6 +1071,36 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-crystal-drake": "无效 quantity 不应写入沙箱。",
   "dragon-boss-scan": "保存点局部回滚后，修复必须保留且被删行必须恢复。",
   "dragon-boss-core": "提交后只应删除 id = 4。",
+  "f7-btree-search": "结果或计划不正确：应返回 CRY-103、72，并通过主键 SEARCH 点查。",
+  "f7-composite-prefix": "应按 95、88、84、82 返回 crystal 高分记录，并命中 realm/score 联合索引。",
+  "f7-covering-read": "应只返回 guard 的 category、code，并在计划中出现覆盖索引。",
+  "f7-invalid-rewrite": "范围结果应为 CRY-105 到 CRY-107，并沿 code 索引 SEARCH。",
+  "f7-plan-audit": "ember 的 peak 应为 92，执行计划应使用 realm/score 联合索引。",
+  "f7-optimize-top": "前两名应为 CRY-106、CRY-104，且不应出现临时排序 B-Tree。",
+  "f7-optimize-core": "应只从覆盖索引返回四条 boss code。",
+  "practice-branch": "应通过主键点查返回 CRY-101。",
+  "practice-root": "应按 95、88 返回两条 crystal 根道记录。",
+  "practice-crystal": "应通过覆盖索引返回 CRY-105 与 EMB-202。",
+  "practice-vine": "闭开范围应只返回 CRY-101、CRY-102。",
+  "index-boss-scan": "void 区结果应依次为 VOI-302、VOI-301。",
+  "index-boss-core": "VOI 前缀的 boss 记录应只返回 VOI-302。",
+  "f8-mvcc-visible": "事务 12 的可见值应为 crystal、locked、safe。",
+  "f8-lock-cycle": "等待图中互锁的一对是 T1 与 T2。",
+  "f8-isolation-phantom": "数量变大的事故应识别为 phantom_read，并由 SERIALIZABLE 阻止。",
+  "f8-modeling-safe": "满足三项约束且评分最高的模型应为 normalized。",
+  "f8-replication-fresh": "健康副本中延迟最低的是 replica-b，18ms。",
+  "f8-sharding-balance": "有效路由统计应得到 shard 0 = 2、shard 2 = 3。",
+  "f8-final-snapshot": "事务 12 下 row_id = 2 的可见值应为 locked。",
+  "f8-final-deadlock": "被 T2 阻塞的是 T1/account:7 与 T3/log:2。",
+  "f8-final-anomaly": "phantom_read 的阻止策略应为 SERIALIZABLE。",
+  "f8-final-route": "不健康副本应为 replica-a，延迟 120ms。",
+  "f8-final-security": "同时参数化、最小权限且允许执行的方法应为 prepared-select。",
+  "practice-demon": "事务 12 下 row_id = 3 的可见值应为 safe。",
+  "practice-dark-knight": "T3 正被 T2 在 log:2 上阻塞。",
+  "practice-lich": "phantom_read 的两次计数应为 2、4。",
+  "practice-golem": "零重复组中评分最高的模型应为 normalized、95。",
+  "throne-boss-scan": "无效路由应为 account 107、shard 9。",
+  "throne-boss-core": "参数化且最小权限的方法应只返回 prepared-select。",
 };
 
 function stageFor(lessonId: LessonId, stageIndex: number): LessonStageDefinition {

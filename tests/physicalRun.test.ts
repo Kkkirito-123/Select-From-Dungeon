@@ -26,13 +26,14 @@ function teachingResult(
   columns: string[],
   rows: Array<Record<string, unknown>>,
   targetIds: number[] = [],
+  plan: string[] = ["SEARCH physical run fixture"],
 ): SqlQueryResult {
   return {
     sql,
     columns,
     rows,
     targetIds,
-    plan: ["SEARCH physical run fixture"],
+    plan,
     baseHeat: 3,
     features: detectQueryFeatures(sql),
   };
@@ -361,6 +362,125 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
         .map((row) => row.id === 2 ? { ...row, status: "fixed" } : row),
     ),
   ],
+  "f7-btree": [teachingResult(
+    "SELECT code, score FROM index_records WHERE id = 3",
+    ["code", "score"],
+    [{ code: "CRY-103", score: 72 }],
+    [],
+    ["SEARCH index_records USING INTEGER PRIMARY KEY (rowid=?)"],
+  )],
+  "f7-composite": [teachingResult(
+    "SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 80 ORDER BY score DESC",
+    ["code", "score"],
+    [
+      { code: "CRY-106", score: 95 },
+      { code: "CRY-104", score: 88 },
+      { code: "CRY-102", score: 84 },
+      { code: "CRY-107", score: 82 },
+    ],
+    [],
+    ["SEARCH index_records USING INDEX idx_index_records_realm_score"],
+  )],
+  "f7-covering": [teachingResult(
+    "SELECT category, code FROM index_records WHERE category = 'guard' ORDER BY code",
+    ["category", "code"],
+    [
+      { category: "guard", code: "CRY-101" },
+      { category: "guard", code: "CRY-102" },
+      { category: "guard", code: "CRY-104" },
+      { category: "guard", code: "EMB-201" },
+      { category: "guard", code: "VOI-301" },
+    ],
+    [],
+    ["SEARCH index_records USING COVERING INDEX idx_index_records_category_code"],
+  )],
+  "f7-invalid": [teachingResult(
+    "SELECT code FROM index_records WHERE code >= 'CRY-105' AND code < 'CRY-108' ORDER BY code",
+    ["code"],
+    [{ code: "CRY-105" }, { code: "CRY-106" }, { code: "CRY-107" }],
+    [],
+    ["SEARCH index_records USING COVERING INDEX idx_index_records_code"],
+  )],
+  "f7-plan": [teachingResult(
+    "SELECT realm, MAX(score) AS peak FROM index_records WHERE realm = 'ember' GROUP BY realm",
+    ["realm", "peak"],
+    [{ realm: "ember", peak: 92 }],
+    [],
+    ["SEARCH index_records USING COVERING INDEX idx_index_records_realm_score"],
+  )],
+  "f7-optimize": [
+    teachingResult(
+      "SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 80 ORDER BY score DESC LIMIT 2",
+      ["code", "score"],
+      [{ code: "CRY-106", score: 95 }, { code: "CRY-104", score: 88 }],
+      [],
+      ["SEARCH index_records USING INDEX idx_index_records_realm_score"],
+    ),
+    teachingResult(
+      "SELECT code FROM index_records WHERE category = 'boss' ORDER BY code",
+      ["code"],
+      [{ code: "CRY-106" }, { code: "CRY-107" }, { code: "EMB-203" }, { code: "VOI-302" }],
+      [],
+      ["SEARCH index_records USING COVERING INDEX idx_index_records_category_code"],
+    ),
+  ],
+  "f8-mvcc": [teachingResult(
+    "SELECT row_id, value FROM tx_versions WHERE created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12) ORDER BY row_id",
+    ["row_id", "value"],
+    [{ row_id: 1, value: "crystal" }, { row_id: 2, value: "locked" }, { row_id: 3, value: "safe" }],
+  )],
+  "f8-lock": [teachingResult(
+    "SELECT a.waiter_tx, a.blocker_tx FROM lock_waits a INNER JOIN lock_waits b ON a.waiter_tx = b.blocker_tx AND a.blocker_tx = b.waiter_tx WHERE a.waiter_tx < a.blocker_tx",
+    ["waiter_tx", "blocker_tx"],
+    [{ waiter_tx: "T1", blocker_tx: "T2" }],
+  )],
+  "f8-isolation": [teachingResult(
+    "SELECT phenomenon, prevented_by FROM isolation_cases WHERE second_count > first_count ORDER BY id",
+    ["phenomenon", "prevented_by"],
+    [{ phenomenon: "phantom_read", prevented_by: "SERIALIZABLE" }],
+  )],
+  "f8-modeling": [teachingResult(
+    "SELECT model FROM schema_choices WHERE has_primary_key = 1 AND has_unique_email = 1 AND duplicate_groups = 0 ORDER BY score DESC LIMIT 1",
+    ["model"],
+    [{ model: "normalized" }],
+  )],
+  "f8-replication": [teachingResult(
+    "SELECT node, lag_ms FROM replica_status WHERE role = 'replica' AND healthy = 1 ORDER BY lag_ms LIMIT 1",
+    ["node", "lag_ms"],
+    [{ node: "replica-b", lag_ms: 18 }],
+  )],
+  "f8-sharding": [teachingResult(
+    "SELECT shard_id, COUNT(*) AS total FROM shard_routes WHERE route_ok = 1 GROUP BY shard_id HAVING COUNT(*) >= 2 ORDER BY shard_id",
+    ["shard_id", "total"],
+    [{ shard_id: 0, total: 2 }, { shard_id: 2, total: 3 }],
+  )],
+  "f8-security": [
+    teachingResult(
+      "SELECT value FROM tx_versions WHERE row_id = 2 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12)",
+      ["value"],
+      [{ value: "locked" }],
+    ),
+    teachingResult(
+      "SELECT waiter_tx, resource FROM lock_waits WHERE blocker_tx = 'T2' ORDER BY waiter_tx",
+      ["waiter_tx", "resource"],
+      [{ waiter_tx: "T1", resource: "account:7" }, { waiter_tx: "T3", resource: "log:2" }],
+    ),
+    teachingResult(
+      "SELECT prevented_by FROM isolation_cases WHERE phenomenon = 'phantom_read'",
+      ["prevented_by"],
+      [{ prevented_by: "SERIALIZABLE" }],
+    ),
+    teachingResult(
+      "SELECT node, lag_ms FROM replica_status WHERE role = 'replica' AND healthy = 0 ORDER BY lag_ms DESC",
+      ["node", "lag_ms"],
+      [{ node: "replica-a", lag_ms: 120 }],
+    ),
+    teachingResult(
+      "SELECT method FROM security_cases WHERE parameterized = 1 AND least_privilege = 1 AND allowed = 1 ORDER BY id",
+      ["method"],
+      [{ method: "prepared-select" }],
+    ),
+  ],
 };
 
 const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
@@ -538,6 +658,52 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     "INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (7, 'bad', -2, 'ready')",
     SANDBOX_ROWS,
   )],
+  51: [teachingResult(
+    "SELECT code FROM index_records WHERE id = 1",
+    ["code"],
+    [{ code: "CRY-101" }],
+  )],
+  52: [teachingResult(
+    "SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 88 ORDER BY score DESC",
+    ["code", "score"],
+    [{ code: "CRY-106", score: 95 }, { code: "CRY-104", score: 88 }],
+    [],
+    ["SEARCH idx_index_records_realm_score"],
+  )],
+  53: [teachingResult(
+    "SELECT category, code FROM index_records WHERE category = 'charm' ORDER BY code",
+    ["category", "code"],
+    [{ category: "charm", code: "CRY-105" }, { category: "charm", code: "EMB-202" }],
+    [],
+    ["SEARCH USING COVERING INDEX idx_index_records_category_code"],
+  )],
+  54: [teachingResult(
+    "SELECT code FROM index_records WHERE code >= 'CRY-101' AND code < 'CRY-103' ORDER BY code",
+    ["code"],
+    [{ code: "CRY-101" }, { code: "CRY-102" }],
+    [],
+    ["SEARCH idx_index_records_code"],
+  )],
+  63: [teachingResult(
+    "SELECT value FROM tx_versions WHERE row_id = 3 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12)",
+    ["value"],
+    [{ value: "safe" }],
+  )],
+  64: [teachingResult(
+    "SELECT blocker_tx, resource FROM lock_waits WHERE waiter_tx = 'T3'",
+    ["blocker_tx", "resource"],
+    [{ blocker_tx: "T2", resource: "log:2" }],
+  )],
+  65: [teachingResult(
+    "SELECT first_count, second_count FROM isolation_cases WHERE phenomenon = 'phantom_read'",
+    ["first_count", "second_count"],
+    [{ first_count: 2, second_count: 4 }],
+  )],
+  66: [teachingResult(
+    "SELECT model, score FROM schema_choices WHERE duplicate_groups = 0 ORDER BY score DESC LIMIT 1",
+    ["model", "score"],
+    [{ model: "normalized", score: 95 }],
+  )],
 };
 
 function pathToAny(session: GameSession, goals: readonly Position[]): Position[] {
@@ -710,7 +876,7 @@ describe("continuous physical maze run", () => {
   it.each([
     ["where", "is-null"],
     ["is-null", "where"],
-  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通前六层", (first, second) => {
+  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通八层", (first, second) => {
     const session = new GameSession(null, null, `physical-${first}-${second}`);
     clearLessonByWalking(session, "select");
     clearLessonByWalking(session, first);
@@ -777,14 +943,40 @@ describe("continuous physical maze run", () => {
     clearLessonByWalking(session, "f6-transaction");
     clearLessonByWalking(session, "f6-savepoint");
 
+    expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 6 });
+    expect(session.advanceFloor()).toBe(true);
+    expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 7 });
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+
+    clearLessonByWalking(session, "f7-btree");
+    clearLessonByWalking(session, "f7-composite");
+    clearLessonByWalking(session, "f7-covering");
+    clearLessonByWalking(session, "f7-invalid");
+    clearLessonByWalking(session, "f7-plan");
+    clearLessonByWalking(session, "f7-optimize");
+
+    expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 7 });
+    expect(session.advanceFloor()).toBe(true);
+    expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 8 });
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+
+    clearLessonByWalking(session, "f8-mvcc");
+    clearLessonByWalking(session, "f8-lock");
+    clearLessonByWalking(session, "f8-isolation");
+    clearLessonByWalking(session, "f8-modeling");
+    clearLessonByWalking(session, "f8-replication");
+    clearLessonByWalking(session, "f8-sharding");
+    clearLessonByWalking(session, "f8-security");
+
     expect(session.snapshot().mode).toBe("victory");
     expect(session.snapshot().completedLessons).toEqual([
-      "f6-insert",
-      "f6-update",
-      "f6-delete",
-      "f6-constraint",
-      "f6-transaction",
-      "f6-savepoint",
+      "f8-mvcc",
+      "f8-lock",
+      "f8-isolation",
+      "f8-modeling",
+      "f8-replication",
+      "f8-sharding",
+      "f8-security",
     ]);
     expect(session.toProfile().masteredLessons).toEqual([
       "select",
@@ -821,6 +1013,19 @@ describe("continuous physical maze run", () => {
       "f6-constraint",
       "f6-transaction",
       "f6-savepoint",
+      "f7-btree",
+      "f7-composite",
+      "f7-covering",
+      "f7-invalid",
+      "f7-plan",
+      "f7-optimize",
+      "f8-mvcc",
+      "f8-lock",
+      "f8-isolation",
+      "f8-modeling",
+      "f8-replication",
+      "f8-sharding",
+      "f8-security",
     ]);
     expect(session.toProfile().victories).toBe(1);
   });

@@ -302,6 +302,19 @@ function emptyProfile(): ProfileProgress {
       "f6-constraint": 0,
       "f6-transaction": 0,
       "f6-savepoint": 0,
+      "f7-btree": 0,
+      "f7-composite": 0,
+      "f7-covering": 0,
+      "f7-invalid": 0,
+      "f7-plan": 0,
+      "f7-optimize": 0,
+      "f8-mvcc": 0,
+      "f8-lock": 0,
+      "f8-isolation": 0,
+      "f8-modeling": 0,
+      "f8-replication": 0,
+      "f8-sharding": 0,
+      "f8-security": 0,
     },
     victories: 0,
     bestRunQueries: null,
@@ -498,7 +511,7 @@ export class GameSession {
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
 
-    if (savedRun?.version === 9 && savedRun.generatorVersion === 4) {
+    if (savedRun?.version === 10 && savedRun.generatorVersion === 4) {
       this.campaign = cloneCampaignProgress(savedRun.campaign);
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
@@ -606,7 +619,7 @@ export class GameSession {
       ? gateChallengeForFloor(this.floorNumber, this.challengeGateId())
       : null;
     const missionTitle = this.mode === "victory"
-      ? "六层贯通 · RUN COMMITTED"
+      ? "八层贯通 · RUN COMMITTED"
       : this.mode === "transition"
         ? `传送门启动 · FLOOR ${String(this.floorNumber + 1).padStart(2, "0")} LOADING`
       : this.mode === "defeat"
@@ -627,7 +640,7 @@ export class GameSession {
           ? lesson.title
           : room.title;
     const missionBody = this.mode === "victory"
-      ? "你击败了龙王。前六层 SQL 图鉴和练习记录已经永久保留。"
+      ? "你击败了魔王。八层 SQL 图鉴和练习记录已经永久保留。"
       : this.mode === "transition"
         ? `第 ${this.floorNumber + 1} 层传送门已经展开。无需按键，正在自动进入下一层。`
       : this.mode === "defeat"
@@ -736,7 +749,7 @@ export class GameSession {
 
   toSavedRun(): SavedRun {
     return {
-      version: 9,
+      version: 10,
       generatorVersion: 4,
       campaign: cloneCampaignProgress(this.campaign),
       floor: this.floorNumber,
@@ -1739,7 +1752,7 @@ export class GameSession {
   }
 
   advanceFloor(): boolean {
-    if (this.mode !== "transition" || this.floorNumber >= 6) return false;
+    if (this.mode !== "transition" || this.floorNumber >= 8) return false;
     const fromFloor = this.floorNumber;
     const transition = advanceCampaignProgress(this.campaign);
     const nextFloor = transition.to;
@@ -1747,7 +1760,7 @@ export class GameSession {
       !transition.ok ||
       transition.completed ||
       nextFloor !== fromFloor + 1 ||
-      nextFloor > 6
+      nextFloor > 8
     ) return false;
     this.campaign = transition.progress;
     const nextSeed = this.campaign.floors.find((slot) => slot.floor === nextFloor)?.seed;
@@ -1810,6 +1823,8 @@ export class GameSession {
       4: "元素熔炉",
       5: "黑铁要塞",
       6: "巨龙熔巢",
+      7: "水晶索引林",
+      8: "黑曜数据王座",
     };
     this.banner = `传送完成：已进入第 ${this.floorNumber} 层「${floorNames[this.floorNumber]}」。装备、遗物、等级与 XP 已保留。`;
     this.revealAt(this.player);
@@ -2311,7 +2326,7 @@ export class GameSession {
     const keyId = `floor-${this.floorNumber}-key`;
     if (!this.keyItems.includes(keyId)) this.keyItems.push(keyId);
     this.completedRoomIds.add(this.currentRoomId);
-    if (this.floorNumber < 6) {
+    if (this.floorNumber < 8) {
       this.mode = "transition";
       return `第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，正在自动进入第 ${this.floorNumber + 1} 层。`;
     }
@@ -2320,7 +2335,7 @@ export class GameSession {
     this.profile.bestRunQueries = this.profile.bestRunQueries === null
       ? this.queryCount
       : Math.min(this.profile.bestRunQueries, this.queryCount);
-    return "获得第六层钥匙。龙王熔巢已平定，前六层 SQL 图鉴均已永久更新。";
+    return "获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。";
   }
 
   private completeAmbush(
@@ -2491,7 +2506,7 @@ export class GameSession {
     this.completedRoomIds.add(item.sourceRoomId);
     const openedBattleChest = item.id.startsWith("lesson-drop:");
     if (item.rewardId === "floor-key") {
-      if (this.floorNumber < 6) {
+      if (this.floorNumber < 8) {
         this.mode = "transition";
         this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，1.5 秒后自动进入第 ${this.floorNumber + 1} 层。`;
       } else {
@@ -2500,7 +2515,7 @@ export class GameSession {
         this.profile.bestRunQueries = this.profile.bestRunQueries === null
           ? this.queryCount
           : Math.min(this.profile.bestRunQueries, this.queryCount);
-        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第六层钥匙。龙王熔巢已平定，前六层 SQL 图鉴均已永久更新。`;
+        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。`;
       }
     } else if (
       item.weapon ||
@@ -2634,7 +2649,7 @@ export class GameSession {
     if (this.mode === "challenge") return "机关破解中 · Ctrl + Enter 提交 · ESC 安全退出";
     if (this.mode === "combat") return "Q + S  打开 SQL 战斗终端";
     if (this.mode === "transition") return `传送门启动 · 自动进入第 ${this.floorNumber + 1} 层`;
-    if (this.mode === "victory") return "前六层已贯通 · 可开始新 Run";
+    if (this.mode === "victory") return "八层已贯通 · 可开始新 Run";
     if (this.mode === "defeat") return "YOU DIED · 正在返回最近篝火";
     const campfire = nearbyCampfire(this.campfires, this.player);
     if (campfire) {

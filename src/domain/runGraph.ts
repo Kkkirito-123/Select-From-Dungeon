@@ -50,6 +50,25 @@ export const FLOOR_SIX_LESSONS = [
   "f6-savepoint",
 ] as const;
 
+export const FLOOR_SEVEN_LESSONS = [
+  "f7-btree",
+  "f7-composite",
+  "f7-covering",
+  "f7-invalid",
+  "f7-plan",
+  "f7-optimize",
+] as const;
+
+export const FLOOR_EIGHT_LESSONS = [
+  "f8-mvcc",
+  "f8-lock",
+  "f8-isolation",
+  "f8-modeling",
+  "f8-replication",
+  "f8-sharding",
+  "f8-security",
+] as const;
+
 export const REQUIRED_RUN_LESSONS = [
   ...FLOOR_ONE_LESSONS,
   ...FLOOR_TWO_LESSONS,
@@ -57,10 +76,12 @@ export const REQUIRED_RUN_LESSONS = [
   ...FLOOR_FOUR_LESSONS,
   ...FLOOR_FIVE_LESSONS,
   ...FLOOR_SIX_LESSONS,
+  ...FLOOR_SEVEN_LESSONS,
+  ...FLOOR_EIGHT_LESSONS,
 ] as const;
 
 export type RunLessonId = (typeof REQUIRED_RUN_LESSONS)[number];
-export type FloorNumber = 1 | 2 | 3 | 4 | 5 | 6;
+export type FloorNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type RoomType =
   | "entry"
@@ -83,6 +104,8 @@ export type RoomReward =
   | "rune-staff"
   | "iron-axe"
   | "dragon-spear"
+  | "crystal-blade"
+  | "royal-sword"
   | "restore-12-hp"
   | "restore-20-hp"
   | "cool-8-heat"
@@ -188,6 +211,19 @@ const REQUIRED_PREREQUISITES: Record<RunLessonId, readonly RunLessonId[]> = {
   "f6-constraint": ["f6-delete"],
   "f6-transaction": ["f6-constraint"],
   "f6-savepoint": ["f6-transaction"],
+  "f7-btree": [],
+  "f7-composite": ["f7-btree"],
+  "f7-covering": ["f7-composite"],
+  "f7-invalid": ["f7-covering"],
+  "f7-plan": ["f7-invalid"],
+  "f7-optimize": ["f7-plan"],
+  "f8-mvcc": [],
+  "f8-lock": ["f8-mvcc"],
+  "f8-isolation": ["f8-lock"],
+  "f8-modeling": ["f8-isolation"],
+  "f8-replication": ["f8-modeling"],
+  "f8-sharding": ["f8-replication"],
+  "f8-security": ["f8-sharding"],
 };
 
 export function lessonsForFloor(floor: FloorNumber): readonly RunLessonId[] {
@@ -196,7 +232,9 @@ export function lessonsForFloor(floor: FloorNumber): readonly RunLessonId[] {
   if (floor === 3) return FLOOR_THREE_LESSONS;
   if (floor === 4) return FLOOR_FOUR_LESSONS;
   if (floor === 5) return FLOOR_FIVE_LESSONS;
-  return FLOOR_SIX_LESSONS;
+  if (floor === 6) return FLOOR_SIX_LESSONS;
+  if (floor === 7) return FLOOR_SEVEN_LESSONS;
+  return FLOOR_EIGHT_LESSONS;
 }
 
 export function stableStringHash(value: string): number {
@@ -520,7 +558,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
 }
 
 interface AdvancedFloorGraphConfig {
-  floor: 3 | 4 | 5 | 6;
+  floor: 3 | 4 | 5 | 6 | 7;
   defaultSeed: string;
   entryTitle: string;
   lessonIds: readonly [
@@ -532,11 +570,16 @@ interface AdvancedFloorGraphConfig {
     RunLessonId,
   ];
   lessonTitles: readonly [string, string, string, string, string, string];
-  firstReward: "bone-blade" | "rune-staff" | "iron-axe" | "dragon-spear";
+  firstReward:
+    | "bone-blade"
+    | "rune-staff"
+    | "iron-axe"
+    | "dragon-spear"
+    | "crystal-blade";
   sideTitles: readonly [string, string, string];
 }
 
-const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4 | 5 | 6, AdvancedFloorGraphConfig>> = {
+const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4 | 5 | 6 | 7, AdvancedFloorGraphConfig>> = {
   3: {
     floor: 3,
     defaultSeed: "亡者墓城-第三层",
@@ -628,6 +671,29 @@ const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4 | 5 | 6, AdvancedFloorGraphCo
     ],
     firstReward: "dragon-spear",
     sideTitles: ["龙息篝火", "龙鳞宝库", "古龙碑廊"],
+  },
+  7: {
+    floor: 7,
+    defaultSeed: "水晶索引林-第七层",
+    entryTitle: "水晶林门",
+    lessonIds: [
+      "f7-btree",
+      "f7-composite",
+      "f7-covering",
+      "f7-invalid",
+      "f7-plan",
+      "f7-optimize",
+    ],
+    lessonTitles: [
+      "B+ 树 枝径",
+      "联合索引 根道",
+      "覆盖索引 镜湖",
+      "索引失效 藤门",
+      "执行计划 晶眼",
+      "查询优化 古树心",
+    ],
+    firstReward: "crystal-blade",
+    sideTitles: ["晶火篝火", "索引宝库", "计划石碑"],
   },
 };
 
@@ -773,9 +839,92 @@ function generateAdvancedFloorGraph(
   };
 }
 
+function generateFloorEightGraph(rawSeed: string): RoomGraph {
+  const seed = rawSeed.trim() || "黑曜数据王座-第八层";
+  const random = createSeededRandom(
+    `select-from-dungeon:run-graph:v2:floor-8:${seed}`,
+  );
+  const lessonIds = FLOOR_EIGHT_LESSONS;
+  const lessonTitles = [
+    "MVCC 版本厅",
+    "死锁 双骑门",
+    "隔离异常 幻境",
+    "数据建模 石像庭",
+    "复制 双塔",
+    "分片 巨兽桥",
+    "安全 魔王座",
+  ] as const;
+  const lessonRoomIds = lessonIds.map((_, index) => `floor-8-lesson-${index + 1}`);
+  const sideIds = ["floor-8-rest", "floor-8-treasure", "floor-8-event"] as const;
+  const sideOrder = shuffled(sideIds, random);
+  const laneById = new Map(sideOrder.map((id, index) => [id, index - 1] as const));
+  const nodes: RoomNode[] = [
+    room({
+      id: "floor-8-entry",
+      type: "entry",
+      title: "黑曜王城门",
+      depth: 0,
+      lane: 0,
+      required: true,
+      reward: null,
+      next: [lessonRoomIds[0]],
+    }),
+    ...lessonRoomIds.map((id, index) => room({
+      id,
+      type: index === 0
+        ? "tutorial"
+        : index === lessonRoomIds.length - 1
+          ? "boss"
+          : index === lessonRoomIds.length - 2
+            ? "elite"
+            : "lesson",
+      title: lessonTitles[index],
+      depth: index + 1,
+      lane: index % 2 === 0 ? -0.45 : 0.45,
+      required: true,
+      lessonId: lessonIds[index],
+      prerequisiteLessons: REQUIRED_PREREQUISITES[lessonIds[index]],
+      reward: index === 0
+        ? "royal-sword"
+        : index === lessonRoomIds.length - 1
+          ? "floor-key"
+          : index === lessonRoomIds.length - 2
+            ? "elite-transaction-shield"
+            : index === 2
+              ? "schema-shard"
+              : "hint-token",
+      next: index === lessonRoomIds.length - 1
+        ? []
+        : index === 0
+          ? shuffled([lessonRoomIds[1], ...sideIds], random)
+          : [lessonRoomIds[index + 1]],
+    })),
+    ...sideIds.map((id, index) => room({
+      id,
+      type: (["rest", "treasure", "event"] as const)[index],
+      title: (["王城篝火", "黑曜宝库", "事故碑廊"] as const)[index],
+      depth: 2 + index,
+      lane: laneById.get(id) ?? index - 1,
+      required: false,
+      prerequisiteLessons: ["f8-mvcc"],
+      reward: pick(OPTIONAL_REWARDS[(["rest", "treasure", "event"] as const)[index]], random),
+      next: [lessonRoomIds[1]],
+    })),
+  ];
+  return {
+    version: 2,
+    floor: 8,
+    seed,
+    entryId: "floor-8-entry",
+    bossId: lessonRoomIds[lessonRoomIds.length - 1],
+    nodes,
+  };
+}
+
 export function generateRoomGraph(rawSeed: string, floor: FloorNumber = 1): RoomGraph {
   if (floor === 1) return generateFloorOneGraph(rawSeed);
   if (floor === 2) return generateFloorTwoGraph(rawSeed);
+  if (floor === 8) return generateFloorEightGraph(rawSeed);
   return generateAdvancedFloorGraph(rawSeed, ADVANCED_FLOOR_CONFIG[floor]);
 }
 
@@ -803,12 +952,12 @@ export function validateRoomGraph(graph: RoomGraph): RoomGraphValidation {
   const errors: string[] = [];
   if (
     graph.version !== 2 ||
-    !([1, 2, 3, 4, 5, 6] as const).includes(graph.floor)
+    !([1, 2, 3, 4, 5, 6, 7, 8] as const).includes(graph.floor)
   ) {
     errors.push("课程图版本或楼层无效。");
   }
-  if (graph.nodes.length < 8 || graph.nodes.length > 10) {
-    errors.push("每层房间数必须在 8 到 10 之间。");
+  if (graph.nodes.length < 8 || graph.nodes.length > 11) {
+    errors.push("每层房间数必须在 8 到 11 之间。");
   }
 
   const nodesById = new Map<string, RoomNode>();
