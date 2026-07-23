@@ -1,0 +1,64 @@
+export type OnboardingStepId =
+  | "move"
+  | "find-monster"
+  | "open-terminal"
+  | "cast-query"
+  | "pickup"
+  | "complete";
+
+export type OnboardingMilestone =
+  | "player-step"
+  | "encounter-start"
+  | "terminal-open"
+  | "query-accepted"
+  | "item-pickup";
+
+export interface OnboardingStep {
+  id: OnboardingStepId;
+  title: string;
+  body: string;
+  shortcut: string;
+}
+
+export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
+  {
+    id: "move",
+    title: "先走一步",
+    body: "用 WASD、方向键或下方方向按钮移动。迷宫会在你走过后显形。",
+    shortcut: "WASD / 方向键",
+  },
+  {
+    id: "find-monster",
+    title: "跟随青色信标",
+    body: "找到正在巡逻的投影史莱姆。真正碰到怪物所在格才会进入战斗。",
+    shortcut: "触碰怪物",
+  },
+  {
+    id: "open-terminal",
+    title: "打开 SQL 终端",
+    body: "遭遇已经锁定。按住 Q + S，或点击 SQL 战斗按钮查看任务和表结构。",
+    shortcut: "Q + S",
+  },
+  {
+    id: "cast-query",
+    title: "写完整查询",
+    body: "先看目标、Schema 和知识锁，再从 SELECT 开始写完整语句。空输入不会消耗回合。",
+    shortcut: "Ctrl / Cmd + Enter",
+  },
+  {
+    id: "pickup",
+    title: "拾取战利品",
+    body: "击败怪物后走到发光掉落上会自动拾取。祭坛、篝火和宝箱仍使用 E 调查。",
+    shortcut: "走到掉落上",
+  },
+  {
+    id: "complete",
+    title: "探索闭环完成",
+    body: "你已经会移动、遭遇、查询和拾取。接下来按自己的路线探索魔王城。",
+    shortcut: "自由探索",
+  },
+] as const;
+
+export function onboardingStep(id: OnboardingStepId): OnboardingStep {
+  return ONBOARDING_STEPS.find((step) => step.id === id) ?? ONBOARDING_STEPS[0];
+}

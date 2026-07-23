@@ -1,0 +1,28 @@
+{
+  "name": "select-from-dungeon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run tests",
+    "test:watch": "vitest",
+    "check": "pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "phaser": "4.2.1",
+    "sql.js": "1.14.1"
+  },
+  "devDependencies": {
+    "@types/sql.js": "1.4.10",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  }
+}
