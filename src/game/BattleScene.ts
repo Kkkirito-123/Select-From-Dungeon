@@ -93,6 +93,66 @@ const BIOME_ARENA: Readonly<Record<BiomeKind, {
     floor: 0x1b2d21,
     accent: "#8bc99a",
   },
+  "bone-yard": {
+    void: 0x090806,
+    line: 0xa99878,
+    platform: 0x39332b,
+    edge: 0xc9b78e,
+    upperA: 0x191612,
+    upperB: 0x211d18,
+    floor: 0x302a24,
+    accent: "#e1d3ad",
+  },
+  "grave-mire": {
+    void: 0x070a07,
+    line: 0x75896d,
+    platform: 0x30372c,
+    edge: 0x95a68a,
+    upperA: 0x151a14,
+    upperB: 0x1d231b,
+    floor: 0x293126,
+    accent: "#b5c8a8",
+  },
+  "spirit-crypt": {
+    void: 0x09060e,
+    line: 0x956cb4,
+    platform: 0x382a43,
+    edge: 0xb58bd0,
+    upperA: 0x17101e,
+    upperB: 0x201529,
+    floor: 0x30233b,
+    accent: "#d2a8e8",
+  },
+  "fire-forge": {
+    void: 0x120503,
+    line: 0xd65335,
+    platform: 0x4e251c,
+    edge: 0xf17a48,
+    upperA: 0x27100a,
+    upperB: 0x34150d,
+    floor: 0x451d14,
+    accent: "#ffad68",
+  },
+  "frost-vault": {
+    void: 0x030b12,
+    line: 0x58aeca,
+    platform: 0x193b4b,
+    edge: 0x85d3e8,
+    upperA: 0x0a1b26,
+    upperB: 0x0e2634,
+    floor: 0x153442,
+    accent: "#adf0ff",
+  },
+  "storm-core": {
+    void: 0x080616,
+    line: 0x8065c4,
+    platform: 0x2d2856,
+    edge: 0xae8bea,
+    upperA: 0x131027,
+    upperB: 0x1b1735,
+    floor: 0x28234a,
+    accent: "#d0b3ff",
+  },
 };
 
 export class BattleScene extends Phaser.Scene {
@@ -388,6 +448,31 @@ export class BattleScene extends Phaser.Scene {
       }
       return;
     }
+    if (biome === "bone-yard" || biome === "grave-mire") {
+      for (let x = 58; x < 620; x += 76) {
+        this.add.rectangle(x, 157, 18, 48, color, 0.18).setOrigin(0.5, 1);
+        this.add.rectangle(x, 113, 28, 5, color, 0.22);
+      }
+      return;
+    }
+    if (biome === "spirit-crypt" || biome === "storm-core") {
+      for (let x = 70; x < 620; x += 94) {
+        this.add.polygon(x, 132, [0, -19, 10, 0, 5, 20, -7, 17, -11, 0], color, 0.18);
+      }
+      return;
+    }
+    if (biome === "fire-forge") {
+      for (let x = 70; x < 620; x += 102) {
+        this.add.triangle(x, 163, -12, 17, 0, -23, 12, 17, color, 0.24);
+      }
+      return;
+    }
+    if (biome === "frost-vault") {
+      for (let x = 64; x < 620; x += 86) {
+        this.add.triangle(x, 154, -13, 20, 0, -25, 13, 20, color, 0.2);
+      }
+      return;
+    }
     this.add.rectangle(320, 142, 536, 22, color, 0.11)
       .setStrokeStyle(3, color, 0.22);
   }
@@ -436,6 +521,47 @@ export class BattleScene extends Phaser.Scene {
       if (monster.species.includes("king")) {
         parts.push(this.add.triangle(0, -48, -24, 16, 0, -15, 24, 16, COLORS.gold));
       }
+    } else if (monster.kind === "skeleton" || monster.kind === "zombie") {
+      const body = monster.kind === "skeleton" ? 0xd5c9a9 : 0x6f8059;
+      parts.push(
+        this.add.rectangle(0, 17, 54, 56, body).setStrokeStyle(6, 0x403a31),
+        this.add.rectangle(0, -30, 55, 46, body + 0x101010),
+        this.add.rectangle(-15, -35, 9, 11, 0x151312),
+        this.add.rectangle(15, -35, 9, 11, 0x151312),
+        this.add.rectangle(-21, 64, 13, 24, body),
+        this.add.rectangle(21, 64, 13, 24, body),
+      );
+    } else if (monster.kind === "ghost" || monster.kind === "necromancer") {
+      const spirit = monster.kind === "necromancer" ? 0x68447d : 0x74558f;
+      parts.push(
+        this.add.rectangle(0, 7, monster.kind === "necromancer" ? 78 : 62, 67, spirit, 0.93),
+        this.add.triangle(-22, 58, -16, 17, 0, -13, 16, 17, spirit, 0.93),
+        this.add.triangle(22, 58, -16, 17, 0, -13, 16, 17, spirit, 0.93),
+        this.add.rectangle(-15, -9, 9, 11, 0xd5fff1),
+        this.add.rectangle(15, -9, 9, 11, 0xd5fff1),
+      );
+      if (monster.kind === "necromancer") {
+        parts.push(this.add.triangle(0, -66, -30, 19, 0, -19, 30, 19, 0xc2a45c));
+      }
+    } else if (
+      monster.kind === "fire-spirit" ||
+      monster.kind === "ice-spirit" ||
+      monster.kind === "thunder-spirit" ||
+      monster.kind === "elemental-king"
+    ) {
+      const element = monster.kind === "fire-spirit"
+        ? 0xe45b3e
+        : monster.kind === "ice-spirit"
+          ? 0x60b9dc
+          : monster.kind === "thunder-spirit" ? 0x9474d8 : 0xd48743;
+      const size = monster.kind === "elemental-king" ? 92 : 68;
+      parts.push(
+        this.add.rectangle(0, 12, size, size, element)
+          .setStrokeStyle(7, element + 0x202020),
+        this.add.triangle(0, -54, -29, 22, 0, -27, 29, 22, element, 0.96),
+        this.add.rectangle(-16, 0, 9, 11, 0xfff8df),
+        this.add.rectangle(16, 0, 9, 11, 0xfff8df),
+      );
     } else if (monster.species.includes("frog")) {
       const poison = monster.species.includes("poison") || monster.species.includes("boss");
       const body = poison ? 0x78893b : 0x5da05c;

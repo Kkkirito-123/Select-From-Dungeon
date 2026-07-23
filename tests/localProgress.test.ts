@@ -149,6 +149,38 @@ describe("localProgress", () => {
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
   });
 
+  it("v0.7 的 profile:v2 会补齐第三、四层计数而不丢失旧掌握记录", () => {
+    const storage = new MemoryStorage();
+    const oldProfile = createEmptyProfile();
+    oldProfile.masteredLessons = ["select", "where"];
+    oldProfile.attempts.select = 4;
+    const oldAttempts = { ...oldProfile.attempts } as Record<string, number>;
+    [
+      "f3-inner",
+      "f3-left",
+      "f3-self",
+      "f3-chain",
+      "f3-union",
+      "f3-audit",
+      "f4-scalar",
+      "f4-in",
+      "f4-exists",
+      "f4-correlated",
+      "f4-cte",
+      "f4-recursive",
+    ].forEach((lesson) => delete oldAttempts[lesson]);
+    storage.setItem(PROFILE_SAVE_KEY, JSON.stringify({
+      ...oldProfile,
+      attempts: oldAttempts,
+    }));
+
+    const restored = loadProfile(storage);
+    expect(restored.masteredLessons).toEqual(["select", "where"]);
+    expect(restored.attempts.select).toBe(4);
+    expect(restored.attempts["f3-inner"]).toBe(0);
+    expect(restored.attempts["f4-recursive"]).toBe(0);
+  });
+
   it("旧 run:v1/v2 不读取，也不会被 v9 清理动作删除", () => {
     const storage = new MemoryStorage();
     const legacyKey = "select-from-dungeon:run:v1";

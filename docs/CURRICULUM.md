@@ -1,8 +1,8 @@
 # SQL Demon Castle Eight-Floor Curriculum Blueprint
 
-Status: **the eight-floor data contract is implemented in v0.6.0; only the
-first two floors currently have playable content**
-Target: staged expansion after the current two-floor MVP
+Status: **v0.8.0 implements the eight-floor data contract and playable content
+for floors one through four; floors five through eight remain planned**
+Target: staged expansion after the current four-floor MVP
 Primary users: SQL beginners, interview reviewers, level designers, and content maintainers
 
 **English** | [简体中文](CURRICULUM.zh-CN.md)
@@ -67,8 +67,8 @@ every SQL dialect, DBA command, or production incident skill.
 |---|---|---|---|---|
 | 1 | Emberstone Keep | Single-table projection, filters, nulls, ordering, and limits | Query | One complete single-table query |
 | 2 | Aggregate Clocktower | Aggregate functions, grouping, group filters, and conditional aggregation | Query | Produce a grouped ranking |
-| 3 | Relational Bridgeworks | Inner, left, self, multi-table joins, and set operations | Query | Join rooms, monsters, and gear |
-| 4 | Mirrorveil Catacombs | Scalar, `IN`, `EXISTS`, correlated subqueries, and CTEs | Query | Find targets above a group baseline |
+| 3 | Undead Grave City | Inner, left, self, multi-table joins, and set operations | Query | Audit grave-city relations and gear |
+| 4 | Elemental Forge | Scalar, `IN`, `EXISTS`, correlated subqueries, CTEs, and recursive CTEs | Query | Recursively trace the elemental chain |
 | 5 | Window Observatory | Partitions, ranks, neighboring rows, and rolling windows | Query | Per-group Top-N and trend analysis |
 | 6 | Rollback Foundry | Data changes, constraints, transactions, savepoints, and ACID | Disposable sandbox | Repair data and roll back safely |
 | 7 | Crystal Index Grove | B+ trees, composite and covering indexes, invalidation, and plans | Query + plan | Reduce the cost of a composite query |
@@ -133,7 +133,7 @@ Boss, and random encounters that review older knowledge. Target duration is
 **Guaranteed reward**: Aggregate Hammer and Condition Rune.
 **Preview breach**: join monsters to rooms through five relationship locks.
 
-### Floor 3: Relational Bridgeworks
+### Floor 3: Undead Grave City
 
 **Goal**: join data through real relationships and detect missing right-side
 records.
@@ -143,25 +143,24 @@ equivalent query or an explicitly labeled concept demonstration.
 
 | Node | Monster | Concept | Clear evidence |
 |---|---|---|---|
-| 3-1 | Twin-table Golem | `INNER JOIN ... ON` | Use real keys; reject `ON 1=1` |
-| 3-2 | Gap Slime | `LEFT JOIN` + `IS NULL` | Find left rows without a right match |
-| 3-3 | Mirror Knight | self join | Use clear aliases for two roles |
-| 3-4 | Relation Beast | three-table join | Control cardinality and duplicate expansion |
-| 3-5 | Set Twins | `UNION`, `UNION ALL` | Align columns and explain deduplication |
-| 3-6 | Relation Auditor | joins + aggregation | Group and filter joined data correctly |
+| 3-1 | Skeleton | `INNER JOIN ... ON` | Use real keys; reject `ON 1=1` |
+| 3-2 | Zombie | `LEFT JOIN` + `IS NULL` | Find left rows without a right match |
+| 3-3 | Ghost | self join | Use clear aliases for two roles |
+| 3-4 | Armored Skeleton | three-table join | Traverse rooms, monsters, and gear |
+| 3-5 | Bone Knight | `UNION` | Align columns and merge grave-route rosters |
+| 3-6 | Necromancer | joins + aggregation | Complete relation counts and strongest-gear audit |
 
-**Boss — Thunder Core**
+**Boss — Necromancer**
 
-- join rooms, monsters, and gear;
-- retain monsters with no gear;
-- count monsters and total gear power per sector;
-- use `HAVING`, ordering, and limits to identify risky sectors;
-- avoid incorrect counts caused by one-to-many expansion.
+- join rooms and monsters, then count records by grave-city sector;
+- retain qualifying sectors with `GROUP BY` and `HAVING`;
+- join monsters to gear, sort by power, and take the strongest core;
+- avoid distorted results from false relations or one-to-many expansion.
 
-**Guaranteed reward**: Relation Chain and Alias Charm.
+**Guaranteed reward**: Bone Blade.
 **Preview breach**: use `EXISTS` to find monsters with qualifying gear.
 
-### Floor 4: Mirrorveil Catacombs
+### Floor 4: Elemental Forge
 
 **Goal**: express a query whose answer depends on another query.
 **Prerequisite**: Floor 3 joins and aggregation.
@@ -169,22 +168,21 @@ equivalent query or an explicitly labeled concept demonstration.
 
 | Node | Monster | Concept | Clear evidence |
 |---|---|---|---|
-| 4-1 | Scalar Mimic | scalar subquery | Return exactly one comparable value |
-| 4-2 | Null Trap | `IN`, `NOT IN` | Recognize null behavior in `NOT IN` |
-| 4-3 | Existence Scout | `EXISTS`, `NOT EXISTS` | Express semi-joins and anti-joins |
-| 4-4 | Echo Mage | correlated subquery | Reference the outer row correctly |
-| 4-5 | Archivist | `WITH` CTE | Split a complex query into named stages |
-| 4-6 | Recursive Seal | recursive CTE concept | Work only with small verifiable hierarchies |
+| 4-1 | Fire Spirit | scalar subquery | Return exactly one comparable value |
+| 4-2 | Ice Spirit | `IN` subquery | Filter monsters through a room set |
+| 4-3 | Thunder Spirit | `EXISTS` | Test for related gear without returning it |
+| 4-4 | Stone Golem | correlated subquery | Reference the current outer monster |
+| 4-5 | Flame Lord | `WITH` CTE | Name the high-power gear stage |
+| 4-6 | Element King | recursive CTE | Generate rooms and trace a master hierarchy |
 
-**Boss — Mirror Council**
+**Boss — Element King**
 
-- calculate average threat for each room;
-- find monsters above their own room average;
-- express the intermediate aggregate with a CTE;
-- use `EXISTS` to verify a required signal or item;
-- return a stable result without duplicates.
+- generate consecutive room IDs with a recursive CTE and join real rooms;
+- state the anchor, `UNION ALL` recursive member, and termination condition;
+- start at the Fire Spirit and follow `master_id` to the Element King;
+- return names and depths in stable order.
 
-**Guaranteed reward**: CTE Lantern and Null Compass.
+**Guaranteed reward**: Rune Staff.
 **Preview breach**: use `ROW_NUMBER() OVER (...)` for the top monster in each
 sector.
 
@@ -394,12 +392,15 @@ Implementations must ensure:
 - data changes occur only in a disposable sandbox, and plan/transaction tests
   never mutate permanent progress.
 
-## 8. Migration from the Current Two Floors
+## 8. Current Four Floors and the Long-Term Blueprint
 
-The current playable MVP contains:
+The current playable MVP retains the original first two floors and adds two
+more in v0.8.0:
 
 - Floor 1: `SELECT`, `WHERE`, `IS NULL`, `GROUP BY`, `HAVING`
 - Floor 2: `ORDER BY`, `DISTINCT`, `INNER JOIN`, `LEFT JOIN`, composite `JOIN`
+- Floor 3: inner/left/self/three-table joins, `UNION`, and relation audit
+- Floor 4: scalar, `IN`, `EXISTS`, correlated subqueries, CTE, and recursive CTE
 
 It remains playable, but its order is not the long-term curriculum. Reuse its
 monsters, fixtures, and evaluators instead of rewriting everything at once:
@@ -409,6 +410,7 @@ monsters, fixtures, and evaluators instead of rewriting everything at once:
 | New Floor 1 | current `SELECT`, `WHERE`, `IS NULL`; current Floor 2 `ORDER BY`, `DISTINCT` | `OR/NOT`, `IN/BETWEEN/LIKE`, single-table Boss |
 | New Floor 2 | current `GROUP BY`, `HAVING`, Aggregate Hammer | `SUM/AVG/MIN/MAX`, `CASE WHEN`, aggregate Boss |
 | New Floor 3 | current `INNER JOIN`, `LEFT JOIN`, JOIN Boss | self join, cardinality, `UNION/UNION ALL` |
+| New Floor 4 | current subquery, CTE, and recursive CTE lessons | `NOT IN` null boundaries and more equivalent variants |
 
 Permanent progress migrates by stable `lessonId`, not former physical floor
 number. Old in-progress Runs start a clearly announced new Run instead of
@@ -458,7 +460,7 @@ migration, and browser acceptance route.
   concurrency.
 - Hints grow from concepts to structure and never auto-fill the answer.
 - Mastery distinguishes hinted clears from independent changed-data solutions.
-- The current two floors have an incremental, reversible migration path.
+- The current four floors have an incremental, reversible migration path.
 - Every implementation stage can be reviewed and accepted in isolation.
 
 ### Risks and trade-offs

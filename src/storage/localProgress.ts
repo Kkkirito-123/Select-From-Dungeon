@@ -29,6 +29,9 @@ import {
 } from "../domain/campaign";
 import type { WorldActor } from "../domain/monsterRoaming";
 import {
+  gateChallengeIdForFloor,
+} from "../content/gateChallenges";
+import {
   lessonsForFloor,
   stableStringHash,
   validateRoomGraph,
@@ -88,7 +91,20 @@ const LESSON_IDS: readonly LessonId[] = [
   "inner-join",
   "left-join",
   "join-boss",
+  "f3-inner",
+  "f3-left",
+  "f3-self",
+  "f3-chain",
+  "f3-union",
+  "f3-audit",
+  "f4-scalar",
+  "f4-in",
+  "f4-exists",
+  "f4-correlated",
+  "f4-cte",
+  "f4-recursive",
 ];
+const PRE_V08_LESSON_IDS: readonly LessonId[] = LESSON_IDS.slice(0, 10);
 
 const PLAY_MODES = [
   "explore",
@@ -106,6 +122,8 @@ const PLAY_MODES = [
 const GATE_CHALLENGE_IDS: readonly GateChallengeId[] = [
   "aggregate-breach",
   "relation-breach",
+  "grave-breach",
+  "forge-breach",
 ];
 const WEAPON_IDS = [
   "data-blade",
@@ -117,13 +135,17 @@ const WEAPON_IDS = [
   "slime-sword",
   "hunter-bow",
   "bone-blade",
+  "rune-staff",
 ] as const;
-const ARMOR_IDS = ["slime-vest", "vine-armor"] as const;
+const ARMOR_IDS = ["slime-vest", "vine-armor", "bone-armor", "rune-armor"] as const;
 const CONSUMABLE_IDS = [
   "slime-gel",
   "water-drop",
   "frog-potion",
   "forest-fruit",
+  "holy-water",
+  "fire-crystal",
+  "ice-crystal",
   "whetstone",
   "repair-shard",
 ] as const;
@@ -138,6 +160,14 @@ const MONSTER_KINDS = [
   "join-spider",
   "left-join-wraith",
   "relation-titan",
+  "skeleton",
+  "zombie",
+  "ghost",
+  "necromancer",
+  "fire-spirit",
+  "ice-spirit",
+  "thunder-spirit",
+  "elemental-king",
 ] as const;
 const MONSTER_RANKS = ["normal", "elite", "boss"] as const;
 const ENCOUNTER_TYPES = ["curriculum", "ambush"] as const;
@@ -152,6 +182,8 @@ const ROOM_REWARDS = [
   "aggregate-hammer",
   "sort-saber",
   "join-chain",
+  "bone-blade",
+  "rune-staff",
   "restore-12-hp",
   "restore-20-hp",
   "cool-8-heat",
@@ -191,6 +223,18 @@ export function createEmptyProfile(): ProfileProgress {
       "inner-join": 0,
       "left-join": 0,
       "join-boss": 0,
+      "f3-inner": 0,
+      "f3-left": 0,
+      "f3-self": 0,
+      "f3-chain": 0,
+      "f3-union": 0,
+      "f3-audit": 0,
+      "f4-scalar": 0,
+      "f4-in": 0,
+      "f4-exists": 0,
+      "f4-correlated": 0,
+      "f4-cte": 0,
+      "f4-recursive": 0,
     },
     victories: 0,
     bestRunQueries: null,
@@ -335,7 +379,7 @@ function isPlayer(value: unknown, requireArmor: boolean): value is PlayerState {
 function isMonster(value: unknown): value is Monster {
   return (
     isPosition(value) &&
-    (value.floor === 1 || value.floor === 2) &&
+    (value.floor === 1 || value.floor === 2 || value.floor === 3 || value.floor === 4) &&
     isNonNegativeInteger(value.id) &&
     isLessonId(value.lessonId) &&
     isNonNegativeInteger(value.roomId) &&
@@ -514,7 +558,7 @@ function isValidGraph(value: unknown): value is RoomGraph {
   if (
     !isRecord(value) ||
     value.version !== 2 ||
-    (value.floor !== 1 && value.floor !== 2) ||
+    (value.floor !== 1 && value.floor !== 2 && value.floor !== 3 && value.floor !== 4) ||
     typeof value.seed !== "string" ||
     value.seed.length === 0 ||
     typeof value.entryId !== "string" ||
@@ -772,7 +816,7 @@ function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
     isRecord(value) &&
     isPositiveInteger(value.id) &&
     isPositiveInteger(value.battleId) &&
-    (value.floor === 1 || value.floor === 2) &&
+    (value.floor === 1 || value.floor === 2 || value.floor === 3 || value.floor === 4) &&
     isNonNegativeInteger(value.monsterId) &&
     typeof value.monsterName === "string" &&
     value.monsterName.length > 0 &&
@@ -838,7 +882,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
   if (
     candidateVersion !== version ||
     run.generatorVersion !== 4 ||
-    (run.floor !== 1 && run.floor !== 2) ||
+    (run.floor !== 1 && run.floor !== 2 && run.floor !== 3 && run.floor !== 4) ||
     !isValidGraph(run.graph)
   ) return false;
   const graph = run.graph;
@@ -853,9 +897,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): bool
   if (!isMazeFloor(run.mazeFloor, graph)) return false;
   const mazeFloor = run.mazeFloor;
   const challengeGateId = `gate:${graph.bossId}`;
-  const expectedChallengeId: GateChallengeId = run.floor === 1
-    ? "aggregate-breach"
-    : "relation-breach";
+  const expectedChallengeId = gateChallengeIdForFloor(run.floor);
   const openedGateIds = version >= 5 ? run.openedGateIds : [];
   const activeGateChallengeId = version >= 5 ? run.activeGateChallengeId : null;
   const answerHistory = version >= 6 ? run.answerHistory : [];
@@ -1396,6 +1438,30 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
   return migrated;
 }
 
+function migratePreV08Profile(value: unknown): ProfileProgress | null {
+  if (!isRecord(value)) return null;
+  const attempts = isRecord(value.attempts) ? value.attempts : null;
+  if (
+    value.version !== 2 ||
+    !Array.isArray(value.masteredLessons) ||
+    !value.masteredLessons.every(isLessonId) ||
+    !attempts ||
+    !PRE_V08_LESSON_IDS.every((lesson) => isNonNegativeInteger(attempts[lesson])) ||
+    !isNonNegativeInteger(value.victories) ||
+    !(value.bestRunQueries === null || isNonNegativeInteger(value.bestRunQueries))
+  ) return null;
+  const migrated = createEmptyProfile();
+  migrated.masteredLessons = [...value.masteredLessons] as LessonId[];
+  LESSON_IDS.forEach((lesson) => {
+    if (isNonNegativeInteger(attempts[lesson])) {
+      migrated.attempts[lesson] = Number(attempts[lesson]);
+    }
+  });
+  migrated.victories = value.victories;
+  migrated.bestRunQueries = value.bestRunQueries;
+  return migrated;
+}
+
 export function loadRun(storage: StorageLike): SavedRun | null {
   const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
   if (isSavedRun(value)) return value;
@@ -1409,6 +1475,8 @@ export function loadRun(storage: StorageLike): SavedRun | null {
 export function loadProfile(storage: StorageLike): ProfileProgress {
   const value = parseJson(safeGetItem(storage, PROFILE_SAVE_KEY));
   if (isProfileProgress(value)) return value;
+  const migratedCurrent = migratePreV08Profile(value);
+  if (migratedCurrent) return migratedCurrent;
   return migrateLegacyProfile(parseJson(safeGetItem(storage, LEGACY_PROFILE_SAVE_KEY)))
     ?? createEmptyProfile();
 }

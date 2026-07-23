@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
+import { isSavedRun } from "../src/storage/localProgress";
 import type {
   GroundItem,
   LessonId,
@@ -37,7 +38,7 @@ function teachingResult(
   };
 }
 
-const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
+const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   select: [
     teachingResult(
       "SELECT name FROM monsters WHERE id = 101",
@@ -158,6 +159,89 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
       [{ name: "丛林王", power: 21 }],
     ),
   ],
+  "f3-inner": [teachingResult(
+    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1",
+    ["name", "room_name"],
+    [{ name: "骷髅", room_name: "骨桥前庭" }],
+  )],
+  "f3-left": [teachingResult(
+    "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 42 AND g.monster_id IS NULL",
+    ["id"],
+    [{ id: 2 }],
+    [2],
+  )],
+  "f3-self": [teachingResult(
+    "SELECT child.name AS child_name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 3",
+    ["child_name", "master_name"],
+    [{ child_name: "幽灵", master_name: "死灵王" }],
+  )],
+  "f3-chain": [teachingResult(
+    "SELECT r.name AS room_name, m.name, g.power FROM rooms r INNER JOIN monsters m ON r.id = m.room_id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 4",
+    ["room_name", "name", "power"],
+    [{ room_name: "骑士墓", name: "铠骷髅", power: 18 }],
+  )],
+  "f3-union": [teachingResult(
+    "SELECT id, name FROM monsters WHERE room_id = 41 UNION SELECT id, name FROM monsters WHERE room_id = 43 ORDER BY id",
+    ["id", "name"],
+    [{ id: 1, name: "骷髅" }, { id: 3, name: "幽灵" }],
+  )],
+  "f3-audit": [
+    teachingResult(
+      "SELECT r.sector, COUNT(*) AS total FROM rooms r INNER JOIN monsters m ON r.id = m.room_id WHERE r.floor = 3 AND m.room_id BETWEEN 41 AND 46 GROUP BY r.sector HAVING COUNT(*) >= 2 ORDER BY r.sector",
+      ["sector", "total"],
+      [
+        { sector: "crypt", total: 2 },
+        { sector: "grave", total: 2 },
+        { sector: "throne", total: 2 },
+      ],
+    ),
+    teachingResult(
+      "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id BETWEEN 41 AND 46 ORDER BY g.power DESC LIMIT 1",
+      ["name", "power"],
+      [{ name: "死灵王", power: 24 }],
+    ),
+  ],
+  "f4-scalar": [teachingResult(
+    "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 51)",
+    ["name"],
+    [{ name: "火灵" }],
+  )],
+  "f4-in": [teachingResult(
+    "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE floor = 4 AND sector = 'frost') ORDER BY name",
+    ["name"],
+    [{ name: "冰灵" }],
+  )],
+  "f4-exists": [teachingResult(
+    "SELECT m.name FROM monsters m WHERE m.id = 14 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
+    ["name"],
+    [{ name: "雷灵" }],
+  )],
+  "f4-correlated": [teachingResult(
+    "SELECT m.name FROM monsters m WHERE m.id = 15 AND (SELECT MAX(g.power) FROM monster_gear g WHERE g.monster_id = m.id) >= 18",
+    ["name"],
+    [{ name: "石巨人" }],
+  )],
+  "f4-cte": [teachingResult(
+    "WITH armored AS (SELECT monster_id FROM monster_gear WHERE power >= 20) SELECT m.name FROM monsters m INNER JOIN armored a ON m.id = a.monster_id WHERE m.id = 16",
+    ["name"],
+    [{ name: "炎王" }],
+  )],
+  "f4-recursive": [
+    teachingResult(
+      "WITH RECURSIVE room_ids(id) AS (SELECT 51 UNION ALL SELECT id + 1 FROM room_ids WHERE id < 53) SELECT r.name AS room_name FROM rooms r INNER JOIN room_ids x ON r.id = x.id ORDER BY r.id",
+      ["room_name"],
+      [{ room_name: "火室" }, { room_name: "冰库" }, { room_name: "雷池" }],
+    ),
+    teachingResult(
+      "WITH RECURSIVE lineage(id, name, master_id, depth) AS (SELECT id, name, master_id, 1 FROM monsters WHERE id = 12 UNION ALL SELECT m.id, m.name, m.master_id, l.depth + 1 FROM monsters m INNER JOIN lineage l ON m.id = l.master_id WHERE l.depth < 3) SELECT name, depth FROM lineage ORDER BY depth",
+      ["name", "depth"],
+      [
+        { name: "火灵", depth: 1 },
+        { name: "石巨人", depth: 2 },
+        { name: "元素王", depth: 3 },
+      ],
+    ),
+  ],
 };
 
 const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
@@ -237,6 +321,60 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
       [{ name: "树妖", sector: "forest-treant" }],
     ),
   ],
+  7: [teachingResult(
+    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 7",
+    ["name", "room_name"],
+    [{ name: "碎骨", room_name: "遗骨荒地" }],
+  )],
+  8: [teachingResult(
+    "SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 8 AND g.monster_id IS NULL",
+    ["name"],
+    [{ name: "腐尸" }],
+  )],
+  9: [
+    teachingResult(
+      "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 9",
+      ["name", "master_name"],
+      [{ name: "鬼火", master_name: "墓主" }],
+    ),
+    teachingResult(
+      "SELECT name FROM monsters WHERE id = 9 AND status = 'haunting'",
+      ["name"],
+      [{ name: "鬼火" }],
+    ),
+  ],
+  10: [teachingResult(
+    "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 10",
+    ["name", "master_name"],
+    [{ name: "游魂", master_name: "墓主" }],
+  )],
+  18: [teachingResult(
+    "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57)",
+    ["name"],
+    [{ name: "火苗" }],
+  )],
+  19: [teachingResult(
+    "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name",
+    ["name"],
+    [{ name: "冰晶" }],
+  )],
+  20: [
+    teachingResult(
+      "SELECT m.name FROM monsters m WHERE m.id = 20 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
+      ["name"],
+      [{ name: "雷兽" }],
+    ),
+    teachingResult(
+      "SELECT name FROM monsters WHERE id = 20 AND status = 'charged'",
+      ["name"],
+      [{ name: "雷兽" }],
+    ),
+  ],
+  21: [teachingResult(
+    "SELECT m.name FROM monsters m WHERE m.id = 21 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
+    ["name"],
+    [{ name: "电球" }],
+  )],
 };
 
 function pathToAny(session: GameSession, goals: readonly Position[]): Position[] {
@@ -346,6 +484,7 @@ function collectItemByWalking(session: GameSession, item: GroundItem): void {
 function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
   engageLessonByWalking(session, lessonId);
   const queries = LESSON_QUERIES[lessonId];
+  if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
   queries.forEach((query, index) => {
     const resolution = session.resolveQuery(query);
     expect(resolution.accepted, resolution.message).toBe(true);
@@ -382,7 +521,7 @@ describe("continuous physical maze run", () => {
   it.each([
     ["where", "is-null"],
     ["is-null", "where"],
-  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通两层", (first, second) => {
+  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通前四层", (first, second) => {
     const session = new GameSession(null, null, `physical-${first}-${second}`);
     clearLessonByWalking(session, "select");
     clearLessonByWalking(session, first);
@@ -401,13 +540,38 @@ describe("continuous physical maze run", () => {
     clearLessonByWalking(session, "left-join");
     clearLessonByWalking(session, "join-boss");
 
+    expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 2 });
+    expect(session.advanceFloor()).toBe(true);
+    expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 3 });
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+
+    clearLessonByWalking(session, "f3-inner");
+    clearLessonByWalking(session, "f3-left");
+    clearLessonByWalking(session, "f3-self");
+    clearLessonByWalking(session, "f3-chain");
+    clearLessonByWalking(session, "f3-union");
+    clearLessonByWalking(session, "f3-audit");
+
+    expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 3 });
+    expect(session.advanceFloor()).toBe(true);
+    expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 4 });
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+
+    clearLessonByWalking(session, "f4-scalar");
+    clearLessonByWalking(session, "f4-in");
+    clearLessonByWalking(session, "f4-exists");
+    clearLessonByWalking(session, "f4-correlated");
+    clearLessonByWalking(session, "f4-cte");
+    clearLessonByWalking(session, "f4-recursive");
+
     expect(session.snapshot().mode).toBe("victory");
     expect(session.snapshot().completedLessons).toEqual([
-      "order-by",
-      "distinct",
-      "inner-join",
-      "left-join",
-      "join-boss",
+      "f4-scalar",
+      "f4-in",
+      "f4-exists",
+      "f4-correlated",
+      "f4-cte",
+      "f4-recursive",
     ]);
     expect(session.toProfile().masteredLessons).toEqual([
       "select",
@@ -420,6 +584,18 @@ describe("continuous physical maze run", () => {
       "inner-join",
       "left-join",
       "join-boss",
+      "f3-inner",
+      "f3-left",
+      "f3-self",
+      "f3-chain",
+      "f3-union",
+      "f3-audit",
+      "f4-scalar",
+      "f4-in",
+      "f4-exists",
+      "f4-correlated",
+      "f4-cte",
+      "f4-recursive",
     ]);
     expect(session.toProfile().victories).toBe(1);
   });

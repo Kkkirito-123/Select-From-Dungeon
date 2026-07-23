@@ -136,6 +136,18 @@ const LESSON_ORDER: readonly LessonId[] = [
   "inner-join",
   "left-join",
   "join-boss",
+  "f3-inner",
+  "f3-left",
+  "f3-self",
+  "f3-chain",
+  "f3-union",
+  "f3-audit",
+  "f4-scalar",
+  "f4-in",
+  "f4-exists",
+  "f4-correlated",
+  "f4-cte",
+  "f4-recursive",
 ];
 
 export const LEVEL_XP_THRESHOLDS = [0, 2, 4, 6, 8, 12, 16, 20, 24] as const;
@@ -254,6 +266,18 @@ function emptyProfile(): ProfileProgress {
       "inner-join": 0,
       "left-join": 0,
       "join-boss": 0,
+      "f3-inner": 0,
+      "f3-left": 0,
+      "f3-self": 0,
+      "f3-chain": 0,
+      "f3-union": 0,
+      "f3-audit": 0,
+      "f4-scalar": 0,
+      "f4-in": 0,
+      "f4-exists": 0,
+      "f4-correlated": 0,
+      "f4-cte": 0,
+      "f4-recursive": 0,
     },
     victories: 0,
     bestRunQueries: null,
@@ -558,9 +582,9 @@ export class GameSession {
       ? gateChallengeForFloor(this.floorNumber, this.challengeGateId())
       : null;
     const missionTitle = this.mode === "victory"
-      ? "双层贯通 · RUN COMMITTED"
+      ? "四层贯通 · RUN COMMITTED"
       : this.mode === "transition"
-        ? "传送门启动 · FLOOR 02 LOADING"
+        ? `传送门启动 · FLOOR ${String(this.floorNumber + 1).padStart(2, "0")} LOADING`
       : this.mode === "defeat"
         ? "生命归零 · YOU DIED"
         : this.mode === "death-review"
@@ -579,9 +603,9 @@ export class GameSession {
           ? lesson.title
           : room.title;
     const missionBody = this.mode === "victory"
-      ? "你击败了丛林王。两层 SQL 图鉴和练习记录已经永久保留。"
+      ? "你击败了元素王。前四层 SQL 图鉴和练习记录已经永久保留。"
       : this.mode === "transition"
-        ? "湖沼森林传送门已经展开。无需按键，正在自动进入第二层。"
+        ? `第 ${this.floorNumber + 1} 层传送门已经展开。无需按键，正在自动进入下一层。`
       : this.mode === "defeat"
         ? "生命值归零。正在返回最近休息的篝火；尚未休息时返回本层出生点。"
         : this.mode === "death-review"
@@ -1691,14 +1715,21 @@ export class GameSession {
   }
 
   advanceFloor(): boolean {
-    if (this.mode !== "transition" || this.floorNumber !== 1) return false;
+    if (this.mode !== "transition" || this.floorNumber >= 4) return false;
+    const fromFloor = this.floorNumber;
     const transition = advanceCampaignProgress(this.campaign);
-    if (!transition.ok || transition.to !== 2) return false;
+    const nextFloor = transition.to;
+    if (
+      !transition.ok ||
+      transition.completed ||
+      nextFloor !== fromFloor + 1 ||
+      nextFloor > 4
+    ) return false;
     this.campaign = transition.progress;
-    const nextSeed = this.campaign.floors.find((slot) => slot.floor === 2)?.seed;
+    const nextSeed = this.campaign.floors.find((slot) => slot.floor === nextFloor)?.seed;
     if (!nextSeed) return false;
-    this.floorNumber = 2;
-    this.graph = generateRoomGraph(nextSeed, 2);
+    this.floorNumber = nextFloor as FloorNumber;
+    this.graph = generateRoomGraph(nextSeed, this.floorNumber);
     this.mazeFloor = generateMazeFloor(this.graph);
     this.campfires = generateCampfires(this.graph, this.mazeFloor);
     this.guidedMap = generateGuidedMapPlan(
@@ -1719,12 +1750,12 @@ export class GameSession {
     this.player = {
       ...this.player,
       ...this.mazeFloor.spawn,
-      hp: Math.min(this.player.maxHp, Math.max(this.player.hp, 3)),
+      hp: this.player.maxHp,
       heat: Math.max(0, this.player.heat - 12),
       weapon: { ...this.player.weapon },
       armor: this.player.armor ? { ...this.player.armor } : null,
     };
-    this.monsters = monstersForFloor(2);
+    this.monsters = monstersForFloor(this.floorNumber);
     this.worldActors = initialActors(
       this.graph,
       this.mazeFloor,
@@ -1748,7 +1779,13 @@ export class GameSession {
       safeStepsRemaining: INITIAL_SAFE_STEPS,
     };
     this.hintLevel = 0;
-    this.banner = "传送完成：已进入第二层「湖沼森林」。装备、遗物、等级与 XP 已保留。";
+    const floorNames: Record<FloorNumber, string> = {
+      1: "余烬地窖",
+      2: "湖沼森林",
+      3: "亡者墓城",
+      4: "元素熔炉",
+    };
+    this.banner = `传送完成：已进入第 ${this.floorNumber} 层「${floorNames[this.floorNumber]}」。装备、遗物、等级与 XP 已保留。`;
     this.revealAt(this.player);
     this.emit();
     return true;
@@ -2063,10 +2100,14 @@ export class GameSession {
   }
 
   private equippedWeaponItem(): EquipmentItem {
+    const optionalWeaponIds: ReadonlySet<Weapon["id"]> = new Set([
+      "slime-sword",
+      "hunter-bow",
+    ]);
     return {
       instanceId: `equipped:weapon:${this.player.weapon.id}`,
       kind: "weapon",
-      protected: this.player.weapon.id !== "bone-blade",
+      protected: !optionalWeaponIds.has(this.player.weapon.id),
       weapon: { ...this.player.weapon },
     };
   }
@@ -2246,16 +2287,16 @@ export class GameSession {
     const keyId = `floor-${this.floorNumber}-key`;
     if (!this.keyItems.includes(keyId)) this.keyItems.push(keyId);
     this.completedRoomIds.add(this.currentRoomId);
-    if (this.floorNumber === 1) {
+    if (this.floorNumber < 4) {
       this.mode = "transition";
-      return "第一层钥匙已接入传送门。无需按键，正在自动进入第二层。";
+      return `第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，正在自动进入第 ${this.floorNumber + 1} 层。`;
     }
     this.mode = "victory";
     this.profile.victories += 1;
     this.profile.bestRunQueries = this.profile.bestRunQueries === null
       ? this.queryCount
       : Math.min(this.profile.bestRunQueries, this.queryCount);
-    return "获得第二层钥匙。丛林王庭已平定，两层 SQL 图鉴均已永久更新。";
+    return "获得第四层钥匙。元素王座已平定，前四层 SQL 图鉴均已永久更新。";
   }
 
   private completeAmbush(
@@ -2426,16 +2467,16 @@ export class GameSession {
     this.completedRoomIds.add(item.sourceRoomId);
     const openedBattleChest = item.id.startsWith("lesson-drop:");
     if (item.rewardId === "floor-key") {
-      if (this.floorNumber === 1) {
+      if (this.floorNumber < 4) {
         this.mode = "transition";
-        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}第一层钥匙已接入双表连接传送门。无需按键，1.2 秒后自动进入第二层。`;
+        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，1.5 秒后自动进入第 ${this.floorNumber + 1} 层。`;
       } else {
         this.mode = "victory";
         this.profile.victories += 1;
         this.profile.bestRunQueries = this.profile.bestRunQueries === null
           ? this.queryCount
           : Math.min(this.profile.bestRunQueries, this.queryCount);
-        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第二层钥匙。丛林王庭已平定，两层 SQL 图鉴均已永久更新。`;
+        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第四层钥匙。元素王座已平定，前四层 SQL 图鉴均已永久更新。`;
       }
     } else if (
       item.weapon ||
@@ -2568,8 +2609,8 @@ export class GameSession {
     if (this.mode === "death-review") return "完成本场复盘后重新出发";
     if (this.mode === "challenge") return "机关破解中 · Ctrl + Enter 提交 · ESC 安全退出";
     if (this.mode === "combat") return "Q + S  打开 SQL 战斗终端";
-    if (this.mode === "transition") return "双表连接传送门启动 · 自动进入第二层";
-    if (this.mode === "victory") return "双层已贯通 · 可开始新 Run";
+    if (this.mode === "transition") return `传送门启动 · 自动进入第 ${this.floorNumber + 1} 层`;
+    if (this.mode === "victory") return "前四层已贯通 · 可开始新 Run";
     if (this.mode === "defeat") return "YOU DIED · 正在返回最近篝火";
     const campfire = nearbyCampfire(this.campfires, this.player);
     if (campfire) {

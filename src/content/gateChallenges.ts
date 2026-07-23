@@ -93,8 +93,68 @@ const FLOOR_TWO_CHALLENGE: GateChallengeDefinition = {
   ],
 };
 
+const FLOOR_THREE_CHALLENGE: GateChallengeDefinition = {
+  id: "grave-breach",
+  title: "墓城越权协议 · 三表审计",
+  objective: "连接怪物、房间和装备，找出第三层 power 不低于 20 的记录。依次返回 id、name、room_name、power；按 power 降序、id 升序，只取前 2 行。",
+  schema: [
+    sqlSchemaLine("monsters"),
+    sqlSchemaLine("rooms"),
+    sqlSchemaLine("monster_gear"),
+    "关系：monsters.room_id = rooms.id；monster_gear.monster_id = monsters.id",
+  ],
+  hints: [
+    "先把 monsters 连接 rooms，再连接 monster_gear。",
+    "用 rooms.floor = 3 与 power >= 20 限定范围。",
+    "按 power DESC、id ASC 排序并 LIMIT 2。",
+  ],
+  requiredFeatures: ["select", "from", "where", "join", "on", "order-by", "limit"],
+  expectedColumns: ["id", "name", "room_name", "power"],
+  expectedRows: [
+    { id: 6, name: "死灵王", room_name: "死灵王庭", power: 24 },
+    { id: 11, name: "墓主", room_name: "墓主祭坛", power: 22 },
+  ],
+};
+
+const FLOOR_FOUR_CHALLENGE: GateChallengeDefinition = {
+  id: "forge-breach",
+  title: "熔炉越权协议 · CTE 主核",
+  objective: "用 CTE 统计每只怪物的最高装备 power，只保留不低于 20 的第四层怪物。依次返回 id、name、max_power；按 max_power 降序、id 升序，只取前 3 行。",
+  schema: [
+    sqlSchemaLine("monsters"),
+    sqlSchemaLine("monster_gear"),
+    "关系：monster_gear.monster_id = monsters.id",
+  ],
+  hints: [
+    "CTE 中按 monster_id 分组，计算 MAX(power) AS max_power。",
+    "在 HAVING 中保留 MAX(power) >= 20，再连接 monsters。",
+    "主查询限定 room_id 51 到 60，排序后 LIMIT 3。",
+  ],
+  requiredFeatures: [
+    "select",
+    "from",
+    "where",
+    "join",
+    "on",
+    "group-by",
+    "having",
+    "order-by",
+    "limit",
+    "cte",
+  ],
+  expectedColumns: ["id", "name", "max_power"],
+  expectedRows: [
+    { id: 17, name: "元素王", max_power: 26 },
+    { id: 22, name: "炉主", max_power: 22 },
+    { id: 16, name: "炎王", max_power: 20 },
+  ],
+};
+
 function definitionForFloor(floor: FloorNumber): GateChallengeDefinition {
-  return floor === 1 ? FLOOR_ONE_CHALLENGE : FLOOR_TWO_CHALLENGE;
+  if (floor === 1) return FLOOR_ONE_CHALLENGE;
+  if (floor === 2) return FLOOR_TWO_CHALLENGE;
+  if (floor === 3) return FLOOR_THREE_CHALLENGE;
+  return FLOOR_FOUR_CHALLENGE;
 }
 
 export function gateChallengeForFloor(

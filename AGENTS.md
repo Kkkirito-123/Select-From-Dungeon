@@ -30,7 +30,7 @@ working here, then read the closest nested `AGENTS.md` if one is added later.
 ## Product and Users
 
 `SQL 魔王城 / SELECT * FROM DUNGEON` is a Chinese browser roguelite for SQL
-beginners and interview learners. The current MVP is a two-floor Run; each floor
+beginners and interview learners. The current MVP is a four-floor Run; each floor
 is a deterministic 64x48 continuous seeded maze, divided into 16x16 technical
 partitions and braided with extra loops to reduce dead-end backtracking. Players reveal the
 non-interactive minimap by physically walking the maze. Moving into a named
@@ -40,8 +40,8 @@ starts at two hearts, uses deterministic one-damage counters with armor-first
 absorption, awards rank-based XP with a visible post-battle settlement, and
 puts every curriculum reward in an
 `E`-opened loot bundle, explains acquired loot, automatically
-opens a short non-interactive portal after the first-floor `HAVING` Boss, and
-ends at a second-floor composite `JOIN` Boss. Step-meter ambushes award XP and
+opens a short non-interactive portal after each of the first three floor Bosses,
+and ends at a fourth-floor recursive-CTE Boss. Step-meter ambushes award XP and
 may produce only optional low-probability loot. Outside safe zones, each
 eligible successful step has a 2% base ambush chance and the meter guarantees an
 encounter after 30 eligible quiet steps; reloads do not reroll the result.
@@ -85,30 +85,33 @@ Chinese characters such as `史莱姆`, `水胶怪`, or `幼龙`, without middle
 epithets or SQL-concept suffixes. Future floors must follow the same rule; SQL
 meaning belongs in fields, objectives, and encounter mechanics rather than the
 display name.
-The v0.6 campaign framework defines and validates all eight future floors,
+The v0.6 campaign framework defines and validates all eight planned floors,
 including their ordered lesson prerequisites, three exercise tiers, five
 encounter roles, theme/topology, monster/equipment/loot pools, deterministic
 completion rewards, and runtime evidence boundary. The current executable
-content remains floors one and two; the other six slots are saved scaffolding,
-not a claim that those floors are playable yet.
-The v0.7 runtime derives three deterministic biome regions per executable floor
+content covers floors one through four; the remaining four slots are saved
+scaffolding, not a claim that those floors are playable yet.
+The runtime derives three deterministic biome regions per executable floor
 from the saved maze instead of persisting duplicate geometry. Floor one uses a
 drainage channel, slime pool, and ember cellar; floor two uses a lake, swamp,
-and forest. Ambushes draw only from the current biome pool, with seeded 5% and
-7% mini-elite weights on floors one and two. The lake and swamp each contain a
-visible optional area Boss with a two-stage exercise, 3 XP, and at least two
-biome-themed drops. These actors never enter entrance/campfire safe zones and
-do not gate curriculum completion.
+and forest; floor three uses a bone yard, grave mire, and spirit crypt; floor
+four uses a fire forge, frost vault, and storm core. Ambushes draw only from the
+current biome pool, with seeded 5%, 7%, 9%, and 11% mini-elite weights by floor.
+Authored optional area Bosses use multi-stage floor-appropriate exercises, award
+3 XP, and guarantee at least two themed drops. These actors never enter
+entrance/campfire safe zones and do not gate curriculum completion.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
-optimizer/InnoDB runtime. Floors three through eight are not implemented. The
+optimizer/InnoDB runtime. Floors five through eight are not implemented. The
 seed randomizes the physical maze,
 non-critical room rewards, and optional loot, but not required SQL data,
 prerequisite lessons, or key weapons. The first floor teaches `SELECT` through
 `HAVING`; the harder second floor teaches `ORDER BY / LIMIT`, `DISTINCT`,
-`INNER JOIN`, `LEFT JOIN`, and a composite `JOIN` query. These ten lesson groups
-are not the complete SQL or MySQL interview curriculum.
+`INNER JOIN`, `LEFT JOIN`, and a composite `JOIN` query. Floor three adds inner,
+left, self, and chained joins plus `UNION`; floor four adds scalar, `IN`,
+`EXISTS`, correlated subqueries, CTEs, and recursive CTEs. These 22 lesson
+groups are not the complete SQL or MySQL interview curriculum.
 
 ## Architecture and Execution Flow
 
@@ -128,7 +131,7 @@ index.html -> src/main.ts
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates, rank minimums, deduplication)
-  -> SqlEngine (in-memory SQLite WASM, seed data, SELECT execution, HP sync)
+  -> SqlEngine (in-memory SQLite WASM, seed data, SELECT/WITH execution, HP sync)
   -> lessonEvaluator (query features, lesson locks, result semantics)
   -> DungeonScene (continuous maze, fog, collision, patrol, same-tile encounter)
   -> BattleScene (separate duel arena, HP bars, intent, combat animation)
@@ -171,8 +174,8 @@ without `OR`, subqueries, or set operators so required predicates cannot be
 hidden in a dead branch. The same one-statement boundary applies to second-floor
 sorting and join lessons, whose relationship predicates are checked as part of
 the concept lock. Shared curriculum data and fixed drops live in
-`src/content/mvpLevel.ts`, with second-floor content in
-`src/content/floor2Level.ts`; room flavor and run rewards live in
+`src/content/mvpLevel.ts`, with later executable floors in
+`src/content/floor2Level.ts`, `floor3Level.ts`, and `floor4Level.ts`; room flavor and run rewards live in
 `src/content/runContent.ts`; optional Boss-gate questions and semantic result
 contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
@@ -180,14 +183,14 @@ contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls, rank minimums,
 same-battle deduplication, unique-equipment conversion, and the three-item cap.
-`src/content/biomeContent.ts` owns the executable two-floor biome encounter
+`src/content/biomeContent.ts` owns the executable four-floor biome encounter
 pools and optional multi-stage exercises. `src/domain/biome.ts` derives region
 ownership, static features, and area-Boss positions from the maze, campfires,
 guided map, and seed; this plan is rebuilt during load and is not serialized.
 `src/content/floorContracts.ts` is the canonical eight-floor future-content
 schema. `src/domain/campaign.ts` owns its serializable ordered floor slots and
 must reject skipped, duplicated, or rerolled transitions. This campaign
-scaffolding must not silently route an unimplemented floor through floor-two
+scaffolding must not silently route an unimplemented floor through any implemented
 content.
 `src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
 complete canonical schema, current task context, and MVP SQL vocabulary. It may
@@ -243,7 +246,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 
 - SQL runs entirely in the browser through `sql.js`/SQLite WASM. No query or
   gameplay data is sent to a backend.
-- The battle terminal accepts one `SELECT` statement. DML, DDL, `PRAGMA`,
+- The battle terminal accepts one read-only `SELECT` or `WITH` statement. DML, DDL, `PRAGMA`,
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.
 - Both SQL textareas provide an IDE-like `PLAN ASSIST` listbox. Typing a prefix
@@ -270,7 +273,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   three campfires, the active checkpoint, encounter meter, level/XP, opened
   challenge gates/shortcuts/dead-end caches, active gate challenge, at most 200
   local answer records, and disposable current Run state),
-  `select-from-dungeon:profile:v2` (ten mastered lessons, attempts, victories, best
+  `select-from-dungeon:profile:v2` (22 mastered lessons, attempts, victories, best
   query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
   state). A valid `select-from-dungeon:run:v8` is migrated in memory into v9
   with deterministic eight-floor campaign slots. A valid `run:v7` is then
@@ -278,7 +281,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   registered; valid `run:v6`, `run:v5`, and `run:v4` data continue through the
   existing migrations before v9. Legacy keys remain undeleted; older Run keys remain
   unread.
-  A valid `select-from-dungeon:profile:v1` is migrated into v2. Snapshot-driven
+  A valid `select-from-dungeon:profile:v1` is migrated into v2, and a pre-v0.8
+  v2 profile is backfilled with the new lesson counters. Snapshot-driven
   persistence is debounced in `src/main.ts`; changing a shape requires a
   version or recovery decision.
 - Core learning drops and keys are deterministic. Optional items use independent
@@ -296,7 +300,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - Standing beside a locked Boss gate and pressing `E` opens an optional
   `QUERY BREACH` terminal. Floor one requires a composite
   `JOIN + WHERE + COUNT + GROUP BY + HAVING + ORDER BY` query; floor two adds
-  `LEFT JOIN`, `COUNT(DISTINCT ...)`, and `LIMIT`. Both query features and exact
+  `LEFT JOIN`, `COUNT(DISTINCT ...)`, and `LIMIT`; floor three uses a three-table
+  gear audit; floor four uses a CTE with grouped maximum power. Both query features and exact
   result semantics are validated. Success opens only that physical gate and
   grants no mastery, attempts, XP, or loot. Wrong results and syntax errors deal
   one armor-first damage; empty input and `Escape` consume nothing.
@@ -317,8 +322,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   one two-way shortcut and one guaranteed middle/rear key that consumes no
   inventory slot. Opening requires both the key and the shortcut's course
   prerequisites; opening, rest, and death never reroll or relock it.
-- Collecting the first-floor key enters `transition` mode. AppShell displays the
-  gold `FLOOR 01 CLEARED / CONGRATULATIONS!!` feedback and calls
+- Collecting a key on floors one through three enters `transition` mode.
+  AppShell displays the gold `FLOOR NN CLEARED / CONGRATULATIONS!!` feedback and calls
   `GameSession.advanceFloor()` after about 1.5 seconds without requiring
   movement or `E`; level, XP, equipment, inventory, consumables, key items,
   relics, and query count carry into a newly generated harder floor while

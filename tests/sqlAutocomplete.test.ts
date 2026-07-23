@@ -106,4 +106,11 @@ describe("SQL autocomplete", () => {
       cursor: 6,
     });
   });
+
+  it("提示第三、四层需要的集合、子查询、CTE 与聚合词汇", () => {
+    expect(getSqlCompletions("uni", 3, 3, SCHEMA).suggestions[0]?.label).toBe("UNION");
+    expect(getSqlCompletions("exi", 3, 3, SCHEMA).suggestions[0]?.label).toBe("EXISTS");
+    expect(getSqlCompletions("rec", 3, 3, SCHEMA).suggestions[0]?.label).toBe("WITH RECURSIVE");
+    expect(getSqlCompletions("max", 3, 3, SCHEMA).suggestions[0]?.label).toBe("MAX()");
+  });
 });

@@ -29,6 +29,12 @@ const KEYWORD_SUGGESTIONS: SqlSuggestion[] = [
   keyword("JOIN", "连接相关数据表"),
   keyword("LEFT JOIN", "保留左表全部记录"),
   keyword("ON", "声明表连接关系"),
+  keyword("UNION", "合并并去重两组查询结果"),
+  keyword("UNION ALL", "合并并保留重复结果"),
+  keyword("IN", "判断值是否属于集合或子查询"),
+  keyword("EXISTS", "判断相关子查询是否返回记录"),
+  keyword("WITH", "命名一个公共表表达式"),
+  keyword("WITH RECURSIVE", "定义递归公共表表达式"),
   keyword("GROUP BY", "按字段聚合分组"),
   keyword("HAVING", "过滤聚合结果"),
   keyword("ORDER BY", "指定结果排序"),
@@ -41,6 +47,8 @@ const KEYWORD_SUGGESTIONS: SqlSuggestion[] = [
 const FUNCTION_SUGGESTIONS: SqlSuggestion[] = [
   sqlFunction("COUNT()", "统计记录数量"),
   sqlFunction("SUM()", "汇总数值字段"),
+  sqlFunction("MIN()", "取得最小值"),
+  sqlFunction("MAX()", "取得最大值"),
   sqlFunction("COALESCE()", "为空值提供备用值"),
 ];
 
@@ -171,10 +179,14 @@ function candidateScore(
 
   if (context === "start" && !query) {
     score += suggestion.label === "SELECT" ? -80 : suggestion.kind === "keyword" ? 20 : 50;
+  } else if (context === "start" && query && suggestion.kind === "table") {
+    score -= 15;
   } else if (context === "table") {
     score += suggestion.kind === "table" ? -60 : 35;
   } else if (context === "value") {
     score += suggestion.kind === "column" ? -45 : suggestion.kind === "function" ? -30 : 20;
+  } else if (context === "any" && query && suggestion.kind === "table") {
+    score -= 15;
   }
   if (suggestion.kind === "keyword") score += 1;
   if (suggestion.kind === "function") score += 2;

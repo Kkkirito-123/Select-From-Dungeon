@@ -50,7 +50,35 @@ export type LessonStageId =
   | "lake-boss-scan"
   | "lake-boss-sort"
   | "frog-boss-left"
-  | "frog-boss-distinct";
+  | "frog-boss-distinct"
+  | "f3-inner-room"
+  | "f3-left-unarmed"
+  | "f3-self-master"
+  | "f3-chain-gear"
+  | "f3-union-patrol"
+  | "f3-audit-groups"
+  | "f3-audit-core"
+  | "f4-scalar-first"
+  | "f4-in-frost"
+  | "f4-exists-gear"
+  | "f4-correlated-gear"
+  | "f4-cte-armor"
+  | "f4-recursive-rooms"
+  | "f4-recursive-core"
+  | "practice-bone"
+  | "practice-zombie"
+  | "practice-spirit"
+  | "practice-spirit-core"
+  | "practice-wraith"
+  | "grave-boss-scan"
+  | "grave-boss-core"
+  | "practice-fire"
+  | "practice-ice"
+  | "practice-storm"
+  | "practice-storm-core"
+  | "practice-spark"
+  | "forge-boss-scan"
+  | "forge-boss-core";
 
 export type PlayMode =
   | "explore"
@@ -65,7 +93,11 @@ export type PlayMode =
   | "victory"
   | "defeat";
 
-export type GateChallengeId = "aggregate-breach" | "relation-breach";
+export type GateChallengeId =
+  | "aggregate-breach"
+  | "relation-breach"
+  | "grave-breach"
+  | "forge-breach";
 
 export type MonsterKind =
   | "projection-slime"
@@ -76,7 +108,15 @@ export type MonsterKind =
   | "distinct-mimic"
   | "join-spider"
   | "left-join-wraith"
-  | "relation-titan";
+  | "relation-titan"
+  | "skeleton"
+  | "zombie"
+  | "ghost"
+  | "necromancer"
+  | "fire-spirit"
+  | "ice-spirit"
+  | "thunder-spirit"
+  | "elemental-king";
 
 export type QueryFeature =
   | "select"
@@ -92,7 +132,14 @@ export type QueryFeature =
   | "distinct"
   | "join"
   | "on"
-  | "left-join";
+  | "left-join"
+  | "self-join"
+  | "union"
+  | "subquery"
+  | "in"
+  | "exists"
+  | "cte"
+  | "recursive";
 
 export interface Position {
   x: number;
@@ -139,7 +186,8 @@ export interface Weapon {
     | "join-chain"
     | "slime-sword"
     | "hunter-bow"
-    | "bone-blade";
+    | "bone-blade"
+    | "rune-staff";
   name: string;
   damage: number;
   heatReduction: number;
@@ -147,7 +195,7 @@ export interface Weapon {
 }
 
 export interface Armor {
-  id: "slime-vest" | "vine-armor";
+  id: "slime-vest" | "vine-armor" | "bone-armor" | "rune-armor";
   name: string;
   maxArmor: number;
   description: string;
@@ -168,6 +216,9 @@ export interface Consumable {
     | "water-drop"
     | "frog-potion"
     | "forest-fruit"
+    | "holy-water"
+    | "fire-crystal"
+    | "ice-crystal"
     | "whetstone"
     | "repair-shard";
   name: string;

@@ -369,7 +369,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot()).toMatchObject({
       mode: "transition",
       floor: 1,
-      interactionPrompt: expect.stringContaining("自动进入第二层"),
+      interactionPrompt: expect.stringContaining("自动进入第 2 层"),
     });
     expect(session.toProfile().victories).toBe(0);
 

@@ -61,12 +61,12 @@ export const SQL_TABLES: readonly SqlTableDefinition[] = [
   {
     name: "rooms",
     title: "房间档案",
-    description: "双层魔王城的房间、区域与楼层信息。",
+    description: "前四层魔王城的房间、区域与楼层信息。",
     columns: [
       column("id", "INTEGER", "房间唯一编号", { primaryKey: true }),
       column("name", "TEXT", "游戏画面显示的房间名称"),
       column("sector", "TEXT", "房间所属区域代号"),
-      column("floor", "INTEGER", "所在楼层：1 或 2"),
+      column("floor", "INTEGER", "所在楼层：1、2、3 或 4"),
     ],
   },
   {

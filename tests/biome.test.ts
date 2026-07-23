@@ -14,7 +14,7 @@ import { generateGuidedMapPlan } from "../src/domain/guidedMap";
 import { generateMazeFloor } from "../src/domain/mazeGenerator";
 import { generateRoomGraph, lessonsForFloor } from "../src/domain/runGraph";
 
-function fixture(seed: string, floorNumber: 1 | 2) {
+function fixture(seed: string, floorNumber: 1 | 2 | 3 | 4) {
   const graph = generateRoomGraph(seed, floorNumber);
   const maze = generateMazeFloor(graph);
   const campfires = generateCampfires(graph, maze);
@@ -24,8 +24,8 @@ function fixture(seed: string, floorNumber: 1 | 2) {
 }
 
 describe("seeded biome plan", () => {
-  it("两层生态方案可复现、每区 14 个地标且不侵入安全区", () => {
-    for (const floorNumber of [1, 2] as const) {
+  it("前四层生态方案可复现、每区 14 个地标且不侵入安全区", () => {
+    for (const floorNumber of [1, 2, 3, 4] as const) {
       for (let index = 0; index < 30; index += 1) {
         const seed = `biome-contract-${floorNumber}-${index}`;
         const first = fixture(seed, floorNumber);
@@ -51,7 +51,7 @@ describe("seeded biome plan", () => {
         });
       }
     }
-  });
+  }, 15_000);
 
   it("第二层稳定生成湖怪与蛙王，首领不会落在安全区", () => {
     for (let index = 0; index < 60; index += 1) {
@@ -92,7 +92,7 @@ describe("biome encounter pools", () => {
     }
   });
 
-  it("小型精英只在有基础怪物的生态内保持约 5% / 7% 权重", () => {
+  it("小型精英只在有基础怪物的生态内保持约 5% / 7% / 9% / 11% 权重", () => {
     const floorOne = weightedBiomeEncounterIds(
       1,
       "ember-cellar",
@@ -103,9 +103,23 @@ describe("biome encounter pools", () => {
       "swamp",
       new Set(lessonsForFloor(2)),
     );
+    const floorThree = weightedBiomeEncounterIds(
+      3,
+      "spirit-crypt",
+      new Set(lessonsForFloor(3)),
+    );
+    const floorFour = weightedBiomeEncounterIds(
+      4,
+      "storm-core",
+      new Set(lessonsForFloor(4)),
+    );
     expect(floorOne.filter((id) => id === 810).length / floorOne.length)
       .toBeCloseTo(0.05, 2);
     expect(floorTwo.filter((id) => id === 1510).length / floorTwo.length)
       .toBeCloseTo(0.07, 2);
+    expect(floorThree.filter((id) => id === 9).length / floorThree.length)
+      .toBeCloseTo(0.09, 2);
+    expect(floorFour.filter((id) => id === 20).length / floorFour.length)
+      .toBeCloseTo(0.11, 2);
   });
 });

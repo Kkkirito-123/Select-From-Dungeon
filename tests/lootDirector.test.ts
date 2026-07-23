@@ -3,6 +3,7 @@ import {
   ARMORS,
   CONSUMABLES,
   lootCandidatesForBiome,
+  lootCandidatesForFloor,
   type LootCandidate,
 } from "../src/content/inventoryCatalog";
 import { FILTER_BOW } from "../src/content/mvpLevel";
@@ -94,6 +95,17 @@ describe("rollLootItems", () => {
         }),
       ]),
     );
+  });
+
+  it("第三、四层旧楼层入口也返回本层候选，且不会重复符文杖", () => {
+    expect(lootCandidatesForFloor(3).map((entry) => entry.item.itemId)).toEqual(
+      expect.arrayContaining(["holy-water", "bone-blade", "bone-armor", "rune-staff"]),
+    );
+    const floorFourIds = lootCandidatesForFloor(4).map((entry) => entry.item.itemId);
+    expect(floorFourIds).toEqual(
+      expect.arrayContaining(["fire-crystal", "rune-staff", "rune-armor"]),
+    );
+    expect(new Set(floorFourIds).size).toBe(floorFourIds.length);
   });
 
   it("普通怪允许空掉落，精英和层主分别保证至少 1/2 件", () => {

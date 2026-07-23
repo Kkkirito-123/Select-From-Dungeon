@@ -314,7 +314,7 @@ function placeZones(
   graph: RoomGraph,
   random: () => number,
 ): MazeZone[] {
-  const slots = graph.floor === 2 ? FLOOR_TWO_ZONE_SLOTS : ZONE_SLOTS;
+  const slots = graph.floor === 1 ? ZONE_SLOTS : FLOOR_TWO_ZONE_SLOTS;
   return graph.nodes.map((node, index) => {
     const base = slots[index] ?? slots[slots.length - 1];
     const slot = jitteredSlot(base, random, node.type === "boss");

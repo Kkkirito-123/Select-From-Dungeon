@@ -10,7 +10,13 @@ export type BiomeKind =
   | "ember-cellar"
   | "lake"
   | "swamp"
-  | "forest";
+  | "forest"
+  | "bone-yard"
+  | "grave-mire"
+  | "spirit-crypt"
+  | "fire-forge"
+  | "frost-vault"
+  | "storm-core";
 
 export type BiomeEncounterRole = "normal" | "mini-elite" | "area-boss";
 
@@ -263,6 +269,202 @@ export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
     status: "ruling",
     weakness: "left",
     masterId: null,
+    isBoss: false,
+    rank: "elite",
+  }),
+] as const;
+
+export const FLOOR_THREE_BIOME_MONSTERS: readonly Monster[] = [
+  biomeMonster({
+    floor: 3,
+    id: 7,
+    lessonId: "f3-inner",
+    roomId: 47,
+    name: "碎骨",
+    species: "bone_scout",
+    kind: "skeleton",
+    hp: 16,
+    maxHp: 16,
+    armor: 0,
+    damage: 2,
+    attackName: "碎骨突刺",
+    status: "patrolling",
+    weakness: "join",
+    masterId: 6,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 3,
+    id: 8,
+    lessonId: "f3-left",
+    roomId: 48,
+    name: "腐尸",
+    species: "grave_zombie",
+    kind: "zombie",
+    hp: 16,
+    maxHp: 16,
+    armor: 0,
+    damage: 2,
+    attackName: "腐土抓击",
+    status: "wandering",
+    weakness: "left",
+    masterId: 6,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 3,
+    id: 9,
+    lessonId: "f3-self",
+    roomId: 49,
+    name: "鬼火",
+    species: "spirit_flame",
+    kind: "ghost",
+    hp: 24,
+    maxHp: 24,
+    armor: 1,
+    damage: 2,
+    attackName: "灵焰追踪",
+    status: "haunting",
+    weakness: "alias",
+    masterId: 11,
+    isBoss: false,
+    rank: "elite",
+  }),
+  biomeMonster({
+    floor: 3,
+    id: 10,
+    lessonId: "f3-self",
+    roomId: 49,
+    name: "游魂",
+    species: "crypt_wraith",
+    kind: "ghost",
+    hp: 16,
+    maxHp: 16,
+    armor: 0,
+    damage: 2,
+    attackName: "魂火扑击",
+    status: "drifting",
+    weakness: "alias",
+    masterId: 11,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 3,
+    id: 11,
+    lessonId: "f3-union",
+    roomId: 50,
+    name: "墓主",
+    species: "tomb_lord",
+    kind: "necromancer",
+    hp: 28,
+    maxHp: 28,
+    armor: 2,
+    damage: 2,
+    attackName: "墓碑合流",
+    status: "sealed",
+    weakness: "union",
+    masterId: 6,
+    isBoss: false,
+    rank: "elite",
+  }),
+] as const;
+
+export const FLOOR_FOUR_BIOME_MONSTERS: readonly Monster[] = [
+  biomeMonster({
+    floor: 4,
+    id: 18,
+    lessonId: "f4-scalar",
+    roomId: 57,
+    name: "火苗",
+    species: "ember_sprite",
+    kind: "fire-spirit",
+    hp: 18,
+    maxHp: 18,
+    armor: 0,
+    damage: 2,
+    attackName: "火苗飞射",
+    status: "sparking",
+    weakness: "scalar",
+    masterId: 22,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 4,
+    id: 19,
+    lessonId: "f4-in",
+    roomId: 58,
+    name: "冰晶",
+    species: "frost_shard",
+    kind: "ice-spirit",
+    hp: 18,
+    maxHp: 18,
+    armor: 0,
+    damage: 2,
+    attackName: "冰晶散射",
+    status: "frozen",
+    weakness: "in",
+    masterId: 22,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 4,
+    id: 20,
+    lessonId: "f4-exists",
+    roomId: 59,
+    name: "雷兽",
+    species: "storm_beast",
+    kind: "thunder-spirit",
+    hp: 27,
+    maxHp: 27,
+    armor: 1,
+    damage: 3,
+    attackName: "雷爪",
+    status: "charged",
+    weakness: "exists",
+    masterId: 22,
+    isBoss: false,
+    rank: "elite",
+  }),
+  biomeMonster({
+    floor: 4,
+    id: 21,
+    lessonId: "f4-exists",
+    roomId: 59,
+    name: "电球",
+    species: "storm_orb",
+    kind: "thunder-spirit",
+    hp: 18,
+    maxHp: 18,
+    armor: 0,
+    damage: 2,
+    attackName: "电弧撞击",
+    status: "sparking",
+    weakness: "exists",
+    masterId: 22,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 4,
+    id: 22,
+    lessonId: "f4-cte",
+    roomId: 60,
+    name: "炉主",
+    species: "forge_lord",
+    kind: "elemental-king",
+    hp: 32,
+    maxHp: 32,
+    armor: 2,
+    damage: 3,
+    attackName: "熔炉封锁",
+    status: "forging",
+    weakness: "cte",
+    masterId: 17,
     isBoss: false,
     rank: "elite",
   }),
@@ -540,6 +742,230 @@ const FROG_BOSS_DISTINCT: LessonStageDefinition = {
   attackTargetIds: [1911],
 };
 
+const PRACTICE_BONE: LessonStageDefinition = {
+  id: "practice-bone",
+  objective: "连接 monsters 与 rooms，查询 id = 7 的 name 与 room_name。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 7;",
+  hints: [
+    "读取怪物名与房间名。",
+    "连接 monsters 与 rooms。",
+    "ON m.room_id = r.id。",
+    "完整写法：SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 7;",
+  ],
+  locks: ["INNER JOIN", "ON"],
+  requiredFeatures: ["join", "on"],
+  attackTargetIds: [7],
+};
+
+const PRACTICE_ZOMBIE: LessonStageDefinition = {
+  id: "practice-zombie",
+  objective: "LEFT JOIN 装备表，找出 id = 8 且没有装备的腐尸。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 8 AND g.monster_id IS NULL;",
+  hints: [
+    "从 monsters m 开始。",
+    "LEFT JOIN monster_gear g。",
+    "检查 g.monster_id IS NULL。",
+    "完整写法：SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 8 AND g.monster_id IS NULL;",
+  ],
+  locks: ["LEFT JOIN", "IS NULL"],
+  requiredFeatures: ["left-join", "is-null"],
+  attackTargetIds: [8],
+};
+
+const PRACTICE_SPIRIT: LessonStageDefinition = {
+  id: "practice-spirit",
+  objective: "自连接 monsters，查询鬼火 #9 的 name 与 master_name。",
+  queryTemplate: "",
+  answerSql: "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 9;",
+  hints: [
+    "同一张表使用 child 与 master 两个别名。",
+    "连接 child.master_id = master.id。",
+    "锁定 child.id = 9。",
+    "完整写法：SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 9;",
+  ],
+  locks: ["SELF JOIN", "ON"],
+  requiredFeatures: ["self-join", "on"],
+  attackTargetIds: [9],
+};
+
+const PRACTICE_SPIRIT_CORE: LessonStageDefinition = {
+  id: "practice-spirit-core",
+  objective: "第二击：查询 id = 9 且 status = 'haunting' 的鬼火 name。",
+  queryTemplate: "",
+  answerSql: "SELECT name FROM monsters WHERE id = 9 AND status = 'haunting';",
+  hints: [
+    "读取 name。",
+    "使用 WHERE。",
+    "用 AND 同时限定 id 与 status。",
+    "完整写法：SELECT name FROM monsters WHERE id = 9 AND status = 'haunting';",
+  ],
+  locks: ["WHERE", "AND"],
+  requiredFeatures: ["where", "and"],
+  attackTargetIds: [9],
+};
+
+const PRACTICE_WRAITH: LessonStageDefinition = {
+  id: "practice-wraith",
+  objective: "自连接 monsters，查询游魂 #10 的 name 与 master_name。",
+  queryTemplate: "",
+  answerSql: "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 10;",
+  hints: [
+    "同一张表使用两个别名。",
+    "连接 child.master_id = master.id。",
+    "锁定 child.id = 10。",
+    "完整写法：SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 10;",
+  ],
+  locks: ["SELF JOIN", "ON"],
+  requiredFeatures: ["self-join", "on"],
+  attackTargetIds: [10],
+};
+
+const GRAVE_BOSS_SCAN: LessonStageDefinition = {
+  id: "grave-boss-scan",
+  objective: "墓主第一击：用 UNION 合并 room_id = 49 与 50 的 id、name，并按 id 排序。",
+  queryTemplate: "",
+  answerSql: "SELECT id, name FROM monsters WHERE room_id = 49 UNION SELECT id, name FROM monsters WHERE room_id = 50 ORDER BY id;",
+  hints: [
+    "两边都返回 id、name。",
+    "分别过滤 room_id = 49 与 50。",
+    "用 UNION 合并。",
+    "完整写法：SELECT id, name FROM monsters WHERE room_id = 49 UNION SELECT id, name FROM monsters WHERE room_id = 50 ORDER BY id;",
+  ],
+  locks: ["UNION", "ORDER BY"],
+  requiredFeatures: ["union", "order-by"],
+  attackTargetIds: [11],
+};
+
+const GRAVE_BOSS_CORE: LessonStageDefinition = {
+  id: "grave-boss-core",
+  objective: "墓主第二击：自连接 monsters，返回 id = 11 的 name 与 master_name。",
+  queryTemplate: "",
+  answerSql: "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 11;",
+  hints: [
+    "为 monsters 使用 child 与 master 两个别名。",
+    "连接 child.master_id = master.id。",
+    "锁定 child.id = 11。",
+    "完整写法：SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 11;",
+  ],
+  locks: ["SELF JOIN", "ON"],
+  requiredFeatures: ["self-join", "on"],
+  attackTargetIds: [11],
+};
+
+const PRACTICE_FIRE: LessonStageDefinition = {
+  id: "practice-fire",
+  objective: "用标量子查询返回 room_id = 57 中最小 id 对应的 name。",
+  queryTemplate: "",
+  answerSql: "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57);",
+  hints: [
+    "外层读取 name。",
+    "内层计算 room_id = 57 的 MIN(id)。",
+    "外层用 id = (...)。",
+    "完整写法：SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57);",
+  ],
+  locks: ["SUBQUERY"],
+  requiredFeatures: ["subquery"],
+  attackTargetIds: [18],
+};
+
+const PRACTICE_ICE: LessonStageDefinition = {
+  id: "practice-ice",
+  objective: "用 IN 子查询返回 room_id 位于 frost-vault 区域的冰晶 name。",
+  queryTemplate: "",
+  answerSql: "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name;",
+  hints: [
+    "内层从 rooms 查询 id。",
+    "过滤 sector = 'frost-vault'。",
+    "外层用 room_id IN (...)。",
+    "完整写法：SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name;",
+  ],
+  locks: ["IN", "SUBQUERY"],
+  requiredFeatures: ["in", "subquery"],
+  attackTargetIds: [19],
+};
+
+const PRACTICE_STORM: LessonStageDefinition = {
+  id: "practice-storm",
+  objective: "用 EXISTS 查询 id = 20 且存在装备记录的雷兽 name。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name FROM monsters m WHERE m.id = 20 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  hints: [
+    "外层锁定雷兽。",
+    "EXISTS 内层查询 monster_gear。",
+    "用 g.monster_id = m.id 相关。",
+    "完整写法：SELECT m.name FROM monsters m WHERE m.id = 20 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  ],
+  locks: ["EXISTS", "SUBQUERY"],
+  requiredFeatures: ["exists", "subquery"],
+  attackTargetIds: [20],
+};
+
+const PRACTICE_STORM_CORE: LessonStageDefinition = {
+  id: "practice-storm-core",
+  objective: "第二击：查询 id = 20 且 status = 'charged' 的雷兽 name。",
+  queryTemplate: "",
+  answerSql: "SELECT name FROM monsters WHERE id = 20 AND status = 'charged';",
+  hints: [
+    "读取 name。",
+    "使用 WHERE 与 AND。",
+    "同时限定 id 和 status。",
+    "完整写法：SELECT name FROM monsters WHERE id = 20 AND status = 'charged';",
+  ],
+  locks: ["WHERE", "AND"],
+  requiredFeatures: ["where", "and"],
+  attackTargetIds: [20],
+};
+
+const PRACTICE_SPARK: LessonStageDefinition = {
+  id: "practice-spark",
+  objective: "用 EXISTS 查询 id = 21 且存在装备记录的电球 name。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name FROM monsters m WHERE m.id = 21 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  hints: [
+    "外层读取 m.name。",
+    "EXISTS 内层检查 monster_gear。",
+    "通过 g.monster_id = m.id 关联。",
+    "完整写法：SELECT m.name FROM monsters m WHERE m.id = 21 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  ],
+  locks: ["EXISTS", "SUBQUERY"],
+  requiredFeatures: ["exists", "subquery"],
+  attackTargetIds: [21],
+};
+
+const FORGE_BOSS_SCAN: LessonStageDefinition = {
+  id: "forge-boss-scan",
+  objective: "炉主第一击：用 CTE 保存 power >= 19 的 monster_id，返回 id = 22 的 name。",
+  queryTemplate: "",
+  answerSql: "WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.name FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 22;",
+  hints: [
+    "先写 WITH strong AS (...)。",
+    "CTE 过滤 power >= 19。",
+    "主查询连接 monsters 与 strong。",
+    "完整写法：WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.name FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 22;",
+  ],
+  locks: ["WITH / CTE", "JOIN"],
+  requiredFeatures: ["cte", "join"],
+  attackTargetIds: [22],
+};
+
+const FORGE_BOSS_CORE: LessonStageDefinition = {
+  id: "forge-boss-core",
+  objective: "炉主第二击：用 EXISTS 返回 id = 22 且存在装备记录的 name。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name FROM monsters m WHERE m.id = 22 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  hints: [
+    "外层读取 m.name。",
+    "EXISTS 检查装备记录。",
+    "内层关联 g.monster_id = m.id。",
+    "完整写法：SELECT m.name FROM monsters m WHERE m.id = 22 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  ],
+  locks: ["EXISTS", "SUBQUERY"],
+  requiredFeatures: ["exists", "subquery"],
+  attackTargetIds: [22],
+};
+
 export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 111, floor: 1, biome: "drainage", role: "normal", randomEncounter: true, stages: [PRACTICE_SELECT] },
   { monsterId: 211, floor: 1, biome: "slime-pool", role: "normal", randomEncounter: true, stages: [PRACTICE_WHERE] },
@@ -553,6 +979,16 @@ export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 1710, floor: 2, biome: "forest", role: "mini-elite", randomEncounter: true, stages: [FOREST_JOIN, FOREST_JOIN_CORE] },
   { monsterId: 1810, floor: 2, biome: "lake", role: "area-boss", randomEncounter: false, stages: [LAKE_BOSS_SCAN, LAKE_BOSS_SORT] },
   { monsterId: 1911, floor: 2, biome: "swamp", role: "area-boss", randomEncounter: false, stages: [FROG_BOSS_LEFT, FROG_BOSS_DISTINCT] },
+  { monsterId: 7, floor: 3, biome: "bone-yard", role: "normal", randomEncounter: true, stages: [PRACTICE_BONE] },
+  { monsterId: 8, floor: 3, biome: "grave-mire", role: "normal", randomEncounter: true, stages: [PRACTICE_ZOMBIE] },
+  { monsterId: 9, floor: 3, biome: "spirit-crypt", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_SPIRIT, PRACTICE_SPIRIT_CORE] },
+  { monsterId: 10, floor: 3, biome: "spirit-crypt", role: "normal", randomEncounter: true, stages: [PRACTICE_WRAITH] },
+  { monsterId: 11, floor: 3, biome: "spirit-crypt", role: "area-boss", randomEncounter: false, stages: [GRAVE_BOSS_SCAN, GRAVE_BOSS_CORE] },
+  { monsterId: 18, floor: 4, biome: "fire-forge", role: "normal", randomEncounter: true, stages: [PRACTICE_FIRE] },
+  { monsterId: 19, floor: 4, biome: "frost-vault", role: "normal", randomEncounter: true, stages: [PRACTICE_ICE] },
+  { monsterId: 20, floor: 4, biome: "storm-core", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_STORM, PRACTICE_STORM_CORE] },
+  { monsterId: 21, floor: 4, biome: "storm-core", role: "normal", randomEncounter: true, stages: [PRACTICE_SPARK] },
+  { monsterId: 22, floor: 4, biome: "fire-forge", role: "area-boss", randomEncounter: false, stages: [FORGE_BOSS_SCAN, FORGE_BOSS_CORE] },
 ] as const;
 
 export const BIOME_PRACTICE_STAGES: Readonly<Record<number, readonly LessonStageDefinition[]>> =
@@ -583,14 +1019,19 @@ export function weightedBiomeEncounterIds(
     encounter.biome === biome &&
     encounter.randomEncounter &&
     unlockedLessons.has(
-      [...FLOOR_ONE_BIOME_MONSTERS, ...FLOOR_TWO_BIOME_MONSTERS]
+      [
+        ...FLOOR_ONE_BIOME_MONSTERS,
+        ...FLOOR_TWO_BIOME_MONSTERS,
+        ...FLOOR_THREE_BIOME_MONSTERS,
+        ...FLOOR_FOUR_BIOME_MONSTERS,
+      ]
         .find((monster) => monster.id === encounter.monsterId)?.lessonId ?? "select",
     )
   ));
   const normal = available.filter((encounter) => encounter.role === "normal");
   const elites = available.filter((encounter) => encounter.role === "mini-elite");
   if (normal.length === 0) return [];
-  const eliteShare = floor === 1 ? 5 : 7;
+  const eliteShare = floor === 1 ? 5 : floor === 2 ? 7 : floor === 3 ? 9 : 11;
   const normalCopies = Math.max(1, Math.floor((100 - eliteShare) / normal.length));
   const eliteCopies = elites.length === 0 ? 0 : Math.max(1, Math.floor(eliteShare / elites.length));
   return [

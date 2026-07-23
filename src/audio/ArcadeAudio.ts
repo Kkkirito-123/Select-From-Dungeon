@@ -214,7 +214,7 @@ export const ARCADE_MUSIC_CREDITS = [
 
 function playlistFor(
   mode: ArcadeMusicMode,
-  floor: 1 | 2,
+  floor: 1 | 2 | 3 | 4,
 ): readonly MusicPattern[] {
   if (floor === 1) return FLOOR_ONE_PLAYLISTS[mode];
   if (mode === "combat") return FLOOR_TWO_COMBAT_PLAYLIST;
@@ -268,7 +268,7 @@ export class ArcadeAudio {
   private nextMusicStepAt = 0;
   private musicStep = 0;
   private activeTrackIndex = 0;
-  private floorValue: 1 | 2 = 1;
+  private floorValue: 1 | 2 | 3 | 4 = 1;
   private completedTrackCycles = 0;
   private readonly musicSources = new Set<AudioScheduledSourceNode>();
   private readonly sfxSources = new Set<AudioScheduledSourceNode>();
@@ -406,7 +406,7 @@ export class ArcadeAudio {
     this.restartMusicPlaylist();
   }
 
-  setFloor(floor: 1 | 2): void {
+  setFloor(floor: 1 | 2 | 3 | 4): void {
     if (this.floorValue === floor || this.disposed) return;
     this.floorValue = floor;
     this.restartMusicPlaylist();
