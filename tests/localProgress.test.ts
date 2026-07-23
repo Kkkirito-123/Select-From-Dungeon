@@ -111,7 +111,7 @@ function expectRunRejected(storage: MemoryStorage, run: SavedRun): void {
 }
 
 describe("localProgress", () => {
-  it("v8 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫、篝火、背包和答题状态", () => {
+  it("v9 Run 与永久 Profile 使用独立 key 并能完整恢复八层骨架、迷宫、篝火、背包和答题状态", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "storage-seed");
     const saved = session.toSavedRun();
@@ -121,7 +121,7 @@ describe("localProgress", () => {
     saveRun(storage, saved);
     saveProfile(storage, profile);
 
-    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v8");
+    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v9");
     expect(PROFILE_SAVE_KEY).toBe("select-from-dungeon:profile:v2");
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(true);
     expect(storage.values.has(PROFILE_SAVE_KEY)).toBe(true);
@@ -131,6 +131,7 @@ describe("localProgress", () => {
     expect(loaded?.worldActors).toEqual(saved.worldActors);
     expect(loaded?.groundItems).toEqual(saved.groundItems);
     expect(loaded?.campfires).toEqual(saved.campfires);
+    expect(loaded?.campaign).toEqual(saved.campaign);
     expect(loaded?.lootBundles).toEqual(saved.lootBundles);
     expect(loaded?.equipmentInventory).toEqual(saved.equipmentInventory);
     expect(loaded?.consumables).toEqual(saved.consumables);
@@ -148,7 +149,7 @@ describe("localProgress", () => {
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
   });
 
-  it("旧 run:v1/v2 不读取，也不会被 v8 清理动作删除", () => {
+  it("旧 run:v1/v2 不读取，也不会被 v9 清理动作删除", () => {
     const storage = new MemoryStorage();
     const legacyKey = "select-from-dungeon:run:v1";
     const legacyRun = {
@@ -163,6 +164,7 @@ describe("localProgress", () => {
     expect(loadRun(storage)).toBeNull();
     expect(storage.readKeys).toEqual([
       RUN_SAVE_KEY,
+      "select-from-dungeon:run:v8",
       "select-from-dungeon:run:v7",
       "select-from-dungeon:run:v6",
       "select-from-dungeon:run:v5",
@@ -175,7 +177,7 @@ describe("localProgress", () => {
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
 
-  it("战斗中的房间、玩家与 Actor 状态也能通过 v8 恢复", () => {
+  it("战斗中的房间、玩家与 Actor 状态也能通过 v9 恢复", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "combat-restore");
     const selectRoom = session.snapshot().roomGraph.nodes.find((node) => (
@@ -201,7 +203,7 @@ describe("localProgress", () => {
     expect(new GameSession(loaded).snapshot().combat).toEqual(saved.combat);
   });
 
-  it("非空篝火菜单、复活点与死亡复盘能通过 v8 完整恢复", () => {
+  it("非空篝火菜单、复活点与死亡复盘能通过 v9 完整恢复", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "campfire-state-roundtrip");
     completeSelect(session);
@@ -262,7 +264,7 @@ describe("localProgress", () => {
     expect(new GameSession(deathReviewRun).snapshot().battleReview).toHaveLength(2);
   }, 15_000);
 
-  it("v8 能恢复由迷宫派生的死路补给状态而无需重复保存引导方案", () => {
+  it("v9 能恢复由迷宫派生的死路补给状态而无需重复保存引导方案", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "guided-cache-roundtrip");
     const cache = session.snapshot().guidedMap.deadEndCaches[0];
@@ -287,7 +289,34 @@ describe("localProgress", () => {
     expect(restored.monsters.find((monster) => monster.id === 101)?.name).toBe("史莱姆");
   });
 
-  it("当前 v7 Run 会迁移到 v8 背包结构，且不会删除原始存档", () => {
+  it("当前 v8 Run 会迁移到 v9 八层框架，且不会删除原始存档", () => {
+    const storage = new MemoryStorage();
+    const current = freshRun("migrate-run-v8");
+    const { campaign: _campaign, ...legacyFields } = current;
+    storage.setItem("select-from-dungeon:run:v8", JSON.stringify({
+      ...legacyFields,
+      version: 8,
+    }));
+
+    const migrated = loadRun(storage);
+
+    expect(migrated).toMatchObject({
+      version: 9,
+      floor: 1,
+      graph: { seed: "migrate-run-v8" },
+      campaign: {
+        version: 1,
+        baseSeed: "migrate-run-v8",
+        currentFloor: 1,
+        status: "active",
+      },
+    });
+    expect(migrated?.campaign.floors).toHaveLength(8);
+    expect(storage.values.has("select-from-dungeon:run:v8")).toBe(true);
+    expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
+  });
+
+  it("当前 v7 Run 会迁移到 v9 背包和八层框架，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v7");
     const {
@@ -297,6 +326,7 @@ describe("localProgress", () => {
       consumables: _consumables,
       keyItems: _keyItems,
       acquiredUniqueItemIds: _acquiredUniqueItemIds,
+      campaign: _campaign,
       player: currentPlayer,
       ...legacyFields
     } = current;
@@ -313,7 +343,8 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 8,
+      version: 9,
+      campaign: { currentFloor: 1, status: "active" },
       activeLootBundleId: null,
       lootBundles: [],
       equipmentInventory: [],
@@ -327,13 +358,14 @@ describe("localProgress", () => {
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
 
-  it("当前 v6 Run 会生成三处篝火并迁移到 v8，且不会删除原始存档", () => {
+  it("当前 v6 Run 会生成三处篝火并迁移到 v9，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v6");
     const {
       campfires: _campfires,
       activeCampfireId: _activeCampfireId,
       respawnCampfireId: _respawnCampfireId,
+      campaign: _campaign,
       ...legacyFields
     } = current;
     storage.setItem("select-from-dungeon:run:v6", JSON.stringify({
@@ -343,7 +375,7 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 8,
+      version: 9,
       activeCampfireId: null,
       respawnCampfireId: null,
       graph: { seed: "migrate-run-v6" },
@@ -369,6 +401,7 @@ describe("localProgress", () => {
       campfires: _campfires,
       activeCampfireId: _activeCampfireId,
       respawnCampfireId: _respawnCampfireId,
+      campaign: _campaign,
       ...legacyFields
     } = current;
     storage.setItem("select-from-dungeon:run:v6", JSON.stringify({
@@ -393,7 +426,7 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 8,
+      version: 9,
       currentRoomId: checkpoint.roomNodeId,
       player: checkpoint.restPosition,
       activeCampfireId: null,
@@ -412,6 +445,7 @@ describe("localProgress", () => {
       campfires: _campfires,
       activeCampfireId: _activeCampfireId,
       respawnCampfireId: _respawnCampfireId,
+      campaign: _campaign,
       ...legacyFields
     } = current;
     storage.setItem("select-from-dungeon:run:v6", JSON.stringify({
@@ -427,7 +461,7 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 8,
+      version: 9,
       mode: "explore",
       currentRoomId: current.graph.entryId,
       player: {
@@ -440,7 +474,7 @@ describe("localProgress", () => {
     });
   });
 
-  it("当前 v5 Run 会迁移到 v8，且不会删除原始存档", () => {
+  it("当前 v5 Run 会迁移到 v9，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v5");
     const {
@@ -450,6 +484,7 @@ describe("localProgress", () => {
       answerHistory: _answerHistory,
       battleSequence: _battleSequence,
       reviewBattleId: _reviewBattleId,
+      campaign: _campaign,
       ...legacyFields
     } = current;
     storage.setItem("select-from-dungeon:run:v5", JSON.stringify({
@@ -459,7 +494,7 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 8,
+      version: 9,
       activeCampfireId: null,
       respawnCampfireId: null,
       answerHistory: [],
@@ -472,7 +507,7 @@ describe("localProgress", () => {
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   }, 15_000);
 
-  it("当前 v4 Run 会迁移到 v8，且不会删除原始存档", () => {
+  it("当前 v4 Run 会迁移到 v9，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v4");
     const {
@@ -484,6 +519,7 @@ describe("localProgress", () => {
       answerHistory: _answerHistory,
       battleSequence: _battleSequence,
       reviewBattleId: _reviewBattleId,
+      campaign: _campaign,
       ...legacyFields
     } = current;
     const legacy = { ...legacyFields, version: 4 };
@@ -491,7 +527,7 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 8,
+      version: 9,
       activeCampfireId: null,
       respawnCampfireId: null,
       openedGateIds: [],
@@ -596,6 +632,17 @@ describe("localProgress", () => {
       victories: -1,
     }));
     expect(loadProfile(storage)).toEqual(createEmptyProfile());
+  });
+
+  it("八层骨架与当前物理楼层不一致时拒绝恢复", () => {
+    const storage = new MemoryStorage();
+    const wrongFloor = freshRun("broken-campaign-floor");
+    wrongFloor.campaign.currentFloor = 2;
+    expectRunRejected(storage, wrongFloor);
+
+    const duplicateActive = freshRun("broken-campaign-status");
+    duplicateActive.campaign.floors[1].status = "active";
+    expectRunRejected(storage, duplicateActive);
   });
 
   it("答题历史损坏或超出查询序号时拒绝恢复整个 Run", () => {

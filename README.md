@@ -19,6 +19,11 @@ and turn the correct result into an animated attack.
   mazes. Each uses twelve 16x16 technical partitions and extra loops to reduce
   dead-end backtracking. Floor one is a stone castle; floor two becomes the
   deep-blue, cyan, and violet Thunder Sonata Tower.
+- The header now shows the current slot out of eight. A validated campaign
+  scaffold defines all eight ordered floor seeds, curriculum prerequisites,
+  exercise tiers, encounter roles, themes, and content pools. Only floors one
+  and two are executable in v0.6; slots three through eight are contracts for
+  later versions rather than placeholder gameplay.
 - Collecting the first Boss key shows a gold
   `FLOOR 01 CLEARED / CONGRATULATIONS!!` transition for approximately 1.5
   seconds and automatically enters floor two—no extra pathfinding, `E` press,
@@ -192,6 +197,8 @@ press `E` to process its items.
 AppShell ── HUD, discovery minimap, onboarding, terminal, query evidence
     │
 GameSession ── authoritative physical world, actors, fog, combat, loot, profile
+  ├─ FloorContracts ── validated eight-floor curriculum and content schema
+  ├─ CampaignDomain ── ordered eight-floor slots and transition invariants
   ├─ RunGraph ── curriculum dependencies and point-of-interest gates
   ├─ MazeGenerator/MazeFloor ── seeded 64x48 physical maze
   ├─ MazeValidation ── topology, reachability, and save invariants
@@ -212,7 +219,10 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   └─ OnboardingController ── separately persisted progressive guide
 ```
 
-`RunGraph` is the curriculum dependency graph; it does not move the player.
+`FloorContracts` defines the future eight-floor curriculum and content boundary,
+while `CampaignDomain` serializes deterministic ordered slots and rejects
+skips, duplicate activation, or rerolled floor seeds. `RunGraph` remains the
+currently executable two-floor dependency graph; it does not move the player.
 `MazeFloor` is the physical world. The discovery minimap is a read-only view of
 exploration, while movement, same-tile encounters, pickups, and gates are
 resolved by `GameSession` against the maze.
@@ -231,8 +241,9 @@ I/O heat are SQLite teaching signals, not evidence about the MySQL optimizer.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v8`: disposable current Run, including the current
-  floor, generated maze, world actors, ground items, pending loot bundles,
+- `select-from-dungeon:run:v9`: disposable current Run, including the
+  deterministic eight-floor campaign scaffold, current executable floor,
+  generated maze, world actors, ground items, pending loot bundles,
   equipment inventory, armor/armor HP, consumables, unique-item history, key
   items, discovered fog cells, three campfires, the active checkpoint, HP,
   level/XP, encounter meter, relics, combat progress, opened challenge gates,
@@ -244,10 +255,11 @@ Browser-local storage is split into:
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-A valid `run:v7` is migrated in memory into v8 with empty inventory/loot state
-and currently equipped gear registered. Valid `run:v6`, `run:v5`, and `run:v4`
-data continue through the existing migrations before v8. Legacy keys are not
-deleted; earlier Run keys remain unread. A valid `profile:v1` migrates to v2,
+A valid `run:v8` is migrated in memory into v9 with deterministic eight-floor
+slots. A valid `run:v7` then receives empty inventory/loot state and registered
+equipped gear; valid `run:v6`, `run:v5`, and `run:v4` continue through the
+existing migrations before v9. Legacy keys are not deleted; earlier Run keys
+remain unread. A valid `profile:v1` migrates to v2,
 preserving first-floor mastery while adding second-floor counters. Snapshot
 persistence is debounced in `src/main.ts` so movement and patrol updates do not
 force a synchronous storage write for every emitted state.
@@ -311,6 +323,12 @@ the inventory exposed the separate non-slot key section, the document stayed at
 zero warnings and errors. Guaranteed-key pickup, permanent opening, two-way
 travel, reload restoration, zero empty dead ends, and the 18-step marker bound
 are covered by domain/storage automation rather than a complete manual Run.
+The v0.6.0 browser pass verified `01 / 08` at desktop and 390×844, moved once,
+reloaded, and recovered the same Seed plus the increased discovered-cell count
+from `run:v9`. The narrow document remained `390 / 390 px`, with zero console
+warnings or errors. Sequential floor-shell transitions through floor eight and
+rejection of malformed campaign/content data are domain/storage evidence, not
+playable third-through-eighth-floor browser evidence.
 Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,

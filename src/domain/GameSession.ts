@@ -70,6 +70,12 @@ import {
   type GuidedMapPlan,
 } from "./guidedMap";
 import { rollLootItems } from "./lootDirector";
+import {
+  advanceCampaignProgress,
+  cloneCampaignProgress,
+  createCampaignProgress,
+  type CampaignProgress,
+} from "./campaign";
 import { MAX_ANSWER_HISTORY } from "./types";
 import type {
   AnswerAttemptRecord,
@@ -314,6 +320,7 @@ function initialGroundItems(graph: RoomGraph, floor: MazeFloor): GroundItem[] {
 }
 
 export class GameSession {
+  private campaign: CampaignProgress;
   private floorNumber: FloorNumber = 1;
   private graph: RoomGraph;
   private mazeFloor: MazeFloor;
@@ -362,6 +369,7 @@ export class GameSession {
     seed = "sql-castle-demo",
   ) {
     this.profile = cloneProfile(profile ?? emptyProfile());
+    this.campaign = createCampaignProgress(seed);
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);
     this.campfires = generateCampfires(this.graph, this.mazeFloor);
@@ -388,7 +396,8 @@ export class GameSession {
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
 
-    if (savedRun?.version === 8 && savedRun.generatorVersion === 4) {
+    if (savedRun?.version === 9 && savedRun.generatorVersion === 4) {
+      this.campaign = cloneCampaignProgress(savedRun.campaign);
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
       this.mazeFloor = cloneMazeFloor(savedRun.mazeFloor);
@@ -527,6 +536,7 @@ export class GameSession {
 
     return {
       mode: this.mode,
+      campaign: cloneCampaignProgress(this.campaign),
       lessonId: lesson.id,
       lessonStageId: stage.id,
       lessonStageIndex: stageIndex,
@@ -604,8 +614,9 @@ export class GameSession {
 
   toSavedRun(): SavedRun {
     return {
-      version: 8,
+      version: 9,
       generatorVersion: 4,
+      campaign: cloneCampaignProgress(this.campaign),
       floor: this.floorNumber,
       graph: cloneGraph(this.graph),
       mazeFloor: cloneMazeFloor(this.mazeFloor),
@@ -1606,7 +1617,11 @@ export class GameSession {
 
   advanceFloor(): boolean {
     if (this.mode !== "transition" || this.floorNumber !== 1) return false;
-    const nextSeed = `${this.graph.seed}:floor-2`;
+    const transition = advanceCampaignProgress(this.campaign);
+    if (!transition.ok || transition.to !== 2) return false;
+    this.campaign = transition.progress;
+    const nextSeed = this.campaign.floors.find((slot) => slot.floor === 2)?.seed;
+    if (!nextSeed) return false;
     this.floorNumber = 2;
     this.graph = generateRoomGraph(nextSeed, 2);
     this.mazeFloor = generateMazeFloor(this.graph);
@@ -1654,6 +1669,7 @@ export class GameSession {
   }
 
   reset(seed = `${this.graph.seed}-next`): void {
+    this.campaign = createCampaignProgress(seed);
     this.floorNumber = 1;
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);

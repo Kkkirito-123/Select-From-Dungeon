@@ -50,6 +50,9 @@ SQL、明确参考 SQL、结果分类、提示等级和战斗结果；最多保�
 怪物显示名必须直白且容易输入：统一使用“史莱姆”“幻影”“幼龙”这类二到三个汉字，
 不得添加间隔点称号或 SQL 概念后缀。未来扩展楼层也遵守同一规则；SQL 含义放在字段、任务与
 遭遇机制中，不塞进显示名。
+`v0.6` Campaign 框架已经定义并校验未来八层的有序课程先修、三种题阶、五类遭遇角色、
+主题/拓扑、怪物/装备/掉落池、确定结业奖励与执行证据边界。当前真正可玩的内容仍是前两层；
+其余六个存档槽只是后续实现骨架，不代表已经可以游玩。
 
 当前明确不包含 AI 生成、账号、排行榜、多人、服务端数据库，也不宣称完整模拟 MySQL 优化器
 或 InnoDB 运行时。生态专属掉落池及第三至八层尚未实现。种子随机化物理迷宫、非关键房间奖励
@@ -65,7 +68,9 @@ index.html -> src/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
   -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
+  -> FloorContracts（八层课程、遭遇、主题与掉落 Schema）
   -> GameSession（权威迷宫、战斗、掉落、答题记录和永久档案）
+  -> CampaignDomain（有序八层槽位与换层不变量）
   -> RunGraph（课程依赖与兴趣点图）
   -> MazeGenerator/MazeValidation（确定性 64×48 物理世界）
   -> CampfireDomain（每层三个稳定复活点与共享安全格掩码）
@@ -85,7 +90,7 @@ index.html -> src/main.ts
 玩家 SQL -> 只读策略 -> SQLite 结果 + EXPLAIN QUERY PLAN
   -> 结果语义 + 关卡知识锁校验 -> 正确时自动攻击 / 错误时怪物反击
   -> 同步 GameSession 与 SQLite HP -> 刷新 Phaser/UI
-  -> 防抖写入 v8 Run 存档 + 永久 v2 Profile 存档
+  -> 防抖写入 v9 Run 存档 + 永久 v2 Profile 存档
 ```
 
 `GameSession` 是物理移动、篝火/复活点、安全区、遭遇计量、课程、演员、迷雾、战斗、生命、
@@ -113,6 +118,9 @@ MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确
 `src/content/inventoryCatalog.ts` 负责背包容量、当前武器/防具/恢复品目录和分层可选候选概率；
 `src/domain/lootDirector.ts` 负责确定性独立判定、阶级最低掉落、同场去重、唯一装备转换与
 三件上限。
+`src/content/floorContracts.ts` 是未来八层内容的权威 Schema；`src/domain/campaign.ts` 负责
+可序列化的有序楼层槽位，必须拒绝跳层、重复激活与 Seed 重抽。八层骨架不得把尚未实现的楼层
+静默套用第二层内容。
 
 ## 仓库地图
 
@@ -166,15 +174,17 @@ python3 scripts/validate-rules.py
   `EXCEPT`；支持表别名限定列，也支持在 `HAVING` 中使用题目要求的 `total` 别名。
 - 当前 I/O 热量使用 SQLite `EXPLAIN QUERY PLAN`。这是 SQLite 证据，不是 MySQL 执行计划。
   后续 MySQL/InnoDB 概念必须明确标记为模拟，或使用另行隔离的真实后端。
-- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v8`（当前楼层、迷宫、演员、地面物品、
+- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v9`（八层 Campaign 槽位、当前楼层、
+  迷宫、演员、地面物品、
   战利品包、装备背包、护甲、恢复品、唯一物品记录、关键物品、迷雾、三个篝火、当前复活点、
   遭遇计量、等级/经验、已打开的挑战门/捷径/死路补给、当前机关题、最多 200 条本地作答记录与可丢弃的当前
   Run 状态）、
   `select-from-dungeon:profile:v2`
   （十项已掌握课程、练习次数、通关数、
   最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。有效的
-  `select-from-dungeon:run:v7` 会在内存中迁移为 v8，并补上空背包/战利品状态与当前已装备
-  物品记录；有效 `run:v6`、`run:v5` 和 `run:v4` 继续经过原有迁移后进入 v8。旧 Key 不删除；
+  有效 `select-from-dungeon:run:v8` 会在内存中迁移为 v9，并补上确定性的八层 Campaign
+  槽位；有效 `run:v7` 再补上空背包/战利品状态与当前已装备物品记录；有效 `run:v6`、
+  `run:v5` 和 `run:v4` 继续经过原有迁移后进入 v9。旧 Key 不删除；
   更旧 Run Key 不读取。
   有效的 `profile:v1` 会迁移为 v2。`src/main.ts` 对快照驱动的持久化进行
   防抖；改变结构时必须处理版本或恢复。

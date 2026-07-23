@@ -1,6 +1,7 @@
 # SQL Demon Castle Eight-Floor Curriculum Blueprint
 
-Status: **curriculum design baseline; not fully implemented**
+Status: **the eight-floor data contract is implemented in v0.6.0; only the
+first two floors currently have playable content**
 Target: staged expansion after the current two-floor MVP
 Primary users: SQL beginners, interview reviewers, level designers, and content maintainers
 

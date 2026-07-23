@@ -177,7 +177,7 @@ describe("v0.4 背包、护甲与战利品包", () => {
     expect(isSavedRun(session.toSavedRun())).toBe(true);
   });
 
-  it("未处理的掉落随 v8 Run 原样保存，刷新与死亡不会重新抽取", () => {
+  it("未处理的掉落随 v9 Run 原样保存，刷新与死亡不会重新抽取", () => {
     const run = runWithOpenLoot(armorLoot("stable-drop"));
     const first = new GameSession(run);
     first.closeLootBundle();
