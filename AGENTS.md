@@ -60,6 +60,7 @@ interview curriculum.
 ```text
 index.html -> src/main.ts
   -> AppShell (DOM HUD, discovery minimap, onboarding, SQL terminal, evidence)
+  -> SqlAutocomplete (visible-schema vocabulary, ranking, replacement, listbox)
   -> GameSession (authoritative maze, actors, fog, combat, loot, profile)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
@@ -106,6 +107,10 @@ the concept lock. Shared curriculum data and fixed drops live in
 `src/content/runContent.ts`; optional Boss-gate questions and semantic result
 contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
+`src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
+currently visible schema plus the MVP SQL vocabulary. It may replace only the
+active token after explicit keyboard or pointer acceptance; it must not generate
+a complete answer, submit a query, or bypass lesson evaluation.
 
 ## Repository Map
 
@@ -155,6 +160,12 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - The battle terminal accepts one `SELECT` statement. DML, DDL, `PRAGMA`,
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.
+- Both SQL textareas provide an IDE-like `PLAN ASSIST` listbox. Typing a prefix
+  opens ranked keyword, function, table, and field suggestions; `Ctrl/Command +
+  Space` opens contextual suggestions, arrows move selection, `Enter`/`Tab` or
+  pointer input accepts, and `Escape` dismisses suggestions before it closes the
+  terminal. Qualified aliases such as `m.` show only fields from the resolved
+  visible table. Accepting a suggestion never submits or counts as a query.
 - First-floor grading further limits answers to one flat `SELECT` without `OR`,
   subqueries, `UNION`, `INTERSECT`, or `EXCEPT`. Table-qualified columns and the
   required `total` alias in `HAVING` are supported.
