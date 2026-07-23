@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   createSeededRandom,
+  FLOOR_FOUR_LESSONS,
   FLOOR_ONE_LESSONS,
+  FLOOR_THREE_LESSONS,
   FLOOR_TWO_LESSONS,
   generateRoomGraph,
   stableStringHash,
@@ -83,6 +85,20 @@ describe("generateRoomGraph", () => {
     expect(byLesson.get("join-boss")?.prerequisiteLessons).toEqual(["left-join"]);
   });
 
+  it("第三、四层分别装入六组高级课程并保持独立种子图", () => {
+    const floorThree = generateRoomGraph("advanced-safe", 3);
+    const floorFour = generateRoomGraph("advanced-safe", 4);
+    expect(floorThree.nodes).toHaveLength(10);
+    expect(floorFour.nodes).toHaveLength(10);
+    expect(floorThree.nodes.map((node) => node.lessonId).filter(Boolean).sort())
+      .toEqual([...FLOOR_THREE_LESSONS].sort());
+    expect(floorFour.nodes.map((node) => node.lessonId).filter(Boolean).sort())
+      .toEqual([...FLOOR_FOUR_LESSONS].sort());
+    expect(floorThree.seed).toBe("advanced-safe");
+    expect(floorFour.seed).toBe("advanced-safe");
+    expect(floorThree.entryId).not.toBe(floorFour.entryId);
+  });
+
   it("WHERE 与 IS NULL 可自由选择，完成后才解锁 GROUP BY", () => {
     const graph = generateRoomGraph("free-order");
     const byLesson = new Map(
@@ -110,6 +126,14 @@ describe("generateRoomGraph", () => {
         errors: [],
       });
       expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 2))).toEqual({
+        valid: true,
+        errors: [],
+      });
+      expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 3))).toEqual({
+        valid: true,
+        errors: [],
+      });
+      expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 4))).toEqual({
         valid: true,
         errors: [],
       });

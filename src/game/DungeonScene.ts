@@ -97,6 +97,58 @@ const FLOOR_TWO_ZONE_COLORS: Record<MazeZone["type"], number> = {
   boss: 0x411b48,
 };
 
+const FLOOR_THREE_COLORS = {
+  void: 0x080706,
+  wall: 0x35302b,
+  wallTop: 0x726657,
+  floor: 0x25211f,
+  floorAlt: 0x302925,
+  line: 0x13100f,
+  query: 0xa8d7c2,
+  gold: 0xd5ba78,
+  ember: 0x9c5149,
+  paper: 0xeee6d1,
+  plum: 0x785c83,
+  fog: 0x050403,
+} as const;
+
+const FLOOR_THREE_ZONE_COLORS: Record<MazeZone["type"], number> = {
+  entry: 0x2b2924,
+  tutorial: 0x293630,
+  lesson: 0x322d35,
+  rest: 0x3b2921,
+  treasure: 0x38321f,
+  event: 0x2e2835,
+  elite: 0x44331f,
+  boss: 0x421f25,
+};
+
+const FLOOR_FOUR_COLORS = {
+  void: 0x09060a,
+  wall: 0x37233b,
+  wallTop: 0x8a5c84,
+  floor: 0x291a2d,
+  floorAlt: 0x332039,
+  line: 0x160d19,
+  query: 0x7ce4ed,
+  gold: 0xffc65c,
+  ember: 0xef604e,
+  paper: 0xfff1d8,
+  plum: 0x9b57bb,
+  fog: 0x050207,
+} as const;
+
+const FLOOR_FOUR_ZONE_COLORS: Record<MazeZone["type"], number> = {
+  entry: 0x2e2137,
+  tutorial: 0x233b45,
+  lesson: 0x3a2348,
+  rest: 0x43241d,
+  treasure: 0x493b20,
+  event: 0x2b2a4d,
+  elite: 0x552923,
+  boss: 0x571c27,
+};
+
 const BIOME_COLORS = {
   drainage: { floor: 0x203138, wall: 0x364a50, accent: 0x6d9da5 },
   "slime-pool": { floor: 0x21372f, wall: 0x344b3d, accent: 0x70c489 },
@@ -104,7 +156,27 @@ const BIOME_COLORS = {
   lake: { floor: 0x173b52, wall: 0x244e62, accent: 0x66c9e8 },
   swamp: { floor: 0x303b27, wall: 0x475136, accent: 0x91ad57 },
   forest: { floor: 0x17352b, wall: 0x284b39, accent: 0x62bd78 },
+  "bone-yard": { floor: 0x36312a, wall: 0x51493d, accent: 0xd8c89f },
+  "grave-mire": { floor: 0x2f3429, wall: 0x465044, accent: 0x9ab18b },
+  "spirit-crypt": { floor: 0x2d243d, wall: 0x493759, accent: 0xb88ad6 },
+  "fire-forge": { floor: 0x4a211c, wall: 0x682d24, accent: 0xff8c51 },
+  "frost-vault": { floor: 0x18384b, wall: 0x28556b, accent: 0x8cdef4 },
+  "storm-core": { floor: 0x282451, wall: 0x403a72, accent: 0xc58df4 },
 } as const;
+
+function colorsForFloor(floor: GameSnapshot["floor"]) {
+  if (floor === 2) return FLOOR_TWO_COLORS;
+  if (floor === 3) return FLOOR_THREE_COLORS;
+  if (floor === 4) return FLOOR_FOUR_COLORS;
+  return COLORS;
+}
+
+function zoneColorsForFloor(floor: GameSnapshot["floor"]): Record<MazeZone["type"], number> {
+  if (floor === 2) return FLOOR_TWO_ZONE_COLORS;
+  if (floor === 3) return FLOOR_THREE_ZONE_COLORS;
+  if (floor === 4) return FLOOR_FOUR_ZONE_COLORS;
+  return ZONE_COLORS;
+}
 
 const KEY_TO_DIRECTION: Record<string, Position> = {
   KeyW: { x: 0, y: -1 },
@@ -417,8 +489,8 @@ export class DungeonScene extends Phaser.Scene {
 
   private drawTerrain(): void {
     const floor = this.snapshot.mazeFloor;
-    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
-    const zoneColors = this.snapshot.floor === 2 ? FLOOR_TWO_ZONE_COLORS : ZONE_COLORS;
+    const colors = colorsForFloor(this.snapshot.floor);
+    const zoneColors = zoneColorsForFloor(this.snapshot.floor);
     this.cameras.main.setBackgroundColor(colors.void);
     for (let y = 0; y < floor.height; y += 1) {
       for (let x = 0; x < floor.width; x += 1) {
@@ -442,7 +514,7 @@ export class DungeonScene extends Phaser.Scene {
           this.terrain.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           this.terrain.lineStyle(1, colors.line, 0.48);
           this.terrain.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
-          if (this.snapshot.floor === 2 && (x + y) % 3 === 0) {
+          if (this.snapshot.floor > 1 && (x + y) % 3 === 0) {
             this.terrain.lineStyle(1, colors.query, 0.2);
             this.terrain.lineBetween(px + 5, py + TILE_SIZE / 2, px + TILE_SIZE - 5, py + TILE_SIZE / 2);
           }
@@ -450,7 +522,7 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    this.terrain.lineStyle(1, colors.query, this.snapshot.floor === 2 ? 0.2 : 0.08);
+    this.terrain.lineStyle(1, colors.query, this.snapshot.floor > 1 ? 0.2 : 0.08);
     for (let chunkX = 1; chunkX < floor.width / floor.chunkSize; chunkX += 1) {
       const x = chunkX * floor.chunkSize * TILE_SIZE;
       this.terrain.lineBetween(x, 0, x, floor.height * TILE_SIZE);
@@ -463,7 +535,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private drawSafeZones(): void {
-    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    const colors = colorsForFloor(this.snapshot.floor);
     safeZoneCellKeys(this.snapshot.mazeFloor, this.snapshot.campfires)
       .forEach((cell) => {
         const [x, y] = cell.split(":").map(Number);
@@ -472,7 +544,7 @@ export class DungeonScene extends Phaser.Scene {
         const py = y * TILE_SIZE;
         this.terrain.fillStyle(
           colors.query,
-          this.snapshot.floor === 2 ? 0.1 : 0.075,
+          this.snapshot.floor > 1 ? 0.1 : 0.075,
         );
         this.terrain.fillRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
         this.terrain.lineStyle(1, colors.query, 0.14);
@@ -481,12 +553,12 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private drawDecorations(): void {
-    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    const colors = colorsForFloor(this.snapshot.floor);
     this.snapshot.mazeFloor.decorations.forEach((decoration) => {
       const pixel = gridToPixels(decoration);
       const color: Record<MazeDecorationKind, number> = {
         torch: colors.gold,
-        rubble: this.snapshot.floor === 2 ? 0x664f9f : 0x505461,
+        rubble: colors.wallTop,
         rune: colors.query,
       };
       const size = decoration.kind === "torch" ? 5 : decoration.kind === "rune" ? 8 : 7;
@@ -537,6 +609,43 @@ export class DungeonScene extends Phaser.Scene {
         parts.push(
           this.add.rectangle(pixel.x, pixel.y + 4, 13, 4, 0x6a4932),
           this.add.triangle(pixel.x, pixel.y - 4, -5, 8, 0, -7, 5, 8, 0xd87b3f, 0.82),
+        );
+      } else if (feature.kind === "bones") {
+        parts.push(
+          this.add.rectangle(pixel.x - 4, pixel.y, 16, 4, 0xd7ccb0).setAngle(32),
+          this.add.rectangle(pixel.x + 5, pixel.y + 1, 14, 4, 0xbcae91).setAngle(-38),
+        );
+      } else if (feature.kind === "grave") {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y + 2, 13, 20, 0x655f58)
+            .setStrokeStyle(1, 0xa39b8c),
+          this.add.rectangle(pixel.x, pixel.y - 8, 8, 3, 0x918879),
+        );
+      } else if (feature.kind === "ghost-flame") {
+        parts.push(
+          this.add.ellipse(pixel.x, pixel.y + 3, 15, 9, 0x7250a1, 0.54),
+          this.add.triangle(pixel.x, pixel.y - 4, -6, 8, 0, -9, 6, 8, 0xb985dc, 0.85),
+        );
+      } else if (feature.kind === "lava") {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y + 2, 22, 8, 0x9d3124, 0.86)
+            .setStrokeStyle(1, 0xff7a3d),
+          this.add.rectangle(pixel.x + 4, pixel.y, 8, 2, 0xffc15b, 0.88),
+        );
+      } else if (feature.kind === "ice") {
+        parts.push(
+          this.add.polygon(
+            pixel.x,
+            pixel.y,
+            [0, -12, 8, -2, 5, 11, -6, 9, -9, -2],
+            0x75cbe8,
+            0.72,
+          ).setStrokeStyle(1, 0xc7f3ff),
+        );
+      } else if (feature.kind === "crystal") {
+        parts.push(
+          this.add.triangle(pixel.x - 4, pixel.y, -5, 9, 0, -12, 5, 9, 0x9d78dc, 0.9),
+          this.add.triangle(pixel.x + 5, pixel.y + 3, -4, 7, 0, -8, 4, 7, 0x6fdbe6, 0.86),
         );
       } else {
         parts.push(
@@ -602,7 +711,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private createShortcutViews(): void {
-    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    const colors = colorsForFloor(this.snapshot.floor);
     this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
       const views = [shortcut.entry, shortcut.exit].map((position) => {
         const pixel = gridToPixels(position);
@@ -631,7 +740,7 @@ export class DungeonScene extends Phaser.Scene {
   private createCampfireViews(): void {
     this.snapshot.campfires.forEach((campfire) => {
       const pixel = gridToPixels(campfire);
-      const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+      const colors = colorsForFloor(this.snapshot.floor);
       const container = this.add.container(pixel.x, pixel.y).setDepth(23);
       const checkpointRing = this.add.ellipse(
         0,
@@ -774,8 +883,14 @@ export class DungeonScene extends Phaser.Scene {
     const diamond = this.add.rectangle(0, 0, 12, 12, COLORS.query, 0.9)
       .setAngle(45)
       .setStrokeStyle(2, COLORS.paper, 0.9);
-    const label = this.add.text(0, -18, this.snapshot.floor === 2 ? "ORDER BY 信标" : "SELECT 信标", {
-      color: this.snapshot.floor === 2 ? "#9eeeff" : "#91e3d1",
+    const beaconLabels: Record<GameSnapshot["floor"], string> = {
+      1: "SELECT 信标",
+      2: "ORDER BY 信标",
+      3: "INNER JOIN 信标",
+      4: "SUBQUERY 信标",
+    };
+    const label = this.add.text(0, -18, beaconLabels[this.snapshot.floor], {
+      color: this.snapshot.floor === 1 ? "#91e3d1" : "#9eeeff",
       fontFamily: "monospace",
       fontSize: "8px",
       fontStyle: "bold",
@@ -815,6 +930,50 @@ export class DungeonScene extends Phaser.Scene {
         this.add.rectangle(-6, 1, 4, 4, 0x10141b),
         this.add.rectangle(7, 0, 4, 4, 0x10141b),
         ...crown,
+      ];
+    }
+    if (monster.kind === "skeleton" || monster.kind === "zombie") {
+      const bone = monster.kind === "skeleton" ? 0xd8cfb6 : 0x70805a;
+      return [
+        this.add.rectangle(0, 8, 25, 26, bone).setStrokeStyle(2, 0x403c35),
+        this.add.rectangle(0, -10, 25, 21, mixColor(bone, 0xffffff, 0.14)),
+        this.add.rectangle(-7, -12, 4, 5, 0x171414),
+        this.add.rectangle(7, -12, 4, 5, 0x171414),
+        this.add.rectangle(-11, 26, 6, 11, bone),
+        this.add.rectangle(11, 26, 6, 11, bone),
+      ];
+    }
+    if (monster.kind === "ghost" || monster.kind === "necromancer") {
+      const spirit = monster.kind === "necromancer" ? 0x68447d : 0x74558f;
+      return [
+        this.add.rectangle(0, 3, monster.kind === "necromancer" ? 38 : 30, 34, spirit, 0.92),
+        this.add.triangle(-10, 26, -7, 8, 0, -7, 7, 8, spirit, 0.92),
+        this.add.triangle(10, 26, -7, 8, 0, -7, 7, 8, spirit, 0.92),
+        this.add.rectangle(-7, -4, 4, 5, 0xcaf4e9),
+        this.add.rectangle(7, -4, 4, 5, 0xcaf4e9),
+        ...(monster.kind === "necromancer"
+          ? [this.add.triangle(0, -27, -14, 9, 0, -9, 14, 9, 0xc2a45c)]
+          : []),
+      ];
+    }
+    if (
+      monster.kind === "fire-spirit" ||
+      monster.kind === "ice-spirit" ||
+      monster.kind === "thunder-spirit" ||
+      monster.kind === "elemental-king"
+    ) {
+      const elementColor = monster.kind === "fire-spirit"
+        ? 0xe55b3f
+        : monster.kind === "ice-spirit"
+          ? 0x65bddd
+          : monster.kind === "thunder-spirit" ? 0x9b79dd : 0xd28a48;
+      const size = monster.kind === "elemental-king" ? 42 : 31;
+      return [
+        this.add.rectangle(0, 5, size, size, elementColor)
+          .setStrokeStyle(3, mixColor(elementColor, 0xffffff, 0.32)),
+        this.add.triangle(0, -18, -13, 10, 0, -12, 13, 10, elementColor, 0.94),
+        this.add.rectangle(-7, 1, 4, 5, 0xfaf5d8),
+        this.add.rectangle(7, 1, 4, 5, 0xfaf5d8),
       ];
     }
     if (monster.species.includes("frog")) {
@@ -974,7 +1133,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private syncGateViews(): void {
-    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    const colors = colorsForFloor(this.snapshot.floor);
     this.snapshot.mazeFloor.gates.forEach((gate) => {
       const view = this.gateViews.get(gate.id);
       if (!view) return;
@@ -1001,7 +1160,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private syncShortcutViews(): void {
-    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+    const colors = colorsForFloor(this.snapshot.floor);
     const discovered = new Set(this.snapshot.discoveredCells);
     this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
       const views = this.shortcutViews.get(shortcut.id);
@@ -1129,7 +1288,7 @@ export class DungeonScene extends Phaser.Scene {
       if (!view) {
         const pixel = gridToPixels(bundle);
         const container = this.add.container(pixel.x, pixel.y).setDepth(24);
-        const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+        const colors = colorsForFloor(this.snapshot.floor);
         const parts: Phaser.GameObjects.GameObject[] = [
           this.add.rectangle(0, 3, 28, 16, 0x8f6338)
             .setStrokeStyle(2, colors.gold),
@@ -1169,7 +1328,7 @@ export class DungeonScene extends Phaser.Scene {
     this.fog.clear();
     const discovered = new Set(this.snapshot.discoveredCells);
     const floor = this.snapshot.mazeFloor;
-    this.fog.fillStyle(this.snapshot.floor === 2 ? FLOOR_TWO_COLORS.fog : COLORS.fog, 0.94);
+    this.fog.fillStyle(colorsForFloor(this.snapshot.floor).fog, 0.94);
     for (let y = 0; y < floor.height; y += 1) {
       for (let x = 0; x < floor.width; x += 1) {
         if (discovered.has(`${x}:${y}`)) continue;

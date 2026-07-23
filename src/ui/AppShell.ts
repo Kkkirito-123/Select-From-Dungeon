@@ -446,7 +446,7 @@ export class AppShell {
                   <section class="terminal-editor">
                     <label class="sr-only" for="sql-editor">输入完整 SQL</label>
                     <div class="sql-editor-shell">
-                      <textarea id="sql-editor" spellcheck="false" autocomplete="off" placeholder="在这里完整写出 SELECT ... FROM ...;"></textarea>
+                      <textarea id="sql-editor" spellcheck="false" autocomplete="off" placeholder="在这里完整写出 SELECT ...；高级层可使用 WITH ...;"></textarea>
                       <div class="sql-assist-rail" aria-hidden="true">
                         <span>PLAN ASSIST / 查询提示</span>
                         <span data-assist-count>CTRL SPACE</span>
@@ -865,7 +865,7 @@ export class AppShell {
   private async executeQuery(): Promise<void> {
     if (this.busy) return;
     if (!this.textarea.value.trim()) {
-      const message = "先写一条完整 SELECT；空输入不会消耗回合。";
+      const message = "先写一条完整的只读 SELECT / WITH 查询；空输入不会消耗回合。";
       this.queryStatus.textContent = message;
       this.queryStatus.dataset.kind = "warning";
       this.showFeedbackNotice({ message, tone: "info" });
@@ -949,7 +949,7 @@ export class AppShell {
   private async executeGateChallenge(): Promise<void> {
     if (this.busy || !this.isGateTerminalOpen()) return;
     if (!this.gateTextarea.value.trim()) {
-      const message = "先写一条完整 SELECT；空输入不会触发机关反噬。";
+      const message = "先写一条完整的只读 SELECT / WITH 查询；空输入不会触发机关反噬。";
       this.gateQueryStatus.textContent = message;
       this.gateQueryStatus.dataset.kind = "warning";
       this.showFeedbackNotice({ message, tone: "info" });
@@ -1849,7 +1849,7 @@ export class AppShell {
       this.textarea.value = "";
       this.clearQueryArtifacts();
       this.queryStatus.textContent = enteredCombat
-        ? "怪物行动已预告。请从 SELECT 开始完整写出本回合 SQL。"
+        ? "怪物行动已预告。请完整写出本回合只读 SQL；第四层允许从 WITH 开始。"
         : "目标已经变化，请重新写一条完整 SQL。";
       this.queryStatus.dataset.kind = "";
     }
@@ -1953,13 +1953,14 @@ export class AppShell {
 
   private renderFloorTransition(snapshot: GameSnapshot): void {
     const portal = requiredElement<HTMLElement>(this.root, "#floor-portal");
-    const transitioning = snapshot.mode === "transition" && snapshot.floor === 1;
+    const transitioning = snapshot.mode === "transition" && snapshot.floor < 4;
     const dungeonCleared = snapshot.mode === "victory";
     portal.hidden = !transitioning && !dungeonCleared;
     if (transitioning) {
-      requiredElement(portal, "#floor-clear-title").textContent = "FLOOR 01 CLEARED";
+      requiredElement(portal, "#floor-clear-title").textContent =
+        `FLOOR ${String(snapshot.floor).padStart(2, "0")} CLEARED`;
       requiredElement(portal, "#floor-clear-copy").textContent =
-        "CONGRATULATIONS!! · 正在传送至第二层";
+        `CONGRATULATIONS!! · 正在传送至第 ${snapshot.floor + 1} 层`;
       this.hidePickupCard();
       this.hideCombatSettlement();
     } else if (dungeonCleared) {
@@ -1982,7 +1983,7 @@ export class AppShell {
     this.floorTransitionTimer = window.setTimeout(() => {
       this.floorTransitionTimer = null;
       const current = this.session.snapshot();
-      if (current.mode !== "transition" || current.floor !== 1) return;
+      if (current.mode !== "transition" || current.floor >= 4) return;
       if (!this.session.advanceFloor()) return;
       const nextSnapshot = this.session.snapshot();
       this.sql.reset(nextSnapshot.monsters);

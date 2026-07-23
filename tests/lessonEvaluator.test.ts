@@ -60,9 +60,9 @@ describe("课程文案", () => {
       ...LESSONS.flatMap((lesson) => lesson.stages),
       ...BIOME_ENCOUNTERS.flatMap((encounter) => encounter.stages),
     ];
-    expect(stages).toHaveLength(34);
+    expect(stages).toHaveLength(62);
     stages.forEach((stage) => {
-      expect(stage.answerSql).toMatch(/^SELECT\b/i);
+      expect(stage.answerSql).toMatch(/^(?:SELECT|WITH)\b/i);
       expect(stage.answerSql.endsWith(";")).toBe(true);
     });
   });
@@ -93,10 +93,43 @@ describe("课程文案", () => {
       1810: "湖怪",
       1900: "丛林王",
       1911: "蛙王",
+      1: "骷髅",
+      2: "僵尸",
+      3: "幽灵",
+      4: "铠骷髅",
+      5: "骨骑士",
+      7: "碎骨",
+      8: "腐尸",
+      9: "鬼火",
+      10: "游魂",
+      11: "墓主",
+      6: "死灵王",
+      12: "火灵",
+      13: "冰灵",
+      14: "雷灵",
+      15: "石巨人",
+      16: "炎王",
+      18: "火苗",
+      19: "冰晶",
+      20: "雷兽",
+      21: "电球",
+      22: "炉主",
+      17: "元素王",
     });
     expect(INITIAL_MONSTERS.every(
       (monster) => !monster.name.includes("·") && monster.name.length <= 3,
     )).toBe(true);
+  });
+
+  it("第三、四层面向玩家的怪物编号从 1 连续到 22", () => {
+    const advancedIds = INITIAL_MONSTERS
+      .filter((monster) => monster.floor === 3 || monster.floor === 4)
+      .map((monster) => monster.id)
+      .sort((left, right) => left - right);
+
+    expect(advancedIds).toEqual(
+      Array.from({ length: 22 }, (_, index) => index + 1),
+    );
   });
 
   it("WHERE 使用短怪物名，并按信息量从短提示推进到完整 SQL", () => {

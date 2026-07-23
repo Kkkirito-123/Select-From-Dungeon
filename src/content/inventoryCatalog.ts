@@ -16,18 +16,14 @@ import {
   AGGREGATE_HAMMER,
 } from "./mvpLevel";
 import { JOIN_CHAIN, SORT_SABER } from "./floor2Level";
+import { BONE_BLADE } from "./floor3Level";
+import { RUNE_STAFF } from "./floor4Level";
+
+export { BONE_BLADE, RUNE_STAFF };
 
 export const EQUIPMENT_CAPACITY = 12;
 export const CONSUMABLE_SLOT_CAPACITY = 3;
 export const CONSUMABLE_STACK_CAPACITY = 5;
-
-export const BONE_BLADE: Weapon = {
-  id: "bone-blade",
-  name: "骨剑",
-  damage: 16,
-  heatReduction: 0,
-  description: "来自下一层的稀有武器。提高伤害，但不会减少课程要求的正确作答次数。",
-};
 
 export const SLIME_SWORD: Weapon = {
   id: "slime-sword",
@@ -57,6 +53,18 @@ export const ARMORS: Readonly<Record<Armor["id"], Armor>> = {
     name: "藤甲",
     maxArmor: 1,
     description: "森林藤蔓编成的护甲，提供 1 点护甲生命。",
+  },
+  "bone-armor": {
+    id: "bone-armor",
+    name: "骨甲",
+    maxArmor: 2,
+    description: "墓城遗骨拼合的护甲，提供 2 点护甲生命。",
+  },
+  "rune-armor": {
+    id: "rune-armor",
+    name: "符文甲",
+    maxArmor: 2,
+    description: "元素符文稳定的护甲，提供 2 点护甲生命。",
   },
 };
 
@@ -89,6 +97,27 @@ export const CONSUMABLES: Readonly<Record<Consumable["id"], Consumable>> = {
     effect: "heal-both",
     amount: 1,
   },
+  "holy-water": {
+    id: "holy-water",
+    name: "圣水",
+    description: "驱散墓城寒意，恢复 1 点基础生命与 1 点护甲生命。",
+    effect: "heal-both",
+    amount: 1,
+  },
+  "fire-crystal": {
+    id: "fire-crystal",
+    name: "火晶",
+    description: "熔炉结晶，恢复 1 点基础生命。",
+    effect: "heal-hp",
+    amount: 1,
+  },
+  "ice-crystal": {
+    id: "ice-crystal",
+    name: "冰晶",
+    description: "寒霜结晶，恢复当前防具的全部护甲生命。",
+    effect: "heal-armor",
+    amount: 3,
+  },
   whetstone: {
     id: "whetstone",
     name: "磨刀石",
@@ -115,6 +144,7 @@ export const WEAPONS: Readonly<Record<Weapon["id"], Weapon>> = {
   "slime-sword": SLIME_SWORD,
   "hunter-bow": HUNTER_BOW,
   "bone-blade": BONE_BLADE,
+  "rune-staff": RUNE_STAFF,
 };
 
 export interface LootCandidate {
@@ -190,6 +220,12 @@ const BIOME_CONSUMABLE: Readonly<Record<BiomeKind, Consumable>> = {
   lake: CONSUMABLES["water-drop"],
   swamp: CONSUMABLES["frog-potion"],
   forest: CONSUMABLES["forest-fruit"],
+  "bone-yard": CONSUMABLES["holy-water"],
+  "grave-mire": CONSUMABLES["holy-water"],
+  "spirit-crypt": CONSUMABLES["repair-shard"],
+  "fire-forge": CONSUMABLES["fire-crystal"],
+  "frost-vault": CONSUMABLES["ice-crystal"],
+  "storm-core": CONSUMABLES["repair-shard"],
 };
 
 function roleProbability(
@@ -211,9 +247,16 @@ export function lootCandidatesForBiome(
   role: BiomeEncounterRole | "curriculum" | "floor-boss",
 ): LootCandidate[] {
   const consumable = BIOME_CONSUMABLE[biome];
-  const weapon = floor === 1 ? SLIME_SWORD : HUNTER_BOW;
-  const armor = floor === 1 ? ARMORS["slime-vest"] : ARMORS["vine-armor"];
-  const nextWeapon = floor === 1 ? SORT_SABER : BONE_BLADE;
+  const weapon = floor === 1
+    ? SLIME_SWORD
+    : floor === 2 ? HUNTER_BOW : floor === 3 ? BONE_BLADE : RUNE_STAFF;
+  const armor = floor === 1
+    ? ARMORS["slime-vest"]
+    : floor === 2 ? ARMORS["vine-armor"] : floor === 3
+      ? ARMORS["bone-armor"] : ARMORS["rune-armor"];
+  const nextWeapon = floor === 1
+    ? SORT_SABER
+    : floor === 2 ? BONE_BLADE : floor === 3 ? RUNE_STAFF : null;
   const candidates = [
     consumableCandidate(consumable, roleProbability(role, 0.06, 0.12, 0.24, 0.24)),
     consumableCandidate(
@@ -222,7 +265,12 @@ export function lootCandidatesForBiome(
     ),
     weaponCandidate(weapon, roleProbability(role, 0.0075, 0.03, 0.075, 0.075)),
     armorCandidate(armor, roleProbability(role, 0.005, 0.025, 0.075, 0.075)),
-    weaponCandidate(nextWeapon, roleProbability(role, 0.0025, 0.005, 0.01, 0.015)),
+    ...(nextWeapon
+      ? [weaponCandidate(
+        nextWeapon,
+        roleProbability(role, 0.0025, 0.005, 0.01, 0.015),
+      )]
+      : []),
   ];
   return candidates.map((candidate) => ({
     probability: candidate.probability,
@@ -238,7 +286,15 @@ export function lootCandidatesForBiome(
 }
 
 export function lootCandidatesForFloor(floor: FloorNumber): LootCandidate[] {
-  const candidates = floor === 1 ? FLOOR_ONE_CANDIDATES : FLOOR_TWO_CANDIDATES;
+  const candidates = floor === 1
+    ? FLOOR_ONE_CANDIDATES
+    : floor === 2
+      ? FLOOR_TWO_CANDIDATES
+      : lootCandidatesForBiome(
+        floor,
+        floor === 3 ? "bone-yard" : "fire-forge",
+        "normal",
+      );
   return candidates.map((candidate) => ({
     probability: candidate.probability,
     item: {

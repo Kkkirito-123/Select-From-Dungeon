@@ -23,7 +23,13 @@ export type BiomeFeatureKind =
   | "ember"
   | "water"
   | "reeds"
-  | "tree";
+  | "tree"
+  | "bones"
+  | "grave"
+  | "ghost-flame"
+  | "lava"
+  | "ice"
+  | "crystal";
 
 export interface BiomeRegion {
   id: string;
@@ -44,7 +50,7 @@ export interface BiomeFeature extends Position {
 export interface BiomePlan {
   version: 1;
   seed: string;
-  floor: 1 | 2;
+  floor: RoomGraph["floor"];
   regions: BiomeRegion[];
   features: BiomeFeature[];
 }
@@ -67,6 +73,25 @@ const FLOOR_TWO_TEMPLATES: readonly RegionTemplate[] = [
   { kind: "swamp", name: "毒雾泥沼", lessonId: "left-join", feature: "reeds" },
   { kind: "forest", name: "古树森林", lessonId: "join-boss", feature: "tree" },
 ];
+
+const FLOOR_THREE_TEMPLATES: readonly RegionTemplate[] = [
+  { kind: "bone-yard", name: "遗骨荒地", lessonId: "f3-inner", feature: "bones" },
+  { kind: "grave-mire", name: "腐土墓园", lessonId: "f3-chain", feature: "grave" },
+  { kind: "spirit-crypt", name: "幽火地宫", lessonId: "f3-union", feature: "ghost-flame" },
+];
+
+const FLOOR_FOUR_TEMPLATES: readonly RegionTemplate[] = [
+  { kind: "fire-forge", name: "烈焰熔炉", lessonId: "f4-cte", feature: "lava" },
+  { kind: "frost-vault", name: "寒霜冰库", lessonId: "f4-in", feature: "ice" },
+  { kind: "storm-core", name: "雷晶核心", lessonId: "f4-exists", feature: "crystal" },
+];
+
+const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTemplate[]>> = {
+  1: FLOOR_ONE_TEMPLATES,
+  2: FLOOR_TWO_TEMPLATES,
+  3: FLOOR_THREE_TEMPLATES,
+  4: FLOOR_FOUR_TEMPLATES,
+};
 
 function positionKey(position: Position): string {
   return `${position.x}:${position.y}`;
@@ -196,7 +221,7 @@ export function generateBiomePlan(
   campfires: readonly Campfire[],
   guidedMap: GuidedMapPlan,
 ): BiomePlan {
-  const templates = graph.floor === 1 ? FLOOR_ONE_TEMPLATES : FLOOR_TWO_TEMPLATES;
+  const templates = TEMPLATES_BY_FLOOR[graph.floor];
   const seed = `select-from-dungeon:biome:v1:floor-${graph.floor}:${graph.seed}`;
   const regions: BiomeRegion[] = templates.map((template, index) => {
     const node = graph.nodes.find((entry) => entry.lessonId === template.lessonId);
@@ -282,14 +307,14 @@ export function validateBiomePlan(
     errors.push("每个生态区域必须提供 14 个低成本地标。");
   }
   const bosses = plan.regions.filter((region) => region.areaBossId !== null);
-  if (graph.floor === 2 && (
-    bosses.length !== 2 ||
+  const expectedBosses = BIOME_ENCOUNTERS.filter((encounter) => (
+    encounter.floor === graph.floor && encounter.role === "area-boss"
+  ));
+  if (
+    bosses.length !== expectedBosses.length ||
     bosses.some((region) => region.areaBossPosition === null)
-  )) {
-    errors.push("第二层必须生成湖怪与蛙王两个可选区域首领。");
-  }
-  if (graph.floor === 1 && bosses.length !== 0) {
-    errors.push("第一层生态样板不生成区域首领。");
+  ) {
+    errors.push(`第 ${graph.floor} 层区域首领数量或位置无效。`);
   }
   return { valid: errors.length === 0, errors };
 }

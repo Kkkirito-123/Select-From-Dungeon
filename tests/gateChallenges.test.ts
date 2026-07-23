@@ -72,4 +72,34 @@ describe("high-difficulty gate challenges", () => {
     ]);
     expect(evaluateGateChallenge(2, result)).toMatchObject({ accepted: true });
   });
+
+  it("第三层要求三表连接，第四层要求 CTE 聚合", async () => {
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    const grave = engine.executeSelect(`
+      SELECT m.id, m.name, r.name AS room_name, g.power
+      FROM monsters m
+      INNER JOIN rooms r ON m.room_id = r.id
+      INNER JOIN monster_gear g ON m.id = g.monster_id
+      WHERE r.floor = 3 AND g.power >= 20
+      ORDER BY g.power DESC, m.id ASC
+      LIMIT 2
+    `);
+    expect(evaluateGateChallenge(3, grave)).toMatchObject({ accepted: true });
+
+    const forge = engine.executeSelect(`
+      WITH strong AS (
+        SELECT monster_id, MAX(power) AS max_power
+        FROM monster_gear
+        GROUP BY monster_id
+        HAVING MAX(power) >= 20
+      )
+      SELECT m.id, m.name, s.max_power
+      FROM monsters m
+      INNER JOIN strong s ON m.id = s.monster_id
+      WHERE m.room_id BETWEEN 51 AND 60
+      ORDER BY s.max_power DESC, m.id ASC
+      LIMIT 3
+    `);
+    expect(evaluateGateChallenge(4, forge)).toMatchObject({ accepted: true });
+  });
 });

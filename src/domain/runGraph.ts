@@ -14,13 +14,33 @@ export const FLOOR_TWO_LESSONS = [
   "join-boss",
 ] as const;
 
+export const FLOOR_THREE_LESSONS = [
+  "f3-inner",
+  "f3-left",
+  "f3-self",
+  "f3-chain",
+  "f3-union",
+  "f3-audit",
+] as const;
+
+export const FLOOR_FOUR_LESSONS = [
+  "f4-scalar",
+  "f4-in",
+  "f4-exists",
+  "f4-correlated",
+  "f4-cte",
+  "f4-recursive",
+] as const;
+
 export const REQUIRED_RUN_LESSONS = [
   ...FLOOR_ONE_LESSONS,
   ...FLOOR_TWO_LESSONS,
+  ...FLOOR_THREE_LESSONS,
+  ...FLOOR_FOUR_LESSONS,
 ] as const;
 
 export type RunLessonId = (typeof REQUIRED_RUN_LESSONS)[number];
-export type FloorNumber = 1 | 2;
+export type FloorNumber = 1 | 2 | 3 | 4;
 
 export type RoomType =
   | "entry"
@@ -39,6 +59,8 @@ export type RoomReward =
   | "aggregate-hammer"
   | "sort-saber"
   | "join-chain"
+  | "bone-blade"
+  | "rune-staff"
   | "restore-12-hp"
   | "restore-20-hp"
   | "cool-8-heat"
@@ -120,10 +142,25 @@ const REQUIRED_PREREQUISITES: Record<RunLessonId, readonly RunLessonId[]> = {
   "inner-join": ["distinct"],
   "left-join": ["inner-join"],
   "join-boss": ["left-join"],
+  "f3-inner": [],
+  "f3-left": ["f3-inner"],
+  "f3-self": ["f3-inner"],
+  "f3-chain": ["f3-left", "f3-self"],
+  "f3-union": ["f3-chain"],
+  "f3-audit": ["f3-union"],
+  "f4-scalar": [],
+  "f4-in": ["f4-scalar"],
+  "f4-exists": ["f4-in"],
+  "f4-correlated": ["f4-exists"],
+  "f4-cte": ["f4-correlated"],
+  "f4-recursive": ["f4-cte"],
 };
 
 export function lessonsForFloor(floor: FloorNumber): readonly RunLessonId[] {
-  return floor === 1 ? FLOOR_ONE_LESSONS : FLOOR_TWO_LESSONS;
+  if (floor === 1) return FLOOR_ONE_LESSONS;
+  if (floor === 2) return FLOOR_TWO_LESSONS;
+  if (floor === 3) return FLOOR_THREE_LESSONS;
+  return FLOOR_FOUR_LESSONS;
 }
 
 export function stableStringHash(value: string): number {
@@ -446,10 +483,218 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
   };
 }
 
+interface AdvancedFloorGraphConfig {
+  floor: 3 | 4;
+  defaultSeed: string;
+  entryTitle: string;
+  lessonIds: readonly [
+    RunLessonId,
+    RunLessonId,
+    RunLessonId,
+    RunLessonId,
+    RunLessonId,
+    RunLessonId,
+  ];
+  lessonTitles: readonly [string, string, string, string, string, string];
+  firstReward: "bone-blade" | "rune-staff";
+  sideTitles: readonly [string, string, string];
+}
+
+const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4, AdvancedFloorGraphConfig>> = {
+  3: {
+    floor: 3,
+    defaultSeed: "亡者墓城-第三层",
+    entryTitle: "墓城石门",
+    lessonIds: [
+      "f3-inner",
+      "f3-left",
+      "f3-self",
+      "f3-chain",
+      "f3-union",
+      "f3-audit",
+    ],
+    lessonTitles: [
+      "INNER JOIN 骨桥",
+      "LEFT JOIN 墓道",
+      "SELF JOIN 灵堂",
+      "多表连接 骑士墓",
+      "UNION 合葬厅",
+      "连接审计 死灵王",
+    ],
+    firstReward: "bone-blade",
+    sideTitles: ["守墓篝火", "遗骨宝库", "幽魂碑廊"],
+  },
+  4: {
+    floor: 4,
+    defaultSeed: "元素熔炉-第四层",
+    entryTitle: "熔炉升降台",
+    lessonIds: [
+      "f4-scalar",
+      "f4-in",
+      "f4-exists",
+      "f4-correlated",
+      "f4-cte",
+      "f4-recursive",
+    ],
+    lessonTitles: [
+      "标量子查询 火室",
+      "IN 子查询 冰库",
+      "EXISTS 雷池",
+      "相关子查询 石炉",
+      "WITH 符文环",
+      "递归 CTE 元素王",
+    ],
+    firstReward: "rune-staff",
+    sideTitles: ["熔炉篝火", "晶石宝库", "元素祭坛"],
+  },
+};
+
+function generateAdvancedFloorGraph(
+  rawSeed: string,
+  config: AdvancedFloorGraphConfig,
+): RoomGraph {
+  const seed = rawSeed.trim() || config.defaultSeed;
+  const random = createSeededRandom(
+    `select-from-dungeon:run-graph:v2:floor-${config.floor}:${seed}`,
+  );
+  const prefix = `floor-${config.floor}`;
+  const lessonRoomIds = config.lessonIds.map((_, index) => `${prefix}-lesson-${index + 1}`);
+  const sideIds = [`${prefix}-rest`, `${prefix}-treasure`, `${prefix}-event`] as const;
+  const sideOrder = shuffled(sideIds, random);
+  const laneById = new Map(sideOrder.map((id, index) => [id, index - 1] as const));
+  const [first, second, third, fourth, fifth, boss] = lessonRoomIds;
+  const firstExits = shuffled([second, third, ...sideIds], random);
+
+  const nodes: RoomNode[] = [
+    room({
+      id: `${prefix}-entry`,
+      type: "entry",
+      title: config.entryTitle,
+      depth: 0,
+      lane: 0,
+      required: true,
+      reward: null,
+      next: [first],
+    }),
+    room({
+      id: first,
+      type: "tutorial",
+      title: config.lessonTitles[0],
+      depth: 1,
+      lane: 0,
+      required: true,
+      lessonId: config.lessonIds[0],
+      reward: config.firstReward,
+      next: firstExits,
+    }),
+    room({
+      id: second,
+      type: "lesson",
+      title: config.lessonTitles[1],
+      depth: 2,
+      lane: -0.8,
+      required: true,
+      lessonId: config.lessonIds[1],
+      prerequisiteLessons: REQUIRED_PREREQUISITES[config.lessonIds[1]],
+      reward: "schema-shard",
+      next: config.floor === 3 ? [fourth] : [third],
+    }),
+    room({
+      id: third,
+      type: "lesson",
+      title: config.lessonTitles[2],
+      depth: 2,
+      lane: 0.8,
+      required: true,
+      lessonId: config.lessonIds[2],
+      prerequisiteLessons: REQUIRED_PREREQUISITES[config.lessonIds[2]],
+      reward: "hint-token",
+      next: [fourth],
+    }),
+    room({
+      id: fourth,
+      type: "lesson",
+      title: config.lessonTitles[3],
+      depth: 3,
+      lane: -0.4,
+      required: true,
+      lessonId: config.lessonIds[3],
+      prerequisiteLessons: REQUIRED_PREREQUISITES[config.lessonIds[3]],
+      reward: "elite-query-lens",
+      next: [fifth],
+    }),
+    room({
+      id: fifth,
+      type: "elite",
+      title: config.lessonTitles[4],
+      depth: 4,
+      lane: 0.4,
+      required: true,
+      lessonId: config.lessonIds[4],
+      prerequisiteLessons: REQUIRED_PREREQUISITES[config.lessonIds[4]],
+      reward: "elite-transaction-shield",
+      next: [boss],
+    }),
+    room({
+      id: boss,
+      type: "boss",
+      title: config.lessonTitles[5],
+      depth: 5,
+      lane: 0,
+      required: true,
+      lessonId: config.lessonIds[5],
+      prerequisiteLessons: REQUIRED_PREREQUISITES[config.lessonIds[5]],
+      reward: "floor-key",
+    }),
+    room({
+      id: sideIds[0],
+      type: "rest",
+      title: config.sideTitles[0],
+      depth: 2,
+      lane: laneById.get(sideIds[0]) ?? -1,
+      required: false,
+      prerequisiteLessons: [config.lessonIds[0]],
+      reward: pick(OPTIONAL_REWARDS.rest, random),
+      next: [second],
+    }),
+    room({
+      id: sideIds[1],
+      type: "treasure",
+      title: config.sideTitles[1],
+      depth: 3,
+      lane: laneById.get(sideIds[1]) ?? 0,
+      required: false,
+      prerequisiteLessons: [config.lessonIds[0]],
+      reward: pick(OPTIONAL_REWARDS.treasure, random),
+      next: [second],
+    }),
+    room({
+      id: sideIds[2],
+      type: "event",
+      title: config.sideTitles[2],
+      depth: 4,
+      lane: laneById.get(sideIds[2]) ?? 1,
+      required: false,
+      prerequisiteLessons: [config.lessonIds[0]],
+      reward: pick(OPTIONAL_REWARDS.event, random),
+      next: [second],
+    }),
+  ];
+
+  return {
+    version: 2,
+    floor: config.floor,
+    seed,
+    entryId: `${prefix}-entry`,
+    bossId: boss,
+    nodes,
+  };
+}
+
 export function generateRoomGraph(rawSeed: string, floor: FloorNumber = 1): RoomGraph {
-  return floor === 1
-    ? generateFloorOneGraph(rawSeed)
-    : generateFloorTwoGraph(rawSeed);
+  if (floor === 1) return generateFloorOneGraph(rawSeed);
+  if (floor === 2) return generateFloorTwoGraph(rawSeed);
+  return generateAdvancedFloorGraph(rawSeed, ADVANCED_FLOOR_CONFIG[floor]);
 }
 
 function reachableIds(startId: string, nodesById: Map<string, RoomNode>): Set<string> {
@@ -474,7 +719,10 @@ function hasPathToBoss(startId: string, bossId: string, nodesById: Map<string, R
 
 export function validateRoomGraph(graph: RoomGraph): RoomGraphValidation {
   const errors: string[] = [];
-  if (graph.version !== 2 || (graph.floor !== 1 && graph.floor !== 2)) {
+  if (
+    graph.version !== 2 ||
+    !([1, 2, 3, 4] as const).includes(graph.floor)
+  ) {
     errors.push("课程图版本或楼层无效。");
   }
   if (graph.nodes.length < 8 || graph.nodes.length > 10) {

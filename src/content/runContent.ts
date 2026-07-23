@@ -246,10 +246,22 @@ const REWARD_CATALOG: Partial<Record<RoomReward, ClaimableReward>> = {
     description: "领取第二层必修武器，用关系连接击穿 JOIN 守卫。",
     kind: "weapon",
   },
+  "bone-blade": {
+    id: "bone-blade",
+    name: "骨剑",
+    description: "领取第三层必修武器，用真实键关系击穿亡者护甲。",
+    kind: "weapon",
+  },
+  "rune-staff": {
+    id: "rune-staff",
+    name: "符文杖",
+    description: "领取第四层必修武器，把子查询结果转化为元素伤害。",
+    kind: "weapon",
+  },
   "floor-key": {
     id: "floor-key",
-    name: "第一层钥匙",
-    description: "魔王城第一层已经贯通。",
+    name: "本层钥匙",
+    description: "当前楼层已经贯通；拾取后结算本层进度。",
     kind: "key",
   },
 };
@@ -261,6 +273,32 @@ export function rewardDetails(reward: RoomReward | null): ClaimableReward | null
 }
 
 export function roomFlavor(type: RoomType, floor = 1): string {
+  if (floor === 4) {
+    const floorFourCopy: Record<RoomType, string> = {
+      entry: "熔炉升降台已经锁定本层 Seed。火、冰与雷晶区域等待探索。",
+      tutorial: "火室要求先让内层查询返回一个值，再由外层锁定目标。",
+      lesson: "元素记录藏在另一份结果集中。观察内外层的依赖方向。",
+      rest: "熔炉篝火稳定着元素流。靠近后按 E 休息或复盘。",
+      treasure: "晶石宝库提供构筑奖励，不改变子查询课程。",
+      event: "元素祭坛只影响当前 Run，不会更改必修数据。",
+      elite: "符文环要求把中间结果命名后再继续查询。",
+      boss: "元素王把主从链藏进递归 CTE。",
+    };
+    return floorFourCopy[type];
+  }
+  if (floor === 3) {
+    const floorThreeCopy: Record<RoomType, string> = {
+      entry: "墓城石门已经闭合。骨桥、墓园和幽火地宫由同一 Seed 固定。",
+      tutorial: "骷髅与墓室分属两张表，只有真实键关系能让骨桥成形。",
+      lesson: "亡者档案互相引用。别名、缺失匹配与多表链决定前路。",
+      rest: "守墓篝火驱散寒意。靠近后按 E 休息或复盘。",
+      treasure: "遗骨宝库提供构筑奖励，不替代 JOIN 练习。",
+      event: "幽魂碑廊只影响当前 Run，不改变必修关系。",
+      elite: "合葬厅要求把两条结果路径合并。",
+      boss: "死灵王正在审计整座墓城的关系与装备。",
+    };
+    return floorThreeCopy[type];
+  }
   if (floor === 2) {
     const floorTwoCopy: Record<RoomType, string> = {
       entry: "传送残响正在湖岸退去。森林、湖泊和泥沼会沿同一 Seed 重新分布。",

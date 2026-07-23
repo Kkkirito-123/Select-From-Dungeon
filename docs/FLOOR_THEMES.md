@@ -1,7 +1,7 @@
 # SQL Demon Castle Eight-Floor Map and Art Direction
 
-Status: **the eight-floor theme/topology contract and the first two floors'
-biome tiles are implemented in v0.7.0; floors three through eight are not**
+Status: **v0.8.0 implements the eight-floor theme/topology contract and biome
+tiles for floors one through four; floors five through eight are not implemented**
 Related curriculum: [Eight-floor curriculum blueprint](CURRICULUM.md)
 Primary users: players, level designers, pixel artists, and frontend implementers
 
@@ -28,12 +28,12 @@ Map variation must support learning:
 
 ### 2.1 Every floor changes five dimensions
 
-1. **Element**: fire, steam, lightning, mirror shadow, astral time, magma, data
+1. **Element**: fire, lake/swamp life, undead ghost flame, fire/frost/storm, astral time, magma, data
    life, and royal void.
-2. **Material**: stone, brass, suspended bridges, mirrors, observatory metal,
+2. **Material**: stone, wetland vegetation, graves and bones, lava and ice, observatory metal,
    black iron, roots and crystals, obsidian and gold.
-3. **Macro topology**: looped keep, converging clocktower, relational islands,
-   nested chambers, partition rings, rollback factory, B+ tree branches, and
+3. **Macro topology**: looped keep, wetland forest, grave-city paths,
+   elemental forge, partition rings, rollback factory, B+ tree branches, and
    throne ascent.
 4. **Landmarks**: the entry, lessons, shortcuts, preview gate, and Boss arena use
    floor-specific silhouettes.
@@ -62,9 +62,9 @@ A palette swap without structural change does not complete a floor theme.
 
 ```text
 Living fire
-  → mechanical heat
-  → relational lightning
-  → ghost mirror flame
+  → wetland life
+  → undead ghost flame
+  → fire, frost, and storm
   → starlight and time
   → magma and cooling
   → root and data life
@@ -81,8 +81,8 @@ persists without giving every floor the same meaning.
 |---|---|---|---|---|
 | 1 | Emberstone Keep | torches, embers, stone | broad corridors and short loops | semicircle brazier court |
 | 2 | Aggregate Clocktower | brass, gears, steam | central shaft and converging spokes | circular clock core |
-| 3 | Relational Bridgeworks | lightning, storms, bridges | relationship islands | three-platform core |
-| 4 | Mirrorveil Catacombs | mirrors, ghost flame, shadow | nested chambers | concentric mirror room |
+| 3 | Undead Grave City | bones, grave mire, ghost flame | grave-path loops | necromancer court |
+| 4 | Elemental Forge | lava, frost, storm crystal | three elemental regions | elemental throne |
 | 5 | Window Observatory | stars, wind, time rings | partitioned ring corridors | circular star chart |
 | 6 | Rollback Foundry | magma, black iron, coolant | production loops and savepoints | dual-state furnace |
 | 7 | Crystal Index Grove | roots, crystals, data flow | B+ tree branches | ancient root core |
@@ -130,50 +130,46 @@ The Boss room is a circular clock face. Group sectors light after reaching the
 `HAVING` threshold. Steam is event-triggered and short-lived rather than a
 continuous particle system.
 
-### Floor 3: Relational Bridgeworks
+### Floor 3: Undead Grave City
 
 **Curriculum**: joins and set operations.
-**Experience**: turn relationships between tables into physical bridges.
+**Experience**: trace one undead population through rooms, masters, and gear.
 
 | Dimension | Direction |
 |---|---|
-| Palette | deep navy, electric cyan, violet, rain gray, lightning white |
-| Materials | floating stone, metal bridges, insulators, storm clouds, relation nodes |
-| Topology | data islands connected by different bridge forms |
-| Ambient | two-frame arcs, distant rain lines, stepped bridge pulses |
-| Landmarks | monster, room, and gear islands; self-join mirror; set twin bridges |
-| Shortcut | a validated relationship makes its bridge permanently bidirectional |
-| Preview | nested rectangles appear under the bridge toward Floor 4 |
+| Palette | bone gray, grave green, ghost violet, old gold, stable cyan SQL accent |
+| Materials | bone piles, graves, mire, sarcophagus silhouettes, ghost lamps |
+| Topology | the low-cost 64x48 loop maze split into bone yard, grave mire, and spirit crypt |
+| Ambient | static bones/graves and low-frequency stepped ghost flames |
+| Landmarks | Bone Bridge, Empty-Armor Passage, Echo Hall, Knight Tomb, Burial Hall, Necromancer Court |
+| Shortcut | one guaranteed middle/rear key opens a permanent bidirectional route |
+| Preview | fire, frost, and storm emblems point toward Floor 4 |
 
-An `INNER JOIN` bridge needs both ends. A `LEFT JOIN` platform preserves the
-entire left island while showing a missing right segment. `UNION` uses two
-parallel bridges that converge. These metaphors supplement, never replace, the
-complete relationship fields in the terminal.
+The three regions use separate tile palettes, static pixel features, and undead
+encounter pools. A deeper red-brown Boss arena isolates the Necromancer. v0.8.0
+deliberately reuses the validated loop topology for navigation and performance;
+a stronger custom grave-city silhouette remains future art work.
 
-The Boss arena contains three platforms for rooms, monsters, and gear, joined
-into the Thunder Core.
-
-### Floor 4: Mirrorveil Catacombs
+### Floor 4: Elemental Forge
 
 **Curriculum**: subqueries, `EXISTS`, and CTEs.
-**Experience**: show a query inside another query without becoming an unfair
-nested maze.
+**Experience**: use three elemental regions for nested and recursive queries
+without making navigation harder than the SQL.
 
 | Dimension | Direction |
 |---|---|
-| Palette | ink black, deep violet, silver, ghost green, mirror blue |
-| Materials | black stone, broken mirrors, reflection tiles, crypt arches, ghost lamps |
-| Topology | larger chambers wrap smaller ones; every inner layer remains legible |
-| Ambient | two-frame mirror gleam, stepped ghost flames, static reflection patterns |
-| Landmarks | scalar mirror, null trap pool, existence gate, CTE archive ring |
-| Shortcut | clearing an inner query turns a mirror wall into an outer-route door |
-| Preview | mirrors form a window partition ring toward Floor 5 |
+| Palette | lava orange, frost blue, storm violet, dark iron, rune gold |
+| Materials | forge brick, ice sheets, crystal pillars, rune stone, elemental throne |
+| Topology | the low-cost loop maze split into fire forge, frost vault, and storm core |
+| Ambient | static lava, ice, and crystal with sparse stepped value changes |
+| Landmarks | Fire Chamber, Frost Vault, Storm Pool, Stone Forge, Rune Ring, Elemental Throne |
+| Shortcut | one guaranteed middle/rear key opens a permanent bidirectional route |
+| Preview | elemental runes form a window-partition ring toward Floor 5 |
 
-The Boss room uses three concentric rectangles. Each successful stage moves
-inward without requiring a walk through solved corridors.
-
-Mirror effects use alternate tiles and fixed highlights, not real-time
-reflection, blur, or post-processing.
+Each region has its own palette, elemental props, and encounter pool; the Boss
+arena uses a purple-red throne palette for the Element King. v0.8.0 adds no
+real-time lighting, heat distortion, reflections, blur, post-processing, or
+larger map.
 
 ### Floor 5: Window Observatory
 

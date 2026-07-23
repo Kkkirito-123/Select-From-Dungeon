@@ -12,8 +12,18 @@ import {
   FLOOR_TWO_MONSTERS,
 } from "./floor2Level";
 import {
+  FLOOR_THREE_LESSON_DEFINITIONS,
+  FLOOR_THREE_MONSTERS,
+} from "./floor3Level";
+import {
+  FLOOR_FOUR_LESSON_DEFINITIONS,
+  FLOOR_FOUR_MONSTERS,
+} from "./floor4Level";
+import {
   BIOME_PRACTICE_STAGES,
   FLOOR_ONE_BIOME_MONSTERS,
+  FLOOR_THREE_BIOME_MONSTERS,
+  FLOOR_FOUR_BIOME_MONSTERS,
   practiceStagesFor,
 } from "./biomeContent";
 import { sqlSchemaLine } from "./sqlSchema";
@@ -182,6 +192,10 @@ export const INITIAL_MONSTERS: readonly Monster[] = [
   },
   ...FLOOR_ONE_BIOME_MONSTERS,
   ...FLOOR_TWO_MONSTERS,
+  ...FLOOR_THREE_MONSTERS,
+  ...FLOOR_THREE_BIOME_MONSTERS,
+  ...FLOOR_FOUR_MONSTERS,
+  ...FLOOR_FOUR_BIOME_MONSTERS,
 ] as const;
 
 export const PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> = {
@@ -396,6 +410,8 @@ export const LESSONS: readonly LessonDefinition[] = [
     ],
   },
   ...FLOOR_TWO_LESSONS,
+  ...FLOOR_THREE_LESSON_DEFINITIONS,
+  ...FLOOR_FOUR_LESSON_DEFINITIONS,
 ] as const;
 
 export const LOOT_AFTER_LESSON: Partial<Record<LessonId, { weapon: Weapon; position: Position }>> = {

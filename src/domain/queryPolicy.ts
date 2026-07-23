@@ -15,8 +15,8 @@ export function validateReadOnlyQuery(input: string): QueryValidation {
     return { ok: false, message: "每回合只允许执行一条 SQL。" };
   }
 
-  if (!/^select\b/i.test(withoutTrailingSemicolon)) {
-    return { ok: false, message: "MVP 战斗终端只开放 SELECT。" };
+  if (!/^(?:select\b|with(?:\s+recursive)?\b)/i.test(withoutTrailingSemicolon)) {
+    return { ok: false, message: "战斗终端只开放只读 SELECT 或 WITH 查询。" };
   }
 
   if (WRITE_KEYWORDS.test(withoutTrailingSemicolon)) {

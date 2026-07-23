@@ -7,14 +7,14 @@
 
 | 文档 | 状态 | 用途 |
 |---|---|---|
-| [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | 规划蓝图；当前只实现前两层 | 课程顺序、题型、掌握标准 |
-| [楼层地图与美术蓝图](./FLOOR_THEMES.zh-CN.md) / [English](./FLOOR_THEMES.md) | 规划蓝图；当前只实现前两层 | 八层主题、地标与视觉边界 |
-| [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | 活跃路线图；`v0.2.0` 至 `v0.7.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
+| [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | 规划蓝图；当前实现前四层 | 课程顺序、题型、掌握标准 |
+| [楼层地图与美术蓝图](./FLOOR_THEMES.zh-CN.md) / [English](./FLOOR_THEMES.md) | 规划蓝图；当前实现前四层 | 八层主题、地标与视觉边界 |
+| [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | 活跃路线图；`v0.2.0` 至 `v0.8.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
 | [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `v0.3.0` 篝火已实现，`v0.5.0` 引导地图与捷径已实现 | 三篝火、安全区、休息、死亡回归、复盘与捷径 |
 
 ## 设计与后续候选
 
-这些文档位于 [`design/`](./design/)；前两层相关部分已经进入运行时，其余楼层在对应版本开始前
+这些文档位于 [`design/`](./design/)；前四层相关部分已经进入运行时，其余楼层在对应版本开始前
 仍需复核：
 
 - [怪物阶级与八层生物演化](./design/MONSTER_PROGRESSION_DESIGN.md)
@@ -23,7 +23,7 @@
 - [装备背包、换装与独立多掉落](./design/INVENTORY_AND_MULTI_DROP_DESIGN.md)（`v0.4.0` 已实现）
 
 当前边界：12 格背包、防具/护甲生命、生态种子化掉落、路线信标、死路补给、保证钥匙捷径、
-八层内容契约、Campaign 存档骨架与前两层生态样板已实现；真正可玩的仍是前两层，第三至八层
+八层内容契约、Campaign 存档骨架与前四层生态课程已实现；真正可玩的是第一至四层，第五至八层
 玩法尚未实现。非关键装备使用低概率独立判定，课程关键奖励、必需武器和钥匙保持 `100%`
 确定获得。
 
