@@ -38,7 +38,7 @@ const WHERE_TARGET = result(
   [201],
 );
 const WHERE_WEAKNESS = result(
-  "SELECT weakness FROM monsters WHERE name = '条件猎犬 · 逐行' AND status = 'escaped'",
+  "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped'",
   ["weakness"],
   [{ weakness: "focus" }],
 );
@@ -337,7 +337,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     const wrong = result(
       "SELECT name FROM monsters",
       ["name"],
-      [{ name: "投影史莱姆 · 青页" }, { name: "条件猎犬 · 逐行" }],
+      [{ name: "投影史莱姆 · 青页" }, { name: "猎犬" }],
     );
     expect(session.resolveQuery(wrong).playerDamage).toBe(1);
     expect(session.snapshot().player.hp).toBe(1);

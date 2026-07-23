@@ -58,7 +58,7 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
       [201],
     ),
     teachingResult(
-      "SELECT weakness FROM monsters WHERE name = '条件猎犬 · 逐行' AND status = 'escaped'",
+      "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped'",
       ["weakness"],
       [{ weakness: "focus" }],
     ),
