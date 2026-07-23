@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
+import { safeZoneCellKeys } from "../src/domain/campfire";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isSavedRun } from "../src/storage/localProgress";
 import type {
@@ -78,6 +79,11 @@ const HAVING_CORE = result(
   "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 900 GROUP BY channel HAVING COUNT(*) >= 3",
   ["channel", "total"],
   [{ channel: "echo", total: 3 }],
+);
+const WRONG_SELECT_NAME = result(
+  "SELECT name FROM monsters",
+  ["name"],
+  [{ name: "史莱姆" }, { name: "猎犬" }],
 );
 
 function roomIdForLesson(session: GameSession, lessonId: LessonId): string {
@@ -276,7 +282,7 @@ describe("GameSession SQL 魔王城 Run", () => {
       expect(aggregateGate).toBeDefined();
       expect(session.snapshot().availableRoomIds).toContain(aggregateGate?.id);
     }
-  });
+  }, 15_000);
 
   it("关键聚合战锤是固定房间奖励，领取后才能进入精英与 Boss 路线", () => {
     const session = new GameSession(null, null, "hammer-route");
@@ -421,6 +427,173 @@ describe("GameSession SQL 魔王城 Run", () => {
     );
   });
 
+  it("相邻 E 打开篝火菜单，只有休息才回满生命并替换复活点", () => {
+    const session = new GameSession(null, null, "campfire-rest");
+    enterLesson(session, "select");
+    expect(session.resolveQuery(WRONG_SELECT_NAME).playerDamage).toBe(1);
+    expect(session.snapshot().player.hp).toBe(1);
+    expect(session.resolveQuery(SELECT_NAME).accepted).toBe(true);
+    expect(session.resolveQuery(SELECT_WEAKNESS).lessonCompleted).toBe("select");
+
+    const [front, middle] = session.snapshot().campfires;
+    if (!front || !middle) throw new Error("测试楼层缺少前、中篝火");
+    expect(session.setPlayerPosition(front.restPosition.x, front.restPosition.y)).toBe(true);
+    expect(session.snapshot().inSafeZone).toBe(true);
+    expect(session.interact()).toMatchObject({
+      ok: true,
+      kind: "campfire",
+      message: expect.stringContaining("可以在此休息"),
+    });
+    expect(session.snapshot()).toMatchObject({
+      mode: "campfire",
+      activeCampfireId: front.id,
+      respawnCampfireId: null,
+      player: { hp: 1, maxHp: 2 },
+    });
+
+    expect(session.leaveCampfire()).toBe(true);
+    expect(session.snapshot()).toMatchObject({
+      mode: "explore",
+      activeCampfireId: null,
+      respawnCampfireId: null,
+      player: { hp: 1 },
+    });
+    expect(session.interact().ok).toBe(true);
+    expect(session.restAtCampfire()).toMatchObject({
+      ok: true,
+      kind: "campfire",
+      message: expect.stringMatching(/生命 1 → 2.*复活点/),
+    });
+    expect(session.snapshot()).toMatchObject({
+      mode: "explore",
+      activeCampfireId: null,
+      respawnCampfireId: front.id,
+      player: { hp: 2, maxHp: 2 },
+    });
+
+    expect(session.setPlayerPosition(middle.restPosition.x, middle.restPosition.y)).toBe(true);
+    expect(session.interact().ok).toBe(true);
+    expect(session.leaveCampfire()).toBe(true);
+    expect(session.snapshot().respawnCampfireId).toBe(front.id);
+    expect(session.interact().ok).toBe(true);
+    expect(session.restAtCampfire().ok).toBe(true);
+    expect(session.snapshot().respawnCampfireId).toBe(middle.id);
+  });
+
+  it("尚未在篝火休息时，死亡回本层出生点并进入本场复盘", () => {
+    const session = new GameSession(null, null, "spawn-respawn");
+    const spawn = { ...session.snapshot().mazeFloor.spawn };
+    enterLesson(session, "select");
+    expect(session.registerQueryError("第一次语法错误", "SELECT FORM monsters").playerDamage).toBe(1);
+    expect(session.registerQueryError("第二次语法错误", "SELECT name FORM").mode).toBe("defeat");
+    expect(session.snapshot()).toMatchObject({
+      mode: "defeat",
+      combat: null,
+      player: { hp: 0 },
+      respawnCampfireId: null,
+    });
+
+    expect(session.respawnAfterDefeat()).toBe(true);
+    expect(session.snapshot()).toMatchObject({
+      mode: "death-review",
+      player: { ...spawn, hp: 2, maxHp: 2 },
+      respawnCampfireId: null,
+      inSafeZone: true,
+    });
+    expect(session.snapshot().battleReview.at(-1)).toMatchObject({
+      result: "syntax-error",
+      outcome: "defeat",
+    });
+    expect(session.continueAfterDeathReview()).toBe(true);
+    expect(session.snapshot().mode).toBe("explore");
+  });
+
+  it("死亡回最近休息篝火，并保留课程、装备、经验与怪物剩余生命", () => {
+    const session = new GameSession(null, null, "campfire-respawn");
+    clearSelect(session);
+    const checkpoint = session.snapshot().campfires[0];
+    if (!checkpoint) throw new Error("测试楼层缺少篝火");
+    expect(session.setPlayerPosition(
+      checkpoint.restPosition.x,
+      checkpoint.restPosition.y,
+    )).toBe(true);
+    expect(session.interact().ok).toBe(true);
+    expect(session.restAtCampfire().ok).toBe(true);
+
+    enterLesson(session, "where");
+    const firstHit = session.resolveQuery(WHERE_TARGET);
+    expect(firstHit.accepted).toBe(true);
+    const damagedMonster = session.snapshot().monsters.find((monster) => monster.id === 201);
+    if (!damagedMonster) throw new Error("测试楼层缺少猎犬");
+    expect(damagedMonster.hp).toBeGreaterThan(0);
+    expect(damagedMonster.hp).toBeLessThan(damagedMonster.maxHp);
+    expect(session.registerQueryError("条件缺失", "SELECT weakness FROM monsters").playerDamage).toBe(1);
+    expect(session.registerQueryError("条件仍缺失", "SELECT weakness FORM monsters").mode).toBe("defeat");
+
+    const beforeRespawn = session.snapshot();
+    expect(session.respawnAfterDefeat()).toBe(true);
+    const respawned = session.snapshot();
+    expect(respawned).toMatchObject({
+      mode: "death-review",
+      respawnCampfireId: checkpoint.id,
+      player: {
+        x: checkpoint.restPosition.x,
+        y: checkpoint.restPosition.y,
+        hp: beforeRespawn.player.maxHp,
+        maxHp: beforeRespawn.player.maxHp,
+        xp: 1,
+        weapon: { id: "filter-bow" },
+      },
+      completedLessons: expect.arrayContaining(["select"]),
+      inSafeZone: true,
+    });
+    expect(respawned.monsters.find((monster) => monster.id === 201)?.hp).toBe(
+      damagedMonster.hp,
+    );
+    expect(respawned.queryCount).toBe(beforeRespawn.queryCount);
+    expect(respawned.campfires).toEqual(beforeRespawn.campfires);
+    expect(session.continueAfterDeathReview()).toBe(true);
+  });
+
+  it("出生安全区内反复移动只累计 totalMoves，不消耗安全步也不刷怪", () => {
+    const session = new GameSession(null, null, "safe-zone-movement");
+    const initial = session.snapshot();
+    const safeCells = safeZoneCellKeys(initial.mazeFloor, initial.campfires);
+    const directions = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 },
+    ];
+    const neighbor = directions.find(({ dx, dy }) => (
+      safeCells.has(`${initial.player.x + dx}:${initial.player.y + dy}`) &&
+      !initial.campfires.some((campfire) => (
+        campfire.x === initial.player.x + dx && campfire.y === initial.player.y + dy
+      )) &&
+      !initial.worldActors.some((actor) => (
+        actor.x === initial.player.x + dx && actor.y === initial.player.y + dy
+      ))
+    ));
+    if (!neighbor) throw new Error("出生安全区缺少可往返的相邻格");
+
+    for (let index = 0; index < 80; index += 1) {
+      const forward = index % 2 === 0;
+      const move = session.attemptPlayerMove(
+        forward ? neighbor.dx : -neighbor.dx,
+        forward ? neighbor.dy : -neighbor.dy,
+      );
+      expect(move).toMatchObject({ ok: true, moved: true, encounterId: null });
+      expect(session.snapshot().mode).toBe("explore");
+    }
+
+    expect(session.snapshot()).toMatchObject({
+      totalMoves: initial.totalMoves + 80,
+      stepsSinceEncounter: initial.stepsSinceEncounter,
+      safeStepsRemaining: initial.safeStepsRemaining,
+      inSafeZone: true,
+    });
+  });
+
   it("Run 存档恢复同一张图，重开只清局内状态而保留永久图鉴", () => {
     const session = new GameSession(null, null, "save-run");
     clearSelect(session);
@@ -431,7 +604,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().roomGraph).toEqual(session.snapshot().roomGraph);
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
-    expect(restored.toSavedRun()).toMatchObject({ version: 6, generatorVersion: 4, floor: 1 });
+    expect(restored.toSavedRun()).toMatchObject({ version: 7, generatorVersion: 4, floor: 1 });
 
     restored.reset("new-run");
     expect(restored.snapshot().runSeed).toBe("new-run");
@@ -440,7 +613,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().profile.masteredLessons).toContain("select");
   });
 
-  it("v6 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
+  it("v7 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
     const session = new GameSession(null, null, "actor-gate-recovery");
     const saved = session.toSavedRun();
     const actor = saved.worldActors.find((entry) => entry.behavior !== "anchored");

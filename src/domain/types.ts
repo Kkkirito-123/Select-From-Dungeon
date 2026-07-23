@@ -39,6 +39,8 @@ export type LessonStageId =
 
 export type PlayMode =
   | "explore"
+  | "campfire"
+  | "death-review"
   | "challenge"
   | "combat"
   | "reward"
@@ -78,6 +80,15 @@ export type QueryFeature =
 export interface Position {
   x: number;
   y: number;
+}
+
+export type CampfirePhase = "front" | "middle" | "rear";
+
+export interface Campfire extends Position {
+  id: string;
+  phase: CampfirePhase;
+  roomNodeId: string;
+  restPosition: Position;
 }
 
 export interface Monster extends Position {
@@ -242,6 +253,10 @@ export interface GameSnapshot {
   focusMonsterId: number | null;
   roomGraph: RoomGraph;
   mazeFloor: MazeFloor;
+  campfires: Campfire[];
+  activeCampfireId: string | null;
+  respawnCampfireId: string | null;
+  inSafeZone: boolean;
   worldActors: WorldActor[];
   groundItems: GroundItem[];
   discoveredCells: string[];
@@ -262,6 +277,7 @@ export interface GameSnapshot {
   runSeed: string;
   floor: FloorNumber;
   queryCount: number;
+  totalMoves: number;
   stepsSinceEncounter: number;
   safeStepsRemaining: number;
   hintLevel: number;
@@ -279,11 +295,14 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 6;
+  version: 7;
   generatorVersion: 4;
   floor: FloorNumber;
   graph: RoomGraph;
   mazeFloor: MazeFloor;
+  campfires: Campfire[];
+  activeCampfireId: string | null;
+  respawnCampfireId: string | null;
   worldActors: WorldActor[];
   groundItems: GroundItem[];
   discoveredCells: string[];
@@ -320,7 +339,7 @@ export interface MoveResolution {
   to: Position;
   encounterId: number | null;
   pickedItemIds: string[];
-  blockedBy: "none" | "wall" | "gate" | "mode";
+  blockedBy: "none" | "wall" | "gate" | "campfire" | "mode";
   message: string;
 }
 
@@ -338,7 +357,7 @@ export interface PatrolBatchResolution {
 
 export interface InteractionResolution {
   ok: boolean;
-  kind: "none" | "challenge" | "combat" | "loot" | "reward";
+  kind: "none" | "campfire" | "challenge" | "combat" | "loot" | "reward";
   message: string;
 }
 

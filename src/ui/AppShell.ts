@@ -24,7 +24,10 @@ import { pickedItemsBetween } from "../game/snapshotFeedback";
 import { createRunSeed } from "../storage/localProgress";
 import { SqlEngine } from "../sql/SqlEngine";
 import type { OnboardingController, OnboardingSnapshot } from "./OnboardingController";
-import { AnswerReviewView } from "./AnswerReviewView";
+import {
+  AnswerReviewView,
+  type AnswerReviewScope,
+} from "./AnswerReviewView";
 import { SqlAutocompleteController } from "./sqlAutocomplete";
 import { SqlChordTracker } from "./SqlChordTracker";
 
@@ -49,6 +52,13 @@ export function canOpenCombatTerminal(
   busy: boolean,
 ): boolean {
   return mode === "combat" && !busy;
+}
+
+export function shouldDismissTransientCard(
+  shownAtMove: number | null,
+  currentTotalMoves: number,
+): boolean {
+  return shownAtMove !== null && currentTotalMoves - shownAtMove >= 3;
 }
 
 export interface CombatSettlementCopy {
@@ -91,6 +101,7 @@ export class AppShell {
   private hintsRoot!: HTMLElement;
   private terminal!: HTMLElement;
   private gateTerminal!: HTMLElement;
+  private campfireMenu!: HTMLElement;
   private answerReview!: AnswerReviewView;
   private executeButton!: HTMLButtonElement;
   private gateExecuteButton!: HTMLButtonElement;
@@ -112,9 +123,12 @@ export class AppShell {
   private focusBeforeTerminal: HTMLElement | null = null;
   private toastTimer: number | null = null;
   private terminalFocusTimer: number | null = null;
-  private pickupTimer: number | null = null;
-  private settlementTimer: number | null = null;
+  private pickupShownAtMove: number | null = null;
+  private settlementShownAtMove: number | null = null;
   private floorTransitionTimer: number | null = null;
+  private defeatRespawnTimer: number | null = null;
+  private reviewContext: "manual" | "campfire" | "death" = "manual";
+  private reviewScope: AnswerReviewScope = "all";
   private activeNotice: FeedbackNotice | null = null;
   private readonly noticeQueue: FeedbackNotice[] = [];
 
@@ -123,6 +137,11 @@ export class AppShell {
     if (event.key === "Escape" && this.isReviewOpen()) {
       event.preventDefault();
       this.closeReview();
+      return;
+    }
+    if (event.key === "Escape" && this.isCampfireMenuOpen()) {
+      event.preventDefault();
+      this.leaveCampfire();
       return;
     }
     if (event.key === "Escape" && this.isGateTerminalOpen()) {
@@ -137,12 +156,19 @@ export class AppShell {
     }
     if (
       event.key === "Tab" &&
-      (this.isReviewOpen() || this.isTerminalOpen() || this.isGateTerminalOpen())
+      (
+        this.isReviewOpen() ||
+        this.isCampfireMenuOpen() ||
+        this.isTerminalOpen() ||
+        this.isGateTerminalOpen()
+      )
     ) {
       this.trapDialogFocus(
         event,
         this.isReviewOpen()
           ? this.answerReview.element
+          : this.isCampfireMenuOpen()
+            ? this.campfireMenu
           : this.isGateTerminalOpen() ? this.gateTerminal : this.terminal,
       );
       return;
@@ -301,14 +327,34 @@ export class AppShell {
                 <small id="combat-result-reward"></small>
               </aside>
 
+              <section id="campfire-menu" class="campfire-menu" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="campfire-menu-title" inert hidden>
+                <div class="campfire-menu__pixel-fire" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                </div>
+                <span>CAMPFIRE / SAFE ZONE</span>
+                <h2 id="campfire-menu-title">篝火</h2>
+                <p id="campfire-menu-status">选择接下来的行动。</p>
+                <div class="campfire-menu__actions">
+                  <button id="rest-at-campfire" type="button" class="primary-action">在此休息</button>
+                  <button id="review-at-campfire" type="button" class="quiet-action">答案复盘</button>
+                </div>
+                <button id="leave-campfire" type="button" class="campfire-menu__leave">ESC · 返回探索</button>
+              </section>
+
               <section id="floor-portal" class="floor-portal" aria-live="assertive" hidden>
                 <div class="floor-portal__ring floor-portal__ring--outer"></div>
                 <div class="floor-portal__ring floor-portal__ring--inner"></div>
                 <div class="floor-portal__tables" aria-hidden="true">
                   <span>MONSTERS</span><i>JOIN</i><span>ROOMS</span>
                 </div>
-                <strong>FLOOR 02 / 雷鸣奏鸣塔</strong>
-                <p>关系已连接，正在自动传送…</p>
+                <strong id="floor-clear-title">FLOOR 01 CLEARED</strong>
+                <p id="floor-clear-copy">CONGRATULATIONS!!</p>
+              </section>
+
+              <section id="run-state-overlay" class="run-state-overlay" aria-live="assertive" hidden>
+                <span>DEFEAT / CHECKPOINT</span>
+                <strong>YOU DIED</strong>
+                <p>正在返回最近休息的篝火…</p>
               </section>
 
               <div id="interaction-prompt" class="interaction-prompt">用 WASD 探索迷宫</div>
@@ -452,7 +498,7 @@ export class AppShell {
             <section class="castle-map-card" aria-label="魔王城发现式迷宫地图">
               <div class="card-heading"><span>迷宫勘测</span><span id="map-explored">探索后显形</span></div>
               <div id="castle-map" class="castle-map"></div>
-              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
+              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-campfire">♨ 篝火</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
             </section>
 
             <section class="mastery-card">
@@ -478,7 +524,7 @@ export class AppShell {
               <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　随机遭遇只结算 XP</p>
               <p><kbd>E</kbd> 打开课程战利品宝箱，或调查祭坛、篝火；靠近 Boss 机关门时可接入高难越级查询。</p>
               <p><kbd>Q + S</kbd> 打开终端　<kbd>Ctrl + Enter</kbd> 执行完整 SQL</p>
-              <p>死亡只重置当前 Run；知识图鉴与练习次数永久保留。</p>
+              <p>死亡后返回最近休息的篝火；未记录篝火时返回本层出生安全区，局内进度保留。</p>
               <button id="replay-onboarding-control" type="button" class="guide-replay">↺ 重新教学</button>
             </section>
 
@@ -492,19 +538,19 @@ export class AppShell {
               <div>
                 <span>LOCAL REVIEW / 本地记录</span>
                 <h2 id="answer-review-title">答题复盘</h2>
-                <p>只保存在本地：记录提交的 SQL 回合，不记录移动或按键，也不会上传。</p>
+                <p id="answer-review-description">只保存在本地：记录提交的 SQL 回合，不记录移动或按键，也不会上传。</p>
               </div>
               <button id="close-review" type="button" class="icon-action" aria-label="关闭答题复盘">ESC ×</button>
             </header>
             <div class="answer-review__columns">
-              <section class="answer-review__section" aria-labelledby="battle-review-title">
+              <section class="answer-review__section" data-review-section="battle" aria-labelledby="battle-review-title">
                 <div class="card-heading">
                   <span id="battle-review-title">最近一场战斗</span>
                   <span id="battle-review-summary">0 次作答</span>
                 </div>
                 <div id="battle-review-list" class="answer-review__list"></div>
               </section>
-              <section class="answer-review__section" aria-labelledby="floor-review-title">
+              <section class="answer-review__section" data-review-section="floor" aria-labelledby="floor-review-title">
                 <div class="card-heading">
                   <span id="floor-review-title">当前楼层</span>
                   <span id="floor-review-summary">0 次作答</span>
@@ -535,6 +581,7 @@ export class AppShell {
     this.hintsRoot = requiredElement(this.root, "#hint-list");
     this.terminal = requiredElement(this.root, "#combat-terminal");
     this.gateTerminal = requiredElement(this.root, "#gate-terminal");
+    this.campfireMenu = requiredElement(this.root, "#campfire-menu");
     this.answerReview = new AnswerReviewView(this.root);
     this.executeButton = requiredElement(this.root, "#execute-query");
     this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
@@ -575,6 +622,21 @@ export class AppShell {
     requiredElement(this.root, "#request-hint").addEventListener("click", () => this.requestHint(), listenerOptions);
     requiredElement(this.root, "#open-review").addEventListener("click", () => this.openReview(), listenerOptions);
     requiredElement(this.root, "#close-review").addEventListener("click", () => this.closeReview(), listenerOptions);
+    requiredElement(this.root, "#rest-at-campfire").addEventListener(
+      "click",
+      () => this.restAtCampfire(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#review-at-campfire").addEventListener(
+      "click",
+      () => this.openReview("floor", "campfire"),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#leave-campfire").addEventListener(
+      "click",
+      () => this.leaveCampfire(),
+      listenerOptions,
+    );
     requiredElement(this.root, "#interact").addEventListener("click", dispatchInteract, listenerOptions);
     this.sqlButton.addEventListener("click", () => this.openTerminal(), listenerOptions);
     requiredElement(this.root, "#reset-game").addEventListener("click", () => this.reset(), listenerOptions);
@@ -659,13 +721,18 @@ export class AppShell {
     this.noticeQueue.length = 0;
     if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
     this.terminalFocusTimer = null;
-    if (this.pickupTimer !== null) window.clearTimeout(this.pickupTimer);
-    this.pickupTimer = null;
-    if (this.settlementTimer !== null) window.clearTimeout(this.settlementTimer);
-    this.settlementTimer = null;
+    this.pickupShownAtMove = null;
+    this.settlementShownAtMove = null;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
     this.floorTransitionTimer = null;
-    this.root.classList.remove("terminal-active", "gate-terminal-active", "review-active");
+    if (this.defeatRespawnTimer !== null) window.clearTimeout(this.defeatRespawnTimer);
+    this.defeatRespawnTimer = null;
+    this.root.classList.remove(
+      "terminal-active",
+      "gate-terminal-active",
+      "campfire-active",
+      "review-active",
+    );
     void this.audio.dispose();
   }
 
@@ -810,15 +877,20 @@ export class AppShell {
     }
   }
 
-  private openReview(): void {
-    if (this.busy || this.isGateTerminalOpen()) return;
+  private openReview(
+    scope: AnswerReviewScope = "all",
+    context: "manual" | "campfire" | "death" = "manual",
+  ): void {
+    if ((this.busy && context !== "death") || this.isGateTerminalOpen()) return;
     if (this.isTerminalOpen()) this.closeTerminal(false);
     if (!this.isReviewOpen()) {
       this.focusBeforeTerminal = document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
     }
-    this.answerReview.render(this.lastSnapshot);
+    this.reviewScope = scope;
+    this.reviewContext = context;
+    this.answerReview.render(this.lastSnapshot, scope);
     this.answerReview.setOpen(true);
     this.root.classList.add("review-active");
     this.answerReview.closeButton.focus({
@@ -828,10 +900,22 @@ export class AppShell {
 
   private closeReview(): void {
     if (!this.isReviewOpen()) return;
+    const context = this.reviewContext;
+    this.reviewContext = "manual";
+    this.reviewScope = "all";
     this.answerReview.setOpen(false);
     this.root.classList.remove("review-active");
     const focusTarget = this.focusBeforeTerminal;
     this.focusBeforeTerminal = null;
+    if (context === "death") {
+      this.session.continueAfterDeathReview();
+      requiredElement<HTMLElement>(this.root, "#game-root").focus();
+      return;
+    }
+    if (context === "campfire" && this.lastSnapshot.mode === "campfire") {
+      requiredElement<HTMLButtonElement>(this.root, "#review-at-campfire").focus();
+      return;
+    }
     if (focusTarget?.isConnected && !focusTarget.matches(":disabled")) {
       focusTarget.focus();
     } else {
@@ -841,6 +925,58 @@ export class AppShell {
 
   private isReviewOpen(): boolean {
     return this.answerReview?.isOpen() ?? false;
+  }
+
+  private restAtCampfire(): void {
+    const resolution = this.session.restAtCampfire();
+    this.showFeedbackNotice({
+      message: resolution.message,
+      tone: resolution.ok ? "success" : "info",
+    });
+    if (resolution.ok) {
+      requiredElement<HTMLElement>(this.root, "#game-root").focus({
+        preventScroll: true,
+      });
+    }
+  }
+
+  private leaveCampfire(): void {
+    if (!this.session.leaveCampfire()) return;
+    requiredElement<HTMLElement>(this.root, "#game-root").focus({
+      preventScroll: true,
+    });
+  }
+
+  private renderCampfireMenu(snapshot: GameSnapshot, entered: boolean): void {
+    const open = snapshot.mode === "campfire" && snapshot.activeCampfireId !== null;
+    this.campfireMenu.hidden = !open;
+    this.campfireMenu.inert = !open;
+    this.campfireMenu.setAttribute("aria-hidden", String(!open));
+    this.campfireMenu.classList.toggle("is-open", open);
+    this.root.classList.toggle("campfire-active", open);
+    if (!open) return;
+
+    const campfire = snapshot.campfires.find(
+      (entry) => entry.id === snapshot.activeCampfireId,
+    );
+    const phaseName = campfire?.phase === "front"
+      ? "前段篝火"
+      : campfire?.phase === "middle"
+        ? "中段篝火"
+        : "后段篝火";
+    requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
+    requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
+      `生命 ${snapshot.player.hp} / ${snapshot.player.maxHp}。休息会恢复满生命，并把这里设为复活点。`;
+    if (entered && !this.isReviewOpen()) {
+      requiredElement<HTMLButtonElement>(
+        this.campfireMenu,
+        "#rest-at-campfire",
+      ).focus({ preventScroll: true });
+    }
+  }
+
+  private isCampfireMenuOpen(): boolean {
+    return this.campfireMenu?.classList.contains("is-open") ?? false;
   }
 
   private openTerminal(): void {
@@ -1000,7 +1136,7 @@ export class AppShell {
     }, 2_400);
   }
 
-  private showPickupCard(item: GroundItem, effect: string): void {
+  private showPickupCard(item: GroundItem, effect: string, totalMoves: number): void {
     const card = requiredElement<HTMLElement>(this.root, "#pickup-card");
     const kindLabel: Record<GroundItem["kind"], string> = {
       weapon: "WEAPON / 已自动装备",
@@ -1013,14 +1149,9 @@ export class AppShell {
     requiredElement(card, "#pickup-name").textContent = item.name;
     requiredElement(card, "#pickup-description").textContent = item.description;
     requiredElement(card, "#pickup-effect").textContent = effect;
-    if (this.pickupTimer !== null) window.clearTimeout(this.pickupTimer);
+    this.pickupShownAtMove = totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
-    this.pickupTimer = window.setTimeout(() => {
-      card.classList.remove("is-visible");
-      card.hidden = true;
-      this.pickupTimer = null;
-    }, 6_000);
   }
 
   private showCombatSettlement(resolution: TurnResolution): void {
@@ -1035,23 +1166,34 @@ export class AppShell {
     requiredElement(card, "#combat-result-progress").textContent = copy.progress;
     requiredElement(card, "#combat-result-level").textContent = copy.levelUp;
     requiredElement(card, "#combat-result-reward").textContent = copy.reward;
-    if (this.settlementTimer !== null) window.clearTimeout(this.settlementTimer);
+    this.settlementShownAtMove = this.lastSnapshot.totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
-    this.settlementTimer = window.setTimeout(() => {
-      card.classList.remove("is-visible");
-      card.hidden = true;
-      this.settlementTimer = null;
-    }, 8_000);
+  }
+
+  private hidePickupCard(): void {
+    const card = this.root.querySelector<HTMLElement>("#pickup-card");
+    if (!card) return;
+    this.pickupShownAtMove = null;
+    card.classList.remove("is-visible");
+    card.hidden = true;
   }
 
   private hideCombatSettlement(): void {
     const card = this.root.querySelector<HTMLElement>("#combat-result-card");
     if (!card) return;
-    if (this.settlementTimer !== null) window.clearTimeout(this.settlementTimer);
-    this.settlementTimer = null;
+    this.settlementShownAtMove = null;
     card.classList.remove("is-visible");
     card.hidden = true;
+  }
+
+  private dismissTransientCards(snapshot: GameSnapshot): void {
+    if (shouldDismissTransientCard(this.pickupShownAtMove, snapshot.totalMoves)) {
+      this.hidePickupCard();
+    }
+    if (shouldDismissTransientCard(this.settlementShownAtMove, snapshot.totalMoves)) {
+      this.hideCombatSettlement();
+    }
   }
 
   private requestHint(): void {
@@ -1098,7 +1240,12 @@ export class AppShell {
       return;
     }
     this.closeTerminal(true);
+    this.hidePickupCard();
     this.hideCombatSettlement();
+    if (this.defeatRespawnTimer !== null) {
+      window.clearTimeout(this.defeatRespawnTimer);
+      this.defeatRespawnTimer = null;
+    }
     const battleScene = this.getBattleScene();
     this.session.reset(createRunSeed());
     this.sql.reset(this.session.snapshot().monsters);
@@ -1137,8 +1284,17 @@ export class AppShell {
     const stageChanged = snapshot.lessonStageId !== this.lastStageId;
     const enteredCombat = snapshot.mode === "combat" && this.lastMode !== "combat";
     const enteredChallenge = snapshot.mode === "challenge" && this.lastMode !== "challenge";
+    const enteredCampfire = snapshot.mode === "campfire" && this.lastMode !== "campfire";
+    const enteredDefeat = snapshot.mode === "defeat" && this.lastMode !== "defeat";
+    const enteredDeathReview =
+      snapshot.mode === "death-review" && this.lastMode !== "death-review";
     this.lastSnapshot = snapshot;
-    if (enteredCombat) this.hideCombatSettlement();
+    if (enteredCombat) {
+      this.hidePickupCard();
+      this.hideCombatSettlement();
+    } else {
+      this.dismissTransientCards(snapshot);
+    }
 
     requiredElement(this.root, "#seed-value").textContent = snapshot.runSeed;
     requiredElement(this.root, "#floor-value").textContent = String(snapshot.floor).padStart(2, "0");
@@ -1178,8 +1334,12 @@ export class AppShell {
     requiredElement(this.root, ".game-stage").classList.toggle("is-combat", snapshot.mode === "combat");
     this.sqlButton.disabled = snapshot.mode !== "combat" || this.busy;
     requiredElement<HTMLButtonElement>(this.root, "#reset-game").disabled =
-      snapshot.mode === "transition";
+      snapshot.mode === "transition" ||
+      snapshot.mode === "defeat" ||
+      snapshot.mode === "death-review";
     this.renderFloorTransition(snapshot);
+    this.renderDefeatTransition(snapshot, enteredDefeat);
+    this.renderCampfireMenu(snapshot, enteredCampfire);
 
     this.renderTarget(target, snapshot);
     this.renderLocks(snapshot);
@@ -1190,7 +1350,9 @@ export class AppShell {
     this.renderRelics(snapshot);
     this.renderGateChallenge(snapshot, enteredChallenge);
     const latestPickup = pickedItems.at(-1);
-    if (latestPickup) this.showPickupCard(latestPickup, snapshot.banner);
+    if (latestPickup) {
+      this.showPickupCard(latestPickup, snapshot.banner, snapshot.totalMoves);
+    }
 
     if (stageChanged || enteredCombat) {
       this.textarea.value = "";
@@ -1210,7 +1372,10 @@ export class AppShell {
       : "explore";
     this.audio.setFloor(snapshot.floor);
     this.audio.setMode(musicMode);
-    if (this.isReviewOpen()) this.answerReview.render(snapshot);
+    if (this.isReviewOpen()) this.answerReview.render(snapshot, this.reviewScope);
+    if (enteredDeathReview || (snapshot.mode === "death-review" && !this.isReviewOpen())) {
+      this.openReview("battle", "death");
+    }
 
     this.lastStageId = snapshot.lessonStageId;
     this.lastMode = snapshot.mode;
@@ -1259,17 +1424,74 @@ export class AppShell {
   private renderFloorTransition(snapshot: GameSnapshot): void {
     const portal = requiredElement<HTMLElement>(this.root, "#floor-portal");
     const transitioning = snapshot.mode === "transition" && snapshot.floor === 1;
-    portal.hidden = !transitioning;
-    if (!transitioning || this.floorTransitionTimer !== null) return;
-    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 350 : 1_200;
+    const dungeonCleared = snapshot.mode === "victory";
+    portal.hidden = !transitioning && !dungeonCleared;
+    if (transitioning) {
+      requiredElement(portal, "#floor-clear-title").textContent = "FLOOR 01 CLEARED";
+      requiredElement(portal, "#floor-clear-copy").textContent =
+        "CONGRATULATIONS!! · 正在传送至第二层";
+      this.hidePickupCard();
+      this.hideCombatSettlement();
+    } else if (dungeonCleared) {
+      requiredElement(portal, "#floor-clear-title").textContent = "DUNGEON CLEARED";
+      requiredElement(portal, "#floor-clear-copy").textContent = "CONGRATULATIONS!!";
+      this.hidePickupCard();
+      this.hideCombatSettlement();
+    }
+    if (!transitioning) {
+      if (this.floorTransitionTimer !== null) {
+        window.clearTimeout(this.floorTransitionTimer);
+        this.floorTransitionTimer = null;
+      }
+      return;
+    }
+    if (this.floorTransitionTimer !== null) return;
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 650
+      : 1_500;
     this.floorTransitionTimer = window.setTimeout(() => {
       this.floorTransitionTimer = null;
+      const current = this.session.snapshot();
+      if (current.mode !== "transition" || current.floor !== 1) return;
       if (!this.session.advanceFloor()) return;
       const nextSnapshot = this.session.snapshot();
       this.sql.reset(nextSnapshot.monsters);
       this.clearQueryArtifacts();
       this.audio.setFloor(nextSnapshot.floor);
       this.audio.setMode("explore");
+    }, delay);
+  }
+
+  private renderDefeatTransition(snapshot: GameSnapshot, entered: boolean): void {
+    const overlay = requiredElement<HTMLElement>(this.root, "#run-state-overlay");
+    const defeated = snapshot.mode === "defeat";
+    overlay.hidden = !defeated;
+    if (!defeated) {
+      if (this.defeatRespawnTimer !== null) {
+        window.clearTimeout(this.defeatRespawnTimer);
+        this.defeatRespawnTimer = null;
+      }
+      return;
+    }
+
+    this.hidePickupCard();
+    this.hideCombatSettlement();
+    requiredElement(overlay, "p").textContent = snapshot.respawnCampfireId
+      ? "正在返回最近休息的篝火…"
+      : "尚未记录篝火，正在返回本层出生安全区…";
+    if (entered && this.defeatRespawnTimer !== null) {
+      window.clearTimeout(this.defeatRespawnTimer);
+      this.defeatRespawnTimer = null;
+    }
+    if (this.defeatRespawnTimer !== null) return;
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 500
+      : 1_200;
+    this.defeatRespawnTimer = window.setTimeout(() => {
+      this.defeatRespawnTimer = null;
+      if (this.session.snapshot().mode !== "defeat") return;
+      this.getBattleScene()?.abortEncounter();
+      this.session.respawnAfterDefeat();
     }, delay);
   }
 
@@ -1485,6 +1707,19 @@ export class AppShell {
       marker.setAttribute("y", String(gate.y + 0.05));
       marker.setAttribute("width", "0.7");
       marker.setAttribute("height", "0.9");
+      svg.append(marker);
+    });
+
+    snapshot.campfires.forEach((campfire) => {
+      if (!discovered.has(`${campfire.x}:${campfire.y}`)) return;
+      const marker = document.createElementNS(SVG_NS, "circle");
+      marker.classList.add("minimap-campfire");
+      if (snapshot.respawnCampfireId === campfire.id) {
+        marker.classList.add("is-checkpoint");
+      }
+      marker.setAttribute("cx", String(campfire.x + 0.5));
+      marker.setAttribute("cy", String(campfire.y + 0.5));
+      marker.setAttribute("r", "0.48");
       svg.append(marker);
     });
 

@@ -36,6 +36,7 @@ import {
 import {
   INITIAL_SAFE_STEPS,
   advanceEncounterMeter,
+  recordSafeZoneMovement,
   resetEncounterMeterAfterBattle,
   type EncounterMeter,
 } from "./encounterDirector";
@@ -47,10 +48,17 @@ import {
   type RoomNode,
   type RoomReward,
 } from "./runGraph";
+import {
+  generateCampfires,
+  isSafeZonePosition,
+  nearbyCampfire,
+  safeZoneCellKeys,
+} from "./campfire";
 import { evaluateStage } from "./lessonEvaluator";
 import { MAX_ANSWER_HISTORY } from "./types";
 import type {
   AnswerAttemptRecord,
+  Campfire,
   ClaimableReward,
   CombatEvent,
   CombatState,
@@ -235,7 +243,7 @@ function initialActors(
 function initialGroundItems(graph: RoomGraph, floor: MazeFloor): GroundItem[] {
   const items: GroundItem[] = [];
   graph.nodes.forEach((node) => {
-    if (node.lessonId || !node.reward) return;
+    if (node.lessonId || node.type === "rest" || !node.reward) return;
     const reward = rewardDetails(node.reward);
     const position = floor.anchors[node.id];
     if (!reward || !position) return;
@@ -257,6 +265,9 @@ export class GameSession {
   private floorNumber: FloorNumber = 1;
   private graph: RoomGraph;
   private mazeFloor: MazeFloor;
+  private campfires: Campfire[];
+  private activeCampfireId: string | null = null;
+  private respawnCampfireId: string | null = null;
   private mode: GameSnapshot["mode"] = "explore";
   private currentRoomId: string;
   private player: PlayerState;
@@ -294,6 +305,7 @@ export class GameSession {
     this.profile = cloneProfile(profile ?? emptyProfile());
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);
+    this.campfires = generateCampfires(this.graph, this.mazeFloor);
     this.currentRoomId = this.graph.entryId;
     this.player = {
       ...this.mazeFloor.spawn,
@@ -310,10 +322,16 @@ export class GameSession {
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
 
-    if (savedRun?.version === 6 && savedRun.generatorVersion === 4) {
+    if (savedRun?.version === 7 && savedRun.generatorVersion === 4) {
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
       this.mazeFloor = cloneMazeFloor(savedRun.mazeFloor);
+      this.campfires = savedRun.campfires.map((campfire) => ({
+        ...campfire,
+        restPosition: { ...campfire.restPosition },
+      }));
+      this.activeCampfireId = savedRun.activeCampfireId;
+      this.respawnCampfireId = savedRun.respawnCampfireId;
       this.mode = savedRun.mode;
       this.currentRoomId = savedRun.currentRoomId;
       this.player = { ...savedRun.player, weapon: { ...savedRun.player.weapon } };
@@ -382,7 +400,11 @@ export class GameSession {
       : this.mode === "transition"
         ? "传送门启动 · FLOOR 02 LOADING"
       : this.mode === "defeat"
-        ? "本轮回滚 · RUN ROLLBACK"
+        ? "生命归零 · YOU DIED"
+        : this.mode === "death-review"
+          ? "死亡复盘 · RETURN TO CHECKPOINT"
+        : this.mode === "campfire"
+          ? "篝火休整 · CHECKPOINT"
         : this.mode === "challenge" && activeGateChallenge
           ? activeGateChallenge.title
         : this.combat?.kind === "ambush"
@@ -395,7 +417,11 @@ export class GameSession {
       : this.mode === "transition"
         ? "双表连接传送门已经展开。无需按键，正在自动进入雷鸣奏鸣塔。"
       : this.mode === "defeat"
-        ? "生命值归零。开始新 Run 会重置迷宫、装备与生命，但不会删除已掌握知识。"
+        ? "生命值归零。正在返回最近休息的篝火；尚未休息时返回本层出生点。"
+        : this.mode === "death-review"
+          ? "生命已恢复。先复盘导致本次死亡的战斗，再重新出发。"
+        : this.mode === "campfire"
+          ? "选择在此休息恢复满生命并更新复活点，或查看当前楼层答案复盘。"
         : this.mode === "challenge" && activeGateChallenge
           ? activeGateChallenge.objective
         : looseWeapon
@@ -421,6 +447,13 @@ export class GameSession {
       focusMonsterId: this.combat?.targetId ?? this.selectedMonsterId ?? target?.id ?? null,
       roomGraph: cloneGraph(this.graph),
       mazeFloor: cloneMazeFloor(this.mazeFloor),
+      campfires: this.campfires.map((campfire) => ({
+        ...campfire,
+        restPosition: { ...campfire.restPosition },
+      })),
+      activeCampfireId: this.activeCampfireId,
+      respawnCampfireId: this.respawnCampfireId,
+      inSafeZone: isSafeZonePosition(this.mazeFloor, this.campfires, this.player),
       worldActors: this.worldActors.map(cloneWorldActor),
       groundItems: this.groundItems.map(cloneItem),
       discoveredCells: [...this.discoveredCells],
@@ -441,6 +474,7 @@ export class GameSession {
       runSeed: this.graph.seed,
       floor: this.floorNumber,
       queryCount: this.queryCount,
+      totalMoves: this.encounterMeter.totalMoves,
       stepsSinceEncounter: this.encounterMeter.stepsSinceEncounter,
       safeStepsRemaining: this.encounterMeter.safeStepsRemaining,
       hintLevel: this.hintLevel,
@@ -470,11 +504,17 @@ export class GameSession {
 
   toSavedRun(): SavedRun {
     return {
-      version: 6,
+      version: 7,
       generatorVersion: 4,
       floor: this.floorNumber,
       graph: cloneGraph(this.graph),
       mazeFloor: cloneMazeFloor(this.mazeFloor),
+      campfires: this.campfires.map((campfire) => ({
+        ...campfire,
+        restPosition: { ...campfire.restPosition },
+      })),
+      activeCampfireId: this.activeCampfireId,
+      respawnCampfireId: this.respawnCampfireId,
       worldActors: this.worldActors.map(cloneWorldActor),
       groundItems: this.groundItems.map(cloneItem),
       discoveredCells: [...this.discoveredCells],
@@ -510,7 +550,15 @@ export class GameSession {
   attemptPlayerMove(dx: number, dy: number): MoveResolution {
     const from = { x: this.player.x, y: this.player.y };
     const to = { x: from.x + dx, y: from.y + dy };
-    if (["challenge", "combat", "transition", "victory", "defeat"].includes(this.mode)) {
+    if ([
+      "campfire",
+      "death-review",
+      "challenge",
+      "combat",
+      "transition",
+      "victory",
+      "defeat",
+    ].includes(this.mode)) {
       return this.moveFailure(from, to, "mode", "当前状态不能移动。");
     }
 
@@ -543,6 +591,16 @@ export class GameSession {
       return this.moveFailure(from, to, gate ? "gate" : "wall", message);
     }
 
+    const blockingCampfire = this.campfires.find(
+      (campfire) => campfire.x === to.x && campfire.y === to.y,
+    );
+    if (blockingCampfire) {
+      const message = "篝火正在燃烧。站到相邻格按 E 休息。";
+      this.banner = message;
+      this.emit();
+      return this.moveFailure(from, to, "campfire", message);
+    }
+
     const actor = this.livingActorAt(to);
     if (actor) {
       const encounter = this.engageActor(actor.monsterId);
@@ -570,8 +628,8 @@ export class GameSession {
       const result = this.collectGroundItem(item, false);
       if (result.ok) pickedItemIds.push(item.id);
     });
-    const encounterId = pickedItemIds.length === 0 && this.mode === "explore"
-      ? this.rollAmbush()
+    const encounterId = this.mode === "explore"
+      ? this.rollAmbush(pickedItemIds.length === 0)
       : null;
     if (pickedItemIds.length === 0 && encounterId === null && this.mode === "explore") {
       this.banner = `${this.currentRoom().title} · 已探索 ${this.discoveredCells.size} 格。`;
@@ -590,7 +648,15 @@ export class GameSession {
   }
 
   setPlayerPosition(x: number, y: number): boolean {
-    if (["challenge", "combat", "transition", "victory", "defeat"].includes(this.mode)) return false;
+    if ([
+      "campfire",
+      "death-review",
+      "challenge",
+      "combat",
+      "transition",
+      "victory",
+      "defeat",
+    ].includes(this.mode)) return false;
     const currentZone = mazeZoneAt(this.mazeFloor, this.player);
     const targetZone = mazeZoneAt(this.mazeFloor, { x, y });
     if (targetZone && targetZone.roomNodeId !== currentZone?.roomNodeId) {
@@ -599,6 +665,7 @@ export class GameSession {
     }
     const actor = this.livingActorAt({ x, y });
     if (actor) return this.engageActor(actor.monsterId).ok;
+    if (this.campfires.some((campfire) => campfire.x === x && campfire.y === y)) return false;
     if (!isMazeWalkable(
       this.mazeFloor,
       x,
@@ -615,7 +682,15 @@ export class GameSession {
   }
 
   travelToRoom(roomId: string): TravelResolution {
-    if (["challenge", "combat", "transition", "victory", "defeat"].includes(this.mode)) {
+    if ([
+      "campfire",
+      "death-review",
+      "challenge",
+      "combat",
+      "transition",
+      "victory",
+      "defeat",
+    ].includes(this.mode)) {
       return this.travelFailure(roomId, "先结算当前战斗。");
     }
     const room = this.graph.nodes.find((node) => node.id === roomId);
@@ -641,7 +716,10 @@ export class GameSession {
           this.completedLessons,
           this.openedGateIds,
         ) &&
-        (!actor || position.x !== actor.x || position.y !== actor.y),
+        (!actor || position.x !== actor.x || position.y !== actor.y) &&
+        !this.campfires.some(
+          (campfire) => campfire.x === position.x && campfire.y === position.y,
+        ),
     ) ?? anchor;
     this.player.x = destination.x;
     this.player.y = destination.y;
@@ -678,17 +756,34 @@ export class GameSession {
   }
 
   interact(): InteractionResolution {
-    if (["transition", "victory", "defeat"].includes(this.mode)) {
+    if (["transition", "victory", "defeat", "death-review"].includes(this.mode)) {
       if (this.mode === "transition") {
         return this.interactionFailure("传送门正在自动校准，无需按键。");
       }
+      if (this.mode === "death-review") {
+        return this.interactionFailure("先完成本场死亡复盘，再重新出发。");
+      }
+      if (this.mode === "defeat") {
+        return this.interactionFailure("正在返回最近篝火。");
+      }
       return this.interactionFailure("本轮已经结束。开始新 Run 可以再次挑战。");
+    }
+    if (this.mode === "campfire") {
+      return this.interactionFailure("篝火菜单已经打开。请选择休息、答案复盘或返回探索。");
     }
     if (this.mode === "combat") {
       return this.interactionFailure("战斗已经开始。按住 Q + S 打开 SQL 终端。");
     }
     if (this.mode === "challenge") {
       return this.interactionFailure("机关破解终端已经开启。提交查询或按 ESC 退出。");
+    }
+    const campfire = nearbyCampfire(this.campfires, this.player);
+    if (campfire) {
+      this.activeCampfireId = campfire.id;
+      this.mode = "campfire";
+      this.banner = `${this.campfirePhaseName(campfire)}已点燃。可以在此休息，或复盘第 ${this.floorNumber} 层答案。`;
+      this.emit();
+      return { ok: true, kind: "campfire", message: this.banner };
     }
     const item = this.groundItems.find(
       (entry) => entry.collection === "interact" && distance(entry, this.player) <= 1,
@@ -704,6 +799,70 @@ export class GameSession {
       return { ok: true, kind: "challenge", message: this.banner };
     }
     return this.interactionFailure("附近没有可调查对象。松散掉落需要走到它所在的格子。");
+  }
+
+  restAtCampfire(): InteractionResolution {
+    if (this.mode !== "campfire" || !this.activeCampfireId) {
+      return this.interactionFailure("当前没有正在使用的篝火。");
+    }
+    const campfire = this.campfires.find((entry) => entry.id === this.activeCampfireId);
+    if (!campfire) return this.interactionFailure("当前篝火记录已经失效。");
+    const previousHp = this.player.hp;
+    this.player.hp = this.player.maxHp;
+    this.respawnCampfireId = campfire.id;
+    this.activeCampfireId = null;
+    this.mode = "explore";
+    this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
+    this.banner = `${this.campfirePhaseName(campfire)}休息完成：生命 ${previousHp} → ${this.player.hp}，这里已成为当前复活点。`;
+    this.emit();
+    return { ok: true, kind: "campfire", message: this.banner };
+  }
+
+  leaveCampfire(): boolean {
+    if (this.mode !== "campfire") return false;
+    this.activeCampfireId = null;
+    this.mode = "explore";
+    this.banner = "离开篝火，继续探索。";
+    this.emit();
+    return true;
+  }
+
+  respawnAfterDefeat(): boolean {
+    if (this.mode !== "defeat") return false;
+    const campfire = this.respawnCampfireId
+      ? this.campfires.find((entry) => entry.id === this.respawnCampfireId)
+      : null;
+    const destination = campfire?.restPosition ?? this.mazeFloor.spawn;
+    this.player = {
+      ...this.player,
+      ...destination,
+      hp: this.player.maxHp,
+      weapon: { ...this.player.weapon },
+    };
+    const zone = mazeZoneAt(this.mazeFloor, destination);
+    this.currentRoomId = zone?.roomNodeId ?? this.graph.entryId;
+    this.visitedRoomIds.add(this.currentRoomId);
+    this.completedRoomIds.add(this.graph.entryId);
+    this.combat = null;
+    this.selectedMonsterId = null;
+    this.activeGateChallengeId = null;
+    this.activeCampfireId = null;
+    this.mode = "death-review";
+    this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
+    this.revealAt(destination);
+    this.banner = campfire
+      ? `已返回${this.campfirePhaseName(campfire)}并恢复满生命。完成本场复盘后重新出发。`
+      : "尚未记录篝火，已返回本层出生安全区并恢复满生命。完成本场复盘后重新出发。";
+    this.emit();
+    return true;
+  }
+
+  continueAfterDeathReview(): boolean {
+    if (this.mode !== "death-review") return false;
+    this.mode = "explore";
+    this.banner = "本场死亡复盘已结束。篝火、装备、经验、课程和怪物剩余生命均已保留。";
+    this.emit();
+    return true;
   }
 
   cancelGateChallenge(): boolean {
@@ -765,7 +924,11 @@ export class GameSession {
   advanceMonsterPatrols(): PatrolBatchResolution {
     if (this.mode !== "explore") return { moves: [], encounterId: null };
     const moves: PatrolBatchResolution["moves"] = [];
-    const blocked = new Set(this.groundItems.map(positionKey));
+    const blocked = new Set([
+      ...this.groundItems.map(positionKey),
+      ...safeZoneCellKeys(this.mazeFloor, this.campfires),
+      ...this.campfires.map(positionKey),
+    ]);
     const occupied = new Set(
       this.worldActors
         .filter((actor) => this.monsters.some((monster) => monster.id === actor.monsterId && monster.hp > 0))
@@ -838,6 +1001,7 @@ export class GameSession {
     const hpUpdates: Array<{ id: number; hp: number }> = [];
     const killedIds: number[] = [];
     let playerDamage = 0;
+    let playerDefeated = false;
     let stageAdvanced = false;
     let lessonCompleted: LessonId | null = null;
     let experience: ExperienceSettlement | null = null;
@@ -881,9 +1045,8 @@ export class GameSession {
       events.push({ type: "enemy-hit", sourceId: target?.id, amount: playerDamage });
       this.banner = `${evaluation.message} ${target?.name ?? "怪物"} 使用${target?.attackName ?? "反击"}，造成 ${playerDamage} 点伤害。`;
       if (this.player.hp === 0) {
-        this.mode = "defeat";
-        this.combat = null;
-        this.banner += " 本轮迷宫与装备已失效，知识图鉴仍然保留。";
+        playerDefeated = true;
+        this.enterDefeat("combat");
       } else {
         this.combat.round += 1;
       }
@@ -904,7 +1067,7 @@ export class GameSession {
         result: evaluation.kind === "exact" ? "correct" : evaluation.kind,
         outcome: evaluation.accepted
           ? experience ? "victory" : "hit"
-          : this.mode === "defeat" ? "defeat" : "countered",
+          : playerDefeated ? "defeat" : "countered",
         feedback: evaluation.message,
         hintLevel: reviewHintLevel,
       });
@@ -944,11 +1107,10 @@ export class GameSession {
     const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
     const playerDamage = 1;
     this.player.hp = Math.max(0, this.player.hp - playerDamage);
+    const playerDefeated = this.player.hp === 0;
     this.banner = `${message} ${target?.name ?? "怪物"} 趁终端失稳反击，造成 ${playerDamage} 点伤害。`;
-    if (this.player.hp === 0) {
-      this.mode = "defeat";
-      this.combat = null;
-      this.banner += " 本轮已经回滚，永久知识进度不受影响。";
+    if (playerDefeated) {
+      this.enterDefeat("combat");
     } else {
       this.combat.round += 1;
     }
@@ -969,7 +1131,7 @@ export class GameSession {
         sql,
         answerSql: stage.answerSql,
         result: "syntax-error",
-        outcome: this.mode === "defeat" ? "defeat" : "countered",
+        outcome: playerDefeated ? "defeat" : "countered",
         feedback: message,
         hintLevel: reviewHintLevel,
       });
@@ -985,7 +1147,7 @@ export class GameSession {
       playerDamage,
       heatAdded: 1,
       locksBroken: [],
-      locksRemaining: [...this.currentStage().locks],
+      locksRemaining: [...stage.locks],
       events,
       mode: this.mode,
       stageAdvanced: false,
@@ -1000,6 +1162,9 @@ export class GameSession {
     this.floorNumber = 2;
     this.graph = generateRoomGraph(nextSeed, 2);
     this.mazeFloor = generateMazeFloor(this.graph);
+    this.campfires = generateCampfires(this.graph, this.mazeFloor);
+    this.activeCampfireId = null;
+    this.respawnCampfireId = null;
     this.mode = "explore";
     this.currentRoomId = this.graph.entryId;
     this.player = {
@@ -1036,6 +1201,9 @@ export class GameSession {
     this.floorNumber = 1;
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);
+    this.campfires = generateCampfires(this.graph, this.mazeFloor);
+    this.activeCampfireId = null;
+    this.respawnCampfireId = null;
     this.mode = "explore";
     this.currentRoomId = this.graph.entryId;
     this.player = {
@@ -1165,6 +1333,12 @@ export class GameSession {
     if (!actor || !monster || !room?.lessonId || monster.hp <= 0) {
       return this.interactionFailure("这只怪物已经不再构成遭遇。");
     }
+    if (
+      isSafeZonePosition(this.mazeFloor, this.campfires, this.player) ||
+      isSafeZonePosition(this.mazeFloor, this.campfires, actor)
+    ) {
+      return this.interactionFailure("安全区内不会开始战斗。离开石圈后怪物才会接近。");
+    }
     const accessMessage = this.roomAccessMessage(room);
     if (accessMessage) return this.interactionFailure(accessMessage);
     const lesson = lessonById(room.lessonId);
@@ -1191,14 +1365,20 @@ export class GameSession {
     return { ok: true, kind: "combat", message: this.banner };
   }
 
-  private rollAmbush(): number | null {
-    const candidateIds = this.monsters
+  private rollAmbush(allowEncounter = true): number | null {
+    if (isSafeZonePosition(this.mazeFloor, this.campfires, this.player)) {
+      this.encounterMeter = recordSafeZoneMovement(this.encounterMeter);
+      return null;
+    }
+    const candidateIds = allowEncounter
+      ? this.monsters
       .filter((monster) => {
         if (monster.encounterType !== "ambush" || monster.hp <= 0) return false;
         const lessonRoom = this.graph.nodes.find((room) => room.lessonId === monster.lessonId);
         return Boolean(lessonRoom) && this.roomAccessMessage(lessonRoom as RoomNode) === null;
       })
-      .map((monster) => monster.id);
+      .map((monster) => monster.id)
+      : [];
     const advance = advanceEncounterMeter(this.encounterMeter, this.graph.seed, candidateIds);
     this.encounterMeter = advance.meter;
     if (advance.targetId === null) return null;
@@ -1458,12 +1638,28 @@ export class GameSession {
     revealAround(this.mazeFloor, position, 5).forEach((cell) => this.discoveredCells.add(cell));
   }
 
+  private campfirePhaseName(campfire: Campfire): string {
+    return {
+      front: "前段篝火",
+      middle: "中段篝火",
+      rear: "后段篝火",
+    }[campfire.phase];
+  }
+
   private interactionPrompt(): string {
+    if (this.mode === "campfire") return "篝火休整中 · 选择在此休息或答案复盘";
+    if (this.mode === "death-review") return "完成本场复盘后重新出发";
     if (this.mode === "challenge") return "机关破解中 · Ctrl + Enter 提交 · ESC 安全退出";
     if (this.mode === "combat") return "Q + S  打开 SQL 战斗终端";
     if (this.mode === "transition") return "双表连接传送门启动 · 自动进入第二层";
     if (this.mode === "victory") return "双层已贯通 · 可开始新 Run";
-    if (this.mode === "defeat") return "本轮已回滚 · 知识图鉴仍保留";
+    if (this.mode === "defeat") return "YOU DIED · 正在返回最近篝火";
+    const campfire = nearbyCampfire(this.campfires, this.player);
+    if (campfire) {
+      return this.respawnCampfireId === campfire.id
+        ? "E  当前复活点 · 篝火"
+        : `E  调查${this.campfirePhaseName(campfire)}`;
+    }
     const interactItem = this.groundItems.find(
       (item) => item.collection === "interact" && distance(item, this.player) <= 1,
     );
@@ -1506,9 +1702,7 @@ export class GameSession {
     this.player.hp = Math.max(0, this.player.hp - 1);
     this.banner = `${message} 机关反噬造成 1 点伤害。`;
     if (this.player.hp === 0) {
-      this.mode = "defeat";
-      this.activeGateChallengeId = null;
-      this.banner += " 生命归零，本轮已回滚；永久 SQL 图鉴不受影响。";
+      this.enterDefeat("gate");
     }
     this.emit();
     return {
@@ -1519,6 +1713,20 @@ export class GameSession {
       playerDamage: 1,
       mode: this.mode,
     };
+  }
+
+  private enterDefeat(source: "combat" | "gate"): void {
+    this.mode = "defeat";
+    this.combat = null;
+    this.selectedMonsterId = null;
+    this.activeGateChallengeId = null;
+    this.activeCampfireId = null;
+    if (source === "gate") {
+      // Gate challenges do not create battle answer records. Clearing this
+      // prevents an unrelated previous battle from appearing after respawn.
+      this.reviewBattleId = null;
+    }
+    this.banner += " YOU DIED。正在返回最近休息的篝火；局内进度与怪物剩余生命都会保留。";
   }
 
   private moveFailure(

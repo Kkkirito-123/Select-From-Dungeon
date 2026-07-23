@@ -2,8 +2,9 @@ import { stableStringHash } from "./runGraph";
 
 export const INITIAL_SAFE_STEPS = 5;
 export const POST_BATTLE_SAFE_STEPS = 5;
-export const AMBUSH_ROLL_START = 6;
-export const AMBUSH_GUARANTEE_AT = 14;
+export const AMBUSH_ROLL_START = 1;
+export const AMBUSH_CHANCE = 0.02;
+export const AMBUSH_GUARANTEE_AT = 30;
 
 export interface EncounterMeter {
   totalMoves: number;
@@ -40,12 +41,8 @@ export function advanceEncounterMeter(
     return { meter, targetId: null };
   }
 
-  const chance = Math.min(
-    1,
-    0.18 + (meter.stepsSinceEncounter - AMBUSH_ROLL_START) * 0.12,
-  );
   const shouldTrigger = meter.stepsSinceEncounter >= AMBUSH_GUARANTEE_AT ||
-    hashUnit(`${seed}:ambush-roll:${meter.totalMoves}`) < chance;
+    hashUnit(`${seed}:ambush-roll:${meter.totalMoves}`) < AMBUSH_CHANCE;
   if (!shouldTrigger) return { meter, targetId: null };
 
   const ordered = [...candidateIds].sort((a, b) => a - b);
@@ -59,6 +56,13 @@ export function advanceEncounterMeter(
       safeStepsRemaining: POST_BATTLE_SAFE_STEPS,
     },
     targetId: ordered[Math.min(targetIndex, ordered.length - 1)] ?? null,
+  };
+}
+
+export function recordSafeZoneMovement(current: EncounterMeter): EncounterMeter {
+  return {
+    ...current,
+    totalMoves: current.totalMoves + 1,
   };
 }
 

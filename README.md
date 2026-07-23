@@ -19,15 +19,17 @@ and turn the correct result into an animated attack.
   mazes. Each uses twelve 16x16 technical partitions and extra loops to reduce
   dead-end backtracking. Floor one is a stone castle; floor two becomes the
   deep-blue, cyan, and violet Thunder Sonata Tower.
-- Collecting the first Boss key plays an approximately 1.2-second relational
-  portal and automatically enters floor two—no extra pathfinding, `E` press, or
-  menu choice. Level, XP, weapon, relics, and query count carry across.
+- Collecting the first Boss key shows a gold
+  `FLOOR 01 CLEARED / CONGRATULATIONS!!` transition for approximately 1.5
+  seconds and automatically enters floor two—no extra pathfinding, `E` press,
+  or menu choice. Level, XP, weapon, relics, and query count carry across.
 - Reveal the discovery minimap by walking through fog. It records explored
   regions and course gates; it is not clickable and never teleports the player.
 - Move into a living curriculum monster's tile or trigger a step-based ambush to
-  start a Pokémon-like single-target battle. Ambushes begin only after an early
-  safe window, become guaranteed after prolonged quiet exploration, and cannot
-  be rerolled by reloading.
+  start a Pokémon-like single-target battle. Outside safe zones, eligible
+  successful steps use a 2% base ambush chance after the safe window and
+  guarantee an encounter after 30 eligible quiet steps. The deterministic
+  result cannot be rerolled by reloading.
   Ordinary monsters take one slow patrol step about every 1,100 ms; the Boss
   remains anchored. The opponent's full name, ID, HP, and next counter are
   visible before every query.
@@ -51,6 +53,15 @@ and turn the correct result into an animated attack.
   its reference answer, error category, hint level, and battle outcome for the
   latest battle or current floor. The local-only log keeps at most 200 SQL turns
   and never records movement or key presses or uploads the log.
+- Find three seeded physical campfires on every floor: one in the front, middle,
+  and rear learning phase. Their visibly bounded tiles and the floor entrance
+  are safe zones with no ambushes, enemy spawns, or patrol entry. Stand beside a
+  fire and press `E` to choose `在此休息` or `答案复盘`. Resting restores maximum
+  HP and makes that fire the checkpoint; review shows the current floor.
+- Death no longer resets the Run. `YOU DIED` appears briefly, then the player
+  returns at full HP to the last rested campfire or the floor entrance and
+  automatically sees the battle that caused the defeat. Mastery, XP, gear,
+  doors, defeated enemies, and the surviving enemy's remaining HP stay intact.
 - Stand beside either locked Boss gate and press `E` to attempt an optional
   high-difficulty `QUERY BREACH`. Its fixed composite query can open that
   physical gate early, but grants no mastery, XP, or loot. A wrong result or
@@ -66,7 +77,8 @@ and turn the correct result into an animated attack.
   deterministic: Filter Bow after `SELECT`, Null Lantern after `IS NULL`, and
   Aggregate Hammer before `GROUP BY`. Floor two adds the Sort Saber and Join
   Chain. Every acquisition opens a non-blocking card with the item's description
-  and exact effect.
+  and exact effect. Acquisition and XP-settlement cards disappear after three
+  later successful movement steps instead of covering exploration indefinitely.
 - Hear electronic-classical Web Audio: floor one rotates four original lyrical
   patterns, while floor two rotates three new chiptune arrangements of
   public-domain Beethoven compositions. Battles use original high-energy space
@@ -78,9 +90,9 @@ and turn the correct result into an animated attack.
 - Follow an optional step-by-step guide through movement, finding a monster,
   opening the terminal, casting the first query, and opening the first reward chest.
   It can be skipped or replayed without changing SQL mastery.
-- Resume the maze, actors, ground items, fog, and combat state separately from
-  permanent mastery, attempt counts, victories, and best query count. Starting
-  a new Run preserves the profile.
+- Resume the maze, actors, ground items, fog, three campfires, checkpoint, and
+  combat state separately from permanent mastery, attempt counts, victories,
+  and best query count. Starting a new Run preserves the profile.
 - Play with WASD/arrow keys on desktop or visible touch controls and a full-screen
   SQL terminal on narrow screens.
 
@@ -164,6 +176,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ RunGraph ── curriculum dependencies and point-of-interest gates
   ├─ MazeGenerator/MazeFloor ── seeded 64x48 physical maze
   ├─ MazeValidation ── topology, reachability, and save invariants
+  ├─ CampfireDomain ── seeded checkpoints and shared visible safe-cell masks
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
   ├─ MonsterRoaming ── deterministic slow patrol decisions
   ├─ gateChallenges ── optional Boss-gate feature and result contracts
@@ -194,22 +207,23 @@ I/O heat are SQLite teaching signals, not evidence about the MySQL optimizer.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v6`: disposable current Run, including the current
-  floor, generated maze, world actors, ground items, discovered fog cells, HP,
-  level/XP, encounter meter, gear, relics, combat progress, opened challenge
-  gates, the active gate challenge, and up to 200 local SQL answer records.
+- `select-from-dungeon:run:v7`: disposable current Run, including the current
+  floor, generated maze, world actors, ground items, discovered fog cells,
+  three campfires, the active checkpoint, HP, level/XP, encounter meter, gear,
+  relics, combat progress, opened challenge gates, the active gate challenge,
+  and up to 200 local SQL answer records.
 - `select-from-dungeon:profile:v2`: ten mastered lessons, attempts, victories, and
   best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-A valid `run:v5` is migrated in memory into v6 with an empty answer history. A
-valid `run:v4` retains its progress, starts with no challenge gates opened, and
-then migrates into v6. Legacy keys are not deleted; earlier Run keys remain
-unread. A valid `profile:v1` migrates to v2, preserving first-floor mastery
-while adding second-floor counters. Snapshot persistence is debounced in `src/main.ts` so
-movement and patrol updates do not force a synchronous storage write for every
-emitted state.
+A valid `run:v6` is migrated in memory into v7 with stable generated campfires
+and no rested checkpoint. Valid `run:v5` and `run:v4` data continue through the
+existing migrations before v7. Legacy keys are not deleted; earlier Run keys
+remain unread. A valid `profile:v1` migrates to v2, preserving first-floor
+mastery while adding second-floor counters. Snapshot persistence is debounced
+in `src/main.ts` so movement and patrol updates do not force a synchronous
+storage write for every emitted state.
 
 ## Validation and Build
 
@@ -248,7 +262,15 @@ reduction `0 → 1`, and retained zero horizontal overflow at 390×844. The
 v0.2.0 review pass verified the top-console entry, two-column empty state,
 close-button focus, and `Escape` close at 1280×720. Populated records and the
 narrow-screen review overlay are covered by automation and CSS inspection but
-have not yet received a manual post-answer browser visual pass. Earlier evidence covered startup,
+have not yet received a manual post-answer browser visual pass. The v0.3 desktop
+pass at 1280×720 verified two SQL attacks, victory XP and chest rewards, pickup
+explanations, settlement and pickup cards disappearing on exactly the third
+successful move, the physical campfire and safe zone, campfire menu, floor
+review, checkpoint replacement after resting, and two invalid queries leading
+to `YOU DIED`, full-health checkpoint return, and a battle-only death review
+containing both attempts. The console remained free of warnings and errors.
+The gold floor-clear presentation and the 390×844 campfire menu still need a
+fresh browser visual pass. Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
 Reduced Motion, subjective audio/timing, and the 10-second
@@ -282,7 +304,9 @@ has unit coverage, not a completed browser iframe acceptance run.
 This MVP covers ten lesson groups across two floors, ending with `LEFT JOIN` and
 a composite `JOIN` challenge. Subqueries, window functions, transactions, index
 internals, isolation levels, and the wider MySQL interview curriculum remain
-future floors, not claims of this release.
+future floors, not claims of this release. The planned 12-slot inventory,
+equippable armor, generic seeded multi-drop system, biome-specific loot, and
+floors three through eight are also not implemented.
 
 Original code and prose use the [MIT License](LICENSE), copyright
 `Kkkirito-123`. Runtime notices and design references are listed in

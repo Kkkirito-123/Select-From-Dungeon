@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/GameSession";
-import type { SavedRun } from "../src/domain/types";
+import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
+import type { SavedRun, SqlQueryResult } from "../src/domain/types";
 import {
   PROFILE_SAVE_KEY,
   RUN_SAVE_KEY,
@@ -64,6 +65,45 @@ function freshRun(seed: string): SavedRun {
   return structuredClone(new GameSession(null, null, seed).toSavedRun());
 }
 
+function queryResult(
+  sql: string,
+  columns: string[],
+  rows: Array<Record<string, unknown>>,
+): SqlQueryResult {
+  return {
+    sql,
+    columns,
+    rows,
+    targetIds: [],
+    plan: ["SEARCH teaching fixture"],
+    baseHeat: 3,
+    features: detectQueryFeatures(sql),
+  };
+}
+
+function completeSelect(session: GameSession): void {
+  const selectRoom = session.snapshot().roomGraph.nodes.find((node) => (
+    node.lessonId === "select"
+  ));
+  if (!selectRoom) throw new Error("测试迷宫缺少 SELECT 区域");
+  expect(session.travelToRoom(selectRoom.id).ok).toBe(true);
+  const actor = session.snapshot().worldActors.find((entry) => (
+    entry.roomNodeId === selectRoom.id
+  ));
+  if (!actor) throw new Error("测试迷宫缺少 SELECT Actor");
+  expect(session.startEncounter(actor.monsterId).ok).toBe(true);
+  expect(session.resolveQuery(queryResult(
+    "SELECT name FROM monsters WHERE id = 101",
+    ["name"],
+    [{ name: "史莱姆" }],
+  )).accepted).toBe(true);
+  expect(session.resolveQuery(queryResult(
+    "SELECT weakness FROM monsters WHERE id = 101",
+    ["weakness"],
+    [{ weakness: "slash" }],
+  )).lessonCompleted).toBe("select");
+}
+
 function expectRunRejected(storage: MemoryStorage, run: SavedRun): void {
   storage.setItem(RUN_SAVE_KEY, JSON.stringify(run));
   expect(() => loadRun(storage)).not.toThrow();
@@ -71,7 +111,7 @@ function expectRunRejected(storage: MemoryStorage, run: SavedRun): void {
 }
 
 describe("localProgress", () => {
-  it("v6 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫和答题状态", () => {
+  it("v7 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫、篝火和答题状态", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "storage-seed");
     const saved = session.toSavedRun();
@@ -81,7 +121,7 @@ describe("localProgress", () => {
     saveRun(storage, saved);
     saveProfile(storage, profile);
 
-    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v6");
+    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v7");
     expect(PROFILE_SAVE_KEY).toBe("select-from-dungeon:profile:v2");
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(true);
     expect(storage.values.has(PROFILE_SAVE_KEY)).toBe(true);
@@ -90,6 +130,9 @@ describe("localProgress", () => {
     expect(loaded?.mazeFloor).toEqual(saved.mazeFloor);
     expect(loaded?.worldActors).toEqual(saved.worldActors);
     expect(loaded?.groundItems).toEqual(saved.groundItems);
+    expect(loaded?.campfires).toEqual(saved.campfires);
+    expect(loaded?.activeCampfireId).toBeNull();
+    expect(loaded?.respawnCampfireId).toBeNull();
     expect(loaded?.discoveredCells).toEqual(saved.discoveredCells);
     expect(loadProfile(storage).masteredLessons).toEqual(["select"]);
 
@@ -98,10 +141,11 @@ describe("localProgress", () => {
     expect(snapshot.mazeFloor.topologyHash).toBe(saved.mazeFloor.topologyHash);
     expect(snapshot.worldActors).toEqual(saved.worldActors);
     expect(snapshot.groundItems).toEqual(saved.groundItems);
+    expect(snapshot.campfires).toEqual(saved.campfires);
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
   });
 
-  it("旧 run:v1/v2 不读取，也不会被 v6 清理动作删除", () => {
+  it("旧 run:v1/v2 不读取，也不会被 v7 清理动作删除", () => {
     const storage = new MemoryStorage();
     const legacyKey = "select-from-dungeon:run:v1";
     const legacyRun = {
@@ -116,6 +160,7 @@ describe("localProgress", () => {
     expect(loadRun(storage)).toBeNull();
     expect(storage.readKeys).toEqual([
       RUN_SAVE_KEY,
+      "select-from-dungeon:run:v6",
       "select-from-dungeon:run:v5",
       "select-from-dungeon:run:v4",
     ]);
@@ -126,7 +171,7 @@ describe("localProgress", () => {
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
 
-  it("战斗中的房间、玩家与 Actor 状态也能通过 v6 恢复", () => {
+  it("战斗中的房间、玩家与 Actor 状态也能通过 v7 恢复", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "combat-restore");
     const selectRoom = session.snapshot().roomGraph.nodes.find((node) => (
@@ -152,6 +197,67 @@ describe("localProgress", () => {
     expect(new GameSession(loaded).snapshot().combat).toEqual(saved.combat);
   });
 
+  it("非空篝火菜单、复活点与死亡复盘能通过 v7 完整恢复", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "campfire-state-roundtrip");
+    completeSelect(session);
+    const checkpoint = session.snapshot().campfires[0];
+    if (!checkpoint) throw new Error("测试楼层缺少前段篝火");
+
+    expect(session.setPlayerPosition(
+      checkpoint.restPosition.x,
+      checkpoint.restPosition.y,
+    )).toBe(true);
+    expect(session.interact().ok).toBe(true);
+    saveRun(storage, session.toSavedRun());
+
+    const campfireRun = loadRun(storage);
+    expect(campfireRun).toMatchObject({
+      mode: "campfire",
+      activeCampfireId: checkpoint.id,
+      respawnCampfireId: null,
+    });
+    if (!campfireRun) throw new Error("篝火菜单存档恢复失败");
+
+    const restored = new GameSession(campfireRun);
+    expect(restored.restAtCampfire().ok).toBe(true);
+    const whereRoom = restored.snapshot().roomGraph.nodes.find((node) => (
+      node.lessonId === "where"
+    ));
+    if (!whereRoom) throw new Error("测试迷宫缺少 WHERE 区域");
+    expect(restored.travelToRoom(whereRoom.id).ok).toBe(true);
+    const actor = restored.snapshot().worldActors.find((entry) => (
+      entry.roomNodeId === whereRoom.id
+    ));
+    if (!actor) throw new Error("测试迷宫缺少 WHERE Actor");
+    expect(restored.startEncounter(actor.monsterId).ok).toBe(true);
+    expect(restored.registerQueryError(
+      "第一次语法错误",
+      "SELECT FORM monsters",
+    ).playerDamage).toBe(1);
+    expect(restored.registerQueryError(
+      "第二次语法错误",
+      "SELECT name FORM monsters",
+    ).mode).toBe("defeat");
+    expect(restored.respawnAfterDefeat()).toBe(true);
+    saveRun(storage, restored.toSavedRun());
+
+    const deathReviewRun = loadRun(storage);
+    expect(deathReviewRun).toMatchObject({
+      mode: "death-review",
+      activeCampfireId: null,
+      respawnCampfireId: checkpoint.id,
+      player: {
+        x: checkpoint.restPosition.x,
+        y: checkpoint.restPosition.y,
+        hp: 2,
+        maxHp: 2,
+      },
+    });
+    expect(deathReviewRun?.answerHistory).toHaveLength(4);
+    expect(new GameSession(deathReviewRun).snapshot().battleReview).toHaveLength(2);
+  }, 15_000);
+
   it("恢复旧存档时使用当前内容中的简短怪物名", () => {
     const saved = freshRun("canonical-monster-names");
     const slime = saved.monsters.find((monster) => monster.id === 101);
@@ -162,10 +268,126 @@ describe("localProgress", () => {
     expect(restored.monsters.find((monster) => monster.id === 101)?.name).toBe("史莱姆");
   });
 
-  it("当前 v5 Run 会迁移到 v6，且不会删除原始存档", () => {
+  it("当前 v6 Run 会生成三处篝火并迁移到 v7，且不会删除原始存档", () => {
+    const storage = new MemoryStorage();
+    const current = freshRun("migrate-run-v6");
+    const {
+      campfires: _campfires,
+      activeCampfireId: _activeCampfireId,
+      respawnCampfireId: _respawnCampfireId,
+      ...legacyFields
+    } = current;
+    storage.setItem("select-from-dungeon:run:v6", JSON.stringify({
+      ...legacyFields,
+      version: 6,
+    }));
+
+    const migrated = loadRun(storage);
+    expect(migrated).toMatchObject({
+      version: 7,
+      activeCampfireId: null,
+      respawnCampfireId: null,
+      graph: { seed: "migrate-run-v6" },
+    });
+    expect(migrated?.campfires).toHaveLength(3);
+    expect(migrated?.campfires.map((campfire) => campfire.phase)).toEqual([
+      "front",
+      "middle",
+      "rear",
+    ]);
+    expect(storage.values.has("select-from-dungeon:run:v6")).toBe(true);
+    expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
+  });
+
+  it("v6 玩家若站在新增篝火中心，迁移时移动到相邻安全格而不丢档", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "migrate-v6-overlapping-campfire");
+    completeSelect(session);
+    const current = structuredClone(session.toSavedRun());
+    const checkpoint = current.campfires[0];
+    if (!checkpoint) throw new Error("测试楼层缺少前段篝火");
+    const {
+      campfires: _campfires,
+      activeCampfireId: _activeCampfireId,
+      respawnCampfireId: _respawnCampfireId,
+      ...legacyFields
+    } = current;
+    storage.setItem("select-from-dungeon:run:v6", JSON.stringify({
+      ...legacyFields,
+      version: 6,
+      currentRoomId: checkpoint.roomNodeId,
+      player: {
+        ...legacyFields.player,
+        x: checkpoint.x,
+        y: checkpoint.y,
+      },
+      visitedRoomIds: [
+        ...new Set([...legacyFields.visitedRoomIds, checkpoint.roomNodeId]),
+      ],
+      discoveredCells: [
+        ...new Set([
+          ...legacyFields.discoveredCells,
+          `${checkpoint.x}:${checkpoint.y}`,
+        ]),
+      ],
+    }));
+
+    const migrated = loadRun(storage);
+    expect(migrated).toMatchObject({
+      version: 7,
+      currentRoomId: checkpoint.roomNodeId,
+      player: checkpoint.restPosition,
+      activeCampfireId: null,
+      respawnCampfireId: null,
+    });
+    expect(migrated?.discoveredCells).toContain(
+      `${checkpoint.restPosition.x}:${checkpoint.restPosition.y}`,
+    );
+    expect(migrated?.banner).toContain("已移至相邻安全格");
+  }, 15_000);
+
+  it("v6 的失败态不会在升级后卡死，会满血回到出生安全区", () => {
+    const storage = new MemoryStorage();
+    const current = freshRun("migrate-defeat-v6");
+    const {
+      campfires: _campfires,
+      activeCampfireId: _activeCampfireId,
+      respawnCampfireId: _respawnCampfireId,
+      ...legacyFields
+    } = current;
+    storage.setItem("select-from-dungeon:run:v6", JSON.stringify({
+      ...legacyFields,
+      version: 6,
+      mode: "defeat",
+      player: { ...legacyFields.player, hp: 0 },
+      combat: null,
+      activeGateChallengeId: null,
+      reviewBattleId: null,
+      answerHistory: [],
+    }));
+
+    const migrated = loadRun(storage);
+    expect(migrated).toMatchObject({
+      version: 7,
+      mode: "explore",
+      currentRoomId: current.graph.entryId,
+      player: {
+        ...current.mazeFloor.spawn,
+        hp: current.player.maxHp,
+        maxHp: current.player.maxHp,
+      },
+      activeCampfireId: null,
+      respawnCampfireId: null,
+    });
+  });
+
+  it("当前 v5 Run 会迁移到 v7，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v5");
     const {
+      campfires: _campfires,
+      activeCampfireId: _activeCampfireId,
+      respawnCampfireId: _respawnCampfireId,
       answerHistory: _answerHistory,
       battleSequence: _battleSequence,
       reviewBattleId: _reviewBattleId,
@@ -178,20 +400,26 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 6,
+      version: 7,
+      activeCampfireId: null,
+      respawnCampfireId: null,
       answerHistory: [],
       battleSequence: 0,
       reviewBattleId: null,
       graph: { seed: "migrate-run-v5" },
     });
+    expect(migrated?.campfires).toHaveLength(3);
     expect(storage.values.has("select-from-dungeon:run:v5")).toBe(true);
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
-  });
+  }, 15_000);
 
-  it("当前 v4 Run 会迁移到 v6，且不会删除原始存档", () => {
+  it("当前 v4 Run 会迁移到 v7，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v4");
     const {
+      campfires: _campfires,
+      activeCampfireId: _activeCampfireId,
+      respawnCampfireId: _respawnCampfireId,
       openedGateIds: _openedGateIds,
       activeGateChallengeId: _activeGateChallengeId,
       answerHistory: _answerHistory,
@@ -204,7 +432,9 @@ describe("localProgress", () => {
 
     const migrated = loadRun(storage);
     expect(migrated).toMatchObject({
-      version: 6,
+      version: 7,
+      activeCampfireId: null,
+      respawnCampfireId: null,
       openedGateIds: [],
       activeGateChallengeId: null,
       answerHistory: [],
@@ -212,6 +442,7 @@ describe("localProgress", () => {
       reviewBattleId: null,
       graph: { seed: "migrate-run-v4" },
     });
+    expect(migrated?.campfires).toHaveLength(3);
     expect(storage.values.has("select-from-dungeon:run:v4")).toBe(true);
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
@@ -374,6 +605,22 @@ describe("localProgress", () => {
     expect(run.groundItems.length).toBeGreaterThan(0);
     run.groundItems[0].sourceRoomId = "missing-room";
     expectRunRejected(storage, run);
+  });
+
+  it("篝火缺失、休息点越界或复活点引用失配时拒绝恢复", () => {
+    const storage = new MemoryStorage();
+
+    const missingCampfire = freshRun("broken-campfire-count");
+    missingCampfire.campfires.pop();
+    expectRunRejected(storage, missingCampfire);
+
+    const invalidRestPosition = freshRun("broken-campfire-rest");
+    invalidRestPosition.campfires[0].restPosition.x = invalidRestPosition.mazeFloor.width;
+    expectRunRejected(storage, invalidRestPosition);
+
+    const unknownCheckpoint = freshRun("broken-campfire-checkpoint");
+    unknownCheckpoint.respawnCampfireId = "campfire:1:missing";
+    expectRunRejected(storage, unknownCheckpoint);
   });
 
   it("探索格必须是无重复的迷宫内规范坐标", () => {
