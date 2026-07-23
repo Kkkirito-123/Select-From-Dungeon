@@ -260,6 +260,7 @@ export function getSqlCompletions(
     ))
     .sort((left, right) => (
       left.score - right.score ||
+      left.suggestion.label.length - right.suggestion.label.length ||
       left.suggestion.label.localeCompare(right.suggestion.label)
     ))
     .slice(0, 8)
