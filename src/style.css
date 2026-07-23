@@ -754,7 +754,8 @@ h1 span {
 
 .terminal-grid {
   display: grid;
-  flex: 1 1 auto;
+  /* Expanded evidence must extend terminal scrolling, never shrink over action buttons. */
+  flex: 1 0 auto;
   grid-template-columns: minmax(180px, 0.72fr) minmax(330px, 1.48fr);
   gap: 10px;
   min-height: 0;

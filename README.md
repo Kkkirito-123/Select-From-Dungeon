@@ -221,12 +221,18 @@ two-stage `Escape`, unchanged query counts, and desktop plus 390x844 layouts.
 The Schema Codex pass verified four-table tab and arrow-key navigation, focus
 retention, the 22-field terminal reference, `armor` completion from the
 canonical catalog, 44 px mobile tab targets, no 390 px horizontal overflow, and
-no console warnings/errors. Earlier evidence covered startup, HUD, touch
-controls, same-tile combat, pickups, patrol contact, counters, and same-seed
-reload. A complete two-floor manual browser Run, 200%/320px layout, Reduced
-Motion, subjective audio/timing, and the 10-second performance/save-rate checks
-have not yet been run. Unit tests and a successful build do not substitute for
-those checks. Domain automation physically walks both floor-one branch orders,
+no console warnings/errors. The integrated pass then opened the complete-field
+and query-evidence panels together at 1280x720, reproduced and fixed pointer
+interception over the execute action, completed the HAVING battle by clicking
+that action, moved after terminal close, collected the key, entered floor two
+automatically, recovered the floor-two state after reload, and rechecked the
+390 px layout without console warnings/errors. Earlier evidence covered startup,
+HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
+same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
+Reduced Motion, subjective audio/timing, and the 10-second
+performance/save-rate checks have not yet been run. Unit tests and a successful
+build do not substitute for those checks. Domain automation physically walks
+both floor-one branch orders,
 the automatic transition, and all five floor-two lessons without Session travel
 or positioning helpers; that is still not a manual browser Run.
 
