@@ -27,6 +27,11 @@ and turn the correct result into an animated attack.
   visible before every query.
 - Press `Q + S` (or the touch button) to open the in-game terminal. Every stage
   starts blank: the player writes the complete `SELECT ... FROM ...` statement.
+- Use the embedded `PLAN ASSIST` completion stack without leaving the game.
+  Prefixes rank SQL keywords, functions, visible tables, and fields; aliases
+  such as `m.` narrow the list to that table. Use arrows plus `Enter`/`Tab`,
+  click or tap, or open it explicitly with `Ctrl/Command + Space`. Accepting a
+  suggestion never executes the query or fills the complete answer.
 - Execute real read-only SQLite WASM queries and inspect result rows plus
   `EXPLAIN QUERY PLAN`. Correct results attack; wrong results and syntax errors
   trigger the telegraphed counter. Empty input consumes no turn.
@@ -144,6 +149,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ MonsterRoaming ── deterministic slow patrol decisions
   ├─ gateChallenges ── optional Boss-gate feature and result contracts
   ├─ lessonEvaluator ── result semantics + concept locks
+  ├─ SqlAutocomplete ── visible-schema completion and accessible listbox state
   ├─ SqlEngine ── read-only SQLite WASM execution and four-table teaching schema
   ├─ DungeonScene ── continuous exploration, fog, collision, patrol
   ├─ BattleScene ── duel presentation and combat animations
@@ -201,15 +207,18 @@ to a static host that serves WASM with the correct MIME type.
 Fresh browser evidence is intentionally narrower than the feature list. This
 revision verified the first-floor challenge prompt, safe exit, one-heart failure,
 successful semantic breach, walking through the opened gate, reload recovery,
-focus without page jumping, and no horizontal overflow at 390x844. Earlier
-evidence covered startup, HUD, touch controls, same-tile combat, pickups, patrol
-contact, counters, and same-seed reload. A complete two-floor manual browser
-Run, 200%/320px layout, Reduced Motion, subjective audio/timing, and the
-10-second performance/save-rate checks have not yet been run. Unit tests and a
-successful build do not substitute for those checks. Domain automation
-physically walks both floor-one branch orders, the automatic transition, and all
-five floor-two lessons without Session travel or positioning helpers; that is
-still not a manual browser Run.
+focus without page jumping, and no horizontal overflow at 390x844. The latest
+completion pass additionally verified automatic prefix suggestions,
+`Ctrl+Space`, arrow selection, `Enter`, `Tab`, pointer/touch acceptance,
+two-stage `Escape`, unchanged query counts, no console warnings/errors, and
+desktop plus 390x844 layouts. Earlier evidence covered startup, HUD, touch
+controls, same-tile combat, pickups, patrol contact, counters, and same-seed
+reload. A complete two-floor manual browser Run, 200%/320px layout, Reduced
+Motion, subjective audio/timing, and the 10-second performance/save-rate checks
+have not yet been run. Unit tests and a successful build do not substitute for
+those checks. Domain automation physically walks both floor-one branch orders,
+the automatic transition, and all five floor-two lessons without Session travel
+or positioning helpers; that is still not a manual browser Run.
 
 To embed a deployed build in a blog:
 

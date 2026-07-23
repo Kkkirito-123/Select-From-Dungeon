@@ -16,6 +16,7 @@ import { pickedItemsBetween } from "../game/snapshotFeedback";
 import { createRunSeed } from "../storage/localProgress";
 import { SqlEngine } from "../sql/SqlEngine";
 import type { OnboardingController, OnboardingSnapshot } from "./OnboardingController";
+import { SqlAutocompleteController } from "./sqlAutocomplete";
 import { SqlChordTracker } from "./SqlChordTracker";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -55,6 +56,8 @@ export class AppShell {
   private gateExecuteButton!: HTMLButtonElement;
   private sqlButton!: HTMLButtonElement;
   private audioButton!: HTMLButtonElement;
+  private combatAutocomplete!: SqlAutocompleteController;
+  private gateAutocomplete!: SqlAutocompleteController;
   private lastStageId: GameSnapshot["lessonStageId"] | null = null;
   private lastMode: GameSnapshot["mode"] | null = null;
   private lastSnapshot!: GameSnapshot;
@@ -261,7 +264,14 @@ export class AppShell {
 
                   <section class="terminal-editor">
                     <label class="sr-only" for="sql-editor">输入完整 SQL</label>
-                    <textarea id="sql-editor" spellcheck="false" autocomplete="off" placeholder="在这里完整写出 SELECT ... FROM ...;"></textarea>
+                    <div class="sql-editor-shell">
+                      <textarea id="sql-editor" spellcheck="false" autocomplete="off" placeholder="在这里完整写出 SELECT ... FROM ...;"></textarea>
+                      <div class="sql-assist-rail" aria-hidden="true">
+                        <span>PLAN ASSIST / 查询提示</span>
+                        <span data-assist-count>CTRL SPACE</span>
+                      </div>
+                      <div id="sql-suggestions" class="sql-suggestions" role="listbox" aria-label="SQL 输入建议" hidden></div>
+                    </div>
                     <div class="action-row">
                       <button id="execute-query" type="button" class="primary-action">执行 SQL 攻击 <kbd>Ctrl ↵</kbd></button>
                       <button id="request-hint" type="button" class="quiet-action">下一条提示 <kbd>H</kbd></button>
@@ -303,7 +313,14 @@ export class AppShell {
 
                   <section class="terminal-editor gate-terminal__editor">
                     <label class="sr-only" for="gate-sql-editor">输入机关破解 SQL</label>
-                    <textarea id="gate-sql-editor" spellcheck="false" autocomplete="off" placeholder="写出完整查询计划，破解结果集校验…"></textarea>
+                    <div class="sql-editor-shell sql-editor-shell--gate">
+                      <textarea id="gate-sql-editor" spellcheck="false" autocomplete="off" placeholder="写出完整查询计划，破解结果集校验…"></textarea>
+                      <div class="sql-assist-rail" aria-hidden="true">
+                        <span>BREACH ASSIST / 机关提示</span>
+                        <span data-assist-count>CTRL SPACE</span>
+                      </div>
+                      <div id="gate-sql-suggestions" class="sql-suggestions" role="listbox" aria-label="机关 SQL 输入建议" hidden></div>
+                    </div>
                     <div class="action-row">
                       <button id="execute-gate-query" type="button" class="primary-action breach-action">执行越级校验 <kbd>Ctrl ↵</kbd></button>
                       <button id="cancel-gate-query" type="button" class="quiet-action">断开连接，不扣血</button>
@@ -405,6 +422,16 @@ export class AppShell {
     this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
     this.sqlButton = requiredElement(this.root, "#open-sql");
     this.audioButton = requiredElement(this.root, "#audio-toggle");
+    this.combatAutocomplete = new SqlAutocompleteController(
+      this.textarea,
+      requiredElement(this.root, "#sql-suggestions"),
+      this.listenerController.signal,
+    );
+    this.gateAutocomplete = new SqlAutocompleteController(
+      this.gateTextarea,
+      requiredElement(this.root, "#gate-sql-suggestions"),
+      this.listenerController.signal,
+    );
 
     const listenerOptions = { signal: this.listenerController.signal };
     this.executeButton.addEventListener("click", () => void this.executeQuery(), listenerOptions);
@@ -500,6 +527,7 @@ export class AppShell {
     }
 
     let reopenAfterResolution = false;
+    this.combatAutocomplete.hide();
     this.busy = true;
     requiredElement(this.root, ".game-stage").classList.add("is-resolving");
     this.executeButton.disabled = true;
@@ -581,6 +609,7 @@ export class AppShell {
       return;
     }
 
+    this.gateAutocomplete.hide();
     this.busy = true;
     this.gateExecuteButton.disabled = true;
     requiredElement(this.root, ".game-stage").classList.add("is-resolving");
@@ -660,6 +689,7 @@ export class AppShell {
   private closeTerminal(returnFocus = true): void {
     if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
     this.terminalFocusTimer = null;
+    this.combatAutocomplete.hide();
     this.terminal.classList.remove("is-open");
     if (!this.isGateTerminalOpen()) this.root.classList.remove("terminal-active");
     this.terminal.inert = true;
@@ -713,6 +743,7 @@ export class AppShell {
   private hideGateTerminal(returnFocus = true): void {
     if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
     this.terminalFocusTimer = null;
+    this.gateAutocomplete.hide();
     this.gateTerminal.classList.remove("is-open");
     this.root.classList.remove("gate-terminal-active");
     if (!this.isTerminalOpen()) this.root.classList.remove("terminal-active");
@@ -967,6 +998,7 @@ export class AppShell {
   private renderGateChallenge(snapshot: GameSnapshot, entered: boolean): void {
     const challenge = snapshot.activeGateChallenge;
     if (!challenge) return;
+    this.gateAutocomplete.setSchemaLines(challenge.schema);
     requiredElement(this.root, "#gate-terminal-title").textContent = challenge.title;
     requiredElement(this.root, "#gate-terminal-objective").textContent = challenge.objective;
 
@@ -1053,6 +1085,7 @@ export class AppShell {
   }
 
   private renderSchema(lines: string[]): void {
+    this.combatAutocomplete.setSchemaLines(lines);
     const root = requiredElement(this.root, "#schema-list");
     root.replaceChildren();
     lines.forEach((line) => {

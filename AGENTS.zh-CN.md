@@ -39,6 +39,7 @@ MySQL 面试八股范围。
 ```text
 index.html -> src/main.ts
   -> AppShell（DOM HUD、发现式小地图、新手引导、SQL 终端与证据）
+  -> SqlAutocomplete（可见 Schema 词汇、排序、替换与 Listbox）
   -> GameSession（权威迷宫、演员、迷雾、战斗、掉落和永久档案）
   -> RunGraph（课程依赖与兴趣点图）
   -> MazeGenerator/MazeValidation（确定性 64×48 物理世界）
@@ -75,7 +76,9 @@ index.html -> src/main.ts
 `src/content/mvpLevel.ts`，第二层内容位于 `src/content/floor2Level.ts`；房间氛围与局内奖励位于
 `src/content/runContent.ts`；可选 Boss 门题目与语义结果约束位于
 `src/content/gateChallenges.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL
-阶段都从空编辑器开始。
+阶段都从空编辑器开始。`src/ui/sqlAutocomplete.ts` 负责从当前可见 Schema 与 MVP SQL 词汇中
+确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得生成完整答案、
+提交查询或绕过课程判定。
 
 ## 仓库地图
 
@@ -118,6 +121,10 @@ python3 scripts/validate-rules.py
 - SQL 通过 `sql.js`/SQLite WASM 完全在浏览器执行，查询与游戏数据不会发送到后端。
 - 战斗终端只接受一条 `SELECT`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面
   最多显示 50 行结果。
+- 两个 SQL 输入框都提供 IDE 式 `PLAN ASSIST` Listbox。输入前缀会显示排序后的关键词、函数、
+  表名与字段名；`Ctrl/Command + Space` 打开语境提示，方向键移动选择，`Enter`/`Tab` 或指针
+  接受，`Escape` 先关闭建议再关闭终端。输入 `m.` 等限定别名时，只显示解析到的可见表字段；
+  接受建议不会提交查询，也不会增加查询次数。
 - 第一层判定进一步限定为一条平坦 `SELECT`，不允许 `OR`、子查询、`UNION`、`INTERSECT` 或
   `EXCEPT`；支持表别名限定列，也支持在 `HAVING` 中使用题目要求的 `total` 别名。
 - 当前 I/O 热量使用 SQLite `EXPLAIN QUERY PLAN`。这是 SQLite 证据，不是 MySQL 执行计划。
