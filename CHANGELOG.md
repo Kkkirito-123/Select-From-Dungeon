@@ -10,6 +10,7 @@
 - 同步产品、仓库指南、课程、地图、设计状态、存档和归因边界。
 - 保持 `run:v10`、`profile:v2` 与 `onboarding:v1`，不制造仅因发布版本变化的存档迁移。
 - 以完整自动化、生产构建和多视口浏览器检查作为发布门；部署与 GitHub Release 另行决定。
+- 归档：[PR #20](https://github.com/Kkkirito-123/select-from-dungeon/pull/20)。
 
 ## `0.11.0` — 2026-07-24
 
@@ -67,4 +68,3 @@
 
 - 加入浏览器本地 SQL 答题记录、最近战斗与当前楼层复盘。
 - 归档：[PR #10](https://github.com/Kkkirito-123/select-from-dungeon/pull/10)。
-
