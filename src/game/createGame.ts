@@ -20,6 +20,11 @@ export function createGame(
     pixelArt: true,
     antialias: false,
     roundPixels: true,
+    fps: {
+      target: 30,
+      limit: 30,
+      smoothStep: true,
+    },
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,

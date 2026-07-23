@@ -130,6 +130,11 @@ export class AppShell {
   private settlementShownAtMove: number | null = null;
   private floorTransitionTimer: number | null = null;
   private defeatRespawnTimer: number | null = null;
+  private lastLocksSignature: string | null = null;
+  private lastSchemaSignature: string | null = null;
+  private lastHintsSignature: string | null = null;
+  private lastMasterySignature: string | null = null;
+  private lastRelicsSignature: string | null = null;
   private reviewContext: "manual" | "campfire" | "death" = "manual";
   private reviewScope: AnswerReviewScope = "all";
   private activeNotice: FeedbackNotice | null = null;
@@ -313,8 +318,8 @@ export class AppShell {
               <div><span class="hud-label">生命</span><strong id="hp-value">2 / 2</strong></div>
               <div id="player-hp-progress" class="meter" role="progressbar" aria-label="玩家生命值" aria-valuemin="0" aria-valuenow="2" aria-valuemax="2"><span id="hp-meter"></span></div>
               <div class="level-chip"><span class="hud-label">等级</span><strong id="level-value">LV.1 · 0 / 2 XP</strong></div>
-              <div><span class="hud-label">I/O 热量</span><strong id="heat-value">0</strong></div>
-              <div id="heat-progress" class="meter heat" role="progressbar" aria-label="I/O 热量" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100"><span id="heat-meter"></span></div>
+              <div id="heat-chip" hidden><span class="hud-label">查询负载</span><strong id="heat-value">0</strong></div>
+              <div id="heat-progress" class="meter heat" role="progressbar" aria-label="SQLite 教学查询负载" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100" hidden><span id="heat-meter"></span></div>
               <div class="weapon-chip"><span class="hud-label">武器</span><strong id="weapon-name">数据之刃</strong></div>
               <div class="armor-chip"><span class="hud-label">防具</span><strong id="armor-name">无防具</strong></div>
               <div class="relic-chip"><span class="hud-label">遗物</span><strong id="relic-count">0</strong></div>
@@ -1807,6 +1812,9 @@ export class AppShell {
       `${snapshot.player.hp} / ${snapshot.player.maxHp}`,
     );
     requiredElement(this.root, "#heat-value").textContent = String(snapshot.player.heat);
+    const heatUnlocked = snapshot.floor >= 7;
+    requiredElement<HTMLElement>(this.root, "#heat-chip").hidden = !heatUnlocked;
+    requiredElement<HTMLElement>(this.root, "#heat-progress").hidden = !heatUnlocked;
     this.renderProgress(
       "#heat-progress",
       "#heat-meter",
@@ -1849,12 +1857,34 @@ export class AppShell {
     this.renderLootMenu(snapshot, enteredLoot);
 
     this.renderTarget(target, snapshot);
-    this.renderLocks(snapshot);
-    this.renderSchema(snapshot.schema);
-    this.renderHints(snapshot.hints);
+    const locksSignature = snapshot.locks.join("\u0000");
+    if (locksSignature !== this.lastLocksSignature) {
+      this.lastLocksSignature = locksSignature;
+      this.renderLocks(snapshot);
+    }
+    const schemaSignature = snapshot.schema.join("\u0000");
+    if (schemaSignature !== this.lastSchemaSignature) {
+      this.lastSchemaSignature = schemaSignature;
+      this.renderSchema(snapshot.schema);
+    }
+    const hintsSignature = snapshot.hints.join("\u0000");
+    if (hintsSignature !== this.lastHintsSignature) {
+      this.lastHintsSignature = hintsSignature;
+      this.renderHints(snapshot.hints);
+    }
     this.renderMazeMap(snapshot);
-    this.renderMastery(snapshot);
-    this.renderRelics(snapshot);
+    const masterySignature = snapshot.profile.masteredLessons.join("\u0000");
+    if (masterySignature !== this.lastMasterySignature) {
+      this.lastMasterySignature = masterySignature;
+      this.renderMastery(snapshot);
+    }
+    const relicsSignature = snapshot.relics
+      .map((relic) => `${relic.id}:${relic.description}`)
+      .join("\u0000");
+    if (relicsSignature !== this.lastRelicsSignature) {
+      this.lastRelicsSignature = relicsSignature;
+      this.renderRelics(snapshot);
+    }
     this.renderGateChallenge(snapshot, enteredChallenge);
     const latestPickup = pickedItems.at(-1) ?? guidedPickup;
     if (latestPickup) {

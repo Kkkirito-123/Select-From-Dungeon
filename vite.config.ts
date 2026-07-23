@@ -24,6 +24,23 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: false,
+    // Phaser ships as one upstream ESM module and cannot be split internally.
+    // Keep it in a separately cached lazy chunk; this limit applies to that
+    // known vendor boundary, while the first-party entry remains much smaller.
+    chunkSizeWarningLimit: 1_800,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "phaser-runtime",
+              test: /node_modules[\\/]phaser/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
   },
   server: {
     host: "0.0.0.0",

@@ -276,12 +276,13 @@ export class ArcadeAudio {
   private gestureCleanup: (() => void) | null = null;
   private initializing: Promise<boolean> | null = null;
   private disposed = false;
+  private pageHiddenValue = false;
   private modeValue: ArcadeMusicMode;
   private mutedValue: boolean;
   private volumeValue: number;
 
   private readonly contextStateHandler = (): void => {
-    if (this.context?.state === "running") {
+    if (this.context?.state === "running" && !this.pageHiddenValue) {
       this.startMusicScheduler();
     } else {
       this.clearModeTransition(true);
@@ -368,7 +369,7 @@ export class ArcadeAudio {
 
   /** Call directly from a user gesture when the host already owns that event. */
   async initialize(): Promise<boolean> {
-    if (this.disposed) return false;
+    if (this.disposed || this.pageHiddenValue) return false;
     if (this.context) return this.resume();
     if (this.initializing) return this.initializing;
 
@@ -383,7 +384,7 @@ export class ArcadeAudio {
 
   /** Retries a suspended AudioContext, normally from a fresh user gesture. */
   async resume(): Promise<boolean> {
-    if (this.disposed) return false;
+    if (this.disposed || this.pageHiddenValue) return false;
     if (!this.context) return this.initialize();
     if (this.context.state === "closed") return false;
 
@@ -484,8 +485,32 @@ export class ArcadeAudio {
     this.applyMasterVolume();
   }
 
+  /** Stops all scheduled audio work while the page is hidden. */
+  async setPageHidden(hidden: boolean): Promise<void> {
+    if (this.disposed) return;
+    this.pageHiddenValue = hidden;
+    const context = this.context;
+    if (hidden) {
+      this.clearModeTransition(true);
+      this.stopMusicScheduler(true);
+      this.stopSources(this.sfxSources);
+      if (context?.state === "running") {
+        try {
+          await context.suspend();
+        } catch {
+          // Embedded browsers may reject suspension during lifecycle changes.
+        }
+      }
+      if (!this.pageHiddenValue && !this.mutedValue) await this.resume();
+      return;
+    }
+    if (!this.mutedValue && context && context.state !== "closed") {
+      await this.resume();
+    }
+  }
+
   async playSfx(effect: ArcadeSfx): Promise<boolean> {
-    if (this.disposed || this.mutedValue) return false;
+    if (this.disposed || this.mutedValue || this.pageHiddenValue) return false;
     if (!(await this.resume()) || !this.context || !this.sfxGain) return false;
 
     const startAt = this.context.currentTime + 0.012;
@@ -594,6 +619,7 @@ export class ArcadeAudio {
     if (
       this.schedulerTimer !== null ||
       this.disposed ||
+      this.pageHiddenValue ||
       this.mutedValue ||
       this.context?.state !== "running" ||
       !this.musicGain

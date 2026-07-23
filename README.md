@@ -27,7 +27,7 @@ and turn the correct result into an animated attack.
 - The header now shows the current slot out of eight. A validated campaign
   scaffold defines all eight ordered floor seeds, curriculum prerequisites,
   exercise tiers, encounter roles, themes, and content pools. All eight floors
-  are executable in v0.10.
+  are executable in v0.10 and hardened for low-cost play in v0.11.
 - Collecting a Boss key on floors one through seven shows a gold
   `FLOOR NN CLEARED / CONGRATULATIONS!!` transition for approximately 1.5
   seconds and automatically enters the next floor—no extra pathfinding, `E`
@@ -442,12 +442,21 @@ The browser startup pass verified `01 / 08`, all 47 Codex entries, and zero
 console warnings/errors at 1280×720 and 390×844; the narrow document and body
 both remained exactly 390 px wide. Late-floor browser visuals remain covered by
 domain content/palette tests rather than a human-operated eight-floor Run.
+The v0.11.0 pass locks the balance contract, coalesces non-critical movement
+saves, pauses rendering/audio while the page is hidden, limits rendering to
+30 FPS, and memoizes unchanged HUD lists. Ten seconds of continuous browser
+movement kept the DOM at 487 nodes, produced no long tasks, and wrote one
+trailing save. Reduced Motion, a 640 px reflow proxy for desktop 200% zoom, and
+390×844 touch input all remained free of horizontal overflow; essential
+controls were at least 44 px, inventory focus landed on its close button, and
+the console reported zero warnings/errors. The production build now separates
+the approximately 474 kB startup entry, 1.38 MB cached Phaser runtime, and
+660 kB SQLite WASM without the previous generic main-chunk warning.
 Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
-same-seed reload. A complete human-operated eight-floor browser Run, 200%/320px layout,
-Reduced Motion, subjective audio/timing, and the 10-second
-performance/save-rate checks have not yet been run. Unit tests and a successful
-build do not substitute for those checks. Domain automation physically walks
+same-seed reload. A complete human-operated eight-floor browser Run, exact
+320 px layout, and subjective audio/timing have not yet been run. Unit tests and
+a successful build do not substitute for those checks. Domain automation physically walks
 both floor-one branch orders, all seven automatic transitions, and all 47 lesson
 groups through floor eight without Session travel or positioning helpers; that is
 still not a human-operated browser Run.
