@@ -16,7 +16,13 @@ export type BiomeKind =
   | "spirit-crypt"
   | "fire-forge"
   | "frost-vault"
-  | "storm-core";
+  | "storm-core"
+  | "iron-yard"
+  | "barracks"
+  | "black-citadel"
+  | "magma-nest"
+  | "crystal-cavern"
+  | "dragon-throne";
 
 export type BiomeEncounterRole = "normal" | "mini-elite" | "area-boss";
 
@@ -465,6 +471,202 @@ export const FLOOR_FOUR_BIOME_MONSTERS: readonly Monster[] = [
     status: "forging",
     weakness: "cte",
     masterId: 17,
+    isBoss: false,
+    rank: "elite",
+  }),
+] as const;
+
+export const FLOOR_FIVE_BIOME_MONSTERS: readonly Monster[] = [
+  biomeMonster({
+    floor: 5,
+    id: 29,
+    lessonId: "f5-over",
+    roomId: 67,
+    name: "小妖",
+    species: "iron_goblin",
+    kind: "goblin",
+    hp: 18,
+    maxHp: 18,
+    armor: 0,
+    damage: 2,
+    attackName: "铁钉投掷",
+    status: "scouting",
+    weakness: "partition",
+    masterId: 33,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 5,
+    id: 30,
+    lessonId: "f5-row-number",
+    roomId: 68,
+    name: "战兽",
+    species: "barracks_orc",
+    kind: "orc",
+    hp: 20,
+    maxHp: 20,
+    armor: 0,
+    damage: 2,
+    attackName: "肩甲冲撞",
+    status: "marching",
+    weakness: "row-number",
+    masterId: 33,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 5,
+    id: 31,
+    lessonId: "f5-rank",
+    roomId: 68,
+    name: "铁卫",
+    species: "iron_guard",
+    kind: "knight",
+    hp: 24,
+    maxHp: 24,
+    armor: 1,
+    damage: 3,
+    attackName: "盾墙推进",
+    status: "guarding",
+    weakness: "rank",
+    masterId: 33,
+    isBoss: false,
+    rank: "elite",
+  }),
+  biomeMonster({
+    floor: 5,
+    id: 32,
+    lessonId: "f5-frame",
+    roomId: 69,
+    name: "巨魔",
+    species: "citadel_troll",
+    kind: "troll",
+    hp: 22,
+    maxHp: 22,
+    armor: 0,
+    damage: 2,
+    attackName: "石块砸击",
+    status: "hauling",
+    weakness: "frame",
+    masterId: 33,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 5,
+    id: 33,
+    lessonId: "f5-top-n",
+    roomId: 70,
+    name: "堡主",
+    species: "citadel_lord",
+    kind: "castle-lord",
+    hp: 36,
+    maxHp: 36,
+    armor: 2,
+    damage: 3,
+    attackName: "城弩齐射",
+    status: "commanding",
+    weakness: "top-n",
+    masterId: 28,
+    isBoss: false,
+    rank: "elite",
+  }),
+] as const;
+
+export const FLOOR_SIX_BIOME_MONSTERS: readonly Monster[] = [
+  biomeMonster({
+    floor: 6,
+    id: 40,
+    lessonId: "f6-insert",
+    roomId: 77,
+    name: "小龙",
+    species: "nest_hatchling",
+    kind: "hatchling",
+    hp: 20,
+    maxHp: 20,
+    armor: 0,
+    damage: 2,
+    attackName: "幼焰喷吐",
+    status: "restless",
+    weakness: "insert",
+    masterId: 44,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 6,
+    id: 41,
+    lessonId: "f6-update",
+    roomId: 77,
+    name: "翼龙",
+    species: "magma_wyvern",
+    kind: "wyvern",
+    hp: 22,
+    maxHp: 22,
+    armor: 0,
+    damage: 2,
+    attackName: "翼爪扫击",
+    status: "circling",
+    weakness: "update",
+    masterId: 44,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 6,
+    id: 42,
+    lessonId: "f6-transaction",
+    roomId: 78,
+    name: "雷龙",
+    species: "cavern_thunder_drake",
+    kind: "dragon",
+    hp: 29,
+    maxHp: 29,
+    armor: 1,
+    damage: 3,
+    attackName: "雷息",
+    status: "charged",
+    weakness: "rollback",
+    masterId: 44,
+    isBoss: false,
+    rank: "elite",
+  }),
+  biomeMonster({
+    floor: 6,
+    id: 43,
+    lessonId: "f6-constraint",
+    roomId: 78,
+    name: "晶龙",
+    species: "cavern_crystal_drake",
+    kind: "dragon",
+    hp: 23,
+    maxHp: 23,
+    armor: 0,
+    damage: 2,
+    attackName: "晶片飞射",
+    status: "crystallized",
+    weakness: "constraint",
+    masterId: 44,
+    isBoss: false,
+    rank: "normal",
+  }),
+  biomeMonster({
+    floor: 6,
+    id: 44,
+    lessonId: "f6-savepoint",
+    roomId: 80,
+    name: "古龙",
+    species: "ancient_cave_dragon",
+    kind: "dragon-king",
+    hp: 40,
+    maxHp: 40,
+    armor: 2,
+    damage: 4,
+    attackName: "古焰轰击",
+    status: "ancient",
+    weakness: "savepoint",
+    masterId: 39,
     isBoss: false,
     rank: "elite",
   }),
@@ -966,6 +1168,198 @@ const FORGE_BOSS_CORE: LessonStageDefinition = {
   attackTargetIds: [22],
 };
 
+const PRACTICE_GOBLIN: LessonStageDefinition = {
+  id: "practice-goblin",
+  objective: "查询 id 29 到 30 的 name，并按 master_id 分区计算 guard_total。",
+  queryTemplate: "",
+  answerSql: "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 29 AND 30 ORDER BY id;",
+  hints: [
+    "返回 name 与 guard_total。",
+    "使用 COUNT(*) OVER (...)。",
+    "按 master_id 分区。",
+    "完整写法：SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 29 AND 30 ORDER BY id;",
+  ],
+  locks: ["OVER", "PARTITION BY"],
+  requiredFeatures: ["over", "partition-by"],
+  attackTargetIds: [29],
+};
+
+const PRACTICE_ORC: LessonStageDefinition = {
+  id: "practice-orc",
+  objective: "连接装备表，对 id 29 到 30 按 power 降序生成 pos，并按 pos 返回 name。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 30 ORDER BY pos;",
+  hints: [
+    "返回 name 与 pos。",
+    "使用 ROW_NUMBER() OVER (...)。",
+    "窗口按装备 power DESC、id 排序。",
+    "完整写法：SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 30 ORDER BY pos;",
+  ],
+  locks: ["ROW_NUMBER", "ORDER BY"],
+  requiredFeatures: ["row-number", "order-by"],
+  attackTargetIds: [30],
+};
+
+const PRACTICE_KNIGHT: LessonStageDefinition = {
+  id: "practice-knight",
+  objective: "连接装备表，查询 id 30 到 31 的 name、power 与 rank_no，按 power 降序排列。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 30 AND 31 ORDER BY g.power DESC, m.id;",
+  hints: [
+    "返回 name、power、rank_no。",
+    "rank_no 使用 RANK()。",
+    "窗口按装备 power DESC。",
+    "完整写法：SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 30 AND 31 ORDER BY g.power DESC, m.id;",
+  ],
+  locks: ["RANK", "OVER"],
+  requiredFeatures: ["rank", "over"],
+  attackTargetIds: [31],
+};
+
+const PRACTICE_TROLL: LessonStageDefinition = {
+  id: "practice-troll",
+  objective: "连接装备表，查询 id 29 到 32 的 name 与 running_power，按 id 累计 power。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32 ORDER BY m.id;",
+  hints: [
+    "返回 name 与 running_power。",
+    "使用 SUM(g.power) OVER (...)。",
+    "写明从第一行到当前行的 ROWS Frame。",
+    "完整写法：SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32 ORDER BY m.id;",
+  ],
+  locks: ["OVER", "ROWS FRAME"],
+  requiredFeatures: ["over", "window-frame"],
+  attackTargetIds: [32],
+};
+
+const IRON_BOSS_SCAN: LessonStageDefinition = {
+  id: "iron-boss-scan",
+  objective: "用 CTE 和 ROW_NUMBER 找出 id 29 到 32 中装备 power 最高的 name、power。",
+  queryTemplate: "",
+  answerSql: "WITH ranked AS (SELECT m.name, g.power, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32) SELECT name, power FROM ranked WHERE rn = 1;",
+  hints: [
+    "先在 ranked CTE 内编号。",
+    "窗口按装备 power DESC、id 排序。",
+    "外层保留 rn = 1。",
+    "完整写法：WITH ranked AS (SELECT m.name, g.power, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32) SELECT name, power FROM ranked WHERE rn = 1;",
+  ],
+  locks: ["WITH", "ROW_NUMBER"],
+  requiredFeatures: ["cte", "row-number"],
+  attackTargetIds: [33],
+};
+
+const IRON_BOSS_CORE: LessonStageDefinition = {
+  id: "iron-boss-core",
+  objective: "连接装备表，查询 id 29 到 32 的 name 与 prev_power，用 LAG 按 id 读取上一行 power。",
+  queryTemplate: "",
+  answerSql: "SELECT m.name, LAG(g.power) OVER (ORDER BY m.id) AS prev_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32 ORDER BY m.id;",
+  hints: [
+    "返回 name 与 prev_power。",
+    "使用 LAG(g.power)。",
+    "窗口和结果都按 id 排序。",
+    "完整写法：SELECT m.name, LAG(g.power) OVER (ORDER BY m.id) AS prev_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32 ORDER BY m.id;",
+  ],
+  locks: ["LAG", "ORDER BY"],
+  requiredFeatures: ["lag", "order-by"],
+  attackTargetIds: [33],
+};
+
+const PRACTICE_HATCHLING: LessonStageDefinition = {
+  id: "practice-hatchling",
+  objective: "向 repair_queue 写入 id = 7、item = 'ember'、quantity = 1、status = 'ready'。",
+  queryTemplate: "",
+  answerSql: "INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'ember', 1, 'ready');",
+  hints: [
+    "使用 INSERT INTO repair_queue。",
+    "明确写出四个字段。",
+    "值是 7、'ember'、1、'ready'。",
+    "完整写法：INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'ember', 1, 'ready');",
+  ],
+  locks: ["INSERT"],
+  requiredFeatures: ["insert"],
+  attackTargetIds: [40],
+};
+
+const PRACTICE_WYVERN: LessonStageDefinition = {
+  id: "practice-wyvern",
+  objective: "把 repair_queue 中 id = 1 的 quantity 更新为 3。",
+  queryTemplate: "",
+  answerSql: "UPDATE repair_queue SET quantity = 3 WHERE id = 1;",
+  hints: [
+    "使用 UPDATE repair_queue。",
+    "SET quantity = 3。",
+    "WHERE id = 1。",
+    "完整写法：UPDATE repair_queue SET quantity = 3 WHERE id = 1;",
+  ],
+  locks: ["UPDATE", "WHERE"],
+  requiredFeatures: ["update", "where"],
+  attackTargetIds: [41],
+};
+
+const PRACTICE_THUNDER_DRAKE: LessonStageDefinition = {
+  id: "practice-thunder-drake",
+  objective: "BEGIN 后把 id = 1 的 quantity 改成 8，再 ROLLBACK。",
+  queryTemplate: "",
+  answerSql: "BEGIN; UPDATE repair_queue SET quantity = 8 WHERE id = 1; ROLLBACK;",
+  hints: [
+    "第一条是 BEGIN。",
+    "中间 UPDATE id = 1。",
+    "最后 ROLLBACK。",
+    "完整写法：BEGIN; UPDATE repair_queue SET quantity = 8 WHERE id = 1; ROLLBACK;",
+  ],
+  locks: ["BEGIN", "UPDATE", "ROLLBACK"],
+  requiredFeatures: ["transaction", "update", "rollback"],
+  attackTargetIds: [42],
+};
+
+const PRACTICE_CRYSTAL_DRAKE: LessonStageDefinition = {
+  id: "practice-crystal-drake",
+  objective: "用 INSERT OR IGNORE 尝试写入 quantity = -2 的无效 id = 7，保持沙箱不变。",
+  queryTemplate: "",
+  answerSql: "INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (7, 'bad', -2, 'ready');",
+  hints: [
+    "使用 INSERT OR IGNORE。",
+    "目标表是 repair_queue。",
+    "无效 quantity 是 -2。",
+    "完整写法：INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (7, 'bad', -2, 'ready');",
+  ],
+  locks: ["INSERT", "OR IGNORE"],
+  requiredFeatures: ["insert", "constraint"],
+  attackTargetIds: [43],
+};
+
+const DRAGON_BOSS_SCAN: LessonStageDefinition = {
+  id: "dragon-boss-scan",
+  objective: "修复 id = 2 后建立 clean 保存点；删除 id = 3，再 ROLLBACK TO clean 并 COMMIT。",
+  queryTemplate: "",
+  answerSql: "BEGIN; UPDATE repair_queue SET status = 'fixed' WHERE id = 2; SAVEPOINT clean; DELETE FROM repair_queue WHERE id = 3; ROLLBACK TO clean; COMMIT;",
+  hints: [
+    "先 BEGIN 并修复 id = 2。",
+    "建立 SAVEPOINT clean。",
+    "删除 id = 3 后 ROLLBACK TO clean。",
+    "完整写法：BEGIN; UPDATE repair_queue SET status = 'fixed' WHERE id = 2; SAVEPOINT clean; DELETE FROM repair_queue WHERE id = 3; ROLLBACK TO clean; COMMIT;",
+  ],
+  locks: ["SAVEPOINT", "ROLLBACK TO", "COMMIT"],
+  requiredFeatures: ["savepoint", "rollback", "commit"],
+  attackTargetIds: [44],
+};
+
+const DRAGON_BOSS_CORE: LessonStageDefinition = {
+  id: "dragon-boss-core",
+  objective: "BEGIN 后建立 keep 保存点，删除 id = 4，RELEASE keep 并 COMMIT。",
+  queryTemplate: "",
+  answerSql: "BEGIN; SAVEPOINT keep; DELETE FROM repair_queue WHERE id = 4; RELEASE keep; COMMIT;",
+  hints: [
+    "先 BEGIN。",
+    "建立 SAVEPOINT keep。",
+    "删除 id = 4，RELEASE 后 COMMIT。",
+    "完整写法：BEGIN; SAVEPOINT keep; DELETE FROM repair_queue WHERE id = 4; RELEASE keep; COMMIT;",
+  ],
+  locks: ["SAVEPOINT", "RELEASE", "COMMIT"],
+  requiredFeatures: ["savepoint", "delete", "commit"],
+  attackTargetIds: [44],
+};
+
 export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 111, floor: 1, biome: "drainage", role: "normal", randomEncounter: true, stages: [PRACTICE_SELECT] },
   { monsterId: 211, floor: 1, biome: "slime-pool", role: "normal", randomEncounter: true, stages: [PRACTICE_WHERE] },
@@ -989,6 +1383,16 @@ export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 20, floor: 4, biome: "storm-core", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_STORM, PRACTICE_STORM_CORE] },
   { monsterId: 21, floor: 4, biome: "storm-core", role: "normal", randomEncounter: true, stages: [PRACTICE_SPARK] },
   { monsterId: 22, floor: 4, biome: "fire-forge", role: "area-boss", randomEncounter: false, stages: [FORGE_BOSS_SCAN, FORGE_BOSS_CORE] },
+  { monsterId: 29, floor: 5, biome: "iron-yard", role: "normal", randomEncounter: true, stages: [PRACTICE_GOBLIN] },
+  { monsterId: 30, floor: 5, biome: "barracks", role: "normal", randomEncounter: true, stages: [PRACTICE_ORC] },
+  { monsterId: 31, floor: 5, biome: "barracks", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_KNIGHT] },
+  { monsterId: 32, floor: 5, biome: "black-citadel", role: "normal", randomEncounter: true, stages: [PRACTICE_TROLL] },
+  { monsterId: 33, floor: 5, biome: "black-citadel", role: "area-boss", randomEncounter: false, stages: [IRON_BOSS_SCAN, IRON_BOSS_CORE] },
+  { monsterId: 40, floor: 6, biome: "magma-nest", role: "normal", randomEncounter: true, stages: [PRACTICE_HATCHLING] },
+  { monsterId: 41, floor: 6, biome: "magma-nest", role: "normal", randomEncounter: true, stages: [PRACTICE_WYVERN] },
+  { monsterId: 42, floor: 6, biome: "crystal-cavern", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_THUNDER_DRAKE] },
+  { monsterId: 43, floor: 6, biome: "crystal-cavern", role: "normal", randomEncounter: true, stages: [PRACTICE_CRYSTAL_DRAKE] },
+  { monsterId: 44, floor: 6, biome: "dragon-throne", role: "area-boss", randomEncounter: false, stages: [DRAGON_BOSS_SCAN, DRAGON_BOSS_CORE] },
 ] as const;
 
 export const BIOME_PRACTICE_STAGES: Readonly<Record<number, readonly LessonStageDefinition[]>> =
@@ -1024,6 +1428,8 @@ export function weightedBiomeEncounterIds(
         ...FLOOR_TWO_BIOME_MONSTERS,
         ...FLOOR_THREE_BIOME_MONSTERS,
         ...FLOOR_FOUR_BIOME_MONSTERS,
+        ...FLOOR_FIVE_BIOME_MONSTERS,
+        ...FLOOR_SIX_BIOME_MONSTERS,
       ]
         .find((monster) => monster.id === encounter.monsterId)?.lessonId ?? "select",
     )
@@ -1031,7 +1437,9 @@ export function weightedBiomeEncounterIds(
   const normal = available.filter((encounter) => encounter.role === "normal");
   const elites = available.filter((encounter) => encounter.role === "mini-elite");
   if (normal.length === 0) return [];
-  const eliteShare = floor === 1 ? 5 : floor === 2 ? 7 : floor === 3 ? 9 : 11;
+  const eliteShare = floor === 1
+    ? 5
+    : floor === 2 ? 7 : floor === 3 ? 9 : floor === 4 ? 11 : floor === 5 ? 13 : 15;
   const normalCopies = Math.max(1, Math.floor((100 - eliteShare) / normal.length));
   const eliteCopies = elites.length === 0 ? 0 : Math.max(1, Math.floor(eliteShare / elites.length));
   return [

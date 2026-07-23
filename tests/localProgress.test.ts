@@ -149,7 +149,7 @@ describe("localProgress", () => {
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
   });
 
-  it("v0.7 的 profile:v2 会补齐第三、四层计数而不丢失旧掌握记录", () => {
+  it("旧 profile:v2 会补齐第三至六层计数而不丢失旧掌握记录", () => {
     const storage = new MemoryStorage();
     const oldProfile = createEmptyProfile();
     oldProfile.masteredLessons = ["select", "where"];
@@ -168,6 +168,18 @@ describe("localProgress", () => {
       "f4-correlated",
       "f4-cte",
       "f4-recursive",
+      "f5-over",
+      "f5-row-number",
+      "f5-rank",
+      "f5-lag-lead",
+      "f5-frame",
+      "f5-top-n",
+      "f6-insert",
+      "f6-update",
+      "f6-delete",
+      "f6-constraint",
+      "f6-transaction",
+      "f6-savepoint",
     ].forEach((lesson) => delete oldAttempts[lesson]);
     storage.setItem(PROFILE_SAVE_KEY, JSON.stringify({
       ...oldProfile,
@@ -179,6 +191,8 @@ describe("localProgress", () => {
     expect(restored.attempts.select).toBe(4);
     expect(restored.attempts["f3-inner"]).toBe(0);
     expect(restored.attempts["f4-recursive"]).toBe(0);
+    expect(restored.attempts["f5-top-n"]).toBe(0);
+    expect(restored.attempts["f6-savepoint"]).toBe(0);
   });
 
   it("旧 run:v1/v2 不读取，也不会被 v9 清理动作删除", () => {

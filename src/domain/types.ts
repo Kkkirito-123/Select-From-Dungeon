@@ -78,7 +78,33 @@ export type LessonStageId =
   | "practice-storm-core"
   | "practice-spark"
   | "forge-boss-scan"
-  | "forge-boss-core";
+  | "forge-boss-core"
+  | "f5-over-count"
+  | "f5-row-number-order"
+  | "f5-rank-ties"
+  | "f5-lag-lead-delta"
+  | "f5-frame-running"
+  | "f5-top-n-groups"
+  | "f5-top-n-core"
+  | "practice-goblin"
+  | "practice-orc"
+  | "practice-knight"
+  | "practice-troll"
+  | "iron-boss-scan"
+  | "iron-boss-core"
+  | "f6-insert-row"
+  | "f6-update-target"
+  | "f6-delete-duplicate"
+  | "f6-constraint-ignore"
+  | "f6-transaction-rollback"
+  | "f6-savepoint-rollback"
+  | "f6-savepoint-commit"
+  | "practice-hatchling"
+  | "practice-wyvern"
+  | "practice-thunder-drake"
+  | "practice-crystal-drake"
+  | "dragon-boss-scan"
+  | "dragon-boss-core";
 
 export type PlayMode =
   | "explore"
@@ -97,7 +123,9 @@ export type GateChallengeId =
   | "aggregate-breach"
   | "relation-breach"
   | "grave-breach"
-  | "forge-breach";
+  | "forge-breach"
+  | "iron-breach"
+  | "dragon-breach";
 
 export type MonsterKind =
   | "projection-slime"
@@ -116,7 +144,16 @@ export type MonsterKind =
   | "fire-spirit"
   | "ice-spirit"
   | "thunder-spirit"
-  | "elemental-king";
+  | "elemental-king"
+  | "goblin"
+  | "orc"
+  | "knight"
+  | "troll"
+  | "castle-lord"
+  | "hatchling"
+  | "wyvern"
+  | "dragon"
+  | "dragon-king";
 
 export type QueryFeature =
   | "select"
@@ -139,7 +176,23 @@ export type QueryFeature =
   | "in"
   | "exists"
   | "cte"
-  | "recursive";
+  | "recursive"
+  | "over"
+  | "partition-by"
+  | "row-number"
+  | "rank"
+  | "dense-rank"
+  | "lag"
+  | "lead"
+  | "window-frame"
+  | "insert"
+  | "update"
+  | "delete"
+  | "constraint"
+  | "transaction"
+  | "savepoint"
+  | "rollback"
+  | "commit";
 
 export interface Position {
   x: number;
@@ -187,7 +240,9 @@ export interface Weapon {
     | "slime-sword"
     | "hunter-bow"
     | "bone-blade"
-    | "rune-staff";
+    | "rune-staff"
+    | "iron-axe"
+    | "dragon-spear";
   name: string;
   damage: number;
   heatReduction: number;
@@ -195,7 +250,13 @@ export interface Weapon {
 }
 
 export interface Armor {
-  id: "slime-vest" | "vine-armor" | "bone-armor" | "rune-armor";
+  id:
+    | "slime-vest"
+    | "vine-armor"
+    | "bone-armor"
+    | "rune-armor"
+    | "iron-armor"
+    | "dragon-armor";
   name: string;
   maxArmor: number;
   description: string;
@@ -219,6 +280,8 @@ export interface Consumable {
     | "holy-water"
     | "fire-crystal"
     | "ice-crystal"
+    | "repair-plate"
+    | "dragon-potion"
     | "whetstone"
     | "repair-shard";
   name: string;

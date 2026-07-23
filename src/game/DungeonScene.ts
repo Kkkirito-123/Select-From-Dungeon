@@ -149,6 +149,58 @@ const FLOOR_FOUR_ZONE_COLORS: Record<MazeZone["type"], number> = {
   boss: 0x571c27,
 };
 
+const FLOOR_FIVE_COLORS = {
+  void: 0x05080b,
+  wall: 0x222b32,
+  wallTop: 0x687681,
+  floor: 0x161d22,
+  floorAlt: 0x1e272d,
+  line: 0x0b1115,
+  query: 0x82d5c8,
+  gold: 0xe0ae4b,
+  ember: 0xb94d42,
+  paper: 0xe9e4d6,
+  plum: 0x735b82,
+  fog: 0x020405,
+} as const;
+
+const FLOOR_FIVE_ZONE_COLORS: Record<MazeZone["type"], number> = {
+  entry: 0x22292b,
+  tutorial: 0x213538,
+  lesson: 0x2b3035,
+  rest: 0x332820,
+  treasure: 0x37321e,
+  event: 0x282936,
+  elite: 0x40311f,
+  boss: 0x421d1b,
+};
+
+const FLOOR_SIX_COLORS = {
+  void: 0x0b0303,
+  wall: 0x352421,
+  wallTop: 0x8a5a43,
+  floor: 0x241512,
+  floorAlt: 0x311b16,
+  line: 0x160a08,
+  query: 0x6ce0d5,
+  gold: 0xf0bd55,
+  ember: 0xf15a3f,
+  paper: 0xffead2,
+  plum: 0x8b4f86,
+  fog: 0x050101,
+} as const;
+
+const FLOOR_SIX_ZONE_COLORS: Record<MazeZone["type"], number> = {
+  entry: 0x31211b,
+  tutorial: 0x22403c,
+  lesson: 0x3d241e,
+  rest: 0x43271c,
+  treasure: 0x49361f,
+  event: 0x382237,
+  elite: 0x52251c,
+  boss: 0x5d1815,
+};
+
 const BIOME_COLORS = {
   drainage: { floor: 0x203138, wall: 0x364a50, accent: 0x6d9da5 },
   "slime-pool": { floor: 0x21372f, wall: 0x344b3d, accent: 0x70c489 },
@@ -162,12 +214,20 @@ const BIOME_COLORS = {
   "fire-forge": { floor: 0x4a211c, wall: 0x682d24, accent: 0xff8c51 },
   "frost-vault": { floor: 0x18384b, wall: 0x28556b, accent: 0x8cdef4 },
   "storm-core": { floor: 0x282451, wall: 0x403a72, accent: 0xc58df4 },
+  "iron-yard": { floor: 0x202a2d, wall: 0x38464b, accent: 0x94b9bd },
+  barracks: { floor: 0x352b22, wall: 0x504136, accent: 0xd39d5e },
+  "black-citadel": { floor: 0x28282c, wall: 0x434248, accent: 0xd5b65b },
+  "magma-nest": { floor: 0x482018, wall: 0x682d21, accent: 0xff7749 },
+  "crystal-cavern": { floor: 0x263046, wall: 0x3f4d68, accent: 0x75dfdc },
+  "dragon-throne": { floor: 0x3d171b, wall: 0x5a252b, accent: 0xf0b955 },
 } as const;
 
 function colorsForFloor(floor: GameSnapshot["floor"]) {
   if (floor === 2) return FLOOR_TWO_COLORS;
   if (floor === 3) return FLOOR_THREE_COLORS;
   if (floor === 4) return FLOOR_FOUR_COLORS;
+  if (floor === 5) return FLOOR_FIVE_COLORS;
+  if (floor === 6) return FLOOR_SIX_COLORS;
   return COLORS;
 }
 
@@ -175,6 +235,8 @@ function zoneColorsForFloor(floor: GameSnapshot["floor"]): Record<MazeZone["type
   if (floor === 2) return FLOOR_TWO_ZONE_COLORS;
   if (floor === 3) return FLOOR_THREE_ZONE_COLORS;
   if (floor === 4) return FLOOR_FOUR_ZONE_COLORS;
+  if (floor === 5) return FLOOR_FIVE_ZONE_COLORS;
+  if (floor === 6) return FLOOR_SIX_ZONE_COLORS;
   return ZONE_COLORS;
 }
 
@@ -647,6 +709,43 @@ export class DungeonScene extends Phaser.Scene {
           this.add.triangle(pixel.x - 4, pixel.y, -5, 9, 0, -12, 5, 9, 0x9d78dc, 0.9),
           this.add.triangle(pixel.x + 5, pixel.y + 3, -4, 7, 0, -8, 4, 7, 0x6fdbe6, 0.86),
         );
+      } else if (feature.kind === "iron") {
+        parts.push(
+          this.add.rectangle(pixel.x - 4, pixel.y, 18, 5, 0x85939a).setAngle(36),
+          this.add.rectangle(pixel.x + 4, pixel.y, 18, 5, 0x59656b).setAngle(-36),
+          this.add.rectangle(pixel.x, pixel.y + 7, 14, 3, 0xd0a94d),
+        );
+      } else if (feature.kind === "banner") {
+        parts.push(
+          this.add.rectangle(pixel.x - 6, pixel.y, 3, 25, 0xa7a08e),
+          this.add.rectangle(pixel.x + 3, pixel.y - 6, 15, 13, 0x99453d)
+            .setStrokeStyle(1, 0xd5aa52),
+        );
+      } else if (feature.kind === "battlement") {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y + 4, 24, 14, 0x4d5559)
+            .setStrokeStyle(1, 0x899397),
+          this.add.rectangle(pixel.x - 8, pixel.y - 5, 6, 8, 0x697378),
+          this.add.rectangle(pixel.x + 8, pixel.y - 5, 6, 8, 0x697378),
+        );
+      } else if (feature.kind === "egg") {
+        parts.push(
+          this.add.ellipse(pixel.x, pixel.y + 2, 16, 23, 0xc8b58b)
+            .setStrokeStyle(2, 0xe96845),
+          this.add.rectangle(pixel.x + 3, pixel.y - 2, 4, 6, 0x754b47, 0.76),
+        );
+      } else if (feature.kind === "magma") {
+        parts.push(
+          this.add.ellipse(pixel.x, pixel.y + 3, 25, 12, 0xa93424, 0.88)
+            .setStrokeStyle(1, 0xff7b40),
+          this.add.rectangle(pixel.x - 3, pixel.y + 1, 11, 2, 0xffc257, 0.92),
+        );
+      } else if (feature.kind === "dragon-bone") {
+        parts.push(
+          this.add.rectangle(pixel.x, pixel.y + 3, 24, 4, 0xd9c7a2).setAngle(-18),
+          this.add.triangle(pixel.x - 11, pixel.y - 2, -5, 6, 0, -7, 5, 6, 0xbda782),
+          this.add.triangle(pixel.x + 11, pixel.y + 3, -4, 5, 0, -6, 4, 5, 0xbda782),
+        );
       } else {
         parts.push(
           this.add.rectangle(pixel.x, pixel.y, 18, 8, 0x385563, 0.56)
@@ -888,6 +987,8 @@ export class DungeonScene extends Phaser.Scene {
       2: "ORDER BY 信标",
       3: "INNER JOIN 信标",
       4: "SUBQUERY 信标",
+      5: "OVER 信标",
+      6: "INSERT 信标",
     };
     const label = this.add.text(0, -18, beaconLabels[this.snapshot.floor], {
       color: this.snapshot.floor === 1 ? "#91e3d1" : "#9eeeff",
@@ -974,6 +1075,52 @@ export class DungeonScene extends Phaser.Scene {
         this.add.triangle(0, -18, -13, 10, 0, -12, 13, 10, elementColor, 0.94),
         this.add.rectangle(-7, 1, 4, 5, 0xfaf5d8),
         this.add.rectangle(7, 1, 4, 5, 0xfaf5d8),
+      ];
+    }
+    if (
+      monster.kind === "goblin" ||
+      monster.kind === "orc" ||
+      monster.kind === "knight" ||
+      monster.kind === "troll" ||
+      monster.kind === "castle-lord"
+    ) {
+      const armored = monster.kind === "knight" || monster.kind === "castle-lord";
+      const large = monster.kind === "troll" || monster.kind === "castle-lord";
+      const body = armored
+        ? 0x66727a
+        : monster.kind === "orc" ? 0x667743 : monster.kind === "troll" ? 0x6f665d : 0x558054;
+      return [
+        this.add.rectangle(0, 5, large ? 43 : 32, large ? 40 : 31, body)
+          .setStrokeStyle(2, 0x292d2c),
+        this.add.rectangle(0, -15, large ? 34 : 27, large ? 22 : 19, mixColor(body, 0xffffff, 0.16)),
+        this.add.rectangle(-7, -16, 4, 5, 0xf0ce6a),
+        this.add.rectangle(7, -16, 4, 5, 0xf0ce6a),
+        ...(armored ? [this.add.rectangle(0, 4, large ? 36 : 27, 8, 0xa9b0b2, 0.72)] : []),
+        ...(monster.kind === "castle-lord"
+          ? [this.add.triangle(0, -33, -14, 9, 0, -9, 14, 9, 0xd5aa52)]
+          : []),
+      ];
+    }
+    if (
+      monster.kind === "hatchling" ||
+      monster.kind === "wyvern" ||
+      monster.kind === "dragon" ||
+      monster.kind === "dragon-king"
+    ) {
+      const large = monster.kind === "dragon" || monster.kind === "dragon-king";
+      const body = monster.species.includes("crystal")
+        ? 0x558ca3
+        : monster.species.includes("thunder") ? 0x8063a6 : 0xa54b38;
+      return [
+        this.add.rectangle(0, 4, large ? 48 : 35, large ? 38 : 29, body)
+          .setStrokeStyle(2, 0x3f1d1a),
+        this.add.triangle(-30, 2, 0, 12, 21, 0, 21, 24, mixColor(body, 0xffffff, 0.18), 0.9),
+        this.add.triangle(30, 2, 0, 0, 21, 12, 0, 24, mixColor(body, 0xffffff, 0.18), 0.9),
+        this.add.rectangle(-7, -7, 4, 5, 0xffe28a),
+        this.add.rectangle(7, -7, 4, 5, 0xffe28a),
+        ...(monster.kind === "dragon-king"
+          ? [this.add.triangle(0, -29, -15, 9, 0, -10, 15, 9, 0xefbd55)]
+          : []),
       ];
     }
     if (monster.species.includes("frog")) {

@@ -3,7 +3,11 @@ import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { SQL_SCHEMA_DDL } from "../content/sqlSchema";
 import { detectQueryFeatures } from "../domain/lessonEvaluator";
 import type { Monster, SqlQueryResult } from "../domain/types";
-import { validateReadOnlyQuery } from "../domain/queryPolicy";
+import {
+  validateReadOnlyQuery,
+  validateSandboxScript,
+} from "../domain/queryPolicy";
+import type { FloorNumber } from "../domain/runGraph";
 
 const MAX_RESULT_ROWS = 50;
 
@@ -91,6 +95,43 @@ export class SqlEngine {
     };
   }
 
+  execute(input: string, floor: FloorNumber): SqlQueryResult {
+    return floor === 6
+      ? this.executeSandbox(input)
+      : this.executeSelect(input);
+  }
+
+  executeSandbox(input: string): SqlQueryResult {
+    const validation = validateSandboxScript(input);
+    if (!validation.ok) {
+      throw new Error(validation.message);
+    }
+    const sandbox = new this.SQL.Database(this.database.export());
+    try {
+      sandbox.run(validation.sql);
+      const snapshot = sandbox.exec(
+        "SELECT id, item, quantity, status FROM repair_queue ORDER BY id",
+      )[0];
+      const columns = snapshot?.columns ?? [];
+      const rows = snapshot ? rowsFromResult(snapshot.columns, snapshot.values) : [];
+      return {
+        sql: validation.sql,
+        columns,
+        rows,
+        targetIds: [],
+        plan: [
+          "COPY in-memory SQLite sandbox",
+          `${validation.statements.length} controlled statement(s)`,
+          "DISCARD sandbox after this turn",
+        ],
+        baseHeat: 4 + validation.statements.length,
+        features: detectQueryFeatures(validation.sql),
+      };
+    } finally {
+      sandbox.close();
+    }
+  }
+
   updateMonsterHp(updates: Array<{ id: number; hp: number }>): void {
     const statement = this.database.prepare(
       "UPDATE monsters SET hp = $hp WHERE id = $id",
@@ -111,6 +152,13 @@ export class SqlEngine {
   private seed(monsters: Monster[]): void {
     this.database.run(`
       ${SQL_SCHEMA_DDL}
+
+      CREATE TABLE repair_queue (
+        id INTEGER PRIMARY KEY,
+        item TEXT NOT NULL,
+        quantity INTEGER NOT NULL CHECK(quantity BETWEEN 0 AND 9),
+        status TEXT NOT NULL
+      );
 
       CREATE INDEX idx_monsters_room_status
         ON monsters(room_id, status);
@@ -189,7 +237,27 @@ export class SqlEngine {
         (57, '火苗池', 'fire-forge', 4),
         (58, '冰晶窟', 'frost-vault', 4),
         (59, '雷兽巢', 'storm-core', 4),
-        (60, '炉主核心', 'forge-boss', 4);
+        (60, '炉主核心', 'forge-boss', 4),
+        (61, '黑铁外门', 'outer', 5),
+        (62, '外城军阵', 'outer', 5),
+        (63, '竞技场', 'arena', 5),
+        (64, '巡逻城墙', 'arena', 5),
+        (65, '累计城墙', 'wall', 5),
+        (66, '城主厅', 'core', 5),
+        (67, '黑铁外城', 'iron-yard', 5),
+        (68, '兽人兵营', 'barracks', 5),
+        (69, '要塞内城', 'black-citadel', 5),
+        (70, '堡主炮台', 'citadel-boss', 5),
+        (71, '孵化台', 'hatchery', 6),
+        (72, '翼龙巢', 'sky', 6),
+        (73, '雷龙洞', 'thunder', 6),
+        (74, '龙晶门', 'crystal', 6),
+        (75, '事务熔洞', 'magma', 6),
+        (76, '龙王巢', 'core', 6),
+        (77, '岩浆孵化场', 'magma-nest', 6),
+        (78, '龙晶洞窟', 'crystal-cavern', 6),
+        (79, '古龙骨道', 'dragon-throne', 6),
+        (80, '古龙王台', 'dragon-boss', 6);
 
       INSERT INTO monster_gear(id, monster_id, gear_name, power) VALUES
         (1, 1200, '雷序军刀', 13),
@@ -213,7 +281,36 @@ export class SqlEngine {
         (19, 17, '元素核', 26),
         (20, 20, '雷兽爪', 19),
         (21, 22, '炉主锤', 22),
-        (22, 21, '电容核', 16);
+        (22, 21, '电容核', 16),
+        (23, 23, '短矛', 18),
+        (24, 25, '黑铁盾', 20),
+        (25, 26, '骑枪', 22),
+        (26, 27, '城墙锤', 24),
+        (27, 28, '城主冠', 28),
+        (28, 31, '卫队盾', 24),
+        (29, 33, '堡垒弩', 26),
+        (30, 34, '幼龙爪', 20),
+        (31, 36, '雷龙角', 24),
+        (32, 37, '龙晶甲', 25),
+        (33, 38, '古龙鳞', 28),
+        (34, 39, '龙王冠', 32),
+        (35, 42, '雷核', 29),
+        (36, 44, '古龙骨', 30),
+        (49, 24, '战斧', 20),
+        (50, 29, '侦察短刀', 18),
+        (51, 30, '兽骨肩甲', 20),
+        (52, 32, '投石索', 22),
+        (53, 35, '翼爪', 22),
+        (54, 40, '火壳', 21),
+        (55, 41, '翼刃', 23),
+        (56, 43, '晶爪', 27);
+
+      INSERT INTO repair_queue(id, item, quantity, status) VALUES
+        (1, 'ore', 2, 'ready'),
+        (2, 'scale', 1, 'damaged'),
+        (3, 'fang', 1, 'duplicate'),
+        (4, 'fang', 1, 'duplicate'),
+        (5, 'core', 1, 'ready');
     `);
 
     const insertMonster = this.database.prepare(`

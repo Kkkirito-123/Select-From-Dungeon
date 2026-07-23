@@ -20,6 +20,7 @@ export type TopologyStrategy =
   | "nested-chambers"
   | "partition-rings"
   | "rollback-factory"
+  | "rollback-nest"
   | "btree-branches"
   | "throne-ascent";
 
@@ -351,47 +352,47 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
   floorContract({
     floor: 5,
     id: "floor-5",
-    name: "星轨窗口观测塔",
+    name: "黑铁窗口要塞",
     learningGoal: "在保留明细行的同时完成排名、相邻比较和累计统计。",
     runtime: "sqlite-readonly",
     runtimeNotice: "题目在浏览器内真实执行 SQLite 窗口查询。",
     lessons: FLOOR_FIVE_LESSONS,
-    encounterNames: ["哥布林", "兽人队长", "巨魔", "黑骑士", "城主"],
-    monsterPool: ["哥布林", "兽人", "骑士", "兽人队长", "城主"],
+    encounterNames: ["哥布林", "兽人", "铁骑", "巨魔", "城主"],
+    monsterPool: ["哥布林", "兽人", "骑士", "铁骑", "巨魔", "城主"],
     equipmentPool: ["iron-axe", "iron-armor"],
     lootPool: ["repair-plate", "iron-axe", "knight-sword", "iron-armor"],
     completionRewardId: "course-proof:floor-5",
     nextFloorKeyId: "floor-key:6",
     theme: {
       topology: "partition-rings",
-      worldElement: "星光与时间环",
-      material: "天文金属与玻璃",
-      landmark: "分区星轨",
-      bossArena: "星盘圆厅",
-      palette: ["#091426", "#243d70", "#7ec8ff", "#eadb80"],
+      worldElement: "城墙、军阵与黑铁",
+      material: "铆钉黑铁与旧石",
+      landmark: "分区军阵",
+      bossArena: "黑铁王厅",
+      palette: ["#05080b", "#222b32", "#82d5c8", "#e0ae4b"],
     },
   }),
   floorContract({
     floor: 6,
     id: "floor-6",
-    name: "熔火回滚铸造厂",
+    name: "巨龙事务熔巢",
     learningGoal: "在隔离副本中安全写入、验证约束并正确提交或回滚。",
     runtime: "sqlite-sandbox",
     runtimeNotice: "写操作只进入一次性 SQLite 沙箱，退出后不污染课程与永久档案。",
     lessons: FLOOR_SIX_LESSONS,
     encounterNames: ["幼龙", "雷龙", "晶龙", "巨龙", "龙王"],
     monsterPool: ["幼龙", "飞龙", "雷龙", "巨龙", "龙王"],
-    equipmentPool: ["dragon-spear", "dragon-scale-armor"],
-    lootPool: ["dragon-potion", "dragon-fang", "dragon-spear", "dragon-scale-armor"],
+    equipmentPool: ["dragon-spear", "dragon-armor"],
+    lootPool: ["dragon-potion", "repair-plate", "dragon-spear", "dragon-armor"],
     completionRewardId: "course-proof:floor-6",
     nextFloorKeyId: "floor-key:7",
     theme: {
-      topology: "rollback-factory",
-      worldElement: "熔岩与冷却液",
-      material: "黑铁与管线",
-      landmark: "事务保存点",
-      bossArena: "双状态事务熔炉",
-      palette: ["#151719", "#4a2a22", "#e25932", "#68c9cf"],
+      topology: "rollback-nest",
+      worldElement: "熔岩、龙晶与古龙骨",
+      material: "火山岩与龙晶",
+      landmark: "保存点龙巢",
+      bossArena: "古龙王座",
+      palette: ["#0b0303", "#352421", "#f15a3f", "#6ce0d5"],
     },
   }),
   floorContract({

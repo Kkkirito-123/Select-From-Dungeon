@@ -9,3 +9,4 @@ dist/
 coverage/
 .vite/
 output/playwright/
+.playwright-cli/

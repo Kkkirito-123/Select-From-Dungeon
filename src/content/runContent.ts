@@ -258,6 +258,18 @@ const REWARD_CATALOG: Partial<Record<RoomReward, ClaimableReward>> = {
     description: "领取第四层必修武器，把子查询结果转化为元素伤害。",
     kind: "weapon",
   },
+  "iron-axe": {
+    id: "iron-axe",
+    name: "黑铁斧",
+    description: "领取第五层必修武器，把窗口排名转化为黑铁重击。",
+    kind: "weapon",
+  },
+  "dragon-spear": {
+    id: "dragon-spear",
+    name: "龙枪",
+    description: "领取第六层必修武器，在一次性事务沙箱中稳定破甲。",
+    kind: "weapon",
+  },
   "floor-key": {
     id: "floor-key",
     name: "本层钥匙",
@@ -273,6 +285,32 @@ export function rewardDetails(reward: RoomReward | null): ClaimableReward | null
 }
 
 export function roomFlavor(type: RoomType, floor = 1): string {
+  if (floor === 6) {
+    const floorSixCopy: Record<RoomType, string> = {
+      entry: "熔巢石门已闭合。所有写操作只进入本场一次性 SQLite 副本。",
+      tutorial: "孵化台等待一条明确列名的 INSERT，永久怪物档案不会被修改。",
+      lesson: "龙巢修复队要求精确 WHERE、约束证据与可验证的前后状态。",
+      rest: "龙息篝火隔绝沙箱操作。靠近后按 E 休息或复盘。",
+      treasure: "龙鳞宝库只提供构筑奖励，不改变事务夹具。",
+      event: "古龙碑记录失败路径，但不会写入永久世界。",
+      elite: "事务熔洞要求在提交和回滚之间做出明确选择。",
+      boss: "龙王守着保存点；局部错误必须回滚，正确修复必须提交。",
+    };
+    return floorSixCopy[type];
+  }
+  if (floor === 5) {
+    const floorFiveCopy: Record<RoomType, string> = {
+      entry: "黑铁城门已经落锁。外城、兵营与内城由同一 Seed 固定。",
+      tutorial: "哥布林军阵保留每名士兵，同时在 OVER 窗口内完成分区统计。",
+      lesson: "要塞守军按区域、顺序与前后行组织，窗口定义决定结果。",
+      rest: "铁炉篝火稳定军阵。靠近后按 E 休息或复盘。",
+      treasure: "军械宝库只改变当前构筑，不替代窗口函数。",
+      event: "战旗回廊记录本轮路线，不改变必修数据。",
+      elite: "累计城墙要求明确 ROWS Frame，不能依赖模糊默认值。",
+      boss: "城主把每个区域的前 N 名藏进 CTE。",
+    };
+    return floorFiveCopy[type];
+  }
   if (floor === 4) {
     const floorFourCopy: Record<RoomType, string> = {
       entry: "熔炉升降台已经锁定本层 Seed。火、冰与雷晶区域等待探索。",

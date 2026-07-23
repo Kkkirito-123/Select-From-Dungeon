@@ -150,11 +150,83 @@ const FLOOR_FOUR_CHALLENGE: GateChallengeDefinition = {
   ],
 };
 
+const FLOOR_FIVE_CHALLENGE: GateChallengeDefinition = {
+  id: "iron-breach",
+  title: "黑铁越权协议 · 窗口军阵",
+  objective: "用 CTE 与 ROW_NUMBER 找出第五层每个 sector 中装备 power 最高的怪物。依次返回 sector、name、power、rn；按 power 降序、sector 升序，只取前 3 行。",
+  schema: [
+    sqlSchemaLine("monsters"),
+    sqlSchemaLine("rooms"),
+    sqlSchemaLine("monster_gear"),
+    "关系：monsters.room_id = rooms.id；monster_gear.monster_id = monsters.id",
+  ],
+  hints: [
+    "CTE 中连接 monsters、rooms 与 monster_gear，并用 rooms.floor = 5 限定楼层。",
+    "ROW_NUMBER 按 sector 分区，在分区内按 power DESC、id ASC。",
+    "外层保留 rn = 1，按 power DESC、sector ASC 排序并 LIMIT 3。",
+  ],
+  requiredFeatures: [
+    "select",
+    "from",
+    "where",
+    "join",
+    "on",
+    "cte",
+    "row-number",
+    "partition-by",
+    "order-by",
+    "limit",
+  ],
+  expectedColumns: ["sector", "name", "power", "rn"],
+  expectedRows: [
+    { sector: "core", name: "城主", power: 28, rn: 1 },
+    { sector: "citadel-boss", name: "堡主", power: 26, rn: 1 },
+    { sector: "barracks", name: "铁卫", power: 24, rn: 1 },
+  ],
+};
+
+const FLOOR_SIX_CHALLENGE: GateChallengeDefinition = {
+  id: "dragon-breach",
+  title: "龙巢越权协议 · 分区预演",
+  objective: "不修改数据：用 CTE 与 ROW_NUMBER 找出第六层每个 sector 中装备 power 最高的怪物。依次返回 id、name、power；按 power 降序、id 升序，只取前 3 行。",
+  schema: [
+    sqlSchemaLine("monsters"),
+    sqlSchemaLine("rooms"),
+    sqlSchemaLine("monster_gear"),
+    "关系：monsters.room_id = rooms.id；monster_gear.monster_id = monsters.id",
+  ],
+  hints: [
+    "机关仍是只读查询，不会开放 repair_queue 写权限。",
+    "CTE 中连接装备表，按 sector 分区，以 power DESC、id ASC 编号。",
+    "外层保留 rn = 1，按 power DESC、id ASC 排序并 LIMIT 3。",
+  ],
+  requiredFeatures: [
+    "select",
+    "from",
+    "where",
+    "join",
+    "on",
+    "cte",
+    "row-number",
+    "partition-by",
+    "order-by",
+    "limit",
+  ],
+  expectedColumns: ["id", "name", "power"],
+  expectedRows: [
+    { id: 39, name: "龙王", power: 32 },
+    { id: 44, name: "古龙", power: 30 },
+    { id: 42, name: "雷龙", power: 29 },
+  ],
+};
+
 function definitionForFloor(floor: FloorNumber): GateChallengeDefinition {
   if (floor === 1) return FLOOR_ONE_CHALLENGE;
   if (floor === 2) return FLOOR_TWO_CHALLENGE;
   if (floor === 3) return FLOOR_THREE_CHALLENGE;
-  return FLOOR_FOUR_CHALLENGE;
+  if (floor === 4) return FLOOR_FOUR_CHALLENGE;
+  if (floor === 5) return FLOOR_FIVE_CHALLENGE;
+  return FLOOR_SIX_CHALLENGE;
 }
 
 export function gateChallengeForFloor(

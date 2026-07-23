@@ -1,8 +1,8 @@
 # SQL Demon Castle Eight-Floor Curriculum Blueprint
 
-Status: **v0.8.0 implements the eight-floor data contract and playable content
-for floors one through four; floors five through eight remain planned**
-Target: staged expansion after the current four-floor MVP
+Status: **v0.9.0 implements the eight-floor data contract and playable content
+for floors one through six; floors seven and eight remain planned**
+Target: staged expansion after the current six-floor MVP
 Primary users: SQL beginners, interview reviewers, level designers, and content maintainers
 
 **English** | [简体中文](CURRICULUM.zh-CN.md)
@@ -69,8 +69,8 @@ every SQL dialect, DBA command, or production incident skill.
 | 2 | Aggregate Clocktower | Aggregate functions, grouping, group filters, and conditional aggregation | Query | Produce a grouped ranking |
 | 3 | Undead Grave City | Inner, left, self, multi-table joins, and set operations | Query | Audit grave-city relations and gear |
 | 4 | Elemental Forge | Scalar, `IN`, `EXISTS`, correlated subqueries, CTEs, and recursive CTEs | Query | Recursively trace the elemental chain |
-| 5 | Window Observatory | Partitions, ranks, neighboring rows, and rolling windows | Query | Per-group Top-N and trend analysis |
-| 6 | Rollback Foundry | Data changes, constraints, transactions, savepoints, and ACID | Disposable sandbox | Repair data and roll back safely |
+| 5 | Black-Iron Window Fortress | Partitions, ranks, neighboring rows, and rolling windows | Query | Per-group Top-N and trend analysis |
+| 6 | Dragon Transaction Nest | Data changes, constraints, transactions, savepoints, and ACID | Disposable sandbox | Repair data and roll back safely |
 | 7 | Crystal Index Grove | B+ trees, composite and covering indexes, invalidation, and plans | Query + plan | Reduce the cost of a composite query |
 | 8 | Obsidian Data Throne | MVCC, locks, anomalies, modeling, replication, sharding, and safety | Incident diagnosis | Multi-stage database interview finale |
 
@@ -186,7 +186,7 @@ equivalent query or an explicitly labeled concept demonstration.
 **Preview breach**: use `ROW_NUMBER() OVER (...)` for the top monster in each
 sector.
 
-### Floor 5: Window Observatory
+### Floor 5: Black-Iron Window Fortress
 
 **Goal**: rank, compare, and accumulate without collapsing detail rows.
 **Prerequisite**: Floor 4 CTEs and aggregation.
@@ -194,14 +194,14 @@ sector.
 
 | Node | Monster | Concept | Clear evidence |
 |---|---|---|---|
-| 5-1 | Partition Ghost | `OVER`, `PARTITION BY` | Explain row-count differences from `GROUP BY` |
-| 5-2 | Number Guard | `ROW_NUMBER` | Produce a deterministic unique order |
-| 5-3 | Rank Twins | `RANK`, `DENSE_RANK` | Handle ties and rank gaps |
-| 5-4 | Neighbor Hound | `LAG`, `LEAD` | Compare neighboring events |
-| 5-5 | Rolling Golem | running and moving windows | Define ordering and the frame |
-| 5-6 | Top-N Officer | CTE + window filter | Return the top N rows per group |
+| 5-1 | Goblin | `OVER`, `PARTITION BY` | Explain row-count differences from `GROUP BY` |
+| 5-2 | Orc | `ROW_NUMBER` | Produce a deterministic unique order |
+| 5-3 | Knight | `RANK`, `DENSE_RANK` | Handle ties and rank gaps |
+| 5-4 | Iron Rider | `LAG`, `LEAD` | Compare neighboring events |
+| 5-5 | Troll | running total and explicit frame | Define ordering and the frame |
+| 5-6 | Castle Lord | CTE + window filter | Return the top N rows per group |
 
-**Boss — Temporal Observer**
+**Boss — Castle Lord**
 
 - rank monsters inside every sector;
 - retain the top two in each group;
@@ -209,11 +209,11 @@ sector.
 - calculate cumulative regional threat;
 - remain correct when values are tied.
 
-**Guaranteed reward**: Window Compass and Temporal Cloak.
+**Guaranteed reward**: Iron Axe, with Iron Armor in the floor loot pool.
 **Preview breach**: complete five writes in a disposable copy, then restore the
 original state with `ROLLBACK`.
 
-### Floor 6: Rollback Foundry
+### Floor 6: Dragon Transaction Nest
 
 **Goal**: modify data safely and understand transaction boundaries and recovery.
 **Prerequisite**: Floors 1–5 query skills.
@@ -222,14 +222,14 @@ failure, and reload must never mutate permanent curriculum data.
 
 | Node | Monster | Concept | Clear evidence |
 |---|---|---|---|
-| 6-1 | Insert Smith | `INSERT` | Name columns and satisfy data constraints |
-| 6-2 | Repair Guard | `UPDATE ... WHERE` | Preview scope; reject accidental full-table updates |
-| 6-3 | Cleanup Slime | `DELETE ... WHERE` | Verify the deletion set with an equivalent `SELECT` |
-| 6-4 | Constraint Golem | primary, unique, null, check, and reference constraints | Diagnose a failed write |
-| 6-5 | Rollback Knight | `BEGIN`, `COMMIT`, `ROLLBACK` | Distinguish success and failure paths |
-| 6-6 | Savepoint Mage | `SAVEPOINT`, `ROLLBACK TO` | Undo only a local transaction error |
+| 6-1 | Hatchling | `INSERT` | Name columns and satisfy the check constraint |
+| 6-2 | Wyvern | `UPDATE ... WHERE` | Reject accidental full-table updates |
+| 6-3 | Thunder Dragon | `DELETE ... WHERE` | Delete only the targeted duplicate |
+| 6-4 | Crystal Dragon | `CHECK`, `INSERT OR IGNORE` | Keep an invalid row out of the final state |
+| 6-5 | Dragon | `BEGIN`, `ROLLBACK` | Verify the fully restored state |
+| 6-6 | Dragon King | `SAVEPOINT`, `ROLLBACK TO`, `RELEASE`, `COMMIT` | Compare local rollback and accepted changes |
 
-**Boss — Transaction Furnace**
+**Boss — Dragon King**
 
 - insert a repair record in one isolated transaction;
 - update an exact target and delete a duplicate;
@@ -238,7 +238,7 @@ failure, and reload must never mutate permanent curriculum data.
 - verify both committed sandbox state and untouched permanent data;
 - explain ACID through the scenario rather than only recalling the acronym.
 
-**Guaranteed reward**: Rollback Shield and Constraint Armor.
+**Guaranteed reward**: Dragon Spear, with Dragon Armor in the floor loot pool.
 **Preview breach**: read query plans and select five effective index options.
 
 ### Floor 7: Crystal Index Grove
@@ -392,15 +392,17 @@ Implementations must ensure:
 - data changes occur only in a disposable sandbox, and plan/transaction tests
   never mutate permanent progress.
 
-## 8. Current Four Floors and the Long-Term Blueprint
+## 8. Current Six Floors and the Long-Term Blueprint
 
-The current playable MVP retains the original first two floors and adds two
-more in v0.8.0:
+The current playable MVP retains the original first two floors, adds floors
+three and four in v0.8.0, and adds floors five and six in v0.9.0:
 
 - Floor 1: `SELECT`, `WHERE`, `IS NULL`, `GROUP BY`, `HAVING`
 - Floor 2: `ORDER BY`, `DISTINCT`, `INNER JOIN`, `LEFT JOIN`, composite `JOIN`
 - Floor 3: inner/left/self/three-table joins, `UNION`, and relation audit
 - Floor 4: scalar, `IN`, `EXISTS`, correlated subqueries, CTE, and recursive CTE
+- Floor 5: `OVER`, `ROW_NUMBER`, ranking, `LAG/LEAD`, frames, and grouped Top-N
+- Floor 6: `INSERT`, `UPDATE`, `DELETE`, constraints, transactions, and savepoints
 
 It remains playable, but its order is not the long-term curriculum. Reuse its
 monsters, fixtures, and evaluators instead of rewriting everything at once:
@@ -460,7 +462,7 @@ migration, and browser acceptance route.
   concurrency.
 - Hints grow from concepts to structure and never auto-fill the answer.
 - Mastery distinguishes hinted clears from independent changed-data solutions.
-- The current four floors have an incremental, reversible migration path.
+- The current six floors have an incremental, reversible migration path.
 - Every implementation stage can be reviewed and accepted in isolation.
 
 ### Risks and trade-offs

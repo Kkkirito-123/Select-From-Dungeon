@@ -18,8 +18,10 @@ import {
 import { JOIN_CHAIN, SORT_SABER } from "./floor2Level";
 import { BONE_BLADE } from "./floor3Level";
 import { RUNE_STAFF } from "./floor4Level";
+import { IRON_AXE } from "./floor5Level";
+import { DRAGON_SPEAR } from "./floor6Level";
 
-export { BONE_BLADE, RUNE_STAFF };
+export { BONE_BLADE, RUNE_STAFF, IRON_AXE, DRAGON_SPEAR };
 
 export const EQUIPMENT_CAPACITY = 12;
 export const CONSUMABLE_SLOT_CAPACITY = 3;
@@ -65,6 +67,18 @@ export const ARMORS: Readonly<Record<Armor["id"], Armor>> = {
     name: "符文甲",
     maxArmor: 2,
     description: "元素符文稳定的护甲，提供 2 点护甲生命。",
+  },
+  "iron-armor": {
+    id: "iron-armor",
+    name: "黑铁甲",
+    maxArmor: 3,
+    description: "要塞军械库锻造的重甲，提供 3 点护甲生命。",
+  },
+  "dragon-armor": {
+    id: "dragon-armor",
+    name: "龙鳞甲",
+    maxArmor: 3,
+    description: "巨龙鳞片编成的护甲，提供 3 点护甲生命。",
   },
 };
 
@@ -118,6 +132,20 @@ export const CONSUMABLES: Readonly<Record<Consumable["id"], Consumable>> = {
     effect: "heal-armor",
     amount: 3,
   },
+  "repair-plate": {
+    id: "repair-plate",
+    name: "铁片",
+    description: "黑铁要塞修理件，恢复当前防具的全部护甲生命。",
+    effect: "heal-armor",
+    amount: 3,
+  },
+  "dragon-potion": {
+    id: "dragon-potion",
+    name: "龙药",
+    description: "龙巢热药，恢复 2 点基础生命与 1 点护甲生命。",
+    effect: "heal-both",
+    amount: 2,
+  },
   whetstone: {
     id: "whetstone",
     name: "磨刀石",
@@ -145,6 +173,8 @@ export const WEAPONS: Readonly<Record<Weapon["id"], Weapon>> = {
   "hunter-bow": HUNTER_BOW,
   "bone-blade": BONE_BLADE,
   "rune-staff": RUNE_STAFF,
+  "iron-axe": IRON_AXE,
+  "dragon-spear": DRAGON_SPEAR,
 };
 
 export interface LootCandidate {
@@ -226,6 +256,12 @@ const BIOME_CONSUMABLE: Readonly<Record<BiomeKind, Consumable>> = {
   "fire-forge": CONSUMABLES["fire-crystal"],
   "frost-vault": CONSUMABLES["ice-crystal"],
   "storm-core": CONSUMABLES["repair-shard"],
+  "iron-yard": CONSUMABLES["repair-plate"],
+  barracks: CONSUMABLES["repair-plate"],
+  "black-citadel": CONSUMABLES.whetstone,
+  "magma-nest": CONSUMABLES["dragon-potion"],
+  "crystal-cavern": CONSUMABLES["ice-crystal"],
+  "dragon-throne": CONSUMABLES["dragon-potion"],
 };
 
 function roleProbability(
@@ -249,14 +285,17 @@ export function lootCandidatesForBiome(
   const consumable = BIOME_CONSUMABLE[biome];
   const weapon = floor === 1
     ? SLIME_SWORD
-    : floor === 2 ? HUNTER_BOW : floor === 3 ? BONE_BLADE : RUNE_STAFF;
+    : floor === 2 ? HUNTER_BOW : floor === 3 ? BONE_BLADE : floor === 4
+      ? RUNE_STAFF : floor === 5 ? IRON_AXE : DRAGON_SPEAR;
   const armor = floor === 1
     ? ARMORS["slime-vest"]
     : floor === 2 ? ARMORS["vine-armor"] : floor === 3
-      ? ARMORS["bone-armor"] : ARMORS["rune-armor"];
+      ? ARMORS["bone-armor"] : floor === 4 ? ARMORS["rune-armor"] : floor === 5
+        ? ARMORS["iron-armor"] : ARMORS["dragon-armor"];
   const nextWeapon = floor === 1
     ? SORT_SABER
-    : floor === 2 ? BONE_BLADE : floor === 3 ? RUNE_STAFF : null;
+    : floor === 2 ? BONE_BLADE : floor === 3 ? RUNE_STAFF : floor === 4
+      ? IRON_AXE : floor === 5 ? DRAGON_SPEAR : null;
   const candidates = [
     consumableCandidate(consumable, roleProbability(role, 0.06, 0.12, 0.24, 0.24)),
     consumableCandidate(
@@ -292,7 +331,9 @@ export function lootCandidatesForFloor(floor: FloorNumber): LootCandidate[] {
       ? FLOOR_TWO_CANDIDATES
       : lootCandidatesForBiome(
         floor,
-        floor === 3 ? "bone-yard" : "fire-forge",
+        floor === 3
+          ? "bone-yard"
+          : floor === 4 ? "fire-forge" : floor === 5 ? "iron-yard" : "magma-nest",
         "normal",
       );
   return candidates.map((candidate) => ({

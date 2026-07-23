@@ -153,6 +153,66 @@ const BIOME_ARENA: Readonly<Record<BiomeKind, {
     floor: 0x28234a,
     accent: "#d0b3ff",
   },
+  "iron-yard": {
+    void: 0x05080a,
+    line: 0x72868d,
+    platform: 0x29343a,
+    edge: 0x91a4aa,
+    upperA: 0x11171a,
+    upperB: 0x182126,
+    floor: 0x212c31,
+    accent: "#b3cbd0",
+  },
+  barracks: {
+    void: 0x0b0805,
+    line: 0xa67745,
+    platform: 0x3c3026,
+    edge: 0xd09b5f,
+    upperA: 0x1d1711,
+    upperB: 0x282016,
+    floor: 0x342a20,
+    accent: "#e1b77e",
+  },
+  "black-citadel": {
+    void: 0x050506,
+    line: 0xa48c4a,
+    platform: 0x333439,
+    edge: 0xd0b65b,
+    upperA: 0x151518,
+    upperB: 0x1e1f23,
+    floor: 0x2b2c31,
+    accent: "#e5ca72",
+  },
+  "magma-nest": {
+    void: 0x100302,
+    line: 0xd84d2f,
+    platform: 0x4a2119,
+    edge: 0xff7845,
+    upperA: 0x250d08,
+    upperB: 0x321009,
+    floor: 0x41180f,
+    accent: "#ff9a69",
+  },
+  "crystal-cavern": {
+    void: 0x03080e,
+    line: 0x4fa8ad,
+    platform: 0x27354a,
+    edge: 0x76dad7,
+    upperA: 0x0c1522,
+    upperB: 0x111e2e,
+    floor: 0x1d2b3e,
+    accent: "#9ce8e4",
+  },
+  "dragon-throne": {
+    void: 0x0f0204,
+    line: 0xc89245,
+    platform: 0x472027,
+    edge: 0xecb557,
+    upperA: 0x26090e,
+    upperB: 0x340d14,
+    floor: 0x40151c,
+    accent: "#f5ca76",
+  },
 };
 
 export class BattleScene extends Phaser.Scene {
@@ -473,6 +533,35 @@ export class BattleScene extends Phaser.Scene {
       }
       return;
     }
+    if (biome === "iron-yard" || biome === "barracks" || biome === "black-citadel") {
+      for (let x = 54; x < 620; x += 78) {
+        this.add.rectangle(x, 155, 42, 50, color, 0.14).setOrigin(0.5, 1);
+        this.add.rectangle(x - 13, 102, 12, 15, color, 0.2);
+        this.add.rectangle(x + 13, 102, 12, 15, color, 0.2);
+      }
+      return;
+    }
+    if (biome === "magma-nest") {
+      for (let x = 72; x < 620; x += 96) {
+        this.add.ellipse(x, 157, 54, 22, color, 0.18);
+        this.add.ellipse(x, 137, 20, 31, color, 0.14)
+          .setStrokeStyle(2, color, 0.2);
+      }
+      return;
+    }
+    if (biome === "crystal-cavern") {
+      for (let x = 62; x < 620; x += 83) {
+        this.add.polygon(x, 133, [0, -27, 13, -5, 8, 26, -10, 22, -14, -4], color, 0.18);
+      }
+      return;
+    }
+    if (biome === "dragon-throne") {
+      for (let x = 64; x < 620; x += 110) {
+        this.add.rectangle(x, 146, 70, 7, color, 0.16).setAngle(x % 3 === 0 ? -14 : 14);
+        this.add.triangle(x - 29, 131, -8, 11, 0, -13, 8, 11, color, 0.2);
+      }
+      return;
+    }
     this.add.rectangle(320, 142, 536, 22, color, 0.11)
       .setStrokeStyle(3, color, 0.22);
   }
@@ -562,6 +651,52 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(-16, 0, 9, 11, 0xfff8df),
         this.add.rectangle(16, 0, 9, 11, 0xfff8df),
       );
+    } else if (
+      monster.kind === "goblin" ||
+      monster.kind === "orc" ||
+      monster.kind === "knight" ||
+      monster.kind === "troll" ||
+      monster.kind === "castle-lord"
+    ) {
+      const armored = monster.kind === "knight" || monster.kind === "castle-lord";
+      const large = monster.kind === "troll" || monster.kind === "castle-lord";
+      const body = armored
+        ? 0x66727a
+        : monster.kind === "orc" ? 0x667743 : monster.kind === "troll" ? 0x6f665d : 0x558054;
+      parts.push(
+        this.add.rectangle(0, 11, large ? 92 : 68, large ? 84 : 66, body)
+          .setStrokeStyle(6, 0x292d2c),
+        this.add.rectangle(0, -42, large ? 72 : 57, large ? 48 : 40, body + 0x151515),
+        this.add.rectangle(-16, -44, 9, 11, 0xf0ce6a),
+        this.add.rectangle(16, -44, 9, 11, 0xf0ce6a),
+      );
+      if (armored) {
+        parts.push(this.add.rectangle(0, 9, large ? 76 : 58, 18, 0xa9b0b2, 0.72));
+      }
+      if (monster.kind === "castle-lord") {
+        parts.push(this.add.triangle(0, -80, -30, 20, 0, -21, 30, 20, COLORS.gold));
+      }
+    } else if (
+      monster.kind === "hatchling" ||
+      monster.kind === "wyvern" ||
+      monster.kind === "dragon" ||
+      monster.kind === "dragon-king"
+    ) {
+      const large = monster.kind === "dragon" || monster.kind === "dragon-king";
+      const body = monster.species.includes("crystal")
+        ? 0x558ca3
+        : monster.species.includes("thunder") ? 0x8063a6 : 0xa54b38;
+      parts.push(
+        this.add.rectangle(0, 10, large ? 103 : 76, large ? 82 : 63, body)
+          .setStrokeStyle(7, 0x3f1d1a),
+        this.add.triangle(-69, 5, 0, 29, 48, 0, 48, 58, body + 0x161616, 0.92),
+        this.add.triangle(69, 5, 0, 0, 48, 29, 0, 58, body + 0x161616, 0.92),
+        this.add.rectangle(-17, -24, 9, 11, 0xffe28a),
+        this.add.rectangle(17, -24, 9, 11, 0xffe28a),
+      );
+      if (monster.kind === "dragon-king") {
+        parts.push(this.add.triangle(0, -73, -32, 21, 0, -23, 32, 21, COLORS.gold));
+      }
     } else if (monster.species.includes("frog")) {
       const poison = monster.species.includes("poison") || monster.species.includes("boss");
       const body = poison ? 0x78893b : 0x5da05c;

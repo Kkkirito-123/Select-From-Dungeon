@@ -32,15 +32,35 @@ export const FLOOR_FOUR_LESSONS = [
   "f4-recursive",
 ] as const;
 
+export const FLOOR_FIVE_LESSONS = [
+  "f5-over",
+  "f5-row-number",
+  "f5-rank",
+  "f5-lag-lead",
+  "f5-frame",
+  "f5-top-n",
+] as const;
+
+export const FLOOR_SIX_LESSONS = [
+  "f6-insert",
+  "f6-update",
+  "f6-delete",
+  "f6-constraint",
+  "f6-transaction",
+  "f6-savepoint",
+] as const;
+
 export const REQUIRED_RUN_LESSONS = [
   ...FLOOR_ONE_LESSONS,
   ...FLOOR_TWO_LESSONS,
   ...FLOOR_THREE_LESSONS,
   ...FLOOR_FOUR_LESSONS,
+  ...FLOOR_FIVE_LESSONS,
+  ...FLOOR_SIX_LESSONS,
 ] as const;
 
 export type RunLessonId = (typeof REQUIRED_RUN_LESSONS)[number];
-export type FloorNumber = 1 | 2 | 3 | 4;
+export type FloorNumber = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type RoomType =
   | "entry"
@@ -61,6 +81,8 @@ export type RoomReward =
   | "join-chain"
   | "bone-blade"
   | "rune-staff"
+  | "iron-axe"
+  | "dragon-spear"
   | "restore-12-hp"
   | "restore-20-hp"
   | "cool-8-heat"
@@ -154,13 +176,27 @@ const REQUIRED_PREREQUISITES: Record<RunLessonId, readonly RunLessonId[]> = {
   "f4-correlated": ["f4-exists"],
   "f4-cte": ["f4-correlated"],
   "f4-recursive": ["f4-cte"],
+  "f5-over": [],
+  "f5-row-number": ["f5-over"],
+  "f5-rank": ["f5-row-number"],
+  "f5-lag-lead": ["f5-rank"],
+  "f5-frame": ["f5-lag-lead"],
+  "f5-top-n": ["f5-frame"],
+  "f6-insert": [],
+  "f6-update": ["f6-insert"],
+  "f6-delete": ["f6-update"],
+  "f6-constraint": ["f6-delete"],
+  "f6-transaction": ["f6-constraint"],
+  "f6-savepoint": ["f6-transaction"],
 };
 
 export function lessonsForFloor(floor: FloorNumber): readonly RunLessonId[] {
   if (floor === 1) return FLOOR_ONE_LESSONS;
   if (floor === 2) return FLOOR_TWO_LESSONS;
   if (floor === 3) return FLOOR_THREE_LESSONS;
-  return FLOOR_FOUR_LESSONS;
+  if (floor === 4) return FLOOR_FOUR_LESSONS;
+  if (floor === 5) return FLOOR_FIVE_LESSONS;
+  return FLOOR_SIX_LESSONS;
 }
 
 export function stableStringHash(value: string): number {
@@ -484,7 +520,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
 }
 
 interface AdvancedFloorGraphConfig {
-  floor: 3 | 4;
+  floor: 3 | 4 | 5 | 6;
   defaultSeed: string;
   entryTitle: string;
   lessonIds: readonly [
@@ -496,11 +532,11 @@ interface AdvancedFloorGraphConfig {
     RunLessonId,
   ];
   lessonTitles: readonly [string, string, string, string, string, string];
-  firstReward: "bone-blade" | "rune-staff";
+  firstReward: "bone-blade" | "rune-staff" | "iron-axe" | "dragon-spear";
   sideTitles: readonly [string, string, string];
 }
 
-const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4, AdvancedFloorGraphConfig>> = {
+const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4 | 5 | 6, AdvancedFloorGraphConfig>> = {
   3: {
     floor: 3,
     defaultSeed: "亡者墓城-第三层",
@@ -546,6 +582,52 @@ const ADVANCED_FLOOR_CONFIG: Readonly<Record<3 | 4, AdvancedFloorGraphConfig>> =
     ],
     firstReward: "rune-staff",
     sideTitles: ["熔炉篝火", "晶石宝库", "元素祭坛"],
+  },
+  5: {
+    floor: 5,
+    defaultSeed: "黑铁要塞-第五层",
+    entryTitle: "黑铁城门",
+    lessonIds: [
+      "f5-over",
+      "f5-row-number",
+      "f5-rank",
+      "f5-lag-lead",
+      "f5-frame",
+      "f5-top-n",
+    ],
+    lessonTitles: [
+      "OVER 军阵",
+      "ROW_NUMBER 哨塔",
+      "RANK 竞技场",
+      "LAG/LEAD 巡逻线",
+      "窗口 Frame 城墙",
+      "分组 Top-N 城主厅",
+    ],
+    firstReward: "iron-axe",
+    sideTitles: ["铁炉篝火", "军械宝库", "战旗回廊"],
+  },
+  6: {
+    floor: 6,
+    defaultSeed: "巨龙熔巢-第六层",
+    entryTitle: "熔巢入口",
+    lessonIds: [
+      "f6-insert",
+      "f6-update",
+      "f6-delete",
+      "f6-constraint",
+      "f6-transaction",
+      "f6-savepoint",
+    ],
+    lessonTitles: [
+      "INSERT 孵化台",
+      "UPDATE 鳞甲炉",
+      "DELETE 清巢槽",
+      "约束龙门",
+      "事务熔洞",
+      "SAVEPOINT 龙王巢",
+    ],
+    firstReward: "dragon-spear",
+    sideTitles: ["龙息篝火", "龙鳞宝库", "古龙碑廊"],
   },
 };
 
@@ -721,7 +803,7 @@ export function validateRoomGraph(graph: RoomGraph): RoomGraphValidation {
   const errors: string[] = [];
   if (
     graph.version !== 2 ||
-    !([1, 2, 3, 4] as const).includes(graph.floor)
+    !([1, 2, 3, 4, 5, 6] as const).includes(graph.floor)
   ) {
     errors.push("课程图版本或楼层无效。");
   }

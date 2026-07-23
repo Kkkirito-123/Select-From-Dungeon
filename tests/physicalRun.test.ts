@@ -38,6 +38,21 @@ function teachingResult(
   };
 }
 
+const SANDBOX_ROWS = [
+  { id: 1, item: "ore", quantity: 2, status: "ready" },
+  { id: 2, item: "scale", quantity: 1, status: "damaged" },
+  { id: 3, item: "fang", quantity: 1, status: "duplicate" },
+  { id: 4, item: "fang", quantity: 1, status: "duplicate" },
+  { id: 5, item: "core", quantity: 1, status: "ready" },
+];
+
+function sandboxResult(
+  sql: string,
+  rows: Array<Record<string, unknown>>,
+): SqlQueryResult {
+  return teachingResult(sql, ["id", "item", "quantity", "status"], rows);
+}
+
 const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   select: [
     teachingResult(
@@ -242,6 +257,110 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       ],
     ),
   ],
+  "f5-over": [teachingResult(
+    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 23 AND 25 ORDER BY id",
+    ["name", "guard_total"],
+    [
+      { name: "哥布林", guard_total: 3 },
+      { name: "兽人", guard_total: 3 },
+      { name: "骑士", guard_total: 3 },
+    ],
+  )],
+  "f5-row-number": [teachingResult(
+    "SELECT m.name, r.sector, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 26 ORDER BY r.sector, pos",
+    ["name", "sector", "pos"],
+    [
+      { name: "铁骑", sector: "arena", pos: 1 },
+      { name: "骑士", sector: "arena", pos: 2 },
+      { name: "兽人", sector: "outer", pos: 1 },
+      { name: "哥布林", sector: "outer", pos: 2 },
+    ],
+  )],
+  "f5-rank": [teachingResult(
+    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no, DENSE_RANK() OVER (ORDER BY g.power DESC) AS dense_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 24 AND 26 ORDER BY g.power DESC, m.id",
+    ["name", "power", "rank_no", "dense_no"],
+    [
+      { name: "铁骑", power: 22, rank_no: 1, dense_no: 1 },
+      { name: "兽人", power: 20, rank_no: 2, dense_no: 2 },
+      { name: "骑士", power: 20, rank_no: 2, dense_no: 2 },
+    ],
+  )],
+  "f5-lag-lead": [teachingResult(
+    "SELECT m.name, g.power, LAG(g.power) OVER (ORDER BY m.id) AS prev_power, LEAD(g.power) OVER (ORDER BY m.id) AS next_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 27 ORDER BY m.id",
+    ["name", "power", "prev_power", "next_power"],
+    [
+      { name: "哥布林", power: 18, prev_power: null, next_power: 20 },
+      { name: "兽人", power: 20, prev_power: 18, next_power: 20 },
+      { name: "骑士", power: 20, prev_power: 20, next_power: 22 },
+      { name: "铁骑", power: 22, prev_power: 20, next_power: 24 },
+      { name: "巨魔", power: 24, prev_power: 22, next_power: null },
+    ],
+  )],
+  "f5-frame": [teachingResult(
+    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 27 ORDER BY m.id",
+    ["name", "running_power"],
+    [
+      { name: "哥布林", running_power: 18 },
+      { name: "兽人", running_power: 38 },
+      { name: "骑士", running_power: 58 },
+      { name: "铁骑", running_power: 80 },
+      { name: "巨魔", running_power: 104 },
+    ],
+  )],
+  "f5-top-n": [
+    teachingResult(
+      "WITH ranked AS (SELECT r.sector, m.name, g.power, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 28) SELECT sector, name, power FROM ranked WHERE rn = 1 ORDER BY sector",
+      ["sector", "name", "power"],
+      [
+        { sector: "arena", name: "铁骑", power: 22 },
+        { sector: "core", name: "城主", power: 28 },
+        { sector: "outer", name: "兽人", power: 20 },
+        { sector: "wall", name: "巨魔", power: 24 },
+      ],
+    ),
+    teachingResult(
+      "WITH ranked AS (SELECT r.sector, m.name, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 26) SELECT sector, name, rn FROM ranked WHERE rn <= 2 ORDER BY sector, rn",
+      ["sector", "name", "rn"],
+      [
+        { sector: "arena", name: "铁骑", rn: 1 },
+        { sector: "arena", name: "骑士", rn: 2 },
+        { sector: "outer", name: "兽人", rn: 1 },
+        { sector: "outer", name: "哥布林", rn: 2 },
+      ],
+    ),
+  ],
+  "f6-insert": [sandboxResult(
+    "INSERT INTO repair_queue(id, item, quantity, status) VALUES (6, 'claw', 2, 'ready')",
+    [...SANDBOX_ROWS, { id: 6, item: "claw", quantity: 2, status: "ready" }],
+  )],
+  "f6-update": [sandboxResult(
+    "UPDATE repair_queue SET status = 'fixed' WHERE id = 2",
+    SANDBOX_ROWS.map((row) => row.id === 2 ? { ...row, status: "fixed" } : row),
+  )],
+  "f6-delete": [sandboxResult(
+    "DELETE FROM repair_queue WHERE id = 4 AND status = 'duplicate'",
+    SANDBOX_ROWS.filter((row) => row.id !== 4),
+  )],
+  "f6-constraint": [sandboxResult(
+    "INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (6, 'bad', -1, 'ready')",
+    SANDBOX_ROWS,
+  )],
+  "f6-transaction": [sandboxResult(
+    "BEGIN; UPDATE repair_queue SET quantity = 9 WHERE id = 1; ROLLBACK",
+    SANDBOX_ROWS,
+  )],
+  "f6-savepoint": [
+    sandboxResult(
+      "BEGIN; UPDATE repair_queue SET status = 'fixed' WHERE id = 2; SAVEPOINT clean; DELETE FROM repair_queue WHERE id = 3; ROLLBACK TO clean; COMMIT",
+      SANDBOX_ROWS.map((row) => row.id === 2 ? { ...row, status: "fixed" } : row),
+    ),
+    sandboxResult(
+      "BEGIN; SAVEPOINT repair; UPDATE repair_queue SET status = 'fixed' WHERE id = 2; DELETE FROM repair_queue WHERE id = 4; RELEASE repair; COMMIT",
+      SANDBOX_ROWS
+        .filter((row) => row.id !== 4)
+        .map((row) => row.id === 2 ? { ...row, status: "fixed" } : row),
+    ),
+  ],
 };
 
 const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
@@ -375,6 +494,50 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     ["name"],
     [{ name: "电球" }],
   )],
+  29: [teachingResult(
+    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 29 AND 30 ORDER BY id",
+    ["name", "guard_total"],
+    [{ name: "小妖", guard_total: 2 }, { name: "战兽", guard_total: 2 }],
+  )],
+  30: [teachingResult(
+    "SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 30 ORDER BY pos",
+    ["name", "pos"],
+    [{ name: "战兽", pos: 1 }, { name: "小妖", pos: 2 }],
+  )],
+  31: [teachingResult(
+    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 30 AND 31 ORDER BY g.power DESC, m.id",
+    ["name", "power", "rank_no"],
+    [
+      { name: "铁卫", power: 24, rank_no: 1 },
+      { name: "战兽", power: 20, rank_no: 2 },
+    ],
+  )],
+  32: [teachingResult(
+    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32 ORDER BY m.id",
+    ["name", "running_power"],
+    [
+      { name: "小妖", running_power: 18 },
+      { name: "战兽", running_power: 38 },
+      { name: "铁卫", running_power: 62 },
+      { name: "巨魔", running_power: 84 },
+    ],
+  )],
+  40: [sandboxResult(
+    "INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'ember', 1, 'ready')",
+    [...SANDBOX_ROWS, { id: 7, item: "ember", quantity: 1, status: "ready" }],
+  )],
+  41: [sandboxResult(
+    "UPDATE repair_queue SET quantity = 3 WHERE id = 1",
+    SANDBOX_ROWS.map((row) => row.id === 1 ? { ...row, quantity: 3 } : row),
+  )],
+  42: [sandboxResult(
+    "BEGIN; UPDATE repair_queue SET quantity = 8 WHERE id = 1; ROLLBACK",
+    SANDBOX_ROWS,
+  )],
+  43: [sandboxResult(
+    "INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (7, 'bad', -2, 'ready')",
+    SANDBOX_ROWS,
+  )],
 };
 
 function pathToAny(session: GameSession, goals: readonly Position[]): Position[] {
@@ -437,6 +600,12 @@ function walkPath(session: GameSession, path: readonly Position[]): void {
         const resolution = session.resolveQuery(query);
         expect(resolution.accepted, resolution.message).toBe(true);
       });
+      let repeatCount = 0;
+      while (session.snapshot().mode === "combat" && repeatCount < 10) {
+        const resolution = session.resolveQuery(queries.at(-1)!);
+        expect(resolution.accepted, resolution.message).toBe(true);
+        repeatCount += 1;
+      }
       expect(session.snapshot().mode).toBe("explore");
     }
   });
@@ -485,11 +654,20 @@ function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
   engageLessonByWalking(session, lessonId);
   const queries = LESSON_QUERIES[lessonId];
   if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
-  queries.forEach((query, index) => {
+  let finalResolution: ReturnType<GameSession["resolveQuery"]> | null = null;
+  queries.forEach((query) => {
     const resolution = session.resolveQuery(query);
     expect(resolution.accepted, resolution.message).toBe(true);
-    expect(resolution.lessonCompleted).toBe(index === queries.length - 1 ? lessonId : null);
+    finalResolution = resolution;
   });
+  let repeatCount = 0;
+  while (session.snapshot().mode === "combat" && repeatCount < 10) {
+    const resolution = session.resolveQuery(queries.at(-1)!);
+    expect(resolution.accepted, resolution.message).toBe(true);
+    finalResolution = resolution;
+    repeatCount += 1;
+  }
+  expect(finalResolution?.lessonCompleted).toBe(lessonId);
   const snapshot = session.snapshot();
   const monster = snapshot.monsters.find((entry) => entry.lessonId === lessonId);
   const bundle = snapshot.lootBundles.find(
@@ -500,7 +678,18 @@ function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
   expect(session.interact()).toMatchObject({ ok: true, kind: "loot-bundle" });
   const protectedWeapon = bundle.items.find((item) => item.kind === "weapon" && item.protected);
   if (protectedWeapon) {
-    expect(session.takeLootItem(bundle.id, protectedWeapon.dropId, "equip").ok).toBe(true);
+    let equipped = session.takeLootItem(bundle.id, protectedWeapon.dropId, "equip");
+    if (!equipped.ok) {
+      const replaceable = session.snapshot().equipmentInventory.find((item) => !item.protected);
+      if (!replaceable) throw new Error(`${lessonId} 背包已满且没有可替换装备`);
+      equipped = session.takeLootItem(
+        bundle.id,
+        protectedWeapon.dropId,
+        "equip",
+        replaceable.instanceId,
+      );
+    }
+    expect(equipped.ok, equipped.message).toBe(true);
   }
   if (session.snapshot().mode === "loot") {
     expect(session.takeAllLoot(bundle.id).ok).toBe(true);
@@ -521,7 +710,7 @@ describe("continuous physical maze run", () => {
   it.each([
     ["where", "is-null"],
     ["is-null", "where"],
-  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通前四层", (first, second) => {
+  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通前六层", (first, second) => {
     const session = new GameSession(null, null, `physical-${first}-${second}`);
     clearLessonByWalking(session, "select");
     clearLessonByWalking(session, first);
@@ -564,14 +753,38 @@ describe("continuous physical maze run", () => {
     clearLessonByWalking(session, "f4-cte");
     clearLessonByWalking(session, "f4-recursive");
 
+    expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 4 });
+    expect(session.advanceFloor()).toBe(true);
+    expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 5 });
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+
+    clearLessonByWalking(session, "f5-over");
+    clearLessonByWalking(session, "f5-row-number");
+    clearLessonByWalking(session, "f5-rank");
+    clearLessonByWalking(session, "f5-lag-lead");
+    clearLessonByWalking(session, "f5-frame");
+    clearLessonByWalking(session, "f5-top-n");
+
+    expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 5 });
+    expect(session.advanceFloor()).toBe(true);
+    expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 6 });
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+
+    clearLessonByWalking(session, "f6-insert");
+    clearLessonByWalking(session, "f6-update");
+    clearLessonByWalking(session, "f6-delete");
+    clearLessonByWalking(session, "f6-constraint");
+    clearLessonByWalking(session, "f6-transaction");
+    clearLessonByWalking(session, "f6-savepoint");
+
     expect(session.snapshot().mode).toBe("victory");
     expect(session.snapshot().completedLessons).toEqual([
-      "f4-scalar",
-      "f4-in",
-      "f4-exists",
-      "f4-correlated",
-      "f4-cte",
-      "f4-recursive",
+      "f6-insert",
+      "f6-update",
+      "f6-delete",
+      "f6-constraint",
+      "f6-transaction",
+      "f6-savepoint",
     ]);
     expect(session.toProfile().masteredLessons).toEqual([
       "select",
@@ -596,6 +809,18 @@ describe("continuous physical maze run", () => {
       "f4-correlated",
       "f4-cte",
       "f4-recursive",
+      "f5-over",
+      "f5-row-number",
+      "f5-rank",
+      "f5-lag-lead",
+      "f5-frame",
+      "f5-top-n",
+      "f6-insert",
+      "f6-update",
+      "f6-delete",
+      "f6-constraint",
+      "f6-transaction",
+      "f6-savepoint",
     ]);
     expect(session.toProfile().victories).toBe(1);
   });
