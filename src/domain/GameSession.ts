@@ -52,6 +52,7 @@ import type {
   ClaimableReward,
   CombatEvent,
   CombatState,
+  ExperienceSettlement,
   GateChallengeId,
   GateChallengeResolution,
   GameSnapshot,
@@ -344,6 +345,9 @@ export class GameSession {
       ? this.monsters.find((monster) => monster.id === this.combat?.targetId)
       : roomTarget;
     const looseWeapon = this.availableWeaponLoot();
+    const looseWeaponItem = looseWeapon
+      ? this.groundItems.find((item) => item.weapon?.id === looseWeapon.weapon.id)
+      : null;
     const roomReward = this.claimableRoomReward();
     const activeGateChallenge = this.activeGateChallengeId
       ? gateChallengeForFloor(this.floorNumber, this.challengeGateId())
@@ -370,7 +374,9 @@ export class GameSession {
         : this.mode === "challenge" && activeGateChallenge
           ? activeGateChallenge.objective
         : looseWeapon
-          ? `走到发光掉落上自动拾取 ${looseWeapon.weapon.name}。`
+          ? looseWeaponItem?.collection === "interact"
+            ? `装有 ${looseWeapon.weapon.name} 的战利品宝箱仍在迷宫中。靠近后按 E 打开。`
+            : `走到发光掉落上自动拾取 ${looseWeapon.weapon.name}。`
           : roomReward
             ? `${roomReward.description} 站到核心旁按 E 调查。`
             : this.combat && target && target.hp > 0
@@ -797,6 +803,7 @@ export class GameSession {
     let playerDamage = 0;
     let stageAdvanced = false;
     let lessonCompleted: LessonId | null = null;
+    let experience: ExperienceSettlement | null = null;
 
     if (evaluation.accepted) {
       const target = this.monsters.find((entry) => entry.id === this.combat?.targetId);
@@ -815,7 +822,8 @@ export class GameSession {
         if (target.hp === 0 && nextSuccessStep >= combatStages.length) {
           killedIds.push(target.id);
           events.push({ type: "death", targetId: target.id });
-          const experienceMessage = this.awardExperience(target);
+          experience = this.awardExperience(target);
+          const experienceMessage = this.describeExperience(experience);
           if (this.combat.kind === "ambush") {
             this.completeAmbush(target, experienceMessage);
           } else {
@@ -859,6 +867,7 @@ export class GameSession {
       mode: this.mode,
       stageAdvanced,
       lessonCompleted,
+      experience,
     };
   }
 
@@ -900,6 +909,7 @@ export class GameSession {
       mode: this.mode,
       stageAdvanced: false,
       lessonCompleted: null,
+      experience: null,
     };
   }
 
@@ -1129,18 +1139,37 @@ export class GameSession {
     return monster.id;
   }
 
-  private awardExperience(monster: Monster): string {
+  private awardExperience(monster: Monster): ExperienceSettlement {
     const gained = experienceForRank(monster.rank);
+    const previousXp = this.player.xp;
     const previousLevel = this.player.level;
+    const previousMaxHp = this.player.maxHp;
     this.player.xp += gained;
     this.player.level = levelForXp(this.player.xp);
     const levelsGained = this.player.level - previousLevel;
     if (levelsGained > 0) {
       this.player.maxHp += levelsGained;
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + levelsGained);
-      return `获得 ${gained} XP，升至 LV.${this.player.level}，生命上限 +${levelsGained}。`;
     }
-    return `获得 ${gained} XP（${this.player.xp} XP / LV.${this.player.level}）。`;
+    return {
+      monsterId: monster.id,
+      monsterName: monster.name,
+      gained,
+      previousXp,
+      currentXp: this.player.xp,
+      previousLevel,
+      currentLevel: this.player.level,
+      previousMaxHp,
+      currentMaxHp: this.player.maxHp,
+    };
+  }
+
+  private describeExperience(experience: ExperienceSettlement): string {
+    const levelsGained = experience.currentLevel - experience.previousLevel;
+    if (levelsGained > 0) {
+      return `获得 ${experience.gained} XP，升至 LV.${experience.currentLevel}，生命上限 +${levelsGained}。`;
+    }
+    return `获得 ${experience.gained} XP（${experience.currentXp} XP / LV.${experience.currentLevel}）。`;
   }
 
   private completeAmbush(monster: Monster, experienceMessage: string): void {
@@ -1179,12 +1208,12 @@ export class GameSession {
         name: fixedLoot.weapon.name,
         description: fixedLoot.weapon.description,
         kind: "weapon",
-        collection: "touch",
+        collection: "interact",
         rewardId: null,
         weapon: { ...fixedLoot.weapon },
       });
       events.push({ type: "loot-drop", targetId: lesson.primaryMonsterId });
-      this.banner = `${lesson.title} 完成，${fixedLoot.weapon.name} 已掉落。${experienceMessage} 走到发光物品上拾取。`;
+      this.banner = `${lesson.title} 完成，装有 ${fixedLoot.weapon.name} 的战利品宝箱已掉落。${experienceMessage} 靠近后按 E 打开。`;
       return;
     }
 
@@ -1197,11 +1226,11 @@ export class GameSession {
         name: roomReward.name,
         description: roomReward.description,
         kind: rewardItemKind(roomReward),
-        collection: "touch",
+        collection: "interact",
         rewardId: this.currentRoom().reward,
       });
       events.push({ type: "loot-drop", targetId: lesson.primaryMonsterId });
-      this.banner = `${lesson.title} 完成，${roomReward.name} 已掉落。${experienceMessage} 走到发光物品上拾取。`;
+      this.banner = `${lesson.title} 完成，装有 ${roomReward.name} 的战利品宝箱已掉落。${experienceMessage} 靠近后按 E 打开。`;
       return;
     }
     this.banner = `${lesson.title} 已掌握。${experienceMessage} 继续探索迷宫。`;
@@ -1219,17 +1248,18 @@ export class GameSession {
     }
     this.groundItems.splice(index, 1);
     this.completedRoomIds.add(item.sourceRoomId);
+    const openedBattleChest = item.id.startsWith("lesson-drop:");
     if (item.rewardId === "floor-key") {
       if (this.floorNumber === 1) {
         this.mode = "transition";
-        this.banner = "第一层钥匙已接入双表连接传送门。无需按键，1.2 秒后自动进入第二层。";
+        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}第一层钥匙已接入双表连接传送门。无需按键，1.2 秒后自动进入第二层。`;
       } else {
         this.mode = "victory";
         this.profile.victories += 1;
         this.profile.bestRunQueries = this.profile.bestRunQueries === null
           ? this.queryCount
           : Math.min(this.profile.bestRunQueries, this.queryCount);
-        this.banner = "获得第二层钥匙。雷鸣主核已关闭，两层 SQL 图鉴均已永久更新。";
+        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第二层钥匙。雷鸣主核已关闭，两层 SQL 图鉴均已永久更新。`;
       }
     } else if (
       item.weapon ||
@@ -1237,11 +1267,11 @@ export class GameSession {
       this.player.weapon.damage !== previousWeapon.damage ||
       this.player.weapon.heatReduction !== previousWeapon.heatReduction
     ) {
-      this.banner = `获得 ${item.name} · 伤害 ${previousWeapon.damage} → ${this.player.weapon.damage} · 热量减免 ${previousWeapon.heatReduction} → ${this.player.weapon.heatReduction}。${item.description}`;
+      this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得 ${item.name} · 伤害 ${previousWeapon.damage} → ${this.player.weapon.damage} · 热量减免 ${previousWeapon.heatReduction} → ${this.player.weapon.heatReduction}。${item.description}`;
     } else if (this.player.hp !== previousHp) {
-      this.banner = `获得 ${item.name} · 生命 ${previousHp} → ${this.player.hp}。${item.description}`;
+      this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得 ${item.name} · 生命 ${previousHp} → ${this.player.hp}。${item.description}`;
     } else {
-      this.banner = `获得 ${item.name}。${item.description} 已加入本轮构筑。`;
+      this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得 ${item.name}。${item.description} 已加入本轮构筑。`;
     }
     if (shouldEmit) this.emit();
     return {
@@ -1339,7 +1369,11 @@ export class GameSession {
     const interactItem = this.groundItems.find(
       (item) => item.collection === "interact" && distance(item, this.player) <= 1,
     );
-    if (interactItem) return `E  调查 ${interactItem.name}`;
+    if (interactItem) {
+      return interactItem.id.startsWith("lesson-drop:")
+        ? `E  打开战利品宝箱 · ${interactItem.name}`
+        : `E  调查 ${interactItem.name}`;
+    }
     const challengeGate = this.nearbyLockedChallengeGate();
     if (challengeGate) return "E  接入高难 SQL 机关 · 错误会损失 1 点生命";
     const touchItem = this.groundItems.find((item) => distance(item, this.player) <= 2);
@@ -1435,6 +1469,7 @@ export class GameSession {
       mode: this.mode,
       stageAdvanced: false,
       lessonCompleted: null,
+      experience: null,
     };
   }
 

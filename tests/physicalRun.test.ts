@@ -321,13 +321,8 @@ function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
   const drop = session.snapshot().groundItems.find(
     (item) => item.id === `lesson-drop:${lessonId}`,
   );
-  if (!drop) {
-    expect(
-      ["where", "distinct", "left-join"].includes(lessonId),
-      `${lessonId} 应产生课程掉落`,
-    ).toBe(true);
-    return;
-  }
+  if (!drop) throw new Error(`${lessonId} 应产生课程战利品宝箱`);
+  expect(drop.collection).toBe("interact");
   collectItemByWalking(session, drop);
 }
 

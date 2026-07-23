@@ -37,9 +37,11 @@ non-interactive minimap by physically walking the maze. Moving into a named
 curriculum monster or passing an encounter check starts a separate
 single-target battle where the player writes complete read-only SQL. The Run
 starts at two hearts, uses deterministic one-heart counters, awards rank-based
-XP, explains acquired loot, automatically opens a short non-interactive portal
-after the first-floor `HAVING` Boss, and ends at a second-floor composite
-`JOIN` Boss.
+XP with a visible post-battle settlement, turns every curriculum victory into a
+deterministic `E`-opened reward chest, explains acquired loot, automatically
+opens a short non-interactive portal after the first-floor `HAVING` Boss, and
+ends at a second-floor composite `JOIN` Boss. Step-meter ambushes award XP but
+do not create curriculum chests.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
 exploration is active. Each floor's locked Boss gate also exposes one optional
 high-difficulty SQL breach: a correct composite query opens only that physical
@@ -222,10 +224,13 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   portal and calls `GameSession.advanceFloor()` after about 1.2 seconds without
   requiring movement or `E`; level, XP, weapon, relics, and query count carry
   into a newly generated harder floor while per-floor maze and lesson state reset.
-- Loose monster drops use touch collection and are picked up by walking over
-  them. A non-blocking card names every acquired item and explains its effect.
-  Altars, treasure chests, and campfires use `E` investigation. Critical
-  curriculum gear remains deterministic and reachable.
+- Every curriculum victory shows an explicit XP settlement and leaves a
+  deterministic reward chest on the defeated monster's tile. The player
+  approaches it and presses `E`; a non-blocking acquisition card then names the
+  item and explains its exact effect. Step-meter ambushes award XP without a
+  chest. Legacy loose drops remain touch-collectable, while altars, treasure
+  rooms, and campfires also use `E`. Critical curriculum gear remains
+  deterministic and reachable.
 - Web Audio music and event cues are authored in project code. First-floor
   exploration rotates four lyrical electronic-classical patterns; second-floor
   exploration rotates three in-code chiptune arrangements of public-domain

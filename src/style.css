@@ -455,6 +455,77 @@ h1 span {
   line-height: 1.45;
 }
 
+.combat-result-card {
+  position: absolute;
+  z-index: 12;
+  top: 12px;
+  left: 50%;
+  width: min(390px, 68%);
+  border: 1px solid var(--gold);
+  border-top: 4px solid var(--query);
+  padding: 13px 15px;
+  background: rgba(8, 9, 12, 0.97);
+  box-shadow: 7px 7px 0 rgba(0, 0, 0, 0.62);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -10px);
+  transition: opacity 140ms linear, transform 180ms steps(4, end);
+}
+
+.combat-result-card.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.combat-result-card > span {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+}
+
+.combat-result-card > strong {
+  display: block;
+  margin: 7px 0 9px;
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+}
+
+.combat-result-card__xp {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-block: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.combat-result-card__xp b {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 18px;
+}
+
+.combat-result-card__xp code {
+  color: var(--paper);
+  font-size: 11px;
+}
+
+.combat-result-card p,
+.combat-result-card small {
+  display: block;
+  margin: 8px 0 0;
+  color: var(--paper);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.combat-result-card small {
+  color: var(--muted);
+}
+
 .floor-portal {
   position: absolute;
   z-index: 20;
@@ -1985,6 +2056,24 @@ h1 span {
     right: 6px;
     left: 6px;
     width: auto;
+  }
+
+  .combat-result-card {
+    top: 6px;
+    right: 6px;
+    left: 6px;
+    width: auto;
+    transform: translateY(-8px);
+  }
+
+  .combat-result-card.is-visible {
+    transform: translateY(0);
+  }
+
+  .combat-result-card__xp {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
   }
 
   .interaction-prompt {
