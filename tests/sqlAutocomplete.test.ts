@@ -7,6 +7,7 @@ import {
 
 const SCHEMA = [
   "monsters(id, room_id, name, status, weakness)",
+  "monster_gear(id, monster_id, gear_name, power)",
   "monster_signals(id, monster_id, channel, charge)",
   "关系：monster_signals.monster_id = monsters.id",
 ];
@@ -17,6 +18,10 @@ describe("SQL autocomplete", () => {
       {
         name: "monsters",
         columns: ["id", "room_id", "name", "status", "weakness"],
+      },
+      {
+        name: "monster_gear",
+        columns: ["id", "monster_id", "gear_name", "power"],
       },
       {
         name: "monster_signals",
@@ -37,18 +42,32 @@ describe("SQL autocomplete", () => {
   it("已有对象前缀时优先表和字段，不继续套用空编辑器的 SELECT 权重", () => {
     const completion = getSqlCompletions("m", 1, 1, SCHEMA);
     expect(completion.suggestions.slice(0, 3).map((suggestion) => suggestion.label))
-      .toEqual(["monster_signals", "monsters", "monster_id"]);
+      .toEqual(["monsters", "monster_gear", "monster_signals"]);
+  });
+
+  it("同等表名前缀命中时先显示短名称，再显示长名称", () => {
+    const sql = "SELECT name FROM mo";
+    const completion = getSqlCompletions(sql, sql.length, sql.length, SCHEMA);
+    expect(completion.suggestions.map((suggestion) => suggestion.label)).toEqual([
+      "monsters",
+      "monster_gear",
+      "monster_signals",
+    ]);
   });
 
   it("在 FROM 后强制触发时优先提示数据表", () => {
     const sql = "SELECT id FROM ";
     const completion = getSqlCompletions(sql, sql.length, sql.length, SCHEMA, true);
     expect(completion.suggestions[0]).toMatchObject({
-      label: "monster_signals",
+      label: "monsters",
       kind: "table",
     });
     expect(completion.suggestions[1]).toMatchObject({
-      label: "monsters",
+      label: "monster_gear",
+      kind: "table",
+    });
+    expect(completion.suggestions[2]).toMatchObject({
+      label: "monster_signals",
       kind: "table",
     });
   });
@@ -60,8 +79,8 @@ describe("SQL autocomplete", () => {
     expect(completion.suggestions.map((suggestion) => suggestion.label)).toEqual([
       "m.id",
       "m.name",
-      "m.room_id",
       "m.status",
+      "m.room_id",
       "m.weakness",
     ]);
     expect(completion.suggestions.every((suggestion) => (
