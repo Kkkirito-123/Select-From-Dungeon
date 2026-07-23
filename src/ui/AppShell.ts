@@ -1,6 +1,13 @@
 import { ArcadeAudio } from "../audio/ArcadeAudio";
 import type { OnboardingMilestone } from "../content/onboarding";
 import { LESSONS } from "../content/mvpLevel";
+import {
+  COMPLETE_SCHEMA_LINES,
+  SQL_RELATIONS,
+  SQL_TABLES,
+  sqlTable,
+  type SqlTableName,
+} from "../content/sqlSchema";
 import { GameSession, LEVEL_XP_THRESHOLDS } from "../domain/GameSession";
 import type {
   GameSnapshot,
@@ -61,6 +68,7 @@ export class AppShell {
   private lastStageId: GameSnapshot["lessonStageId"] | null = null;
   private lastMode: GameSnapshot["mode"] | null = null;
   private lastSnapshot!: GameSnapshot;
+  private selectedSchemaTable: SqlTableName = "monsters";
   private busy = false;
   private readonly sqlChord = new SqlChordTracker();
   private readonly listenerController = new AbortController();
@@ -178,6 +186,10 @@ export class AppShell {
   ) {}
 
   mount(): void {
+    const schemaFieldCount = SQL_TABLES.reduce(
+      (total, table) => total + table.columns.length,
+      0,
+    );
     this.root.innerHTML = `
       <div class="page-frame">
         <header class="masthead">
@@ -260,6 +272,10 @@ export class AppShell {
                     <p id="terminal-objective"></p>
                     <div id="lock-list" class="lock-list"></div>
                     <div id="schema-list" class="schema-list"></div>
+                    <details class="terminal-schema-reference">
+                      <summary>完整字段速查 <span>${SQL_TABLES.length} TABLES</span></summary>
+                      <div id="terminal-schema-reference" class="schema-reference-grid"></div>
+                    </details>
                   </section>
 
                   <section class="terminal-editor">
@@ -304,6 +320,10 @@ export class AppShell {
                     <div class="breach-risk"><span>RISK</span><strong>错误查询 −1 生命</strong></div>
                     <p id="gate-terminal-objective"></p>
                     <div id="gate-challenge-schema" class="schema-list"></div>
+                    <details class="terminal-schema-reference terminal-schema-reference--gate">
+                      <summary>完整字段速查 <span>${SQL_TABLES.length} TABLES</span></summary>
+                      <div id="gate-schema-reference" class="schema-reference-grid"></div>
+                    </details>
                     <details class="breach-hints">
                       <summary>分级破解提示 / 不直接给答案</summary>
                       <div id="gate-challenge-hints" class="hint-list"></div>
@@ -385,6 +405,18 @@ export class AppShell {
               <div id="relic-list" class="relic-list">本轮尚无遗物</div>
             </section>
 
+            <section class="schema-codex-card" aria-labelledby="schema-codex-title">
+              <div class="card-heading">
+                <span id="schema-codex-title">SCHEMA CODEX / 字段图鉴</span>
+                <span>${SQL_TABLES.length} TABLES · ${schemaFieldCount} FIELDS</span>
+              </div>
+              <p class="schema-codex-intro">完整字段、类型、空值与关系。切换表查看，不会改变当前任务。</p>
+              <div id="schema-table-tabs" class="schema-table-tabs" role="tablist" aria-label="选择数据表"></div>
+              <div id="schema-table-panel" class="schema-table-panel" role="tabpanel"></div>
+              <div id="schema-relation-trace" class="schema-relation-trace"></div>
+              <p class="schema-codex-note">REF 表示教学 JOIN 关系；SQLite 当前未声明 FOREIGN KEY 约束。</p>
+            </section>
+
             <section class="control-card">
               <div class="card-heading"><span>行动规则</span><span>无倒计时</span></div>
               <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　走到松散掉落上自动拾取</p>
@@ -432,6 +464,9 @@ export class AppShell {
       requiredElement(this.root, "#gate-sql-suggestions"),
       this.listenerController.signal,
     );
+    this.renderCompactSchema(requiredElement(this.root, "#terminal-schema-reference"));
+    this.renderCompactSchema(requiredElement(this.root, "#gate-schema-reference"));
+    this.renderSchemaCodex();
 
     const listenerOptions = { signal: this.listenerController.signal };
     this.executeButton.addEventListener("click", () => void this.executeQuery(), listenerOptions);
@@ -458,6 +493,34 @@ export class AppShell {
     requiredElement(this.root, "#skip-onboarding").addEventListener("click", () => this.onboarding.skip(), listenerOptions);
     requiredElement(this.root, "#replay-onboarding").addEventListener("click", () => this.onboarding.replay(), listenerOptions);
     requiredElement(this.root, "#replay-onboarding-control").addEventListener("click", () => this.onboarding.replay(), listenerOptions);
+    requiredElement(this.root, "#schema-table-tabs").addEventListener("click", (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-schema-table]");
+      const tableName = button?.dataset.schemaTable as SqlTableName | undefined;
+      if (!tableName || !SQL_TABLES.some((table) => table.name === tableName)) return;
+      this.selectSchemaTable(tableName, true);
+    }, listenerOptions);
+    requiredElement(this.root, "#schema-table-tabs").addEventListener("keydown", (event) => {
+      if (!(event instanceof KeyboardEvent)) return;
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-schema-table]");
+      const tableName = button?.dataset.schemaTable as SqlTableName | undefined;
+      if (!tableName) return;
+      const currentIndex = SQL_TABLES.findIndex((table) => table.name === tableName);
+      if (currentIndex < 0) return;
+      let nextIndex = currentIndex;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        nextIndex = (currentIndex + 1) % SQL_TABLES.length;
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        nextIndex = (currentIndex - 1 + SQL_TABLES.length) % SQL_TABLES.length;
+      } else if (event.key === "Home") {
+        nextIndex = 0;
+      } else if (event.key === "End") {
+        nextIndex = SQL_TABLES.length - 1;
+      } else {
+        return;
+      }
+      event.preventDefault();
+      this.selectSchemaTable(SQL_TABLES[nextIndex].name, true);
+    }, listenerOptions);
     this.audioButton.addEventListener("click", () => void this.toggleAudio(), listenerOptions);
     requiredElement<HTMLInputElement>(this.root, "#audio-volume").addEventListener("input", (event) => {
       this.audio.setVolume(Number((event.currentTarget as HTMLInputElement).value));
@@ -998,7 +1061,10 @@ export class AppShell {
   private renderGateChallenge(snapshot: GameSnapshot, entered: boolean): void {
     const challenge = snapshot.activeGateChallenge;
     if (!challenge) return;
-    this.gateAutocomplete.setSchemaLines(challenge.schema);
+    this.gateAutocomplete.setSchemaLines([
+      ...challenge.schema,
+      ...COMPLETE_SCHEMA_LINES,
+    ]);
     requiredElement(this.root, "#gate-terminal-title").textContent = challenge.title;
     requiredElement(this.root, "#gate-terminal-objective").textContent = challenge.objective;
 
@@ -1085,7 +1151,10 @@ export class AppShell {
   }
 
   private renderSchema(lines: string[]): void {
-    this.combatAutocomplete.setSchemaLines(lines);
+    this.combatAutocomplete.setSchemaLines([
+      ...lines,
+      ...COMPLETE_SCHEMA_LINES,
+    ]);
     const root = requiredElement(this.root, "#schema-list");
     root.replaceChildren();
     lines.forEach((line) => {
@@ -1093,6 +1162,115 @@ export class AppShell {
       code.textContent = line;
       root.append(code);
     });
+  }
+
+  private renderCompactSchema(root: HTMLElement): void {
+    root.replaceChildren();
+    SQL_TABLES.forEach((table) => {
+      const article = document.createElement("article");
+      const title = document.createElement("strong");
+      title.textContent = table.name;
+      const fields = document.createElement("code");
+      fields.textContent = table.columns.map((column) => column.name).join(", ");
+      article.append(title, fields);
+      root.append(article);
+    });
+  }
+
+  private renderSchemaCodex(): void {
+    const selectedTable = sqlTable(this.selectedSchemaTable);
+    const tabs = requiredElement(this.root, "#schema-table-tabs");
+    const panel = requiredElement(this.root, "#schema-table-panel");
+    const trace = requiredElement(this.root, "#schema-relation-trace");
+    tabs.replaceChildren();
+    panel.replaceChildren();
+    trace.replaceChildren();
+
+    SQL_TABLES.forEach((table) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.id = `schema-tab-${table.name}`;
+      button.dataset.schemaTable = table.name;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(table.name === selectedTable.name));
+      button.setAttribute("aria-controls", "schema-table-panel");
+      button.tabIndex = table.name === selectedTable.name ? 0 : -1;
+      button.textContent = table.name;
+      tabs.append(button);
+    });
+
+    panel.setAttribute("aria-labelledby", `schema-tab-${selectedTable.name}`);
+    const heading = document.createElement("div");
+    heading.className = "schema-table-heading";
+    const title = document.createElement("strong");
+    title.textContent = selectedTable.name;
+    const subtitle = document.createElement("span");
+    subtitle.textContent = selectedTable.title;
+    heading.append(title, subtitle);
+    const description = document.createElement("p");
+    description.textContent = selectedTable.description;
+    const columnList = document.createElement("div");
+    columnList.className = "schema-column-list";
+
+    selectedTable.columns.forEach((column) => {
+      const relation = SQL_RELATIONS.find((entry) => (
+        entry.fromTable === selectedTable.name && entry.fromColumn === column.name
+      ));
+      const row = document.createElement("div");
+      row.className = "schema-column-row";
+      const name = document.createElement("code");
+      name.textContent = column.name;
+      const type = document.createElement("span");
+      type.className = "schema-column-type";
+      type.textContent = column.type;
+      const badges = document.createElement("span");
+      badges.className = "schema-column-badges";
+      if (column.primaryKey) badges.append(this.schemaBadge("PK", "primary"));
+      if (relation) badges.append(this.schemaBadge("REF", "reference"));
+      badges.append(this.schemaBadge(column.nullable ? "NULL" : "NOT NULL", "nullability"));
+      const detail = document.createElement("small");
+      detail.textContent = relation
+        ? `${column.description} → ${relation.toTable}.${relation.toColumn}`
+        : column.description;
+      row.append(name, type, badges, detail);
+      columnList.append(row);
+    });
+
+    panel.append(heading, description, columnList);
+
+    const relationTitle = document.createElement("strong");
+    relationTitle.textContent = "RELATION TRACE / 关系追踪";
+    trace.append(relationTitle);
+    const relations = SQL_RELATIONS.filter((relation) => (
+      relation.fromTable === selectedTable.name || relation.toTable === selectedTable.name
+    ));
+    relations.forEach((relation) => {
+      const line = document.createElement("code");
+      line.textContent = `${relation.fromTable}.${relation.fromColumn} → ${
+        relation.toTable
+      }.${relation.toColumn} · ${relation.description}`;
+      trace.append(line);
+    });
+  }
+
+  private selectSchemaTable(tableName: SqlTableName, focus: boolean): void {
+    this.selectedSchemaTable = tableName;
+    this.renderSchemaCodex();
+    if (!focus) return;
+    requiredElement<HTMLButtonElement>(
+      this.root,
+      `#schema-tab-${tableName}`,
+    ).focus({ preventScroll: true });
+  }
+
+  private schemaBadge(
+    label: string,
+    kind: "primary" | "reference" | "nullability",
+  ): HTMLElement {
+    const badge = document.createElement("i");
+    badge.dataset.kind = kind;
+    badge.textContent = label;
+    return badge;
   }
 
   private renderHints(hints: string[]): void {

@@ -1,5 +1,6 @@
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
+import { SQL_SCHEMA_DDL } from "../content/sqlSchema";
 import { detectQueryFeatures } from "../domain/lessonEvaluator";
 import type { Monster, SqlQueryResult } from "../domain/types";
 import { validateReadOnlyQuery } from "../domain/queryPolicy";
@@ -109,39 +110,7 @@ export class SqlEngine {
 
   private seed(monsters: Monster[]): void {
     this.database.run(`
-      CREATE TABLE monsters (
-        id INTEGER PRIMARY KEY,
-        room_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        species TEXT NOT NULL,
-        hp INTEGER NOT NULL,
-        armor INTEGER NOT NULL,
-        status TEXT NOT NULL,
-        weakness TEXT,
-        master_id INTEGER,
-        is_boss INTEGER NOT NULL
-      );
-
-      CREATE TABLE monster_signals (
-        id INTEGER PRIMARY KEY,
-        monster_id INTEGER NOT NULL,
-        channel TEXT NOT NULL,
-        charge INTEGER NOT NULL
-      );
-
-      CREATE TABLE rooms (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        sector TEXT NOT NULL,
-        floor INTEGER NOT NULL
-      );
-
-      CREATE TABLE monster_gear (
-        id INTEGER PRIMARY KEY,
-        monster_id INTEGER NOT NULL,
-        gear_name TEXT NOT NULL,
-        power INTEGER NOT NULL
-      );
+      ${SQL_SCHEMA_DDL}
 
       CREATE INDEX idx_monsters_room_status
         ON monsters(room_id, status);

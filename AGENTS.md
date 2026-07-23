@@ -60,7 +60,8 @@ interview curriculum.
 ```text
 index.html -> src/main.ts
   -> AppShell (DOM HUD, discovery minimap, onboarding, SQL terminal, evidence)
-  -> SqlAutocomplete (visible-schema vocabulary, ranking, replacement, listbox)
+  -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
+  -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
   -> GameSession (authoritative maze, actors, fog, combat, loot, profile)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
@@ -94,8 +95,12 @@ optional notice, `EncounterDirector` makes repeatable successful-step ambush
 decisions without rerolling on reload, and `OnboardingController` owns the
 separately persisted step-by-step tutorial.
 
-`SqlEngine` owns the `monsters`, `monster_signals`, `rooms`, and `monster_gear`
-in-memory schema and query execution; UI code must not bypass its read-only policy. `lessonEvaluator`
+`src/content/sqlSchema.ts` owns the canonical field/type/nullability metadata,
+generated DDL, and teaching relationships for `monsters`, `monster_signals`,
+`rooms`, and `monster_gear`. `SqlEngine` executes that DDL and owns in-memory
+query execution; UI code must not duplicate the table definitions or bypass its
+read-only policy. The catalog relationships are JOIN guidance, not declared
+SQLite `FOREIGN KEY` constraints. `lessonEvaluator`
 accepts equivalent SQL only when both result semantics and the current concept
 locks pass. First-floor lessons are intentionally limited to one flat `SELECT`
 without `OR`, subqueries, or set operators so required predicates cannot be
@@ -108,15 +113,17 @@ the concept lock. Shared curriculum data and fixed drops live in
 contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
 `src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
-currently visible schema plus the MVP SQL vocabulary. It may replace only the
-active token after explicit keyboard or pointer acceptance; it must not generate
-a complete answer, submit a query, or bypass lesson evaluation.
+complete canonical schema, current task context, and MVP SQL vocabulary. It may
+replace only the active token after explicit keyboard or pointer acceptance; it
+must not generate a complete answer, submit a query, or bypass lesson
+evaluation.
 
 ## Repository Map
 
 ```text
 src/audio/          Original procedural Web Audio music loops and event SFX
-src/content/        Curriculum, entities, fixed weapons, rewards, onboarding copy
+src/content/        Curriculum, canonical SQL schema, entities, fixed weapons,
+                    rewards, and onboarding copy
 src/domain/         Pure state, combat rules, course graph, physical maze,
                     validation, roaming, semantic evaluation, and query policy
 src/feedback/       Semantic gameplay-event routing to notices and audio cues
@@ -161,11 +168,16 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.
 - Both SQL textareas provide an IDE-like `PLAN ASSIST` listbox. Typing a prefix
-  opens ranked keyword, function, table, and field suggestions; `Ctrl/Command +
-  Space` opens contextual suggestions, arrows move selection, `Enter`/`Tab` or
-  pointer input accepts, and `Escape` dismisses suggestions before it closes the
-  terminal. Qualified aliases such as `m.` show only fields from the resolved
-  visible table. Accepting a suggestion never submits or counts as a query.
+  opens ranked keyword, function, canonical table, and complete field
+  suggestions; `Ctrl/Command + Space` opens contextual suggestions, arrows move
+  selection, `Enter`/`Tab` or pointer input accepts, and `Escape` dismisses
+  suggestions before it closes the terminal. Qualified aliases such as `m.`
+  show only fields from the resolved table. Accepting a suggestion never submits
+  or counts as a query.
+- The permanent Schema Codex exposes all four tables and 22 fields with type,
+  nullability, primary-key, and logical-relation metadata. Its tabs support
+  click, arrows, `Home`, and `End`; both terminals also expose a collapsed
+  complete-field reference without changing the current lesson objective.
 - First-floor grading further limits answers to one flat `SELECT` without `OR`,
   subqueries, `UNION`, `INTERSECT`, or `EXCEPT`. Table-qualified columns and the
   required `total` alias in `HAVING` are supported.

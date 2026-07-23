@@ -28,10 +28,16 @@ and turn the correct result into an animated attack.
 - Press `Q + S` (or the touch button) to open the in-game terminal. Every stage
   starts blank: the player writes the complete `SELECT ... FROM ...` statement.
 - Use the embedded `PLAN ASSIST` completion stack without leaving the game.
-  Prefixes rank SQL keywords, functions, visible tables, and fields; aliases
-  such as `m.` narrow the list to that table. Use arrows plus `Enter`/`Tab`,
-  click or tap, or open it explicitly with `Ctrl/Command + Space`. Accepting a
-  suggestion never executes the query or fills the complete answer.
+  Prefixes rank SQL keywords, functions, all four canonical tables, and all 22
+  fields; aliases such as `m.` narrow the list to that table. Use arrows plus
+  `Enter`/`Tab`, click or tap, or open it explicitly with `Ctrl/Command +
+  Space`. Accepting a suggestion never executes the query or fills the complete
+  answer.
+- Browse a permanent `SCHEMA CODEX` for field names, types, nullability, primary
+  keys, and logical JOIN relationships. Its four table tabs are keyboard
+  operable, while battle and breach terminals offer a collapsed complete-field
+  quick reference. `REF` labels are teaching relationships, not declared SQLite
+  foreign-key constraints.
 - Execute real read-only SQLite WASM queries and inspect result rows plus
   `EXPLAIN QUERY PLAN`. Correct results attack; wrong results and syntax errors
   trigger the telegraphed counter. Empty input consumes no turn.
@@ -149,8 +155,9 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ MonsterRoaming ── deterministic slow patrol decisions
   ├─ gateChallenges ── optional Boss-gate feature and result contracts
   ├─ lessonEvaluator ── result semantics + concept locks
-  ├─ SqlAutocomplete ── visible-schema completion and accessible listbox state
-  ├─ SqlEngine ── read-only SQLite WASM execution and four-table teaching schema
+  ├─ SqlSchemaCatalog ── canonical four-table metadata and generated DDL
+  ├─ SqlAutocomplete ── complete-schema completion and accessible listbox state
+  ├─ SqlEngine ── read-only SQLite WASM execution and runtime synchronization
   ├─ DungeonScene ── continuous exploration, fog, collision, patrol
   ├─ BattleScene ── duel presentation and combat animations
   ├─ FeedbackDirector ── exploration notices and event audio routing
@@ -210,8 +217,11 @@ successful semantic breach, walking through the opened gate, reload recovery,
 focus without page jumping, and no horizontal overflow at 390x844. The latest
 completion pass additionally verified automatic prefix suggestions,
 `Ctrl+Space`, arrow selection, `Enter`, `Tab`, pointer/touch acceptance,
-two-stage `Escape`, unchanged query counts, no console warnings/errors, and
-desktop plus 390x844 layouts. Earlier evidence covered startup, HUD, touch
+two-stage `Escape`, unchanged query counts, and desktop plus 390x844 layouts.
+The Schema Codex pass verified four-table tab and arrow-key navigation, focus
+retention, the 22-field terminal reference, `armor` completion from the
+canonical catalog, 44 px mobile tab targets, no 390 px horizontal overflow, and
+no console warnings/errors. Earlier evidence covered startup, HUD, touch
 controls, same-tile combat, pickups, patrol contact, counters, and same-seed
 reload. A complete two-floor manual browser Run, 200%/320px layout, Reduced
 Motion, subjective audio/timing, and the 10-second performance/save-rate checks

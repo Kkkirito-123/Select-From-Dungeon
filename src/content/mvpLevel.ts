@@ -12,6 +12,7 @@ import {
   FLOOR_TWO_MONSTERS,
   FLOOR_TWO_PRACTICE_STAGES,
 } from "./floor2Level";
+import { sqlSchemaLine } from "./sqlSchema";
 
 export const TILE_SIZE = 32;
 export const MAP_ROWS = [
@@ -327,7 +328,7 @@ export function practiceStageFor(monsterId: number): LessonStageDefinition | nul
 }
 
 const MONSTER_SCHEMA = [
-  "monsters(id, room_id, name, species, hp, status, weakness, master_id)",
+  sqlSchemaLine("monsters"),
   "每条记录都是魔王城里真实存在的怪物。",
 ];
 
@@ -452,7 +453,7 @@ export const LESSONS: readonly LessonDefinition[] = [
     title: "聚合钟楼 · 统计信号",
     intro: "执行官把信号拆成 echo 与 noise。按 channel 分组统计，聚合战锤才能找到钟摆。",
     schema: [
-      "monster_signals(id, monster_id, channel, charge)",
+      sqlSchemaLine("monster_signals"),
       "执行官 ID = 800，信号分为 echo 与 noise。",
     ],
     primaryMonsterId: 800,
@@ -479,7 +480,7 @@ export const LESSONS: readonly LessonDefinition[] = [
     title: "魔王核心 · 过滤分组",
     intro: "监视者的信号分成 echo、ward 与 noise。HAVING 只在分组形成之后审判它们。",
     schema: [
-      "monster_signals(id, monster_id, channel, charge)",
+      sqlSchemaLine("monster_signals"),
       "魔王 ID = 900；HAVING 在 GROUP BY 之后过滤聚合结果。",
     ],
     primaryMonsterId: 900,
