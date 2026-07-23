@@ -39,7 +39,8 @@ MySQL 面试八股范围。
 ```text
 index.html -> src/main.ts
   -> AppShell（DOM HUD、发现式小地图、新手引导、SQL 终端与证据）
-  -> SqlAutocomplete（可见 Schema 词汇、排序、替换与 Listbox）
+  -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
+  -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
   -> GameSession（权威迷宫、演员、迷雾、战斗、掉落和永久档案）
   -> RunGraph（课程依赖与兴趣点图）
   -> MazeGenerator/MazeValidation（确定性 64×48 物理世界）
@@ -69,22 +70,25 @@ index.html -> src/main.ts
 `EncounterDirector` 根据成功移动做可复现的伏击判定，刷新页面不会重抽；`OnboardingController`
 管理独立持久化的逐步教学。
 
-`SqlEngine` 负责 `monsters`、`monster_signals`、`rooms`、`monster_gear` 内存 Schema 与查询执行；UI 不得绕开它的只读
-边界。`lessonEvaluator` 允许等价 SQL，但必须同时满足查询结果和本关概念锁。第一层课程刻意
+`src/content/sqlSchema.ts` 负责 `monsters`、`monster_signals`、`rooms`、
+`monster_gear` 的权威字段、类型、可空性元数据、生成 DDL 与教学关系；`SqlEngine` 执行该 DDL
+并负责内存查询，UI 不得重复维护表定义或绕开只读边界。目录中的关系是 JOIN 教学提示，不是
+SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，但必须同时满足查询结果
+和本关概念锁。第一层课程刻意
 限定为单层 `SELECT`，不允许 `OR`、子查询或集合运算，避免把必修条件藏在无效分支里。第二层
 排序与连接题也遵循单语句边界，并把真实关系条件纳入概念锁。共享课程数据与固定掉落位于
 `src/content/mvpLevel.ts`，第二层内容位于 `src/content/floor2Level.ts`；房间氛围与局内奖励位于
 `src/content/runContent.ts`；可选 Boss 门题目与语义结果约束位于
 `src/content/gateChallenges.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL
-阶段都从空编辑器开始。`src/ui/sqlAutocomplete.ts` 负责从当前可见 Schema 与 MVP SQL 词汇中
-确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得生成完整答案、
-提交查询或绕过课程判定。
+阶段都从空编辑器开始。`src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
+MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得
+生成完整答案、提交查询或绕过课程判定。
 
 ## 仓库地图
 
 ```text
 src/audio/          原创程序化 Web Audio 音乐循环与事件音效
-src/content/        课程、实体、固定武器、奖励与新手引导文案
+src/content/        课程、权威 SQL Schema、实体、固定武器、奖励与新手引导文案
 src/domain/         纯状态、战斗规则、课程图、物理迷宫、校验、巡逻、语义与查询策略
 src/feedback/       把语义游戏事件路由到通知和音频提示
 src/game/           连续迷宫探索、战斗场景与游戏启动
@@ -122,9 +126,11 @@ python3 scripts/validate-rules.py
 - 战斗终端只接受一条 `SELECT`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面
   最多显示 50 行结果。
 - 两个 SQL 输入框都提供 IDE 式 `PLAN ASSIST` Listbox。输入前缀会显示排序后的关键词、函数、
-  表名与字段名；`Ctrl/Command + Space` 打开语境提示，方向键移动选择，`Enter`/`Tab` 或指针
-  接受，`Escape` 先关闭建议再关闭终端。输入 `m.` 等限定别名时，只显示解析到的可见表字段；
-  接受建议不会提交查询，也不会增加查询次数。
+  权威表名与完整字段名；`Ctrl/Command + Space` 打开语境提示，方向键移动选择，
+  `Enter`/`Tab` 或指针接受，`Escape` 先关闭建议再关闭终端。输入 `m.` 等限定别名时，只显示
+  解析到的表字段；接受建议不会提交查询，也不会增加查询次数。
+- 永久 Schema 图鉴列出四张表、22 个字段及类型、可空性、主键和逻辑关系；表标签支持点击、
+  方向键、`Home` 与 `End`，两个终端也提供默认折叠的完整字段速查，且不会改变当前题目目标。
 - 第一层判定进一步限定为一条平坦 `SELECT`，不允许 `OR`、子查询、`UNION`、`INTERSECT` 或
   `EXCEPT`；支持表别名限定列，也支持在 `HAVING` 中使用题目要求的 `total` 别名。
 - 当前 I/O 热量使用 SQLite `EXPLAIN QUERY PLAN`。这是 SQLite 证据，不是 MySQL 执行计划。

@@ -7,6 +7,7 @@ import type {
   QueryFeature,
   SqlQueryResult,
 } from "../domain/types";
+import { sqlSchemaLine } from "./sqlSchema";
 
 interface GateChallengeDefinition {
   id: GateChallengeId;
@@ -30,8 +31,8 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   title: "聚合越权协议 · HAVING 王门",
   objective: "从 monsters 与 monster_signals 中找出至少拥有 3 条 echo 信号、且 echo 总电荷不少于 24 的怪物。依次返回 id、name、echo_count、total_charge；按 total_charge 降序、id 升序。",
   schema: [
-    "monsters(id, name)",
-    "monster_signals(id, monster_id, channel, charge)",
+    sqlSchemaLine("monsters"),
+    sqlSchemaLine("monster_signals"),
     "关系：monster_signals.monster_id = monsters.id",
   ],
   hints: [
@@ -62,9 +63,9 @@ const FLOOR_TWO_CHALLENGE: GateChallengeDefinition = {
   title: "关系越权协议 · JOIN 主核",
   objective: "统计二层每个房间的怪物数量与装备总 power，没有装备也必须保留。只保留装备总 power 不少于 10 的房间，依次返回 id、room_name、monster_count、total_power；按 total_power 降序、id 升序，只取前 2 行。",
   schema: [
-    "rooms(id, name, floor)",
-    "monsters(id, room_id)",
-    "monster_gear(id, monster_id, power)",
+    sqlSchemaLine("rooms"),
+    sqlSchemaLine("monsters"),
+    sqlSchemaLine("monster_gear"),
     "关系：monsters.room_id = rooms.id；monster_gear.monster_id = monsters.id",
   ],
   hints: [

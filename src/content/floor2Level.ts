@@ -6,6 +6,7 @@ import type {
   Position,
   Weapon,
 } from "../domain/types";
+import { COMPLETE_SCHEMA_LINES } from "./sqlSchema";
 
 export const SORT_SABER: Weapon = {
   id: "sort-saber",
@@ -279,12 +280,7 @@ export const FLOOR_TWO_PRACTICE_STAGES: Readonly<Record<number, LessonStageDefin
   },
 };
 
-const FLOOR_TWO_SCHEMA = [
-  "monsters(id, room_id, name, species, hp, status, weakness, master_id)",
-  "rooms(id, name, sector, floor)",
-  "monster_gear(id, monster_id, gear_name, power)",
-  "monster_signals(id, monster_id, channel, charge)",
-];
+const FLOOR_TWO_SCHEMA = [...COMPLETE_SCHEMA_LINES];
 
 export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
   {
