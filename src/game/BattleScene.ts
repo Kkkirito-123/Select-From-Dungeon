@@ -690,14 +690,16 @@ export class BattleScene extends Phaser.Scene {
 
   private playLootDrop(): void {
     this.playSound("drop");
-    const drop = this.trackTransient(
-      this.add.rectangle(470, 244, 15, 15, COLORS.gold, 0.98)
-        .setStrokeStyle(3, COLORS.paper)
-        .setAngle(45)
-        .setDepth(19),
+    const chest = this.trackTransient(
+      this.add.container(470, 244).setDepth(19),
     );
+    chest.add([
+      this.add.rectangle(0, 5, 28, 15, 0x8f6338).setStrokeStyle(2, COLORS.gold),
+      this.add.rectangle(0, -6, 28, 8, 0xb88745).setStrokeStyle(2, COLORS.paper),
+      this.add.rectangle(0, 2, 6, 8, COLORS.gold).setStrokeStyle(1, COLORS.paper),
+    ]);
     const label = this.trackTransient(
-      this.add.text(470, 270, "DROP", {
+      this.add.text(470, 273, "CHEST", {
         color: "#e8dfc7",
         fontFamily: "monospace",
         fontSize: "10px",
@@ -708,7 +710,7 @@ export class BattleScene extends Phaser.Scene {
     );
     if (this.reducedMotion) return;
     this.addEffectTween({
-      targets: [drop, label],
+      targets: [chest, label],
       y: "-=10",
       yoyo: true,
       duration: 145,

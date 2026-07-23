@@ -340,6 +340,18 @@ export interface CombatEvent {
   amount?: number;
 }
 
+export interface ExperienceSettlement {
+  monsterId: number;
+  monsterName: string;
+  gained: number;
+  previousXp: number;
+  currentXp: number;
+  previousLevel: number;
+  currentLevel: number;
+  previousMaxHp: number;
+  currentMaxHp: number;
+}
+
 export interface TurnResolution {
   accepted: boolean;
   message: string;
@@ -355,6 +367,7 @@ export interface TurnResolution {
   mode: PlayMode;
   stageAdvanced: boolean;
   lessonCompleted: LessonId | null;
+  experience: ExperienceSettlement | null;
 }
 
 export interface GateChallengeResolution {

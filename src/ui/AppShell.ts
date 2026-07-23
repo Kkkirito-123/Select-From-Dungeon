@@ -10,6 +10,7 @@ import {
 } from "../content/sqlSchema";
 import { GameSession, LEVEL_XP_THRESHOLDS } from "../domain/GameSession";
 import type {
+  ExperienceSettlement,
   GameSnapshot,
   GroundItem,
   Monster,
@@ -49,6 +50,36 @@ export function canOpenCombatTerminal(
   return mode === "combat" && !busy;
 }
 
+export interface CombatSettlementCopy {
+  title: string;
+  xp: string;
+  progress: string;
+  levelUp: string;
+  reward: string;
+}
+
+export function combatSettlementCopy(
+  experience: ExperienceSettlement,
+  chestDropped: boolean,
+): CombatSettlementCopy {
+  const nextXp = LEVEL_XP_THRESHOLDS[experience.currentLevel];
+  const progress = nextXp === undefined
+    ? `LV.${experience.currentLevel} · ${experience.previousXp} → ${experience.currentXp} XP · MAX`
+    : `LV.${experience.currentLevel} · ${experience.previousXp} → ${experience.currentXp} / ${nextXp} XP`;
+  const levelUp = experience.currentLevel > experience.previousLevel
+    ? `LEVEL UP · LV.${experience.previousLevel} → LV.${experience.currentLevel} · 生命上限 ${experience.previousMaxHp} → ${experience.currentMaxHp}`
+    : "距离下一等级又近了一步";
+  return {
+    title: `击败 ${experience.monsterName}`,
+    xp: `+${experience.gained} XP`,
+    progress,
+    levelUp,
+    reward: chestDropped
+      ? "战利品宝箱已出现在怪物位置 · 靠近后按 E 打开"
+      : "随机遭遇只结算经验 · 不会掉落课程宝箱",
+  };
+}
+
 export class AppShell {
   private textarea!: HTMLTextAreaElement;
   private gateTextarea!: HTMLTextAreaElement;
@@ -80,6 +111,7 @@ export class AppShell {
   private toastTimer: number | null = null;
   private terminalFocusTimer: number | null = null;
   private pickupTimer: number | null = null;
+  private settlementTimer: number | null = null;
   private floorTransitionTimer: number | null = null;
   private activeNotice: FeedbackNotice | null = null;
   private readonly noticeQueue: FeedbackNotice[] = [];
@@ -243,6 +275,17 @@ export class AppShell {
                 <strong id="pickup-name">获得道具</strong>
                 <p id="pickup-description"></p>
                 <small id="pickup-effect"></small>
+              </aside>
+
+              <aside id="combat-result-card" class="combat-result-card" role="status" aria-live="assertive" aria-atomic="true" hidden>
+                <span>VICTORY / 战斗结算</span>
+                <strong id="combat-result-title">击败怪物</strong>
+                <div class="combat-result-card__xp">
+                  <b id="combat-result-xp">+0 XP</b>
+                  <code id="combat-result-progress">LV.1 · 0 / 2 XP</code>
+                </div>
+                <p id="combat-result-level"></p>
+                <small id="combat-result-reward"></small>
               </aside>
 
               <section id="floor-portal" class="floor-portal" aria-live="assertive" hidden>
@@ -419,8 +462,8 @@ export class AppShell {
 
             <section class="control-card">
               <div class="card-heading"><span>行动规则</span><span>无倒计时</span></div>
-              <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　走到松散掉落上自动拾取</p>
-              <p><kbd>E</kbd> 调查祭坛、篝火和宝箱；靠近 Boss 机关门时可接入高难越级查询。</p>
+              <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　随机遭遇只结算 XP</p>
+              <p><kbd>E</kbd> 打开课程战利品宝箱，或调查祭坛、篝火；靠近 Boss 机关门时可接入高难越级查询。</p>
               <p><kbd>Q + S</kbd> 打开终端　<kbd>Ctrl + Enter</kbd> 执行完整 SQL</p>
               <p>死亡只重置当前 Run；知识图鉴与练习次数永久保留。</p>
               <button id="replay-onboarding-control" type="button" class="guide-replay">↺ 重新教学</button>
@@ -573,6 +616,8 @@ export class AppShell {
     this.terminalFocusTimer = null;
     if (this.pickupTimer !== null) window.clearTimeout(this.pickupTimer);
     this.pickupTimer = null;
+    if (this.settlementTimer !== null) window.clearTimeout(this.settlementTimer);
+    this.settlementTimer = null;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
     this.floorTransitionTimer = null;
     this.root.classList.remove("terminal-active", "gate-terminal-active");
@@ -637,6 +682,7 @@ export class AppShell {
         this.showFeedbackNotice({ message, tone: "danger" });
         if (resolution.mode !== "combat") this.getBattleScene()?.abortEncounter();
       }
+      if (resolution.experience) this.showCombatSettlement(resolution);
       reopenAfterResolution = resolution.mode === "combat";
     } catch (error) {
       console.error("战斗回合结算失败", error);
@@ -899,6 +945,37 @@ export class AppShell {
     }, 6_000);
   }
 
+  private showCombatSettlement(resolution: TurnResolution): void {
+    if (!resolution.experience) return;
+    const card = requiredElement<HTMLElement>(this.root, "#combat-result-card");
+    const copy = combatSettlementCopy(
+      resolution.experience,
+      resolution.events.some((event) => event.type === "loot-drop"),
+    );
+    requiredElement(card, "#combat-result-title").textContent = copy.title;
+    requiredElement(card, "#combat-result-xp").textContent = copy.xp;
+    requiredElement(card, "#combat-result-progress").textContent = copy.progress;
+    requiredElement(card, "#combat-result-level").textContent = copy.levelUp;
+    requiredElement(card, "#combat-result-reward").textContent = copy.reward;
+    if (this.settlementTimer !== null) window.clearTimeout(this.settlementTimer);
+    card.hidden = false;
+    card.classList.add("is-visible");
+    this.settlementTimer = window.setTimeout(() => {
+      card.classList.remove("is-visible");
+      card.hidden = true;
+      this.settlementTimer = null;
+    }, 8_000);
+  }
+
+  private hideCombatSettlement(): void {
+    const card = this.root.querySelector<HTMLElement>("#combat-result-card");
+    if (!card) return;
+    if (this.settlementTimer !== null) window.clearTimeout(this.settlementTimer);
+    this.settlementTimer = null;
+    card.classList.remove("is-visible");
+    card.hidden = true;
+  }
+
   private requestHint(): void {
     if (this.busy) {
       this.showFeedbackNotice({ message: "当前回合正在结算，结束后再查看提示。", tone: "info" });
@@ -943,6 +1020,7 @@ export class AppShell {
       return;
     }
     this.closeTerminal(true);
+    this.hideCombatSettlement();
     const battleScene = this.getBattleScene();
     this.session.reset(createRunSeed());
     this.sql.reset(this.session.snapshot().monsters);
@@ -982,6 +1060,7 @@ export class AppShell {
     const enteredCombat = snapshot.mode === "combat" && this.lastMode !== "combat";
     const enteredChallenge = snapshot.mode === "challenge" && this.lastMode !== "challenge";
     this.lastSnapshot = snapshot;
+    if (enteredCombat) this.hideCombatSettlement();
 
     requiredElement(this.root, "#seed-value").textContent = snapshot.runSeed;
     requiredElement(this.root, "#floor-value").textContent = String(snapshot.floor).padStart(2, "0");
