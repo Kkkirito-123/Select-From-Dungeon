@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ARMORS,
   CONSUMABLES,
+  lootCandidatesForBiome,
   type LootCandidate,
 } from "../src/content/inventoryCatalog";
 import { FILTER_BOW } from "../src/content/mvpLevel";
@@ -68,6 +69,33 @@ const weaponCandidate = candidate({
 }, 0);
 
 describe("rollLootItems", () => {
+  it("生态池给出对应恢复品，普通怪仍维持低概率掉落", () => {
+    expect(lootCandidatesForBiome(1, "slime-pool", "normal")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          probability: 0.06,
+          item: expect.objectContaining({ itemId: "slime-gel" }),
+        }),
+      ]),
+    );
+    expect(lootCandidatesForBiome(2, "swamp", "normal")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          probability: 0.06,
+          item: expect.objectContaining({ itemId: "frog-potion" }),
+        }),
+      ]),
+    );
+    expect(lootCandidatesForBiome(2, "forest", "normal")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          probability: 0.0075,
+          item: expect.objectContaining({ itemId: "hunter-bow" }),
+        }),
+      ]),
+    );
+  });
+
   it("普通怪允许空掉落，精英和层主分别保证至少 1/2 件", () => {
     const base = {
       seed: "drop-minimum",
@@ -79,6 +107,23 @@ describe("rollLootItems", () => {
     expect(rollLootItems({ ...base, monster: monster("normal") })).toEqual([]);
     expect(rollLootItems({ ...base, monster: monster("elite") })).toHaveLength(1);
     expect(rollLootItems({ ...base, monster: monster("boss") })).toHaveLength(2);
+  });
+
+  it("区域首领即使概率均未命中也会稳定补足两件不重复战利品", () => {
+    const items = rollLootItems({
+      seed: "area-boss-minimum",
+      floor: 2,
+      monster: { ...monster("elite"), floor: 2, id: 1810 },
+      candidates: lootCandidatesForBiome(2, "lake", "area-boss").map((entry) => ({
+        ...entry,
+        probability: 0,
+      })),
+      fixedItems: [],
+      acquiredUniqueItemIds: new Set(),
+      minimumNonKeyDrops: 2,
+    });
+    expect(items).toHaveLength(2);
+    expect(new Set(items.map((item) => item.itemId)).size).toBe(2);
   });
 
   it("每项独立命中后同场去重，非关键物品最多三件", () => {

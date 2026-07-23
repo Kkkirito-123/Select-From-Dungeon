@@ -9,6 +9,7 @@ export interface LootRollInput {
   candidates: readonly LootCandidate[];
   fixedItems: readonly LootItem[];
   acquiredUniqueItemIds: ReadonlySet<string>;
+  minimumNonKeyDrops?: number;
 }
 
 function cloneLootItem(item: LootItem): LootItem {
@@ -87,7 +88,10 @@ export function rollLootItems(input: LootRollInput): LootItem[] {
     normalized.push(item);
   });
 
-  const minimum = minimumDrops(input.monster.rank);
+  const minimum = Math.max(
+    minimumDrops(input.monster.rank),
+    input.minimumNonKeyDrops ?? 0,
+  );
   for (const candidate of input.candidates) {
     if (normalized.filter((item) => !isKey(item)).length >= minimum) break;
     let item: LootItem = {

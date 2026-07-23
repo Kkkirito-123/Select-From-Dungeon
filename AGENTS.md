@@ -81,7 +81,7 @@ reference SQL, result category, hint level, and battle outcome. The log is
 capped at 200 SQL turns, never records movement or key presses, and is never
 uploaded.
 Authored monster display names stay direct and easy to type: two or three
-Chinese characters such as `史莱姆`, `幻影`, or `幼龙`, without middle-dot
+Chinese characters such as `史莱姆`, `水胶怪`, or `幼龙`, without middle-dot
 epithets or SQL-concept suffixes. Future floors must follow the same rule; SQL
 meaning belongs in fields, objectives, and encounter mechanics rather than the
 display name.
@@ -91,11 +91,19 @@ encounter roles, theme/topology, monster/equipment/loot pools, deterministic
 completion rewards, and runtime evidence boundary. The current executable
 content remains floors one and two; the other six slots are saved scaffolding,
 not a claim that those floors are playable yet.
+The v0.7 runtime derives three deterministic biome regions per executable floor
+from the saved maze instead of persisting duplicate geometry. Floor one uses a
+drainage channel, slime pool, and ember cellar; floor two uses a lake, swamp,
+and forest. Ambushes draw only from the current biome pool, with seeded 5% and
+7% mini-elite weights on floors one and two. The lake and swamp each contain a
+visible optional area Boss with a two-stage exercise, 3 XP, and at least two
+biome-themed drops. These actors never enter entrance/campfire safe zones and
+do not gate curriculum completion.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
-optimizer/InnoDB runtime. Biome-specific loot pools and floors three through
-eight are also not implemented. The seed randomizes the physical maze,
+optimizer/InnoDB runtime. Floors three through eight are not implemented. The
+seed randomizes the physical maze,
 non-critical room rewards, and optional loot, but not required SQL data,
 prerequisite lessons, or key weapons. The first floor teaches `SELECT` through
 `HAVING`; the harder second floor teaches `ORDER BY / LIMIT`, `DISTINCT`,
@@ -116,6 +124,7 @@ index.html -> src/main.ts
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
   -> CampfireDomain (three seeded checkpoints and shared safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
+  -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates, rank minimums, deduplication)
@@ -168,9 +177,13 @@ the concept lock. Shared curriculum data and fixed drops live in
 contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
 `src/content/inventoryCatalog.ts` owns inventory capacities, the current
-weapon/armor/consumable catalog, and per-floor optional candidate probabilities;
+weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls, rank minimums,
 same-battle deduplication, unique-equipment conversion, and the three-item cap.
+`src/content/biomeContent.ts` owns the executable two-floor biome encounter
+pools and optional multi-stage exercises. `src/domain/biome.ts` derives region
+ownership, static features, and area-Boss positions from the maze, campfires,
+guided map, and seed; this plan is rebuilt during load and is not serialized.
 `src/content/floorContracts.ts` is the canonical eight-floor future-content
 schema. `src/domain/campaign.ts` owns its serializable ordered floor slots and
 must reject skipped, duplicated, or rerolled transitions. This campaign

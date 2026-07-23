@@ -58,7 +58,7 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
       [201],
     ),
     teachingResult(
-      "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped'",
+      "SELECT weakness FROM monsters WHERE name = '水胶怪' AND status = 'escaped'",
       ["weakness"],
       [{ weakness: "focus" }],
     ),
@@ -73,7 +73,7 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
       ["name"],
-      [{ name: "幽灵" }],
+      [{ name: "毒胶怪" }],
     ),
   ],
   "group-by": [
@@ -127,12 +127,12 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400",
       ["name", "room_name"],
-      [{ name: "蛛后", room_name: "双表桥" }],
+      [{ name: "树妖", room_name: "古树桥" }],
     ),
     teachingResult(
       "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400",
       ["name", "sector"],
-      [{ name: "蛛后", sector: "bridge" }],
+      [{ name: "树妖", sector: "forest-bridge" }],
     ),
   ],
   "left-join": [
@@ -155,57 +155,88 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 1900 ORDER BY g.power DESC LIMIT 1",
       ["name", "power"],
-      [{ name: "雷王", power: 21 }],
+      [{ name: "丛林王", power: 21 }],
     ),
   ],
 };
 
-const AMBUSH_QUERIES: Record<number, SqlQueryResult> = {
-  111: teachingResult(
+const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
+  111: [teachingResult(
     "SELECT name FROM monsters WHERE id = 111",
     ["name"],
-    [{ name: "幻影" }],
-  ),
-  211: teachingResult(
-    "SELECT id FROM monsters WHERE room_id = 12 AND status = 'lurking'",
+    [{ name: "软泥怪" }],
+  )],
+  211: [teachingResult(
+    "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
     ["id"],
     [{ id: 211 }],
     [211],
-  ),
-  311: teachingResult(
-    "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'faded'",
+  )],
+  311: [teachingResult(
+    "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
     ["name"],
-    [{ name: "鬼火" }],
-  ),
-  810: teachingResult(
+    [{ name: "毒胶怪" }],
+  )],
+  810: [
+    teachingResult(
     "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 810 GROUP BY channel",
     ["channel", "total"],
     [
       { channel: "echo", total: 2 },
       { channel: "noise", total: 2 },
     ],
-  ),
-  1210: teachingResult(
+    ),
+    teachingResult(
+      "SELECT name FROM monsters WHERE id = 810",
+      ["name"],
+      [{ name: "铁胶怪" }],
+    ),
+  ],
+  1210: [teachingResult(
     "SELECT channel FROM monster_signals WHERE monster_id = 1210 ORDER BY charge DESC LIMIT 1",
     ["channel"],
     [{ channel: "surge" }],
-  ),
-  1310: teachingResult(
+  )],
+  1310: [teachingResult(
     "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1310 ORDER BY channel",
     ["channel"],
     [{ channel: "echo" }, { channel: "mirror" }],
-  ),
-  1410: teachingResult(
+  )],
+  1410: [teachingResult(
     "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1410",
     ["name", "room_name"],
-    [{ name: "幼蛛", room_name: "伏击桥" }],
-  ),
-  1510: teachingResult(
-    "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL",
-    ["id"],
-    [{ id: 1510 }],
-    [1510],
-  ),
+    [{ name: "青蛙", room_name: "泥沼石径" }],
+  )],
+  1510: [
+    teachingResult(
+      "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL",
+      ["id"],
+      [{ id: 1510 }],
+      [1510],
+    ),
+    teachingResult(
+      "SELECT name FROM monsters WHERE id = 1510 AND status = 'toxic'",
+      ["name"],
+      [{ name: "毒蛙" }],
+    ),
+  ],
+  1610: [teachingResult(
+    "SELECT name, hp FROM monsters WHERE id = 1610 ORDER BY hp DESC LIMIT 1",
+    ["name", "hp"],
+    [{ name: "猎犬", hp: 13 }],
+  )],
+  1710: [
+    teachingResult(
+      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1710",
+      ["name", "room_name"],
+      [{ name: "树妖", room_name: "树妖林地" }],
+    ),
+    teachingResult(
+      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1710 ORDER BY r.sector LIMIT 1",
+      ["name", "sector"],
+      [{ name: "树妖", sector: "forest-treant" }],
+    ),
+  ],
 };
 
 function pathToAny(session: GameSession, goals: readonly Position[]): Position[] {
@@ -262,10 +293,12 @@ function walkPath(session: GameSession, path: readonly Position[]): void {
     const move = session.attemptPlayerMove(step.x, step.y);
     expect(move, move.message).toMatchObject({ ok: true, moved: true });
     if (move.encounterId !== null) {
-      const query = AMBUSH_QUERIES[move.encounterId];
-      if (!query) throw new Error(`突发遭遇没有测试查询：${move.encounterId}`);
-      const resolution = session.resolveQuery(query);
-      expect(resolution.accepted, resolution.message).toBe(true);
+      const queries = AMBUSH_QUERIES[move.encounterId];
+      if (!queries) throw new Error(`突发遭遇没有测试查询：${move.encounterId}`);
+      queries.forEach((query) => {
+        const resolution = session.resolveQuery(query);
+        expect(resolution.accepted, resolution.message).toBe(true);
+      });
       expect(session.snapshot().mode).toBe("explore");
     }
   });

@@ -17,12 +17,14 @@ and turn the correct result into an animated attack.
 
 - Complete a two-floor Run made from separate deterministic 64x48 continuous
   mazes. Each uses twelve 16x16 technical partitions and extra loops to reduce
-  dead-end backtracking. Floor one is a stone castle; floor two becomes the
-  deep-blue, cyan, and violet Thunder Sonata Tower.
+  dead-end backtracking. Floor one contains a stone drainage channel, slime
+  pool, and ember cellar; floor two contains a moonlit lake, toxic swamp, and
+  ancient forest. Each region has its own palette, static pixel features, and
+  encounter pool.
 - The header now shows the current slot out of eight. A validated campaign
   scaffold defines all eight ordered floor seeds, curriculum prerequisites,
   exercise tiers, encounter roles, themes, and content pools. Only floors one
-  and two are executable in v0.6; slots three through eight are contracts for
+  and two are executable in v0.7; slots three through eight are contracts for
   later versions rather than placeholder gameplay.
 - Collecting the first Boss key shows a gold
   `FLOOR 01 CLEARED / CONGRATULATIONS!!` transition for approximately 1.5
@@ -47,6 +49,11 @@ and turn the correct result into an animated attack.
   Ordinary monsters take one slow patrol step about every 1,100 ms; the Boss
   remains anchored. The opponent's full name, ID, HP, and next counter are
   visible before every query.
+- Ambushes draw only from the biome under the player. Floor one uses slimes and
+  a 5% mini-elite weight; floor two uses aquatic, swamp, and forest monsters
+  with a 7% mini-elite weight. The visible optional Lake Beast and Frog King
+  each require two floor-appropriate exercises, award 3 XP, and guarantee at
+  least two themed drops without blocking curriculum progress.
 - Press `Q + S` (or the touch button) to open the in-game terminal. Every stage
   starts blank: the player writes the complete `SELECT ... FROM ...` statement.
 - Use the embedded `PLAN ASSIST` completion stack without leaving the game.
@@ -97,7 +104,9 @@ and turn the correct result into an animated attack.
   guarantee at least one item, Bosses at least two, and keys are extra.
   Curriculum rewards remain guaranteed: Filter Bow after `SELECT`, Null Lantern
   after `IS NULL`, Aggregate Hammer before `GROUP BY`, then Sort Saber and Join
-  Chain on floor two. Duplicate unique equipment converts to a consumable.
+  Chain on floor two. Biome pools can also yield low-probability items such as
+  Slime Sword, Hunter Bow, and Frog Potion. Duplicate unique equipment converts
+  to a consumable.
   Full equipment inventory requires explicit replacement and keeps leftovers in
   the bundle. Ordinary items can be dropped at the player's feet and recovered
   before floor transition; protected base/course items and keys cannot be
@@ -123,7 +132,7 @@ and turn the correct result into an animated attack.
 ## First-Floor Learning Route
 
 1. `SELECT / FROM`: query monster `#101` for its `name`, then its `weakness`.
-2. `WHERE / AND`: isolate the escaped hound by room and status, then query its
+2. `WHERE / AND`: isolate the Water Slime by room and status, then query its
    weakness by the monster's visible name.
 3. `IS NULL`: find the unowned monster ID, then the cursed unowned monster name.
 4. `COUNT / GROUP BY`: group `monster_id = 800` signals by `channel` and count
@@ -186,7 +195,7 @@ WHERE id = 101;
 
 Start at the castle gate and follow the onboarding card or cyan beacon through
 the actual maze. The minimap only reveals where you have explored: it cannot be
-clicked to travel. Move into the projection slime's tile, press `Q + S`, type
+clicked to travel. Move into the Slime's tile, press `Q + S`, type
 the complete query, and use `Ctrl/Cmd + Enter` to attack. After victory, read
 the XP settlement, approach the loot bundle left on the monster's tile, and
 press `E` to process its items.
@@ -204,6 +213,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ MazeValidation ── topology, reachability, and save invariants
   ├─ CampfireDomain ── seeded checkpoints and shared visible safe-cell masks
   ├─ GuidedMap ── route beacons, dead-end caches, guaranteed key, shortcut
+  ├─ BiomeDomain ── derived regions, static features, safe area-Boss anchors
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
   ├─ MonsterRoaming ── deterministic slow patrol decisions
   ├─ LootDirector ── independent candidates, rank minimums, deduplication
@@ -231,9 +241,9 @@ The maze generator isolates `topology` and `decor` random streams. `GuidedMap`
 then derives route beacons, dead-end caches, and the keyed shortcut from the
 fixed maze, curriculum graph, and campfires, so decoration density cannot move
 courses, keys, or shortcuts. Actors and fixed curriculum drops derive from
-course anchors and optional loot uses independent stable hashes. Separate
-`theme` and `spawn` streams and an independent content-version field are still
-outside this MVP.
+course anchors, while biome loot uses independent stable hashes. The biome plan
+is rebuilt from maze, campfires, guided map, and seed instead of being stored.
+An independent content-version field is still outside this MVP.
 
 The terminal accepts one `SELECT` statement and displays at most 50 rows. DML,
 DDL, `PRAGMA`, `ATTACH`, and multiple statements are rejected. Query plans and
@@ -329,6 +339,12 @@ from `run:v9`. The narrow document remained `390 / 390 px`, with zero console
 warnings or errors. Sequential floor-shell transitions through floor eight and
 rejection of malformed campaign/content data are domain/storage evidence, not
 playable third-through-eighth-floor browser evidence.
+The v0.7.0 browser pass entered a real floor-one Slime battle and verified the
+drainage palette, biome label, species-specific pixel actor, full SQL objective,
+and touch controls at desktop and 390×844. The narrow layout showed the complete
+arena and controls without horizontal clipping; the console reported zero
+errors. Seed breadth, biome exclusivity, area-Boss placement, two-stage
+resolution, XP, and minimum loot are covered by domain tests.
 Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
@@ -364,8 +380,8 @@ This MVP covers ten lesson groups across two floors, ending with `LEFT JOIN` and
 a composite `JOIN` challenge. Subqueries, window functions, transactions, index
 internals, isolation levels, and the wider MySQL interview curriculum remain
 future floors, not claims of this release. The 12-slot inventory, equippable
-armor, and generic seeded multi-drop system are implemented; biome-specific loot
-and floors three through eight are not.
+armor, seeded biome multi-drop system, and two-floor biome slice are
+implemented; floors three through eight are not.
 
 Original code and prose use the [MIT License](LICENSE), copyright
 `Kkkirito-123`. Runtime notices and design references are listed in

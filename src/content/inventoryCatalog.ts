@@ -6,6 +6,10 @@ import type {
 } from "../domain/types";
 import type { FloorNumber } from "../domain/runGraph";
 import {
+  type BiomeEncounterRole,
+  type BiomeKind,
+} from "./biomeContent";
+import {
   DATA_BLADE,
   FILTER_BOW,
   NULL_LANTERN,
@@ -23,6 +27,22 @@ export const BONE_BLADE: Weapon = {
   damage: 16,
   heatReduction: 0,
   description: "来自下一层的稀有武器。提高伤害，但不会减少课程要求的正确作答次数。",
+};
+
+export const SLIME_SWORD: Weapon = {
+  id: "slime-sword",
+  name: "软泥短剑",
+  damage: 8,
+  heatReduction: 0,
+  description: "余烬地窖的轻型武器。正确查询造成 8 点伤害，不会跳过题目阶段。",
+};
+
+export const HUNTER_BOW: Weapon = {
+  id: "hunter-bow",
+  name: "猎人弓",
+  damage: 14,
+  heatReduction: 0,
+  description: "森林猎具仓的主题武器。正确查询造成 14 点伤害，不会跳过题目阶段。",
 };
 
 export const ARMORS: Readonly<Record<Armor["id"], Armor>> = {
@@ -55,6 +75,13 @@ export const CONSUMABLES: Readonly<Record<Consumable["id"], Consumable>> = {
     effect: "heal-armor",
     amount: 1,
   },
+  "frog-potion": {
+    id: "frog-potion",
+    name: "蛙药",
+    description: "恢复 1 点基础生命；生命已满时恢复 1 点护甲生命。",
+    effect: "heal-both",
+    amount: 1,
+  },
   "forest-fruit": {
     id: "forest-fruit",
     name: "树果",
@@ -85,6 +112,8 @@ export const WEAPONS: Readonly<Record<Weapon["id"], Weapon>> = {
   "aggregate-hammer": AGGREGATE_HAMMER,
   "sort-saber": SORT_SABER,
   "join-chain": JOIN_CHAIN,
+  "slime-sword": SLIME_SWORD,
+  "hunter-bow": HUNTER_BOW,
   "bone-blade": BONE_BLADE,
 };
 
@@ -153,6 +182,60 @@ const FLOOR_TWO_CANDIDATES: readonly LootCandidate[] = [
   armorCandidate(ARMORS["vine-armor"], 0.005),
   weaponCandidate(BONE_BLADE, 0.0025),
 ];
+
+const BIOME_CONSUMABLE: Readonly<Record<BiomeKind, Consumable>> = {
+  drainage: CONSUMABLES["water-drop"],
+  "slime-pool": CONSUMABLES["slime-gel"],
+  "ember-cellar": CONSUMABLES.whetstone,
+  lake: CONSUMABLES["water-drop"],
+  swamp: CONSUMABLES["frog-potion"],
+  forest: CONSUMABLES["forest-fruit"],
+};
+
+function roleProbability(
+  role: BiomeEncounterRole | "curriculum" | "floor-boss",
+  normal: number,
+  miniElite: number,
+  areaBoss: number,
+  floorBoss: number,
+): number {
+  if (role === "mini-elite") return miniElite;
+  if (role === "area-boss") return areaBoss;
+  if (role === "floor-boss") return floorBoss;
+  return normal;
+}
+
+export function lootCandidatesForBiome(
+  floor: FloorNumber,
+  biome: BiomeKind,
+  role: BiomeEncounterRole | "curriculum" | "floor-boss",
+): LootCandidate[] {
+  const consumable = BIOME_CONSUMABLE[biome];
+  const weapon = floor === 1 ? SLIME_SWORD : HUNTER_BOW;
+  const armor = floor === 1 ? ARMORS["slime-vest"] : ARMORS["vine-armor"];
+  const nextWeapon = floor === 1 ? SORT_SABER : BONE_BLADE;
+  const candidates = [
+    consumableCandidate(consumable, roleProbability(role, 0.06, 0.12, 0.24, 0.24)),
+    consumableCandidate(
+      CONSUMABLES["repair-shard"],
+      roleProbability(role, 0.02, 0.08, 0.16, 0.16),
+    ),
+    weaponCandidate(weapon, roleProbability(role, 0.0075, 0.03, 0.075, 0.075)),
+    armorCandidate(armor, roleProbability(role, 0.005, 0.025, 0.075, 0.075)),
+    weaponCandidate(nextWeapon, roleProbability(role, 0.0025, 0.005, 0.01, 0.015)),
+  ];
+  return candidates.map((candidate) => ({
+    probability: candidate.probability,
+    item: {
+      ...candidate.item,
+      weapon: candidate.item.weapon ? { ...candidate.item.weapon } : undefined,
+      armor: candidate.item.armor ? { ...candidate.item.armor } : undefined,
+      consumable: candidate.item.consumable
+        ? { ...candidate.item.consumable }
+        : undefined,
+    },
+  }));
+}
 
 export function lootCandidatesForFloor(floor: FloorNumber): LootCandidate[] {
   const candidates = floor === 1 ? FLOOR_ONE_CANDIDATES : FLOOR_TWO_CANDIDATES;

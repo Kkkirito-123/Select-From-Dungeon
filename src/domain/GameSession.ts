@@ -10,7 +10,7 @@ import {
   LOOT_AFTER_LESSON,
   NULL_LANTERN,
   lessonById,
-  practiceStageFor,
+  practiceStagesFor,
 } from "../content/mvpLevel";
 import {
   evaluateGateChallenge,
@@ -23,8 +23,12 @@ import {
   CONSUMABLE_STACK_CAPACITY,
   EQUIPMENT_CAPACITY,
   WEAPONS,
-  lootCandidatesForFloor,
+  lootCandidatesForBiome,
 } from "../content/inventoryCatalog";
+import {
+  biomeEncounterFor,
+  weightedBiomeEncounterIds,
+} from "../content/biomeContent";
 import {
   cloneMazeFloor,
   generateMazeFloor,
@@ -70,6 +74,12 @@ import {
   type GuidedMapPlan,
 } from "./guidedMap";
 import { rollLootItems } from "./lootDirector";
+import {
+  biomeRegionAt,
+  cloneBiomePlan,
+  generateBiomePlan,
+  type BiomePlan,
+} from "./biome";
 import {
   advanceCampaignProgress,
   cloneCampaignProgress,
@@ -266,21 +276,25 @@ function restoredMonstersForFloor(
   savedMonsters: readonly Monster[],
   floor: FloorNumber,
 ): Monster[] {
-  const canonicalNames = new Map(
-    monstersForFloor(floor).map((monster) => [monster.id, monster.name]),
-  );
-  return cloneMonsters(savedMonsters).map((monster) => ({
-    ...monster,
-    name: canonicalNames.get(monster.id) ?? monster.name,
-  }));
+  const savedById = new Map(savedMonsters.map((monster) => [monster.id, monster]));
+  return monstersForFloor(floor).map((canonical) => {
+    const saved = savedById.get(canonical.id);
+    return saved
+      ? {
+          ...canonical,
+          hp: Math.min(canonical.maxHp, Math.max(0, saved.hp)),
+        }
+      : { ...canonical };
+  });
 }
 
 function initialActors(
   graph: RoomGraph,
   floor: MazeFloor,
   monsters: readonly Monster[],
+  biomePlan: BiomePlan,
 ): WorldActor[] {
-  return monsters
+  const curriculumActors: WorldActor[] = monsters
     .filter((monster) => monster.encounterType === "curriculum")
     .map((monster) => {
     const room = graph.nodes.find((node) => node.lessonId === monster.lessonId);
@@ -296,6 +310,34 @@ function initialActors(
       moveTick: 0,
     };
     });
+  const areaBossActors = biomePlan.regions.flatMap((region) => {
+    if (region.areaBossId === null || region.areaBossPosition === null) return [];
+    const monster = monsters.find((entry) => entry.id === region.areaBossId);
+    const room = graph.nodes.find((entry) => entry.lessonId === monster?.lessonId);
+    if (!monster || !room) return [];
+    return [{
+      monsterId: monster.id,
+      roomNodeId: room.id,
+      ...region.areaBossPosition,
+      home: { ...region.areaBossPosition },
+      behavior: "anchored" as const,
+      roamRadius: 0,
+      moveTick: 0,
+    }];
+  });
+  return [...curriculumActors, ...areaBossActors];
+}
+
+function restoredActorsForFloor(
+  savedActors: readonly WorldActor[],
+  expectedActors: readonly WorldActor[],
+): WorldActor[] {
+  const savedByMonster = new Map(
+    savedActors.map((actor) => [actor.monsterId, actor]),
+  );
+  return expectedActors.map((expected) => (
+    cloneWorldActor(savedByMonster.get(expected.monsterId) ?? expected)
+  ));
 }
 
 function initialGroundItems(graph: RoomGraph, floor: MazeFloor): GroundItem[] {
@@ -326,6 +368,7 @@ export class GameSession {
   private mazeFloor: MazeFloor;
   private campfires: Campfire[];
   private guidedMap: GuidedMapPlan;
+  private biomePlan: BiomePlan;
   private activeCampfireId: string | null = null;
   private respawnCampfireId: string | null = null;
   private activeLootBundleId: string | null = null;
@@ -378,6 +421,12 @@ export class GameSession {
       this.mazeFloor,
       this.campfires,
     );
+    this.biomePlan = generateBiomePlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
     this.currentRoomId = this.graph.entryId;
     this.player = {
       ...this.mazeFloor.spawn,
@@ -390,7 +439,12 @@ export class GameSession {
       armor: null,
       armorHp: 0,
     };
-    this.worldActors = initialActors(this.graph, this.mazeFloor, this.monsters);
+    this.worldActors = initialActors(
+      this.graph,
+      this.mazeFloor,
+      this.monsters,
+      this.biomePlan,
+    );
     this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
     this.visitedRoomIds.add(this.currentRoomId);
     this.completedRoomIds.add(this.currentRoomId);
@@ -410,6 +464,12 @@ export class GameSession {
         this.mazeFloor,
         this.campfires,
       );
+      this.biomePlan = generateBiomePlan(
+        this.graph,
+        this.mazeFloor,
+        this.campfires,
+        this.guidedMap,
+      );
       this.activeCampfireId = savedRun.activeCampfireId;
       this.respawnCampfireId = savedRun.respawnCampfireId;
       this.activeLootBundleId = savedRun.activeLootBundleId;
@@ -421,9 +481,21 @@ export class GameSession {
         armor: savedRun.player.armor ? { ...savedRun.player.armor } : null,
       };
       this.monsters = restoredMonstersForFloor(savedRun.monsters, savedRun.floor);
-      this.worldActors = savedRun.worldActors.map((savedActor) => {
+      const expectedActors = initialActors(
+        this.graph,
+        this.mazeFloor,
+        this.monsters,
+        this.biomePlan,
+      );
+      this.worldActors = restoredActorsForFloor(
+        savedRun.worldActors,
+        expectedActors,
+      ).map((savedActor) => {
         const actor = cloneWorldActor(savedActor);
-        if (isActorPatrolPosition(actor, this.mazeFloor, actor)) return actor;
+        if (
+          actor.behavior === "anchored" ||
+          isActorPatrolPosition(actor, this.mazeFloor, actor)
+        ) return actor;
         return { ...actor, x: actor.home.x, y: actor.home.y };
       });
       this.groundItems = savedRun.groundItems.map(cloneItem);
@@ -507,9 +579,9 @@ export class GameSession {
           ? lesson.title
           : room.title;
     const missionBody = this.mode === "victory"
-      ? "你关闭了雷鸣主核。两层 SQL 图鉴和练习记录已经永久保留。"
+      ? "你击败了丛林王。两层 SQL 图鉴和练习记录已经永久保留。"
       : this.mode === "transition"
-        ? "双表连接传送门已经展开。无需按键，正在自动进入雷鸣奏鸣塔。"
+        ? "湖沼森林传送门已经展开。无需按键，正在自动进入第二层。"
       : this.mode === "defeat"
         ? "生命值归零。正在返回最近休息的篝火；尚未休息时返回本层出生点。"
         : this.mode === "death-review"
@@ -537,6 +609,8 @@ export class GameSession {
     return {
       mode: this.mode,
       campaign: cloneCampaignProgress(this.campaign),
+      biomePlan: cloneBiomePlan(this.biomePlan),
+      currentBiome: biomeRegionAt(this.biomePlan, this.player).kind,
       lessonId: lesson.id,
       lessonStageId: stage.id,
       lessonStageIndex: stageIndex,
@@ -755,7 +829,8 @@ export class GameSession {
       ? this.rollAmbush(pickedItemIds.length === 0)
       : null;
     if (pickedItemIds.length === 0 && encounterId === null && this.mode === "explore") {
-      this.banner = `${this.currentRoom().title} · 已探索 ${this.discoveredCells.size} 格。`;
+      const biome = biomeRegionAt(this.biomePlan, this.player);
+      this.banner = `${biome.name} · ${this.currentRoom().title} · 已探索 ${this.discoveredCells.size} 格。`;
     }
     this.emit();
     return {
@@ -1631,6 +1706,12 @@ export class GameSession {
       this.mazeFloor,
       this.campfires,
     );
+    this.biomePlan = generateBiomePlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
     this.activeCampfireId = null;
     this.respawnCampfireId = null;
     this.mode = "explore";
@@ -1644,7 +1725,12 @@ export class GameSession {
       armor: this.player.armor ? { ...this.player.armor } : null,
     };
     this.monsters = monstersForFloor(2);
-    this.worldActors = initialActors(this.graph, this.mazeFloor, this.monsters);
+    this.worldActors = initialActors(
+      this.graph,
+      this.mazeFloor,
+      this.monsters,
+      this.biomePlan,
+    );
     this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
     this.lootBundles = [];
     this.activeLootBundleId = null;
@@ -1662,7 +1748,7 @@ export class GameSession {
       safeStepsRemaining: INITIAL_SAFE_STEPS,
     };
     this.hintLevel = 0;
-    this.banner = "传送完成：已进入第二层「雷鸣奏鸣塔」。装备、遗物、等级与 XP 已保留。";
+    this.banner = "传送完成：已进入第二层「湖沼森林」。装备、遗物、等级与 XP 已保留。";
     this.revealAt(this.player);
     this.emit();
     return true;
@@ -1678,6 +1764,12 @@ export class GameSession {
       this.graph,
       this.mazeFloor,
       this.campfires,
+    );
+    this.biomePlan = generateBiomePlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
     );
     this.activeCampfireId = null;
     this.respawnCampfireId = null;
@@ -1695,7 +1787,12 @@ export class GameSession {
       armorHp: 0,
     };
     this.monsters = monstersForFloor(1);
-    this.worldActors = initialActors(this.graph, this.mazeFloor, this.monsters);
+    this.worldActors = initialActors(
+      this.graph,
+      this.mazeFloor,
+      this.monsters,
+      this.biomePlan,
+    );
     this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
     this.lootBundles = [];
     this.equipmentInventory = [];
@@ -1752,8 +1849,8 @@ export class GameSession {
 
   private currentCombatStages(): readonly LessonStageDefinition[] {
     if (this.combat?.kind === "ambush") {
-      const practice = practiceStageFor(this.combat.targetId);
-      if (practice) return [practice];
+      const practice = practiceStagesFor(this.combat.targetId);
+      if (practice.length > 0) return practice;
     }
     return this.currentLesson().stages;
   }
@@ -1827,14 +1924,19 @@ export class GameSession {
     const accessMessage = this.roomAccessMessage(room);
     if (accessMessage) return this.interactionFailure(accessMessage);
     const lesson = lessonById(room.lessonId);
-    const stage = lesson.stages[0];
+    const combatKind = monster.encounterType;
+    const stages = combatKind === "ambush"
+      ? practiceStagesFor(monster.id)
+      : lesson.stages;
+    const stage = stages[0];
+    if (!stage) return this.interactionFailure("这只怪物尚未配置可执行的 SQL 题。");
     this.currentRoomId = room.id;
     this.visitedRoomIds.add(room.id);
     this.beginBattleReview();
     this.mode = "combat";
     this.combat = {
       targetId: monster.id,
-      kind: "curriculum",
+      kind: combatKind,
       round: 1,
       successStep: 0,
       intent: {
@@ -1845,7 +1947,11 @@ export class GameSession {
     };
     this.selectedMonsterId = monster.id;
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
-    this.banner = `触碰遭遇 ${monster.name}（ID #${monster.id}）。按住 Q + S 写出完整 SQL。`;
+    const encounter = biomeEncounterFor(monster.id);
+    const roleLabel = encounter?.role === "area-boss"
+      ? "区域首领"
+      : encounter?.role === "mini-elite" ? "小型精英" : "触碰遭遇";
+    this.banner = `${roleLabel} ${monster.name}（ID #${monster.id}，${stages.length} 阶段）。按住 Q + S 写出完整 SQL。`;
     this.emit();
     return { ok: true, kind: "combat", message: this.banner };
   }
@@ -1855,20 +1961,31 @@ export class GameSession {
       this.encounterMeter = recordSafeZoneMovement(this.encounterMeter);
       return null;
     }
+    const unlockedLessons = new Set(
+      this.graph.nodes
+        .filter((room) => room.lessonId && this.roomAccessMessage(room) === null)
+        .map((room) => room.lessonId as LessonId),
+    );
+    const currentBiome = biomeRegionAt(this.biomePlan, this.player).kind;
+    const weightedIds = weightedBiomeEncounterIds(
+      this.floorNumber,
+      currentBiome,
+      unlockedLessons,
+    );
+    const livingIds = new Set(
+      this.monsters
+        .filter((monster) => monster.encounterType === "ambush" && monster.hp > 0)
+        .map((monster) => monster.id),
+    );
     const candidateIds = allowEncounter
-      ? this.monsters
-      .filter((monster) => {
-        if (monster.encounterType !== "ambush" || monster.hp <= 0) return false;
-        const lessonRoom = this.graph.nodes.find((room) => room.lessonId === monster.lessonId);
-        return Boolean(lessonRoom) && this.roomAccessMessage(lessonRoom as RoomNode) === null;
-      })
-      .map((monster) => monster.id)
+      ? weightedIds.filter((id) => livingIds.has(id))
       : [];
     const advance = advanceEncounterMeter(this.encounterMeter, this.graph.seed, candidateIds);
     this.encounterMeter = advance.meter;
     if (advance.targetId === null) return null;
     const monster = this.monsters.find((entry) => entry.id === advance.targetId);
-    const stage = monster ? practiceStageFor(monster.id) : null;
+    const stages = monster ? practiceStagesFor(monster.id) : [];
+    const stage = stages[0];
     if (!monster || !stage) return null;
 
     this.beginBattleReview();
@@ -1886,7 +2003,11 @@ export class GameSession {
     };
     this.selectedMonsterId = monster.id;
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
-    this.banner = `突发遭遇 ${monster.name}（ID #${monster.id}）！完成这条 ${lessonById(monster.lessonId).concept} 练习即可脱身。`;
+    const encounter = biomeEncounterFor(monster.id);
+    const roleLabel = encounter?.role === "mini-elite" ? "小型精英" : "突发遭遇";
+    this.banner = `${roleLabel} ${monster.name}（ID #${monster.id}）！完成 ${
+      stages.length
+    } 道 ${lessonById(monster.lessonId).concept} 练习即可脱身。`;
     return monster.id;
   }
 
@@ -2134,7 +2255,7 @@ export class GameSession {
     this.profile.bestRunQueries = this.profile.bestRunQueries === null
       ? this.queryCount
       : Math.min(this.profile.bestRunQueries, this.queryCount);
-    return "获得第二层钥匙。雷鸣主核已关闭，两层 SQL 图鉴均已永久更新。";
+    return "获得第二层钥匙。丛林王庭已平定，两层 SQL 图鉴均已永久更新。";
   }
 
   private completeAmbush(
@@ -2248,13 +2369,21 @@ export class GameSession {
     position: Position,
     fixedItems: readonly LootItem[],
   ): number {
+    const biome = biomeRegionAt(this.biomePlan, position).kind;
+    const encounter = biomeEncounterFor(monster.id);
+    const role = monster.isBoss
+      ? "floor-boss" as const
+      : encounter?.role ?? "curriculum";
     const items = rollLootItems({
       seed: this.graph.seed,
       floor: this.floorNumber,
       monster,
-      candidates: lootCandidatesForFloor(this.floorNumber),
+      candidates: lootCandidatesForBiome(this.floorNumber, biome, role),
       fixedItems,
       acquiredUniqueItemIds: this.acquiredUniqueItemIds,
+      minimumNonKeyDrops: role === "area-boss"
+        ? 2
+        : role === "mini-elite" ? 1 : undefined,
     });
     if (items.length === 0) return 0;
     const id = `loot:${this.floorNumber}:${monster.id}`;
@@ -2306,7 +2435,7 @@ export class GameSession {
         this.profile.bestRunQueries = this.profile.bestRunQueries === null
           ? this.queryCount
           : Math.min(this.profile.bestRunQueries, this.queryCount);
-        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第二层钥匙。雷鸣主核已关闭，两层 SQL 图鉴均已永久更新。`;
+        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第二层钥匙。丛林王庭已平定，两层 SQL 图鉴均已永久更新。`;
       }
     } else if (
       item.weapon ||

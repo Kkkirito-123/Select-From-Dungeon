@@ -31,8 +31,8 @@ describe("high-difficulty gate challenges", () => {
     `);
 
     expect(result.rows).toEqual([
-      { id: 800, name: "石巨人", echo_count: 3, total_charge: 24 },
-      { id: 900, name: "魔王", echo_count: 3, total_charge: 24 },
+      { id: 800, name: "铁胶怪", echo_count: 3, total_charge: 24 },
+      { id: 900, name: "泥王", echo_count: 3, total_charge: 24 },
     ]);
     expect(evaluateGateChallenge(1, result)).toMatchObject({ accepted: true });
 
@@ -67,8 +67,8 @@ describe("high-difficulty gate challenges", () => {
     `);
 
     expect(result.rows).toEqual([
-      { id: 25, room_name: "雷鸣主核", monster_count: 1, total_power: 38 },
-      { id: 23, room_name: "双表桥", monster_count: 1, total_power: 15 },
+      { id: 25, room_name: "丛林王庭", monster_count: 1, total_power: 38 },
+      { id: 23, room_name: "古树桥", monster_count: 1, total_power: 15 },
     ]);
     expect(evaluateGateChallenge(2, result)).toMatchObject({ accepted: true });
   });

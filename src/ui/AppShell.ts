@@ -1754,6 +1754,9 @@ export class AppShell {
       : undefined;
     const roomLabel = combatLesson?.concept ?? roomLesson?.concept
       ?? (snapshot.mode === "reward" ? "REWARD" : room?.type === "entry" ? "MAZE" : "EXPLORE");
+    const biomeName = snapshot.biomePlan.regions.find(
+      (region) => region.kind === snapshot.currentBiome,
+    )?.name ?? "未知生态";
     const target = snapshot.focusMonsterId === null
       ? undefined
       : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId);
@@ -1778,6 +1781,7 @@ export class AppShell {
     requiredElement(this.root, "#floor-value").textContent =
       `${String(snapshot.campaign.currentFloor).padStart(2, "0")} / 08`;
     this.root.dataset.floor = String(snapshot.floor);
+    this.root.dataset.biome = snapshot.currentBiome;
     requiredElement(this.root, "#hp-value").textContent = `${snapshot.player.hp} / ${snapshot.player.maxHp}`;
     this.renderProgress(
       "#player-hp-progress",
@@ -1803,7 +1807,8 @@ export class AppShell {
       ? `LV.${snapshot.player.level} · ${snapshot.player.xp} XP · MAX`
       : `LV.${snapshot.player.level} · ${snapshot.player.xp} / ${nextXp} XP`;
     requiredElement(this.root, "#relic-count").textContent = String(snapshot.relics.length);
-    requiredElement(this.root, "#lesson-concept").textContent = `${snapshot.currentRoomType.toUpperCase()} / ${roomLabel}`;
+    requiredElement(this.root, "#lesson-concept").textContent =
+      `${biomeName} / ${snapshot.currentRoomType.toUpperCase()} / ${roomLabel}`;
     requiredElement(this.root, "#mission-title").textContent = snapshot.missionTitle;
     requiredElement(this.root, "#mission-body").textContent = snapshot.missionBody;
     requiredElement(this.root, "#lesson-intro").textContent = snapshot.lessonIntro;
