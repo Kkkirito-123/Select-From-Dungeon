@@ -15,20 +15,20 @@ and turn the correct result into an animated attack.
 
 ## MVP Features
 
-- Complete a six-floor Run made from separate deterministic 64x48 continuous
+- Complete an eight-floor Run made from separate deterministic 64x48 continuous
   mazes. Each uses twelve 16x16 technical partitions and extra loops to reduce
   dead-end backtracking. Floor one contains a stone drainage channel, slime
   pool, and ember cellar; floor two contains a moonlit lake, toxic swamp, and
   ancient forest; floor three becomes an undead grave city; floor four becomes
-  an elemental forge; floor five is a black-iron fortress; and floor six is a
-  magma, crystal, and dragon-bone nest. Each region has its own palette, static
-  pixel features, and encounter pool.
+  an elemental forge; floor five is a black-iron fortress; floor six is a magma,
+  crystal, and dragon-bone nest; floor seven is a crystal index forest; and
+  floor eight is an obsidian data throne. Each region has its own palette,
+  static pixel features, and encounter pool.
 - The header now shows the current slot out of eight. A validated campaign
   scaffold defines all eight ordered floor seeds, curriculum prerequisites,
-  exercise tiers, encounter roles, themes, and content pools. Floors one through
-  six are executable in v0.9; slots seven and eight remain contracts for later
-  versions rather than placeholder gameplay.
-- Collecting a Boss key on floors one through five shows a gold
+  exercise tiers, encounter roles, themes, and content pools. All eight floors
+  are executable in v0.10.
+- Collecting a Boss key on floors one through seven shows a gold
   `FLOOR NN CLEARED / CONGRATULATIONS!!` transition for approximately 1.5
   seconds and automatically enters the next floor—no extra pathfinding, `E`
   press, or menu choice. Level, XP, equipment, inventory, relics, and query
@@ -52,17 +52,17 @@ and turn the correct result into an animated attack.
   Ordinary monsters take one slow patrol step about every 1,100 ms; the Boss
   remains anchored. The opponent's full name, ID, HP, and next counter are
   visible before every query.
-- Ambushes draw only from the biome under the player. Floors one through six
-  use 5%, 7%, 9%, 11%, 13%, and 15% seeded mini-elite weights. Pools progress
-  from slimes, wetland creatures, undead, and elementals to fortress troops and
-  dragons.
+- Ambushes draw only from the biome under the player. Floors one through eight
+  use 5%, 7%, 9%, 11%, 13%, 15%, 17%, and 19% seeded mini-elite weights. Pools
+  progress from slimes, wetland creatures, undead, and elementals to fortress
+  troops, dragons, index beasts, and demon-castle guards.
   Authored visible area Bosses require floor-appropriate multi-stage exercises,
   award 3 XP, and guarantee at least two themed drops without blocking
   curriculum progress.
 - Press `Q + S` (or the touch button) to open the in-game terminal. Every stage
   starts blank: the player writes the complete statement. Floors one through
-  five use `SELECT`/`WITH`; floor six accepts controlled writes and transaction
-  scripts against a disposable `repair_queue`.
+  five and seven through eight use `SELECT`/`WITH`; floor six accepts controlled
+  writes and transaction scripts against a disposable `repair_queue`.
 - Use the embedded `PLAN ASSIST` completion stack without leaving the game.
   Prefixes rank SQL keywords, functions, all four canonical tables, and all 22
   fields; aliases such as `m.` narrow the list to that table. Use arrows plus
@@ -74,12 +74,14 @@ and turn the correct result into an animated attack.
   operable, while battle and breach terminals offer a collapsed complete-field
   quick reference. `REF` labels are teaching relationships, not declared SQLite
   foreign-key constraints.
-- Execute real read-only SQLite WASM queries on floors one through five and
-  controlled `INSERT`, `UPDATE`, `DELETE`, transaction, and savepoint scripts
-  on floor six. Every floor-six submission runs in an exported in-memory
-  database copy and is discarded after grading. Correct results attack; wrong
-  results and syntax errors trigger the telegraphed counter. Empty input
-  consumes no turn.
+- Execute real read-only SQLite WASM queries on floors one through five, seven,
+  and eight, plus controlled `INSERT`, `UPDATE`, `DELETE`, transaction, and
+  savepoint scripts on floor six. Floor seven grades stable
+  `EXPLAIN QUERY PLAN` structure instead of device timing. Floor eight queries
+  deterministic incident records and does not pretend SQLite is a distributed
+  MVCC engine. Every floor-six submission runs in an exported in-memory database
+  copy and is discarded after grading. Correct results attack; wrong results and
+  syntax errors trigger the telegraphed counter. Empty input consumes no turn.
 - Open `答题复盘` from the top console to review every submitted SQL statement,
   its reference answer, error category, hint level, and battle outcome for the
   latest battle or current floor. The local-only log keeps at most 200 SQL turns
@@ -115,7 +117,8 @@ and turn the correct result into an animated attack.
   Curriculum rewards remain guaranteed: Filter Bow after `SELECT`, Null Lantern
   after `IS NULL`, Aggregate Hammer before `GROUP BY`, Sort Saber and Join
   Chain on floor two, Bone Blade on floor three, Rune Staff on floor four,
-  Iron Axe on floor five, and Dragon Spear on floor six.
+  Iron Axe on floor five, Dragon Spear on floor six, Crystal Blade on floor
+  seven, and Royal Sword on floor eight.
   Biome pools can also yield low-probability armor, consumables, and the next
   floor's weapon. Duplicate unique equipment converts to a consumable.
   Full equipment inventory requires explicit replacement and keeps leftovers in
@@ -295,10 +298,10 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   └─ OnboardingController ── separately persisted progressive guide
 ```
 
-`FloorContracts` defines the future eight-floor curriculum and content boundary,
-while `CampaignDomain` serializes deterministic ordered slots and rejects
-skips, duplicate activation, or rerolled floor seeds. `RunGraph` remains the
-currently executable six-floor dependency graph; it does not move the player.
+`FloorContracts` defines the eight-floor curriculum and content boundary, while
+`CampaignDomain` serializes deterministic ordered slots and rejects skips,
+duplicate activation, or rerolled floor seeds. `RunGraph` is the executable
+eight-floor dependency graph; it does not move the player.
 `MazeFloor` is the physical world. The discovery minimap is a read-only view of
 exploration, while movement, same-tile encounters, pickups, and gates are
 resolved by `GameSession` against the maze.
@@ -311,16 +314,18 @@ course anchors, while biome loot uses independent stable hashes. The biome plan
 is rebuilt from maze, campfires, guided map, and seed instead of being stored.
 An independent content-version field is still outside this MVP.
 
-On floors one through five the terminal accepts one read-only `SELECT` or
-`WITH` statement and displays at most 50 rows. Floor six accepts one to eight
-validated statements against disposable `repair_queue`; DDL, `PRAGMA`,
-`ATTACH`, permanent tables, and unbounded updates/deletes are rejected. Query
-plans and I/O heat are SQLite teaching signals, not evidence about the MySQL
-optimizer.
+On floors one through five and seven through eight, the terminal accepts one
+read-only `SELECT` or `WITH` statement and displays at most 50 rows. Floor six
+accepts one to eight validated statements against disposable `repair_queue`;
+DDL, `PRAGMA`, `ATTACH`, permanent tables, and unbounded updates/deletes are
+rejected. Query plans and I/O heat are SQLite teaching signals, not evidence
+about the MySQL optimizer. Floor-eight concurrency and distribution exercises
+read deterministic incident fixtures rather than claiming native SQLite
+behavior.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v9`: disposable current Run, including the
+- `select-from-dungeon:run:v10`: disposable current Run, including the
   deterministic eight-floor campaign scaffold, current executable floor,
   generated maze, world actors, ground items, pending loot bundles,
   equipment inventory, armor/armor HP, consumables, unique-item history, key
@@ -329,16 +334,15 @@ Browser-local storage is split into:
   opened shortcut/cache state, the active gate challenge, and up to 200 local
   SQL answer records. The guided plan itself is rebuilt from the seed instead
   of storing a duplicate copy.
-- `select-from-dungeon:profile:v2`: 34 mastered lessons, attempts, victories, and
+- `select-from-dungeon:profile:v2`: 47 mastered lessons, attempts, victories, and
   best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-A valid `run:v8` is migrated in memory into v9 with deterministic eight-floor
-slots. A valid `run:v7` then receives empty inventory/loot state and registered
-equipped gear; valid `run:v6`, `run:v5`, and `run:v4` continue through the
-existing migrations before v9. Legacy keys are not deleted; earlier Run keys
-remain unread. A valid `profile:v1` migrates to v2,
+A valid `run:v9` is migrated in memory into v10 without changing the current
+Run. Valid `run:v8` through `run:v4` saves continue through the existing
+migration chain before v10. Legacy keys are not deleted; earlier Run keys remain
+unread. A valid `profile:v1` migrates to v2,
 preserving first-floor mastery while adding second-floor counters. Pre-v0.8
 v2 profiles are backfilled with floor-three through floor-six counters. Snapshot
 persistence is debounced in `src/main.ts` so movement and patrol updates do not
@@ -430,14 +434,22 @@ browser reached the black-iron fortress and dragon transaction nest, accepted
 sandbox, returned the inserted `claw` row, and displayed
 `COPY → controlled statement → DISCARD` evidence. At 390×844 the document and
 viewport both remained 390 px wide; the console reported zero errors.
+The v0.10.0 automation pass executes all floor-seven reference queries against
+real SQLite query plans, validates deterministic floor-eight incident results,
+walks both floor-one branch orders through all eight floors, completes all 47
+required lesson groups, and verifies lossless `run:v9` to `run:v10` migration.
+The browser startup pass verified `01 / 08`, all 47 Codex entries, and zero
+console warnings/errors at 1280×720 and 390×844; the narrow document and body
+both remained exactly 390 px wide. Late-floor browser visuals remain covered by
+domain content/palette tests rather than a human-operated eight-floor Run.
 Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
-same-seed reload. A complete human-operated six-floor browser Run, 200%/320px layout,
+same-seed reload. A complete human-operated eight-floor browser Run, 200%/320px layout,
 Reduced Motion, subjective audio/timing, and the 10-second
 performance/save-rate checks have not yet been run. Unit tests and a successful
 build do not substitute for those checks. Domain automation physically walks
-both floor-one branch orders, all five automatic transitions, and all 34 lesson
-groups through floor six without Session travel or positioning helpers; that is
+both floor-one branch orders, all seven automatic transitions, and all 47 lesson
+groups through floor eight without Session travel or positioning helpers; that is
 still not a human-operated browser Run.
 
 To embed a deployed build in a blog:
@@ -461,12 +473,12 @@ has unit coverage, not a completed browser iframe acceptance run.
 
 ## Scope and Attribution
 
-This MVP covers 22 lesson groups across four floors, ending with correlated
-subqueries, CTEs, and a recursive-CTE Boss. Window functions, transactions,
-index internals, isolation levels, and the wider MySQL interview curriculum
-remain future floors, not claims of this release. The 12-slot inventory,
-equippable armor, seeded biome multi-drop system, and six-floor biome slice are
-implemented; floors seven and eight are not.
+This MVP covers 47 lesson groups across eight floors, ending with real SQLite
+query-plan exercises and deterministic incident analysis for MVCC, locking,
+isolation, modeling, replication, sharding, and SQL security. Distributed-system
+records are teaching fixtures, not claims that SQLite implements those systems.
+The 12-slot inventory, equippable armor, seeded biome multi-drop system, and all
+eight biome slices are implemented.
 
 Original code and prose use the [MIT License](LICENSE), copyright
 `Kkkirito-123`. Runtime notices and design references are listed in

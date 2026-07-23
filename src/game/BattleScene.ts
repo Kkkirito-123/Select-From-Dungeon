@@ -213,6 +213,30 @@ const BIOME_ARENA: Readonly<Record<BiomeKind, {
     floor: 0x40151c,
     accent: "#f5ca76",
   },
+  "crystal-grove": {
+    void: 0x020b09, line: 0x65c9b4, platform: 0x1d463e, edge: 0x8ee8d3,
+    upperA: 0x0b211c, upperB: 0x103028, floor: 0x173a32, accent: "#a8f2df",
+  },
+  "root-maze": {
+    void: 0x070b05, line: 0x80925b, platform: 0x34422c, edge: 0xa8bc76,
+    upperA: 0x171d11, upperB: 0x222917, floor: 0x2e3926, accent: "#c5d991",
+  },
+  "index-heart": {
+    void: 0x020a0b, line: 0x58bfc1, platform: 0x1c4245, edge: 0x83dfe0,
+    upperA: 0x091e20, upperB: 0x0d2b2d, floor: 0x17383a, accent: "#a8eded",
+  },
+  "obsidian-hall": {
+    void: 0x030205, line: 0x6d657d, platform: 0x272431, edge: 0x9287a5,
+    upperA: 0x0e0c13, upperB: 0x16131d, floor: 0x201d29, accent: "#b4a9c3",
+  },
+  "void-court": {
+    void: 0x050207, line: 0x84539c, platform: 0x34203e, edge: 0xae70c7,
+    upperA: 0x15091b, upperB: 0x200e29, floor: 0x2d1738, accent: "#d19ae4",
+  },
+  "data-throne": {
+    void: 0x070402, line: 0xb58b39, platform: 0x49351d, edge: 0xe1b553,
+    upperA: 0x1e1408, upperB: 0x2b1d0c, floor: 0x3b2915, accent: "#f4d27a",
+  },
 };
 
 export class BattleScene extends Phaser.Scene {

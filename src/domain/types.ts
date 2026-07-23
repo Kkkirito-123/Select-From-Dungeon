@@ -104,7 +104,37 @@ export type LessonStageId =
   | "practice-thunder-drake"
   | "practice-crystal-drake"
   | "dragon-boss-scan"
-  | "dragon-boss-core";
+  | "dragon-boss-core"
+  | "f7-btree-search"
+  | "f7-composite-prefix"
+  | "f7-covering-read"
+  | "f7-invalid-rewrite"
+  | "f7-plan-audit"
+  | "f7-optimize-top"
+  | "f7-optimize-core"
+  | "practice-branch"
+  | "practice-root"
+  | "practice-crystal"
+  | "practice-vine"
+  | "index-boss-scan"
+  | "index-boss-core"
+  | "f8-mvcc-visible"
+  | "f8-lock-cycle"
+  | "f8-isolation-phantom"
+  | "f8-modeling-safe"
+  | "f8-replication-fresh"
+  | "f8-sharding-balance"
+  | "f8-final-snapshot"
+  | "f8-final-deadlock"
+  | "f8-final-anomaly"
+  | "f8-final-route"
+  | "f8-final-security"
+  | "practice-demon"
+  | "practice-dark-knight"
+  | "practice-lich"
+  | "practice-golem"
+  | "throne-boss-scan"
+  | "throne-boss-core";
 
 export type PlayMode =
   | "explore"
@@ -125,7 +155,9 @@ export type GateChallengeId =
   | "grave-breach"
   | "forge-breach"
   | "iron-breach"
-  | "dragon-breach";
+  | "dragon-breach"
+  | "index-breach"
+  | "throne-breach";
 
 export type MonsterKind =
   | "projection-slime"
@@ -153,7 +185,20 @@ export type MonsterKind =
   | "hatchling"
   | "wyvern"
   | "dragon"
-  | "dragon-king";
+  | "dragon-king"
+  | "index-guard"
+  | "root-beast"
+  | "crystal-spirit"
+  | "vine-witch"
+  | "index-eye"
+  | "index-tree"
+  | "demon-soldier"
+  | "dark-knight"
+  | "lich"
+  | "obsidian-golem"
+  | "replica-twin"
+  | "shard-beast"
+  | "demon-king";
 
 export type QueryFeature =
   | "select"
@@ -242,7 +287,9 @@ export interface Weapon {
     | "bone-blade"
     | "rune-staff"
     | "iron-axe"
-    | "dragon-spear";
+    | "dragon-spear"
+    | "crystal-blade"
+    | "royal-sword";
   name: string;
   damage: number;
   heatReduction: number;
@@ -256,7 +303,9 @@ export interface Armor {
     | "bone-armor"
     | "rune-armor"
     | "iron-armor"
-    | "dragon-armor";
+    | "dragon-armor"
+    | "crystal-armor"
+    | "royal-armor";
   name: string;
   maxArmor: number;
   description: string;
@@ -282,6 +331,9 @@ export interface Consumable {
     | "ice-crystal"
     | "repair-plate"
     | "dragon-potion"
+    | "crystal-fruit"
+    | "black-potion"
+    | "full-potion"
     | "whetstone"
     | "repair-shard";
   name: string;
@@ -500,7 +552,7 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 9;
+  version: 10;
   generatorVersion: 4;
   campaign: CampaignProgress;
   floor: FloorNumber;

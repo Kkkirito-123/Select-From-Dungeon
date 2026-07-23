@@ -1,8 +1,8 @@
 # SQL Demon Castle Eight-Floor Curriculum Blueprint
 
-Status: **v0.9.0 implements the eight-floor data contract and playable content
-for floors one through six; floors seven and eight remain planned**
-Target: staged expansion after the current six-floor MVP
+Status: **v0.10.0 implements the eight-floor data contract and all eight
+playable floors**
+Target: eight-floor MVP complete; later work is release hardening
 Primary users: SQL beginners, interview reviewers, level designers, and content maintainers
 
 **English** | [简体中文](CURRICULUM.zh-CN.md)
@@ -392,10 +392,11 @@ Implementations must ensure:
 - data changes occur only in a disposable sandbox, and plan/transaction tests
   never mutate permanent progress.
 
-## 8. Current Six Floors and the Long-Term Blueprint
+## 8. Current Eight Floors
 
-The current playable MVP retains the original first two floors, adds floors
-three and four in v0.8.0, and adds floors five and six in v0.9.0:
+The playable MVP retains the original first two floors, adds floors three and
+four in v0.8.0, floors five and six in v0.9.0, and floors seven and eight in
+v0.10.0:
 
 - Floor 1: `SELECT`, `WHERE`, `IS NULL`, `GROUP BY`, `HAVING`
 - Floor 2: `ORDER BY`, `DISTINCT`, `INNER JOIN`, `LEFT JOIN`, composite `JOIN`
@@ -403,6 +404,14 @@ three and four in v0.8.0, and adds floors five and six in v0.9.0:
 - Floor 4: scalar, `IN`, `EXISTS`, correlated subqueries, CTE, and recursive CTE
 - Floor 5: `OVER`, `ROW_NUMBER`, ranking, `LAG/LEAD`, frames, and grouped Top-N
 - Floor 6: `INSERT`, `UPDATE`, `DELETE`, constraints, transactions, and savepoints
+- Floor 7: point lookup, composite and covering indexes, sargable rewrites,
+  SQLite query plans, and query optimization
+- Floor 8: MVCC visibility, locks/deadlocks, isolation anomalies, modeling,
+  replication, sharding, query security, and a five-stage final Boss
+
+Floor 7 reads real SQLite `EXPLAIN QUERY PLAN` evidence. Floor 8 uses
+deterministic incident-record fixtures and does not claim that SQLite natively
+implements the modeled row-version, replication, or sharding systems.
 
 It remains playable, but its order is not the long-term curriculum. Reuse its
 monsters, fixtures, and evaluators instead of rewriting everything at once:
@@ -462,7 +471,7 @@ migration, and browser acceptance route.
   concurrency.
 - Hints grow from concepts to structure and never auto-fill the answer.
 - Mastery distinguishes hinted clears from independent changed-data solutions.
-- The current six floors have an incremental, reversible migration path.
+- The current eight floors have an incremental, reversible migration path.
 - Every implementation stage can be reviewed and accepted in isolation.
 
 ### Risks and trade-offs

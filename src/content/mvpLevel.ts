@@ -28,12 +28,22 @@ import {
   FLOOR_SIX_MONSTERS,
 } from "./floor6Level";
 import {
+  FLOOR_SEVEN_LESSON_DEFINITIONS,
+  FLOOR_SEVEN_MONSTERS,
+} from "./floor7Level";
+import {
+  FLOOR_EIGHT_LESSON_DEFINITIONS,
+  FLOOR_EIGHT_MONSTERS,
+} from "./floor8Level";
+import {
   BIOME_PRACTICE_STAGES,
   FLOOR_ONE_BIOME_MONSTERS,
   FLOOR_THREE_BIOME_MONSTERS,
   FLOOR_FOUR_BIOME_MONSTERS,
   FLOOR_FIVE_BIOME_MONSTERS,
   FLOOR_SIX_BIOME_MONSTERS,
+  FLOOR_SEVEN_BIOME_MONSTERS,
+  FLOOR_EIGHT_BIOME_MONSTERS,
   practiceStagesFor,
 } from "./biomeContent";
 import { sqlSchemaLine } from "./sqlSchema";
@@ -210,6 +220,10 @@ export const INITIAL_MONSTERS: readonly Monster[] = [
   ...FLOOR_FIVE_BIOME_MONSTERS,
   ...FLOOR_SIX_MONSTERS,
   ...FLOOR_SIX_BIOME_MONSTERS,
+  ...FLOOR_SEVEN_MONSTERS,
+  ...FLOOR_SEVEN_BIOME_MONSTERS,
+  ...FLOOR_EIGHT_MONSTERS,
+  ...FLOOR_EIGHT_BIOME_MONSTERS,
 ] as const;
 
 export const PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> = {
@@ -428,6 +442,8 @@ export const LESSONS: readonly LessonDefinition[] = [
   ...FLOOR_FOUR_LESSON_DEFINITIONS,
   ...FLOOR_FIVE_LESSON_DEFINITIONS,
   ...FLOOR_SIX_LESSON_DEFINITIONS,
+  ...FLOOR_SEVEN_LESSON_DEFINITIONS,
+  ...FLOOR_EIGHT_LESSON_DEFINITIONS,
 ] as const;
 
 export const LOOT_AFTER_LESSON: Partial<Record<LessonId, { weapon: Weapon; position: Position }>> = {

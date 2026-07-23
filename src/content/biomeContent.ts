@@ -22,7 +22,13 @@ export type BiomeKind =
   | "black-citadel"
   | "magma-nest"
   | "crystal-cavern"
-  | "dragon-throne";
+  | "dragon-throne"
+  | "crystal-grove"
+  | "root-maze"
+  | "index-heart"
+  | "obsidian-hall"
+  | "void-court"
+  | "data-throne";
 
 export type BiomeEncounterRole = "normal" | "mini-elite" | "area-boss";
 
@@ -669,6 +675,72 @@ export const FLOOR_SIX_BIOME_MONSTERS: readonly Monster[] = [
     masterId: 39,
     isBoss: false,
     rank: "elite",
+  }),
+] as const;
+
+export const FLOOR_SEVEN_BIOME_MONSTERS: readonly Monster[] = [
+  biomeMonster({
+    floor: 7, id: 51, lessonId: "f7-btree", roomId: 87, name: "枝妖",
+    species: "branch_imp", kind: "index-guard", hp: 22, maxHp: 22, armor: 0,
+    damage: 3, attackName: "枝刺", status: "guarding", weakness: "search",
+    masterId: 55, isBoss: false, rank: "normal",
+  }),
+  biomeMonster({
+    floor: 7, id: 52, lessonId: "f7-composite", roomId: 87, name: "根兽",
+    species: "grove_root_beast", kind: "root-beast", hp: 24, maxHp: 24, armor: 1,
+    damage: 3, attackName: "根撞", status: "rooted", weakness: "left-prefix",
+    masterId: 55, isBoss: false, rank: "normal",
+  }),
+  biomeMonster({
+    floor: 7, id: 53, lessonId: "f7-covering", roomId: 88, name: "晶灵",
+    species: "grove_crystal_spirit", kind: "crystal-spirit", hp: 28, maxHp: 28, armor: 1,
+    damage: 4, attackName: "晶光", status: "reflecting", weakness: "covering",
+    masterId: 55, isBoss: false, rank: "elite",
+  }),
+  biomeMonster({
+    floor: 7, id: 54, lessonId: "f7-invalid", roomId: 88, name: "树魔",
+    species: "grove_tree_demon", kind: "vine-witch", hp: 24, maxHp: 24, armor: 1,
+    damage: 3, attackName: "藤鞭", status: "casting", weakness: "range",
+    masterId: 55, isBoss: false, rank: "normal",
+  }),
+  biomeMonster({
+    floor: 7, id: 55, lessonId: "f7-optimize", roomId: 90, name: "林王",
+    species: "grove_king", kind: "index-tree", hp: 48, maxHp: 48, armor: 2,
+    damage: 4, attackName: "树冠重压", status: "ruling", weakness: "rewrite",
+    masterId: 50, isBoss: false, rank: "elite",
+  }),
+] as const;
+
+export const FLOOR_EIGHT_BIOME_MONSTERS: readonly Monster[] = [
+  biomeMonster({
+    floor: 8, id: 63, lessonId: "f8-mvcc", roomId: 98, name: "魔兵",
+    species: "demon_soldier", kind: "demon-soldier", hp: 26, maxHp: 26, armor: 1,
+    damage: 4, attackName: "黑刃", status: "patrolling", weakness: "snapshot",
+    masterId: 67, isBoss: false, rank: "normal",
+  }),
+  biomeMonster({
+    floor: 8, id: 64, lessonId: "f8-lock", roomId: 98, name: "黑骑",
+    species: "dark_knight", kind: "dark-knight", hp: 28, maxHp: 28, armor: 1,
+    damage: 4, attackName: "锁链斩", status: "waiting", weakness: "deadlock",
+    masterId: 67, isBoss: false, rank: "normal",
+  }),
+  biomeMonster({
+    floor: 8, id: 65, lessonId: "f8-isolation", roomId: 99, name: "魔将",
+    species: "demon_general", kind: "lich", hp: 32, maxHp: 32, armor: 2,
+    damage: 5, attackName: "幻读", status: "shifting", weakness: "serializable",
+    masterId: 67, isBoss: false, rank: "elite",
+  }),
+  biomeMonster({
+    floor: 8, id: 66, lessonId: "f8-modeling", roomId: 99, name: "石像",
+    species: "obsidian_statue", kind: "obsidian-golem", hp: 28, maxHp: 28, armor: 2,
+    damage: 4, attackName: "石拳", status: "duplicating", weakness: "normalization",
+    masterId: 67, isBoss: false, rank: "normal",
+  }),
+  biomeMonster({
+    floor: 8, id: 67, lessonId: "f8-security", roomId: 101, name: "王兽",
+    species: "throne_beast", kind: "shard-beast", hp: 56, maxHp: 56, armor: 3,
+    damage: 5, attackName: "王庭冲撞", status: "guarding", weakness: "evidence",
+    masterId: 62, isBoss: false, rank: "elite",
   }),
 ] as const;
 
@@ -1360,6 +1432,202 @@ const DRAGON_BOSS_CORE: LessonStageDefinition = {
   attackTargetIds: [44],
 };
 
+const PRACTICE_BRANCH: LessonStageDefinition = {
+  id: "practice-branch",
+  objective: "查询 id = 1 的 code。",
+  queryTemplate: "",
+  answerSql: "SELECT code FROM index_records WHERE id = 1;",
+  hints: [
+    "返回 code。",
+    "表是 index_records。",
+    "用 id = 1 点查。",
+    "完整写法：SELECT code FROM index_records WHERE id = 1;",
+  ],
+  locks: ["WHERE"],
+  requiredFeatures: ["where"],
+  attackTargetIds: [51],
+};
+
+const PRACTICE_ROOT: LessonStageDefinition = {
+  id: "practice-root",
+  objective: "查询 crystal 区 score >= 88 的 code、score，按 score 降序。",
+  queryTemplate: "",
+  answerSql: "SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 88 ORDER BY score DESC;",
+  hints: [
+    "返回 code、score。",
+    "先过滤 realm = 'crystal'。",
+    "再过滤 score >= 88。",
+    "按 score DESC。",
+    "完整写法：SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 88 ORDER BY score DESC;",
+  ],
+  locks: ["WHERE", "AND", "ORDER BY"],
+  requiredFeatures: ["where", "and", "order-by"],
+  attackTargetIds: [52],
+};
+
+const PRACTICE_CRYSTAL: LessonStageDefinition = {
+  id: "practice-crystal",
+  objective: "查询 charm 类别的 category、code，按 code 排序，并保持覆盖索引。",
+  queryTemplate: "",
+  answerSql: "SELECT category, code FROM index_records WHERE category = 'charm' ORDER BY code;",
+  hints: [
+    "只返回 category、code。",
+    "过滤 category = 'charm'。",
+    "按 code 排序。",
+    "完整写法：SELECT category, code FROM index_records WHERE category = 'charm' ORDER BY code;",
+  ],
+  locks: ["WHERE", "ORDER BY"],
+  requiredFeatures: ["where", "order-by"],
+  attackTargetIds: [53],
+};
+
+const PRACTICE_VINE: LessonStageDefinition = {
+  id: "practice-vine",
+  objective: "不用函数，查询 code 从 CRY-101（含）到 CRY-103（不含）的 code。",
+  queryTemplate: "",
+  answerSql: "SELECT code FROM index_records WHERE code >= 'CRY-101' AND code < 'CRY-103' ORDER BY code;",
+  hints: [
+    "返回 code。",
+    "下界是 CRY-101。",
+    "上界是 CRY-103，使用小于。",
+    "最后按 code 排序。",
+    "完整写法：SELECT code FROM index_records WHERE code >= 'CRY-101' AND code < 'CRY-103' ORDER BY code;",
+  ],
+  locks: ["WHERE", "AND", "ORDER BY"],
+  requiredFeatures: ["where", "and", "order-by"],
+  attackTargetIds: [54],
+};
+
+const INDEX_BOSS_SCAN: LessonStageDefinition = {
+  id: "index-boss-scan",
+  objective: "查询 void 区的 code、score，按 score 降序。",
+  queryTemplate: "",
+  answerSql: "SELECT code, score FROM index_records WHERE realm = 'void' ORDER BY score DESC;",
+  hints: [
+    "返回 code、score。",
+    "过滤 realm = 'void'。",
+    "按 score DESC。",
+    "完整写法：SELECT code, score FROM index_records WHERE realm = 'void' ORDER BY score DESC;",
+  ],
+  locks: ["WHERE", "ORDER BY"],
+  requiredFeatures: ["where", "order-by"],
+  attackTargetIds: [55],
+};
+
+const INDEX_BOSS_CORE: LessonStageDefinition = {
+  ...INDEX_BOSS_SCAN,
+  id: "index-boss-core",
+  objective: "核心：查询 code 处于 VOI 前缀范围的 boss code，按 code 排序。",
+  answerSql: "SELECT code FROM index_records WHERE category = 'boss' AND code >= 'VOI' AND code < 'VOJ' ORDER BY code;",
+  hints: [
+    "只返回 code。",
+    "先过滤 category = 'boss'。",
+    "VOI 前缀可写成 >= 'VOI' 且 < 'VOJ'。",
+    "最后按 code 排序。",
+    "完整写法：SELECT code FROM index_records WHERE category = 'boss' AND code >= 'VOI' AND code < 'VOJ' ORDER BY code;",
+  ],
+  locks: ["WHERE", "AND", "ORDER BY"],
+  requiredFeatures: ["where", "and", "order-by"],
+};
+
+const PRACTICE_DEMON: LessonStageDefinition = {
+  id: "practice-demon",
+  objective: "查询事务 12 可见且 row_id = 3 的 value。",
+  queryTemplate: "",
+  answerSql: "SELECT value FROM tx_versions WHERE row_id = 3 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12);",
+  hints: [
+    "返回 value。",
+    "锁定 row_id = 3。",
+    "created_tx 不晚于 12。",
+    "再判断版本未过期。",
+    "完整写法：SELECT value FROM tx_versions WHERE row_id = 3 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12);",
+  ],
+  locks: ["WHERE", "AND", "IS NULL"],
+  requiredFeatures: ["where", "and", "is-null"],
+  attackTargetIds: [63],
+};
+
+const PRACTICE_DARK_KNIGHT: LessonStageDefinition = {
+  id: "practice-dark-knight",
+  objective: "查询 waiter_tx = 'T3' 的 blocker_tx、resource。",
+  queryTemplate: "",
+  answerSql: "SELECT blocker_tx, resource FROM lock_waits WHERE waiter_tx = 'T3';",
+  hints: [
+    "返回 blocker_tx、resource。",
+    "表是 lock_waits。",
+    "过滤 waiter_tx = 'T3'。",
+    "完整写法：SELECT blocker_tx, resource FROM lock_waits WHERE waiter_tx = 'T3';",
+  ],
+  locks: ["WHERE"],
+  requiredFeatures: ["where"],
+  attackTargetIds: [64],
+};
+
+const PRACTICE_LICH: LessonStageDefinition = {
+  id: "practice-lich",
+  objective: "查询 phenomenon = 'phantom_read' 的 first_count、second_count。",
+  queryTemplate: "",
+  answerSql: "SELECT first_count, second_count FROM isolation_cases WHERE phenomenon = 'phantom_read';",
+  hints: [
+    "返回 first_count、second_count。",
+    "表是 isolation_cases。",
+    "过滤 phantom_read。",
+    "完整写法：SELECT first_count, second_count FROM isolation_cases WHERE phenomenon = 'phantom_read';",
+  ],
+  locks: ["WHERE"],
+  requiredFeatures: ["where"],
+  attackTargetIds: [65],
+};
+
+const PRACTICE_GOLEM: LessonStageDefinition = {
+  id: "practice-golem",
+  objective: "查询 duplicate_groups = 0 的 model、score，按 score 降序只取一行。",
+  queryTemplate: "",
+  answerSql: "SELECT model, score FROM schema_choices WHERE duplicate_groups = 0 ORDER BY score DESC LIMIT 1;",
+  hints: [
+    "返回 model、score。",
+    "过滤 duplicate_groups = 0。",
+    "按 score DESC。",
+    "LIMIT 1。",
+    "完整写法：SELECT model, score FROM schema_choices WHERE duplicate_groups = 0 ORDER BY score DESC LIMIT 1;",
+  ],
+  locks: ["WHERE", "ORDER BY", "LIMIT"],
+  requiredFeatures: ["where", "order-by", "limit"],
+  attackTargetIds: [66],
+};
+
+const THRONE_BOSS_SCAN: LessonStageDefinition = {
+  id: "throne-boss-scan",
+  objective: "查询 route_ok = 0 的 account_id、shard_id。",
+  queryTemplate: "",
+  answerSql: "SELECT account_id, shard_id FROM shard_routes WHERE route_ok = 0;",
+  hints: [
+    "返回 account_id、shard_id。",
+    "表是 shard_routes。",
+    "过滤 route_ok = 0。",
+    "完整写法：SELECT account_id, shard_id FROM shard_routes WHERE route_ok = 0;",
+  ],
+  locks: ["WHERE"],
+  requiredFeatures: ["where"],
+  attackTargetIds: [67],
+};
+
+const THRONE_BOSS_CORE: LessonStageDefinition = {
+  ...THRONE_BOSS_SCAN,
+  id: "throne-boss-core",
+  objective: "核心：查询参数化且最小权限的 method，按 id。",
+  answerSql: "SELECT method FROM security_cases WHERE parameterized = 1 AND least_privilege = 1 ORDER BY id;",
+  hints: [
+    "只返回 method。",
+    "过滤 parameterized = 1。",
+    "再过滤 least_privilege = 1。",
+    "按 id 排序。",
+    "完整写法：SELECT method FROM security_cases WHERE parameterized = 1 AND least_privilege = 1 ORDER BY id;",
+  ],
+  locks: ["WHERE", "AND", "ORDER BY"],
+  requiredFeatures: ["where", "and", "order-by"],
+};
+
 export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 111, floor: 1, biome: "drainage", role: "normal", randomEncounter: true, stages: [PRACTICE_SELECT] },
   { monsterId: 211, floor: 1, biome: "slime-pool", role: "normal", randomEncounter: true, stages: [PRACTICE_WHERE] },
@@ -1393,6 +1661,16 @@ export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 42, floor: 6, biome: "crystal-cavern", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_THUNDER_DRAKE] },
   { monsterId: 43, floor: 6, biome: "crystal-cavern", role: "normal", randomEncounter: true, stages: [PRACTICE_CRYSTAL_DRAKE] },
   { monsterId: 44, floor: 6, biome: "dragon-throne", role: "area-boss", randomEncounter: false, stages: [DRAGON_BOSS_SCAN, DRAGON_BOSS_CORE] },
+  { monsterId: 51, floor: 7, biome: "crystal-grove", role: "normal", randomEncounter: true, stages: [PRACTICE_BRANCH] },
+  { monsterId: 52, floor: 7, biome: "root-maze", role: "normal", randomEncounter: true, stages: [PRACTICE_ROOT] },
+  { monsterId: 53, floor: 7, biome: "index-heart", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_CRYSTAL] },
+  { monsterId: 54, floor: 7, biome: "root-maze", role: "normal", randomEncounter: true, stages: [PRACTICE_VINE] },
+  { monsterId: 55, floor: 7, biome: "index-heart", role: "area-boss", randomEncounter: false, stages: [INDEX_BOSS_SCAN, INDEX_BOSS_CORE] },
+  { monsterId: 63, floor: 8, biome: "obsidian-hall", role: "normal", randomEncounter: true, stages: [PRACTICE_DEMON] },
+  { monsterId: 64, floor: 8, biome: "void-court", role: "normal", randomEncounter: true, stages: [PRACTICE_DARK_KNIGHT] },
+  { monsterId: 65, floor: 8, biome: "void-court", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_LICH] },
+  { monsterId: 66, floor: 8, biome: "data-throne", role: "normal", randomEncounter: true, stages: [PRACTICE_GOLEM] },
+  { monsterId: 67, floor: 8, biome: "data-throne", role: "area-boss", randomEncounter: false, stages: [THRONE_BOSS_SCAN, THRONE_BOSS_CORE] },
 ] as const;
 
 export const BIOME_PRACTICE_STAGES: Readonly<Record<number, readonly LessonStageDefinition[]>> =
@@ -1430,6 +1708,8 @@ export function weightedBiomeEncounterIds(
         ...FLOOR_FOUR_BIOME_MONSTERS,
         ...FLOOR_FIVE_BIOME_MONSTERS,
         ...FLOOR_SIX_BIOME_MONSTERS,
+        ...FLOOR_SEVEN_BIOME_MONSTERS,
+        ...FLOOR_EIGHT_BIOME_MONSTERS,
       ]
         .find((monster) => monster.id === encounter.monsterId)?.lessonId ?? "select",
     )
@@ -1439,7 +1719,8 @@ export function weightedBiomeEncounterIds(
   if (normal.length === 0) return [];
   const eliteShare = floor === 1
     ? 5
-    : floor === 2 ? 7 : floor === 3 ? 9 : floor === 4 ? 11 : floor === 5 ? 13 : 15;
+    : floor === 2 ? 7 : floor === 3 ? 9 : floor === 4 ? 11 : floor === 5
+      ? 13 : floor === 6 ? 15 : floor === 7 ? 17 : 19;
   const normalCopies = Math.max(1, Math.floor((100 - eliteShare) / normal.length));
   const eliteCopies = elites.length === 0 ? 0 : Math.max(1, Math.floor(eliteShare / elites.length));
   return [

@@ -5,6 +5,8 @@ import {
   FLOOR_FOUR_LESSONS,
   FLOOR_ONE_LESSONS,
   FLOOR_SIX_LESSONS,
+  FLOOR_SEVEN_LESSONS,
+  FLOOR_EIGHT_LESSONS,
   FLOOR_THREE_LESSONS,
   FLOOR_TWO_LESSONS,
   generateRoomGraph,
@@ -87,15 +89,19 @@ describe("generateRoomGraph", () => {
     expect(byLesson.get("join-boss")?.prerequisiteLessons).toEqual(["left-join"]);
   });
 
-  it("第三到六层分别装入六组高级课程并保持独立种子图", () => {
+  it("第三到八层装入各自高级课程并保持独立种子图", () => {
     const floorThree = generateRoomGraph("advanced-safe", 3);
     const floorFour = generateRoomGraph("advanced-safe", 4);
     const floorFive = generateRoomGraph("advanced-safe", 5);
     const floorSix = generateRoomGraph("advanced-safe", 6);
+    const floorSeven = generateRoomGraph("advanced-safe", 7);
+    const floorEight = generateRoomGraph("advanced-safe", 8);
     expect(floorThree.nodes).toHaveLength(10);
     expect(floorFour.nodes).toHaveLength(10);
     expect(floorFive.nodes).toHaveLength(10);
     expect(floorSix.nodes).toHaveLength(10);
+    expect(floorSeven.nodes).toHaveLength(10);
+    expect(floorEight.nodes).toHaveLength(11);
     expect(floorThree.nodes.map((node) => node.lessonId).filter(Boolean).sort())
       .toEqual([...FLOOR_THREE_LESSONS].sort());
     expect(floorFour.nodes.map((node) => node.lessonId).filter(Boolean).sort())
@@ -104,12 +110,19 @@ describe("generateRoomGraph", () => {
       .toEqual([...FLOOR_FIVE_LESSONS].sort());
     expect(floorSix.nodes.map((node) => node.lessonId).filter(Boolean).sort())
       .toEqual([...FLOOR_SIX_LESSONS].sort());
+    expect(floorSeven.nodes.map((node) => node.lessonId).filter(Boolean).sort())
+      .toEqual([...FLOOR_SEVEN_LESSONS].sort());
+    expect(floorEight.nodes.map((node) => node.lessonId).filter(Boolean).sort())
+      .toEqual([...FLOOR_EIGHT_LESSONS].sort());
     expect(floorThree.seed).toBe("advanced-safe");
     expect(floorFour.seed).toBe("advanced-safe");
     expect(floorFive.seed).toBe("advanced-safe");
     expect(floorSix.seed).toBe("advanced-safe");
+    expect(floorSeven.seed).toBe("advanced-safe");
+    expect(floorEight.seed).toBe("advanced-safe");
     expect(floorThree.entryId).not.toBe(floorFour.entryId);
     expect(floorFive.entryId).not.toBe(floorSix.entryId);
+    expect(floorSeven.entryId).not.toBe(floorEight.entryId);
   });
 
   it("WHERE 与 IS NULL 可自由选择，完成后才解锁 GROUP BY", () => {
@@ -155,6 +168,14 @@ describe("generateRoomGraph", () => {
         errors: [],
       });
       expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 6))).toEqual({
+        valid: true,
+        errors: [],
+      });
+      expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 7))).toEqual({
+        valid: true,
+        errors: [],
+      });
+      expect(validateRoomGraph(generateRoomGraph(`invariant-${index}`, 8))).toEqual({
         valid: true,
         errors: [],
       });

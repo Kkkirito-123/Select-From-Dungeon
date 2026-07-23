@@ -220,13 +220,62 @@ const FLOOR_SIX_CHALLENGE: GateChallengeDefinition = {
   ],
 };
 
+const FLOOR_SEVEN_CHALLENGE: GateChallengeDefinition = {
+  id: "index-breach",
+  title: "索引越权协议 · 分区最优叶",
+  objective: "用 CTE 与 ROW_NUMBER 找出每个 realm 中 score 最高的索引记录。返回 realm、code、score；按 score 降序，只取前 3 行。",
+  schema: [
+    "index_records(id, realm, category, score, code, payload)",
+    "真实 SQLite 索引：(realm, score DESC)、(category, code)、code",
+  ],
+  hints: [
+    "CTE 中用 ROW_NUMBER，按 realm 分区、score DESC 与 id ASC 编号。",
+    "外层保留 rn = 1。",
+    "按 score DESC 排序并 LIMIT 3。",
+  ],
+  requiredFeatures: [
+    "select", "from", "where", "cte", "row-number", "partition-by", "order-by", "limit",
+  ],
+  expectedColumns: ["realm", "code", "score"],
+  expectedRows: [
+    { realm: "crystal", code: "CRY-106", score: 95 },
+    { realm: "ember", code: "EMB-203", score: 92 },
+    { realm: "void", code: "VOI-302", score: 86 },
+  ],
+};
+
+const FLOOR_EIGHT_CHALLENGE: GateChallengeDefinition = {
+  id: "throne-breach",
+  title: "王座越权协议 · 副本决策窗",
+  objective: "用 CTE 与 ROW_NUMBER 为健康 replica 按 region 分区、lag_ms 升序排名。返回 region、node、lag_ms，只保留 rn = 1；按 lag_ms 升序。",
+  schema: [
+    "replica_status(node, region, lag_ms, healthy, role)",
+    "固定教学记录，不代表 SQLite 自带复制。",
+  ],
+  hints: [
+    "CTE 先过滤 role = 'replica' 且 healthy = 1。",
+    "ROW_NUMBER 按 region 分区，以 lag_ms、node 升序编号。",
+    "外层保留 rn = 1 并按 lag_ms 排序。",
+  ],
+  requiredFeatures: [
+    "select", "from", "where", "and", "cte", "row-number", "partition-by", "order-by",
+  ],
+  expectedColumns: ["region", "node", "lag_ms"],
+  expectedRows: [
+    { region: "west", node: "replica-b", lag_ms: 18 },
+    { region: "north", node: "replica-c", lag_ms: 42 },
+  ],
+};
+
 function definitionForFloor(floor: FloorNumber): GateChallengeDefinition {
   if (floor === 1) return FLOOR_ONE_CHALLENGE;
   if (floor === 2) return FLOOR_TWO_CHALLENGE;
   if (floor === 3) return FLOOR_THREE_CHALLENGE;
   if (floor === 4) return FLOOR_FOUR_CHALLENGE;
   if (floor === 5) return FLOOR_FIVE_CHALLENGE;
-  return FLOOR_SIX_CHALLENGE;
+  if (floor === 6) return FLOOR_SIX_CHALLENGE;
+  if (floor === 7) return FLOOR_SEVEN_CHALLENGE;
+  return FLOOR_EIGHT_CHALLENGE;
 }
 
 export function gateChallengeForFloor(

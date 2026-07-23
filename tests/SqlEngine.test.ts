@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
 import { FLOOR_FIVE_LESSON_DEFINITIONS } from "../src/content/floor5Level";
 import { FLOOR_SIX_LESSON_DEFINITIONS } from "../src/content/floor6Level";
+import { FLOOR_SEVEN_LESSON_DEFINITIONS } from "../src/content/floor7Level";
+import { FLOOR_EIGHT_LESSON_DEFINITIONS } from "../src/content/floor8Level";
 import { evaluateLesson } from "../src/domain/lessonEvaluator";
 import { SqlEngine } from "../src/sql/SqlEngine";
 
@@ -112,5 +114,41 @@ describe("SqlEngine floor-two schema", () => {
     expect(fresh.rows).toHaveLength(5);
     expect(fresh.rows.some((row) => row.id === 6)).toBe(false);
     expect(fresh.plan).toContain("DISCARD sandbox after this turn");
+  });
+
+  it("第七层使用真实 SQLite 查询计划，第八层五阶段事故夹具均可复现", async () => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+
+    for (const lesson of FLOOR_SEVEN_LESSON_DEFINITIONS) {
+      lesson.stages.forEach((stage, stageIndex) => {
+        const result = engine.execute(stage.answerSql, 7);
+        const evaluation = evaluateLesson(lesson.id, stageIndex, result);
+        expect(
+          evaluation.accepted,
+          `${lesson.id} stage ${stageIndex}: ${evaluation.message}; ${result.plan.join(" | ")}`,
+        ).toBe(true);
+        expect(result.plan.length).toBeGreaterThan(0);
+      });
+    }
+
+    for (const lesson of FLOOR_EIGHT_LESSON_DEFINITIONS) {
+      lesson.stages.forEach((stage, stageIndex) => {
+        const result = engine.execute(stage.answerSql, 8);
+        const evaluation = evaluateLesson(lesson.id, stageIndex, result);
+        expect(
+          evaluation.accepted,
+          `${lesson.id} stage ${stageIndex}: ${evaluation.message}; ${JSON.stringify(result.rows)}`,
+        ).toBe(true);
+      });
+    }
+
+    const finalBoss = FLOOR_EIGHT_LESSON_DEFINITIONS.find(
+      (lesson) => lesson.id === "f8-security",
+    );
+    expect(finalBoss?.stages).toHaveLength(5);
   });
 });
