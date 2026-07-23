@@ -2,6 +2,9 @@
 
 **简体中文** | [English](README.md)
 
+[八层课程蓝图](docs/CURRICULUM.zh-CN.md) |
+[English curriculum blueprint](docs/CURRICULUM.md)
+
 一个面向 SQL 初学者与面试复习者的浏览器肉鸽。SQL 就是战斗动作：探索由种子生成的像素魔王城，
 实际走过连续迷宫，进入有名字怪物所在格后切换到独立对战，写出一条完整 SQLite 查询，再把
 正确结果变成攻击动画。
