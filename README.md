@@ -8,6 +8,9 @@
 [中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
 
+**Release baseline: `v1.0.0`** · [Changelog](CHANGELOG.md) ·
+[Release checklist](docs/RELEASE_CHECKLIST.md)
+
 A Chinese browser roguelite for SQL beginners and interview review. SQL is the
 combat action: physically explore a continuous seeded pixel maze, move into a
 named monster's tile to enter a separate duel, write a complete SQLite query,
@@ -318,7 +321,7 @@ On floors one through five and seven through eight, the terminal accepts one
 read-only `SELECT` or `WITH` statement and displays at most 50 rows. Floor six
 accepts one to eight validated statements against disposable `repair_queue`;
 DDL, `PRAGMA`, `ATTACH`, permanent tables, and unbounded updates/deletes are
-rejected. Query plans and I/O heat are SQLite teaching signals, not evidence
+rejected. Query plans and query load are SQLite teaching signals, not evidence
 about the MySQL optimizer. Floor-eight concurrency and distribution exercises
 read deterministic incident fixtures rather than claiming native SQLite
 behavior.
@@ -343,10 +346,11 @@ A valid `run:v9` is migrated in memory into v10 without changing the current
 Run. Valid `run:v8` through `run:v4` saves continue through the existing
 migration chain before v10. Legacy keys are not deleted; earlier Run keys remain
 unread. A valid `profile:v1` migrates to v2,
-preserving first-floor mastery while adding second-floor counters. Pre-v0.8
-v2 profiles are backfilled with floor-three through floor-six counters. Snapshot
-persistence is debounced in `src/main.ts` so movement and patrol updates do not
-force a synchronous storage write for every emitted state.
+preserving first-floor mastery while adding second-floor counters. Older v2
+profiles are backfilled with missing lesson counters.
+`src/storage/progressPersistence.ts` coalesces non-critical movement and patrol
+snapshots, while query, loot, inventory, mode, and topology changes flush
+immediately.
 
 ## Validation and Build
 
@@ -452,6 +456,15 @@ controls were at least 44 px, inventory focus landed on its close button, and
 the console reported zero warnings/errors. The production build now separates
 the approximately 474 kB startup entry, 1.38 MB cached Phaser runtime, and
 660 kB SQLite WASM without the previous generic main-chunk warning.
+The v1.0.0 production-preview pass reran all 193 tests, type/build/rule gates,
+and verified the license/attribution copies. Desktop keyboard input increased
+the real movement counter. At 390×844 with Reduced Motion, 32 ordinary touch
+moves physically reached Slime `#101`; the real SQLite query
+`SELECT name FROM monsters WHERE id = 101;` increased the query count from
+0 to 1, reduced HP from 12 to 6, and opened the second stage. The 390×844 and
+640×720 inventory dialogs stayed inside the viewport with focus on the close
+button. All three production-preview viewports had zero horizontal overflow
+and zero console warnings/errors.
 Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete human-operated eight-floor browser Run, exact
