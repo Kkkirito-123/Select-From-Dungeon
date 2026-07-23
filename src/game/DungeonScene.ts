@@ -407,6 +407,14 @@ export class DungeonScene extends Phaser.Scene {
     if (this.pagePaused) this.resetPlayerMovement();
   };
 
+  private readonly wakeHandler = (): void => {
+    this.battleTransitioning = false;
+    this.resetPlayerMovement();
+    this.snapshot = this.session.snapshot();
+    this.syncViews();
+    this.cameras.main.startFollow(this.playerView, true, 0.18, 0.18);
+  };
+
   private canAcceptGameplayInput(event?: KeyboardEvent): boolean {
     if (
       !this.scene.isActive() ||
@@ -451,13 +459,7 @@ export class DungeonScene extends Phaser.Scene {
       loop: true,
       callback: () => this.advancePatrols(),
     });
-    this.events.on(Phaser.Scenes.Events.WAKE, () => {
-      this.battleTransitioning = false;
-      this.resetPlayerMovement();
-      this.snapshot = this.session.snapshot();
-      this.syncViews();
-      this.cameras.main.startFollow(this.playerView, true, 0.18, 0.18);
-    });
+    this.events.on(Phaser.Scenes.Events.WAKE, this.wakeHandler);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
   }
 
@@ -482,6 +484,7 @@ export class DungeonScene extends Phaser.Scene {
     document.removeEventListener("visibilitychange", this.visibilityHandler);
     window.removeEventListener("dungeon:move", this.externalMoveHandler);
     window.removeEventListener("dungeon:interact", this.externalInteractHandler);
+    this.events.off(Phaser.Scenes.Events.WAKE, this.wakeHandler);
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.patrolTimer?.destroy();

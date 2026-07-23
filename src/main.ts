@@ -1,19 +1,18 @@
 import "./style.css";
-import Phaser from "phaser";
+import type Phaser from "phaser";
 import { ArcadeAudio } from "./audio/ArcadeAudio";
 import { GameSession } from "./domain/GameSession";
 import { FeedbackDirector } from "./feedback/FeedbackDirector";
-import { BattleScene } from "./game/BattleScene";
-import { createGame } from "./game/createGame";
+import type { BattleScene } from "./game/BattleScene";
+import { applyPageVisibilityRuntime } from "./runtime/pageLifecycle";
 import { SqlEngine } from "./sql/SqlEngine";
 import {
   createRunSeed,
   loadProfile,
   loadRun,
-  persistProfileIfChanged,
-  saveRun,
   type StorageLike,
 } from "./storage/localProgress";
+import { startProgressPersistence } from "./storage/progressPersistence";
 import { AppShell } from "./ui/AppShell";
 import { OnboardingController } from "./ui/OnboardingController";
 
@@ -39,7 +38,10 @@ async function bootstrap(): Promise<void> {
   const savedRun = loadRun(storage);
   const profile = loadProfile(storage);
   const session = new GameSession(savedRun, profile, savedRun?.graph.seed ?? createRunSeed());
-  const sql = await SqlEngine.create(session.snapshot().monsters);
+  const [sql, { createGame }] = await Promise.all([
+    SqlEngine.create(session.snapshot().monsters),
+    import("./game/createGame"),
+  ]);
   const audio = new ArcadeAudio({ mode: "explore", volume: 0.55 });
   const feedback = new FeedbackDirector(audio);
   const onboarding = new OnboardingController(storage);
@@ -51,80 +53,36 @@ async function bootstrap(): Promise<void> {
   try {
     app.mount();
     game = createGame(session, audio, feedback);
+    root.dataset.runtimeState = "active";
   } catch (error) {
     app.destroy();
     game?.destroy(true);
     throw error;
   }
 
-  let saveTimer: number | null = null;
-  let lastProfileJson = JSON.stringify(profile);
-  let previousPersistenceState: {
-    mode: string;
-    queryCount: number;
-    itemIds: string;
-    inventoryState: string;
-    topologyHash: number;
-  } | null = null;
-  const flushProgress = (): void => {
-    if (saveTimer !== null) {
-      window.clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    saveRun(storage, session.toSavedRun());
-    lastProfileJson = persistProfileIfChanged(
-      storage,
-      session.toProfile(),
-      lastProfileJson,
-    );
-  };
-  const scheduleProgressSave = (): void => {
-    if (saveTimer !== null) window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(flushProgress, 350);
-  };
-  const unsubscribePersistence = session.subscribe((snapshot) => {
-    const current = {
-      mode: snapshot.mode,
-      queryCount: snapshot.queryCount,
-      itemIds: [
-        ...snapshot.groundItems.map((item) => item.id),
-        ...snapshot.lootBundles.map((bundle) => (
-          `${bundle.id}:${bundle.items.map((item) => item.dropId).join(",")}`
-        )),
-      ].sort().join("|"),
-      inventoryState: JSON.stringify({
-        weapon: snapshot.player.weapon.id,
-        armor: snapshot.player.armor?.id ?? null,
-        armorHp: snapshot.player.armorHp,
-        equipment: snapshot.equipmentInventory.map((item) => item.instanceId),
-        consumables: snapshot.consumables.map((stack) => [
-          stack.item.id,
-          stack.quantity,
-        ]),
-      }),
-      topologyHash: snapshot.mazeFloor.topologyHash,
-    };
-    const critical = previousPersistenceState === null ||
-      current.mode !== previousPersistenceState.mode ||
-      current.queryCount !== previousPersistenceState.queryCount ||
-      current.itemIds !== previousPersistenceState.itemIds ||
-      current.inventoryState !== previousPersistenceState.inventoryState ||
-      current.topologyHash !== previousPersistenceState.topologyHash;
-    previousPersistenceState = current;
-    if (critical) flushProgress();
-    else scheduleProgressSave();
-  });
+  const persistence = startProgressPersistence(
+    session,
+    storage,
+    JSON.stringify(profile),
+  );
 
-  const pageHideHandler = (): void => flushProgress();
+  const pageHideHandler = (): void => persistence.flush();
   const visibilityChangeHandler = (): void => {
-    if (document.visibilityState === "hidden") flushProgress();
+    const hidden = document.visibilityState === "hidden";
+    void applyPageVisibilityRuntime({
+      hidden,
+      root,
+      loop: game?.loop ?? null,
+      audio,
+      flushProgress: persistence.flush,
+    });
   };
   window.addEventListener("pagehide", pageHideHandler);
   document.addEventListener("visibilitychange", visibilityChangeHandler);
 
   const beforeUnloadHandler = (): void => {
-    flushProgress();
-    unsubscribePersistence();
+    persistence.flush();
+    persistence.destroy();
     window.removeEventListener("pagehide", pageHideHandler);
     document.removeEventListener("visibilitychange", visibilityChangeHandler);
     app.destroy();

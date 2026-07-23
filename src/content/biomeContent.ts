@@ -32,6 +32,17 @@ export type BiomeKind =
 
 export type BiomeEncounterRole = "normal" | "mini-elite" | "area-boss";
 
+export const MINI_ELITE_PERCENT_BY_FLOOR: Readonly<Record<FloorNumber, number>> = {
+  1: 5,
+  2: 7,
+  3: 9,
+  4: 11,
+  5: 13,
+  6: 15,
+  7: 17,
+  8: 19,
+};
+
 export interface BiomeEncounterDefinition {
   monsterId: number;
   floor: FloorNumber;
@@ -1717,10 +1728,7 @@ export function weightedBiomeEncounterIds(
   const normal = available.filter((encounter) => encounter.role === "normal");
   const elites = available.filter((encounter) => encounter.role === "mini-elite");
   if (normal.length === 0) return [];
-  const eliteShare = floor === 1
-    ? 5
-    : floor === 2 ? 7 : floor === 3 ? 9 : floor === 4 ? 11 : floor === 5
-      ? 13 : floor === 6 ? 15 : floor === 7 ? 17 : 19;
+  const eliteShare = MINI_ELITE_PERCENT_BY_FLOOR[floor];
   const normalCopies = Math.max(1, Math.floor((100 - eliteShare) / normal.length));
   const eliteCopies = elites.length === 0 ? 0 : Math.max(1, Math.floor(eliteShare / elites.length));
   return [

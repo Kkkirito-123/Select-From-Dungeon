@@ -36,6 +36,8 @@ describe("ArcadeAudio", () => {
     expect(await audio.initialize()).toBe(false);
     expect(await audio.resume()).toBe(false);
     await expect(audio.playSfx("step")).resolves.toBe(false);
+    await expect(audio.setPageHidden(true)).resolves.toBeUndefined();
+    await expect(audio.setPageHidden(false)).resolves.toBeUndefined();
     await expect(audio.dispose()).resolves.toBeUndefined();
     expect(await audio.initialize()).toBe(false);
   });

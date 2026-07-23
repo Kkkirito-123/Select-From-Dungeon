@@ -9,7 +9,7 @@
 |---|---|---|
 | [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | 规划蓝图；当前实现全部八层 | 课程顺序、题型、掌握标准 |
 | [楼层地图与美术蓝图](./FLOOR_THEMES.zh-CN.md) / [English](./FLOOR_THEMES.md) | 规划蓝图；当前实现全部八层 | 八层主题、地标与视觉边界 |
-| [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | 活跃路线图；`v0.2.0` 至 `v0.10.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
+| [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | 活跃路线图；`v0.2.0` 至 `v0.11.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
 | [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `v0.3.0` 篝火已实现，`v0.5.0` 引导地图与捷径已实现 | 三篝火、安全区、休息、死亡回归、复盘与捷径 |
 
 ## 设计与后续候选
