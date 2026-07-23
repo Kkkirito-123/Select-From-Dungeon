@@ -671,25 +671,46 @@ export class DungeonScene extends Phaser.Scene {
       if (!view) {
         const pixel = gridToPixels(item);
         const container = this.add.container(pixel.x, pixel.y).setDepth(24);
-        const color = item.kind === "weapon"
-          ? COLORS.gold
-          : item.kind === "heal"
-            ? COLORS.query
-            : item.kind === "key"
-              ? COLORS.ember
-              : COLORS.plum;
-        const diamond = this.add.rectangle(0, 0, 13, 13, color, 0.95)
-          .setAngle(45)
-          .setStrokeStyle(2, COLORS.paper);
-        const core = this.add.rectangle(0, 0, 5, 5, COLORS.paper);
-        const label = this.add.text(0, -24, item.name, {
+        const sourceRoom = this.snapshot.roomGraph.nodes.find(
+          (room) => room.id === item.sourceRoomId,
+        );
+        const isChest = item.collection === "interact" && (
+          item.id.startsWith("lesson-drop:") || sourceRoom?.type === "treasure"
+        );
+        const parts: Phaser.GameObjects.GameObject[] = [];
+        if (isChest) {
+          parts.push(
+            this.add.rectangle(0, 3, 24, 14, 0x8f6338)
+              .setStrokeStyle(2, COLORS.gold),
+            this.add.rectangle(0, -6, 24, 8, 0xb88745)
+              .setStrokeStyle(2, COLORS.paper),
+            this.add.rectangle(0, 1, 5, 7, COLORS.gold)
+              .setStrokeStyle(1, COLORS.paper),
+          );
+        } else {
+          const color = item.kind === "weapon"
+            ? COLORS.gold
+            : item.kind === "heal"
+              ? COLORS.query
+              : item.kind === "key"
+                ? COLORS.ember
+                : COLORS.plum;
+          parts.push(
+            this.add.rectangle(0, 0, 13, 13, color, 0.95)
+              .setAngle(45)
+              .setStrokeStyle(2, COLORS.paper),
+            this.add.rectangle(0, 0, 5, 5, COLORS.paper),
+          );
+        }
+        const label = this.add.text(0, -24, isChest ? "E · 战利品宝箱" : item.name, {
           color: "#f1d28b",
           fontFamily: "monospace",
           fontSize: "7px",
           backgroundColor: "#08090cdd",
           padding: { x: 3, y: 2 },
         }).setOrigin(0.5);
-        container.add([diamond, core, label]);
+        parts.push(label);
+        container.add(parts);
         this.entityLayer.add(container);
         const tween = this.reducedMotion
           ? undefined

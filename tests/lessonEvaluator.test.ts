@@ -4,7 +4,11 @@ import {
   evaluateLesson,
   evaluateStage,
 } from "../src/domain/lessonEvaluator";
-import { INITIAL_MONSTERS, practiceStageFor } from "../src/content/mvpLevel";
+import {
+  INITIAL_MONSTERS,
+  LESSONS,
+  practiceStageFor,
+} from "../src/content/mvpLevel";
 import type { SqlQueryResult } from "../src/domain/types";
 
 function makeResult(
@@ -78,6 +82,24 @@ describe("课程文案", () => {
     )).toBe(true);
   });
 
+  it("WHERE 使用短怪物名，并按信息量从短提示推进到完整 SQL", () => {
+    const monster = INITIAL_MONSTERS.find((candidate) => candidate.id === 201);
+    const lesson = LESSONS.find((candidate) => candidate.id === "where");
+    const secondStage = lesson?.stages[1];
+
+    expect(monster?.name).toBe("猎犬");
+    expect(lesson?.stages.map((stage) => stage.hints.length)).toEqual([5, 5]);
+    expect(secondStage?.objective).toBe(
+      "第二击：返回 name = '猎犬' 且 status = 'escaped' 的 weakness。",
+    );
+    expect(secondStage?.hints).toEqual([
+      "返回列：weakness。",
+      "数据表：monsters。",
+      "过滤字段：name 与 status，用 AND 连接。",
+      "精确值：name = '猎犬'，status = 'escaped'。",
+      "完整写法：SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped';",
+    ]);
+  });
 });
 
 describe("evaluateLesson stages", () => {

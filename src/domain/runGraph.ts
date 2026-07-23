@@ -352,7 +352,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
       required: true,
       lessonId: "distinct",
       prerequisiteLessons: ["order-by"],
-      reward: null,
+      reward: "schema-shard",
       next: [FLOOR_2_JOIN_ID],
     }),
     room({
@@ -409,7 +409,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
       required: true,
       lessonId: "left-join",
       prerequisiteLessons: ["inner-join"],
-      reward: null,
+      reward: "elite-transaction-shield",
       next: [FLOOR_2_ELITE_ID],
     }),
     room({

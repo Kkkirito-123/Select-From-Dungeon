@@ -222,6 +222,12 @@ const REWARD_CATALOG: Partial<Record<RoomReward, ClaimableReward>> = {
     description: "精英奖励：恢复 1 颗心并清除热量。",
     kind: "event",
   },
+  "filter-rune": {
+    id: "filter-rune",
+    name: "过滤弓",
+    description: "WHERE 条件命中时造成 7 点伤害，并减少 1 点查询热量。",
+    kind: "weapon",
+  },
   "aggregate-hammer": {
     id: "aggregate-hammer",
     name: "聚合战锤",

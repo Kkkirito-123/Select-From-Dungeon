@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isSavedRun } from "../src/storage/localProgress";
-import type { GroundItem, LessonId, SqlQueryResult } from "../src/domain/types";
+import type {
+  GroundItem,
+  LessonId,
+  SqlQueryResult,
+  TurnResolution,
+} from "../src/domain/types";
 
 function result(
   sql: string,
@@ -91,13 +96,22 @@ function enterLesson(session: GameSession, lessonId: LessonId): void {
   expect(session.snapshot().lessonId).toBe(lessonId);
 }
 
-function collectTouchItem(
+function collectGroundItem(
   session: GameSession,
   predicate: (item: GroundItem) => boolean,
 ): GroundItem {
   const snapshot = session.snapshot();
   const item = snapshot.groundItems.find(predicate);
   if (!item) throw new Error("缺少预期的地面掉落");
+  if (item.collection === "interact") {
+    expect(session.setPlayerPosition(item.x, item.y)).toBe(true);
+    const resolution = session.interact();
+    expect(resolution.ok).toBe(true);
+    if (item.id.startsWith("lesson-drop:")) {
+      expect(resolution.message).toContain("打开战利品宝箱");
+    }
+    return item;
+  }
   const directions = [
     { x: -1, y: 0 },
     { x: 1, y: 0 },
@@ -125,7 +139,7 @@ function collectTouchItem(
   return item;
 }
 
-function clearSelect(session: GameSession): void {
+function clearSelect(session: GameSession): TurnResolution {
   enterLesson(session, "select");
   const first = session.resolveQuery(SELECT_NAME);
   expect(first.accepted).toBe(true);
@@ -135,21 +149,40 @@ function clearSelect(session: GameSession): void {
 
   const second = session.resolveQuery(SELECT_WEAKNESS);
   expect(second.lessonCompleted).toBe("select");
+  expect(second.experience).toMatchObject({
+    monsterId: 101,
+    gained: 1,
+    previousXp: 0,
+    currentXp: 1,
+    previousLevel: 1,
+    currentLevel: 1,
+  });
   expect(session.snapshot().mode).toBe("explore");
-  collectTouchItem(session, (item) => item.id === "lesson-drop:select");
+  expect(session.snapshot().groundItems.find(
+    (item) => item.id === "lesson-drop:select",
+  )?.collection).toBe("interact");
+  collectGroundItem(session, (item) => item.id === "lesson-drop:select");
   expect(session.snapshot().player.weapon.id).toBe("filter-bow");
+  return second;
 }
 
-function clearBranch(session: GameSession, lessonId: "where" | "is-null"): void {
+function clearBranch(
+  session: GameSession,
+  lessonId: "where" | "is-null",
+): TurnResolution {
   enterLesson(session, lessonId);
   if (lessonId === "where") {
     expect(session.resolveQuery(WHERE_TARGET).accepted).toBe(true);
-    expect(session.resolveQuery(WHERE_WEAKNESS).lessonCompleted).toBe("where");
+    const completed = session.resolveQuery(WHERE_WEAKNESS);
+    expect(completed.lessonCompleted).toBe("where");
+    return completed;
   } else {
     expect(session.resolveQuery(NULL_TARGET).accepted).toBe(true);
-    expect(session.resolveQuery(NULL_NAME).lessonCompleted).toBe("is-null");
-    collectTouchItem(session, (item) => item.id === "lesson-drop:is-null");
+    const completed = session.resolveQuery(NULL_NAME);
+    expect(completed.lessonCompleted).toBe("is-null");
+    collectGroundItem(session, (item) => item.id === "lesson-drop:is-null");
     expect(session.snapshot().player.weapon.id).toBe("null-lantern");
+    return completed;
   }
 }
 
@@ -177,7 +210,16 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().player).toMatchObject({ hp: 2, maxHp: 2, level: 1, xp: 0 });
     clearSelect(session);
     expect(session.snapshot().player).toMatchObject({ level: 1, xp: 1, maxHp: 2 });
-    clearBranch(session, "where");
+    const levelUp = clearBranch(session, "where");
+    expect(levelUp.experience).toMatchObject({
+      gained: 1,
+      previousXp: 1,
+      currentXp: 2,
+      previousLevel: 1,
+      currentLevel: 2,
+      previousMaxHp: 2,
+      currentMaxHp: 3,
+    });
     expect(session.snapshot().player).toMatchObject({ level: 2, xp: 2, maxHp: 3 });
   });
 
@@ -292,7 +334,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     enterLesson(session, "group-by");
     expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
     expect(session.snapshot().mode).toBe("explore");
-    collectTouchItem(session, (item) => item.id === "lesson-drop:group-by");
+    collectGroundItem(session, (item) => item.id === "lesson-drop:group-by");
 
     enterLesson(session, "having");
     expect(session.resolveQuery(HAVING_SHIELD).accepted).toBe(true);
@@ -300,7 +342,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().monsters.find((monster) => monster.id === 900)?.hp).toBe(12);
     expect(session.resolveQuery(HAVING_CORE).lessonCompleted).toBe("having");
     expect(session.snapshot().mode).toBe("explore");
-    collectTouchItem(session, (item) => item.id === "lesson-drop:having");
+    collectGroundItem(session, (item) => item.id === "lesson-drop:having");
     expect(session.snapshot()).toMatchObject({
       mode: "transition",
       floor: 1,

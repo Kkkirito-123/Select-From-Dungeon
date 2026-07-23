@@ -2,6 +2,11 @@
 
 [简体中文](README.zh-CN.md) | **English**
 
+[Eight-floor curriculum blueprint](docs/CURRICULUM.md) |
+[Floor map and art direction](docs/FLOOR_THEMES.md) |
+[中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
+[中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
+
 A Chinese browser roguelite for SQL beginners and interview review. SQL is the
 combat action: physically explore a continuous seeded pixel maze, move into a
 named monster's tile to enter a separate duel, write a complete SQLite query,
@@ -47,9 +52,12 @@ and turn the correct result into an animated attack.
   syntax error costs one heart; empty input and safe exit cost nothing.
 - Start each Run with two hearts. Normal, elite, and Boss victories grant 1, 3,
   and 5 XP; levels unlock at 2, 4, 6, 8, then every four XP through 24, adding
-  one maximum heart while restoring one heart.
-- Collect loose monster drops by walking over them. Altars, treasure chests, and
-  campfires use `E` investigation. Guaranteed curriculum weapons remain
+  one maximum heart while restoring one heart. A post-battle card shows the
+  defeated monster, exact XP change, level progress, and any level-up.
+- Every curriculum victory leaves a deterministic reward chest on the monster's
+  tile; approach it and press `E` to open it. Step-meter ambushes grant XP but
+  no curriculum chest. Altars, treasure rooms, and campfires also use `E`.
+  Guaranteed curriculum weapons remain
   deterministic: Filter Bow after `SELECT`, Null Lantern after `IS NULL`, and
   Aggregate Hammer before `GROUP BY`. Floor two adds the Sort Saber and Join
   Chain. Every acquisition opens a non-blocking card with the item's description
@@ -63,7 +71,7 @@ and turn the correct result into an animated attack.
   clears, drops, pickups, gate openings, victory, and defeat receive distinct
   cues. No third-party music or audio asset is bundled.
 - Follow an optional step-by-step guide through movement, finding a monster,
-  opening the terminal, casting the first query, and collecting the first drop.
+  opening the terminal, casting the first query, and opening the first reward chest.
   It can be skipped or replayed without changing SQL mastery.
 - Resume the maze, actors, ground items, fog, and combat state separately from
   permanent mastery, attempt counts, victories, and best query count. Starting
@@ -138,9 +146,9 @@ WHERE id = 101;
 Start at the castle gate and follow the onboarding card or cyan beacon through
 the actual maze. The minimap only reveals where you have explored: it cannot be
 clicked to travel. Move into the projection slime's tile, press `Q + S`, type
-the complete query, and use `Ctrl/Cmd + Enter` to attack. After victory, walk
-over the loose glowing drop to collect it automatically; use `E` only to
-investigate altars, treasure chests, and campfires.
+the complete query, and use `Ctrl/Cmd + Enter` to attack. After victory, read
+the XP settlement, approach the chest left on the monster's tile, and press
+`E` to claim its deterministic reward.
 
 ## Architecture and Storage
 
@@ -226,7 +234,11 @@ and query-evidence panels together at 1280x720, reproduced and fixed pointer
 interception over the execute action, completed the HAVING battle by clicking
 that action, moved after terminal close, collected the key, entered floor two
 automatically, recovered the floor-two state after reload, and rechecked the
-390 px layout without console warnings/errors. Earlier evidence covered startup,
+390 px layout without console warnings/errors. The v0.1.1 reward pass then
+verified an ambush-only `+1 XP` settlement with no chest, a curriculum victory
+that advanced `1 → 2 XP`, raised `LV.1 → LV.2` and maximum hearts `2 → 3`,
+spawned an `E`-opened Filter Bow chest, applied damage `6 → 7` and heat
+reduction `0 → 1`, and retained zero horizontal overflow at 390×844. Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
 Reduced Motion, subjective audio/timing, and the 10-second

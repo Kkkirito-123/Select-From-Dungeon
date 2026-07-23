@@ -47,9 +47,9 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   },
   {
     id: "pickup",
-    title: "拾取战利品",
-    body: "击败怪物后走到发光掉落上会自动拾取。祭坛、篝火和宝箱仍使用 E 调查。",
-    shortcut: "走到掉落上",
+    title: "打开战利品宝箱",
+    body: "击败课程怪后，宝箱会出现在怪物位置。靠近宝箱按 E，领取其中的确定性奖励。",
+    shortcut: "靠近宝箱按 E",
   },
   {
     id: "complete",
