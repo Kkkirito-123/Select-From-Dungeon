@@ -4,7 +4,7 @@ import {
   evaluateLesson,
   evaluateStage,
 } from "../src/domain/lessonEvaluator";
-import { practiceStageFor } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS, practiceStageFor } from "../src/content/mvpLevel";
 import type { SqlQueryResult } from "../src/domain/types";
 
 function makeResult(
@@ -49,6 +49,37 @@ describe("detectQueryFeatures", () => {
   });
 });
 
+describe("课程文案", () => {
+  it("所有怪物使用不带装饰后缀的二到三字名称", () => {
+    expect(Object.fromEntries(
+      INITIAL_MONSTERS.map((monster) => [monster.id, monster.name]),
+    )).toEqual({
+      101: "史莱姆",
+      111: "幻影",
+      201: "猎犬",
+      211: "暗影犬",
+      301: "幽灵",
+      311: "鬼火",
+      800: "石巨人",
+      810: "石像鬼",
+      900: "魔王",
+      1200: "飞龙",
+      1210: "幼龙",
+      1300: "宝箱怪",
+      1310: "分身",
+      1400: "蛛后",
+      1410: "幼蛛",
+      1500: "幽影",
+      1510: "怨灵",
+      1900: "雷王",
+    });
+    expect(INITIAL_MONSTERS.every(
+      (monster) => !monster.name.includes("·") && monster.name.length <= 3,
+    )).toBe(true);
+  });
+
+});
+
 describe("evaluateLesson stages", () => {
   it("突发遭遇题仍检查真实结果与对应 SQL 核心", () => {
     const stage = practiceStageFor(211);
@@ -72,7 +103,7 @@ describe("evaluateLesson stages", () => {
     const name = makeResult(
       "select name from monsters where id=101",
       ["name"],
-      [{ name: "投影史莱姆 · 青页" }],
+      [{ name: "史莱姆" }],
     );
     const weakness = makeResult(
       "SELECT weakness FROM monsters WHERE id = 101",
@@ -88,16 +119,16 @@ describe("evaluateLesson stages", () => {
     const actual = makeResult(
       "SELECT m.name FROM monsters AS m WHERE m.id = 101",
       ["name"],
-      [{ name: "投影史莱姆 · 青页" }],
+      [{ name: "史莱姆" }],
     );
     expect(evaluateLesson("select", 0, actual).accepted).toBe(true);
   });
 
   it("硬编码结果缺少来源表时不能通过 SELECT", () => {
     const actual = makeResult(
-      "SELECT '投影史莱姆 · 青页' AS name",
+      "SELECT '史莱姆' AS name",
       ["name"],
-      [{ name: "投影史莱姆 · 青页" }],
+      [{ name: "史莱姆" }],
     );
     expect(evaluateLesson("select", 0, actual).accepted).toBe(false);
   });
@@ -133,7 +164,7 @@ describe("evaluateLesson stages", () => {
     const actual = makeResult(
       "SELECT weakness, name, status FROM monsters WHERE id = 201 AND 1 = 1",
       ["weakness", "name", "status"],
-      [{ weakness: "focus", name: "条件猎犬 · 逐行", status: "escaped" }],
+      [{ weakness: "focus", name: "猎犬", status: "escaped" }],
       [201],
     );
     expect(evaluateLesson("where", 1, actual).accepted).toBe(false);
@@ -141,7 +172,7 @@ describe("evaluateLesson stages", () => {
 
   it("WHERE 第二阶段接受按怪物名与状态返回 weakness", () => {
     const actual = makeResult(
-      "SELECT weakness FROM monsters WHERE name = '条件猎犬 · 逐行' AND status = 'escaped'",
+      "SELECT weakness FROM monsters WHERE name = '猎犬' AND status = 'escaped'",
       ["weakness"],
       [{ weakness: "focus" }],
     );
@@ -163,7 +194,7 @@ describe("evaluateLesson stages", () => {
     const actual = makeResult(
       "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
       ["name"],
-      [{ name: "NULL 幽灵 · 无主者" }],
+      [{ name: "幽灵" }],
     );
     expect(evaluateLesson("is-null", 1, actual).accepted).toBe(true);
   });
@@ -254,12 +285,12 @@ describe("evaluateLesson stages", () => {
     const exact = makeResult(
       "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 1400",
       ["name", "room_name"],
-      [{ name: "连接蛛后 · 双表桥", room_name: "双表桥" }],
+      [{ name: "蛛后", room_name: "双表桥" }],
     );
     const bypass = makeResult(
       "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON 1 = 1 WHERE m.id = 1400 AND r.id = 23",
       ["name", "room_name"],
-      [{ name: "连接蛛后 · 双表桥", room_name: "双表桥" }],
+      [{ name: "蛛后", room_name: "双表桥" }],
     );
     expect(evaluateLesson("inner-join", 0, exact).accepted).toBe(true);
     expect(evaluateLesson("inner-join", 0, bypass).accepted).toBe(false);

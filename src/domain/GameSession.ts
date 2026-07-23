@@ -189,6 +189,19 @@ function monstersForFloor(floor: FloorNumber): Monster[] {
   return cloneMonsters(INITIAL_MONSTERS.filter((monster) => monster.floor === floor));
 }
 
+function restoredMonstersForFloor(
+  savedMonsters: readonly Monster[],
+  floor: FloorNumber,
+): Monster[] {
+  const canonicalNames = new Map(
+    monstersForFloor(floor).map((monster) => [monster.id, monster.name]),
+  );
+  return cloneMonsters(savedMonsters).map((monster) => ({
+    ...monster,
+    name: canonicalNames.get(monster.id) ?? monster.name,
+  }));
+}
+
 function initialActors(
   graph: RoomGraph,
   floor: MazeFloor,
@@ -294,7 +307,7 @@ export class GameSession {
       this.mode = savedRun.mode;
       this.currentRoomId = savedRun.currentRoomId;
       this.player = { ...savedRun.player, weapon: { ...savedRun.player.weapon } };
-      this.monsters = cloneMonsters(savedRun.monsters);
+      this.monsters = restoredMonstersForFloor(savedRun.monsters, savedRun.floor);
       this.worldActors = savedRun.worldActors.map((savedActor) => {
         const actor = cloneWorldActor(savedActor);
         if (isActorPatrolPosition(actor, this.mazeFloor, actor)) return actor;

@@ -45,6 +45,11 @@ exploration is active. Each floor's locked Boss gate also exposes one optional
 high-difficulty SQL breach: a correct composite query opens only that physical
 gate, while a wrong or invalid query costs one heart and never grants mastery,
 XP, or loot.
+Authored monster display names stay direct and easy to type: two or three
+Chinese characters such as `史莱姆`, `幻影`, or `幼龙`, without middle-dot
+epithets or SQL-concept suffixes. Future floors must follow the same rule; SQL
+meaning belongs in fields, objectives, and encounter mechanics rather than the
+display name.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL

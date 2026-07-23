@@ -276,7 +276,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: ELITE_ID,
       type: "elite",
-      title: "GROUP BY 聚合执行官",
+      title: "GROUP BY 石巨人",
       depth: 4,
       lane: -groupLane,
       required: true,
@@ -288,7 +288,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: BOSS_ID,
       type: "boss",
-      title: "HAVING 魔王 · 查询监视者",
+      title: "HAVING 魔王",
       depth: 5,
       lane: 0,
       required: true,
@@ -426,7 +426,7 @@ function generateFloorTwoGraph(rawSeed: string): RoomGraph {
     room({
       id: FLOOR_2_BOSS_ID,
       type: "boss",
-      title: "JOIN 指挥家 · 雷鸣主核",
+      title: "雷王",
       depth: 6,
       lane: 0,
       required: true,

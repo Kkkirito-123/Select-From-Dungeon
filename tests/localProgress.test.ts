@@ -151,6 +151,16 @@ describe("localProgress", () => {
     expect(new GameSession(loaded).snapshot().combat).toEqual(saved.combat);
   });
 
+  it("恢复旧存档时使用当前内容中的简短怪物名", () => {
+    const saved = freshRun("canonical-monster-names");
+    const slime = saved.monsters.find((monster) => monster.id === 101);
+    if (!slime) throw new Error("旧存档缺少史莱姆");
+    slime.name = "旧版名称 · 装饰后缀";
+
+    const restored = new GameSession(saved).snapshot();
+    expect(restored.monsters.find((monster) => monster.id === 101)?.name).toBe("史莱姆");
+  });
+
   it("当前 v4 Run 会迁移到 v5，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
     const current = freshRun("migrate-run-v4");
