@@ -21,6 +21,7 @@ import {
 import type {
   ClaimableReward,
   CombatState,
+  GateChallengeId,
   GroundItem,
   LessonId,
   LootDrop,
@@ -32,11 +33,12 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v5";
 export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
-// Earlier Run keys belong to prior map and progression formats. They are never
-// read or removed, so v4 recovery cannot mutate a user's legacy local data.
+// v4 is read once as a compatible baseline and upgraded in memory. Legacy keys
+// are never deleted, so v5 recovery cannot mutate a user's previous Run.
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -57,7 +59,19 @@ const LESSON_IDS: readonly LessonId[] = [
   "join-boss",
 ];
 
-const PLAY_MODES = ["explore", "combat", "reward", "transition", "victory", "defeat"] as const;
+const PLAY_MODES = [
+  "explore",
+  "challenge",
+  "combat",
+  "reward",
+  "transition",
+  "victory",
+  "defeat",
+] as const;
+const GATE_CHALLENGE_IDS: readonly GateChallengeId[] = [
+  "aggregate-breach",
+  "relation-breach",
+];
 const WEAPON_IDS = [
   "data-blade",
   "filter-bow",
@@ -549,11 +563,12 @@ function isDiscoveredCell(value: unknown, floor: MazeFloor): value is string {
   return x < floor.width && y < floor.height;
 }
 
-export function isSavedRun(value: unknown): value is SavedRun {
+function isSavedRunVersion(value: unknown, version: 4 | 5): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
+  const candidateVersion: unknown = run.version;
   if (
-    run.version !== 4 ||
+    candidateVersion !== version ||
     run.generatorVersion !== 4 ||
     (run.floor !== 1 && run.floor !== 2) ||
     !isValidGraph(run.graph)
@@ -562,8 +577,25 @@ export function isSavedRun(value: unknown): value is SavedRun {
   if (run.floor !== graph.floor) return false;
   if (!isMazeFloor(run.mazeFloor, graph)) return false;
   const mazeFloor = run.mazeFloor;
+  const challengeGateId = `gate:${graph.bossId}`;
+  const expectedChallengeId: GateChallengeId = run.floor === 1
+    ? "aggregate-breach"
+    : "relation-breach";
+  const openedGateIds = version === 5 ? run.openedGateIds : [];
+  const activeGateChallengeId = version === 5 ? run.activeGateChallengeId : null;
   if (
     !PLAY_MODES.includes(run.mode as (typeof PLAY_MODES)[number]) ||
+    (version === 4 && run.mode === "challenge") ||
+    !Array.isArray(openedGateIds) ||
+    !openedGateIds.every((id) => id === challengeGateId) ||
+    !hasUniqueValues(openedGateIds) ||
+    !(activeGateChallengeId === null || (
+      typeof activeGateChallengeId === "string" &&
+      GATE_CHALLENGE_IDS.includes(activeGateChallengeId as GateChallengeId) &&
+      activeGateChallengeId === expectedChallengeId
+    )) ||
+    ((run.mode === "challenge") !== (activeGateChallengeId !== null)) ||
+    (activeGateChallengeId !== null && openedGateIds.includes(challengeGateId)) ||
     typeof run.currentRoomId !== "string" ||
     !graph.nodes.some((node) => node.id === run.currentRoomId) ||
     !isPlayer(run.player) ||
@@ -609,6 +641,7 @@ export function isSavedRun(value: unknown): value is SavedRun {
   const unlockedReachableCells = reachableMazeCells(
     mazeFloor,
     new Set(run.completedLessons),
+    new Set(openedGateIds),
   );
   if (
     !isFloorCell(player, mazeFloor) ||
@@ -694,6 +727,24 @@ export function isSavedRun(value: unknown): value is SavedRun {
   return true;
 }
 
+export function isSavedRun(value: unknown): value is SavedRun {
+  return isSavedRunVersion(value, 5);
+}
+
+function migrateLegacyRun(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 4)) return null;
+  const legacy = value as Omit<
+    SavedRun,
+    "version" | "openedGateIds" | "activeGateChallengeId"
+  > & { version: 4 };
+  return {
+    ...legacy,
+    version: 5,
+    openedGateIds: [],
+    activeGateChallengeId: null,
+  };
+}
+
 export function isProfileProgress(value: unknown): value is ProfileProgress {
   if (!isRecord(value)) return false;
   const profile = value as Partial<ProfileProgress>;
@@ -738,7 +789,8 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
 
 export function loadRun(storage: StorageLike): SavedRun | null {
   const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
-  return isSavedRun(value) ? value : null;
+  if (isSavedRun(value)) return value;
+  return migrateLegacyRun(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {

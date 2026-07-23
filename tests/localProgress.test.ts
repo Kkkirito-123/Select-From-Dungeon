@@ -71,7 +71,7 @@ function expectRunRejected(storage: MemoryStorage, run: SavedRun): void {
 }
 
 describe("localProgress", () => {
-  it("v4 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫状态", () => {
+  it("v5 Run 与永久 Profile 使用独立 key 并能完整恢复迷宫状态", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "storage-seed");
     const saved = session.toSavedRun();
@@ -81,7 +81,7 @@ describe("localProgress", () => {
     saveRun(storage, saved);
     saveProfile(storage, profile);
 
-    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v4");
+    expect(RUN_SAVE_KEY).toBe("select-from-dungeon:run:v5");
     expect(PROFILE_SAVE_KEY).toBe("select-from-dungeon:profile:v2");
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(true);
     expect(storage.values.has(PROFILE_SAVE_KEY)).toBe(true);
@@ -101,7 +101,7 @@ describe("localProgress", () => {
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
   });
 
-  it("旧 run:v1/v2 不读取，也不会被 v4 清理动作删除", () => {
+  it("旧 run:v1/v2 不读取，也不会被 v5 清理动作删除", () => {
     const storage = new MemoryStorage();
     const legacyKey = "select-from-dungeon:run:v1";
     const legacyRun = {
@@ -114,7 +114,10 @@ describe("localProgress", () => {
     storage.setItem(previousKey, JSON.stringify({ ...legacyRun, version: 2, generatorVersion: 2 }));
 
     expect(loadRun(storage)).toBeNull();
-    expect(storage.readKeys).toEqual([RUN_SAVE_KEY]);
+    expect(storage.readKeys).toEqual([
+      RUN_SAVE_KEY,
+      "select-from-dungeon:run:v4",
+    ]);
     clearRun(storage);
     expect(storage.removedKeys).toEqual([RUN_SAVE_KEY]);
     expect(storage.values.has(legacyKey)).toBe(true);
@@ -122,7 +125,7 @@ describe("localProgress", () => {
     expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
 
-  it("战斗中的房间、玩家与 Actor 状态也能通过 v4 恢复", () => {
+  it("战斗中的房间、玩家与 Actor 状态也能通过 v5 恢复", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "combat-restore");
     const selectRoom = session.snapshot().roomGraph.nodes.find((node) => (
@@ -146,6 +149,28 @@ describe("localProgress", () => {
     expect(loaded?.currentRoomId).toBe(selectRoom.id);
     expect(loaded?.combat?.targetId).toBe(actor.monsterId);
     expect(new GameSession(loaded).snapshot().combat).toEqual(saved.combat);
+  });
+
+  it("当前 v4 Run 会迁移到 v5，且不会删除原始存档", () => {
+    const storage = new MemoryStorage();
+    const current = freshRun("migrate-run-v4");
+    const {
+      openedGateIds: _openedGateIds,
+      activeGateChallengeId: _activeGateChallengeId,
+      ...legacyFields
+    } = current;
+    const legacy = { ...legacyFields, version: 4 };
+    storage.setItem("select-from-dungeon:run:v4", JSON.stringify(legacy));
+
+    const migrated = loadRun(storage);
+    expect(migrated).toMatchObject({
+      version: 5,
+      openedGateIds: [],
+      activeGateChallengeId: null,
+      graph: { seed: "migrate-run-v4" },
+    });
+    expect(storage.values.has("select-from-dungeon:run:v4")).toBe(true);
+    expect(storage.values.has(RUN_SAVE_KEY)).toBe(false);
   });
 
   it("永久 Profile v1 会迁移为包含第二层课程的 v2", () => {

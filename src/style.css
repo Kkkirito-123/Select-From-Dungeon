@@ -633,6 +633,90 @@ h1 span {
   transform: translateY(0);
 }
 
+.gate-terminal {
+  border-color: var(--plum-light);
+  border-top-color: var(--gold);
+  background:
+    linear-gradient(135deg, rgba(78, 55, 92, 0.22), transparent 44%),
+    rgba(8, 8, 13, 0.992);
+}
+
+.gate-terminal::before {
+  width: 148px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--gold) 0 18px,
+      transparent 18px 24px,
+      var(--plum-light) 24px 42px,
+      transparent 42px 48px
+    );
+}
+
+.gate-terminal__topline {
+  border-bottom-color: #5b4563;
+}
+
+.gate-terminal__topline .terminal-prompt {
+  color: var(--gold-light);
+}
+
+.gate-terminal__brief,
+.gate-terminal__editor {
+  background:
+    linear-gradient(180deg, rgba(78, 55, 92, 0.13), transparent 42%),
+    #101118;
+}
+
+.breach-risk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #8b554e;
+  border-left: 4px solid var(--ember);
+  padding: 7px 9px;
+  background: rgba(199, 82, 72, 0.1);
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.breach-risk span {
+  color: #ff8178;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.breach-risk strong {
+  color: var(--paper);
+  font-size: 12px;
+}
+
+.breach-hints {
+  margin-top: 10px;
+  border: 1px dashed #685671;
+}
+
+.breach-hints summary {
+  padding: 7px 9px;
+  color: #d5c6db;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.breach-hints .hint-list {
+  padding: 0 8px 8px;
+}
+
+.breach-note {
+  margin: 10px 0 0 !important;
+  border-top: 1px solid #3f3546;
+  padding-top: 8px;
+  color: var(--gold-light) !important;
+  font-size: 11px !important;
+}
+
 .terminal-topline {
   display: flex;
   flex: 0 0 auto;
@@ -751,7 +835,8 @@ h1 span {
   line-height: 1.5;
 }
 
-#sql-editor {
+#sql-editor,
+#gate-sql-editor {
   display: block;
   flex: 1 1 auto;
   width: 100%;
@@ -770,8 +855,19 @@ h1 span {
   tab-size: 2;
 }
 
-#sql-editor::placeholder {
+#sql-editor::placeholder,
+#gate-sql-editor::placeholder {
   color: #5f6572;
+}
+
+#gate-sql-editor {
+  border-color: #6d5b76;
+  border-left-color: var(--gold);
+  background:
+    linear-gradient(90deg, rgba(215, 173, 85, 0.035) 1px, transparent 1px),
+    #06060a;
+  background-size: 18px 18px;
+  caret-color: #ff8178;
 }
 
 .action-row {
@@ -809,6 +905,17 @@ h1 span {
 
 .primary-action:hover {
   background: #92decf;
+}
+
+.breach-action {
+  border-color: var(--gold-light);
+  background: var(--gold);
+  color: #171006;
+  box-shadow: 3px 3px 0 #735b29;
+}
+
+.breach-action:hover {
+  background: var(--gold-light);
 }
 
 .quiet-action {
@@ -1532,7 +1639,8 @@ h1 span {
     padding: 8px;
   }
 
-  #sql-editor {
+  #sql-editor,
+  #gate-sql-editor {
     min-height: 170px;
     font-size: 16px;
   }

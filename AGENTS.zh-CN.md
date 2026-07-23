@@ -24,7 +24,9 @@
 的必修怪物所在格或通过步数遭遇判定时切换到独立单体战斗，在游戏内写完整只读 SQL。每局以
 两颗心开始，怪物反击固定扣一颗心，胜利按怪物等级获得经验，拾取后会解释道具作用；击败第一层
 两阶段 `HAVING` 魔王后自动显示短暂传送门，最终在第二层击败综合 `JOIN` 魔王。探索状态下，
-地图普通怪约每 1,100 毫秒巡逻一步。
+地图普通怪约每 1,100 毫秒巡逻一步。每层锁定的 Boss 门还提供一个可选高难 SQL 越级机关：
+正确组合查询只打开当前物理门，错误结果或语法错误损失一颗心，且永远不会授予课程掌握、XP
+或战利品。
 
 当前明确不包含 AI 生成、账号、排行榜、多人、服务端数据库，也不宣称完整模拟 MySQL 优化器
 或 InnoDB 运行时。种子只随机化物理迷宫和非关键奖励，不随机必修 SQL 数据、前置课程和关键
@@ -54,7 +56,7 @@ index.html -> src/main.ts
 玩家 SQL -> 只读策略 -> SQLite 结果 + EXPLAIN QUERY PLAN
   -> 结果语义 + 关卡知识锁校验 -> 正确时自动攻击 / 错误时怪物反击
   -> 同步 GameSession 与 SQLite HP -> 刷新 Phaser/UI
-  -> 防抖写入 v4 Run 存档 + 永久 v2 Profile 存档
+  -> 防抖写入 v5 Run 存档 + 永久 v2 Profile 存档
 ```
 
 `GameSession` 是物理移动、遭遇计量、课程、演员、迷雾、战斗、生命、经验、掉落与档案的事实
@@ -71,8 +73,9 @@ index.html -> src/main.ts
 限定为单层 `SELECT`，不允许 `OR`、子查询或集合运算，避免把必修条件藏在无效分支里。第二层
 排序与连接题也遵循单语句边界，并把真实关系条件纳入概念锁。共享课程数据与固定掉落位于
 `src/content/mvpLevel.ts`，第二层内容位于 `src/content/floor2Level.ts`；房间氛围与局内奖励位于
-`src/content/runContent.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL 阶段都
-从空编辑器开始。
+`src/content/runContent.ts`；可选 Boss 门题目与语义结果约束位于
+`src/content/gateChallenges.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL
+阶段都从空编辑器开始。
 
 ## 仓库地图
 
@@ -119,17 +122,24 @@ python3 scripts/validate-rules.py
   `EXCEPT`；支持表别名限定列，也支持在 `HAVING` 中使用题目要求的 `total` 别名。
 - 当前 I/O 热量使用 SQLite `EXPLAIN QUERY PLAN`。这是 SQLite 证据，不是 MySQL 执行计划。
   后续 MySQL/InnoDB 概念必须明确标记为模拟，或使用另行隔离的真实后端。
-- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v4`（当前楼层、迷宫、演员、地面物品、
-  迷雾、遭遇计量、等级/经验与可丢弃的当前 Run 状态）、`select-from-dungeon:profile:v2`
+- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v5`（当前楼层、迷宫、演员、地面物品、
+  迷雾、遭遇计量、等级/经验、已打开的挑战门、当前机关题与可丢弃的当前 Run 状态）、
+  `select-from-dungeon:profile:v2`
   （十项已掌握课程、练习次数、通关数、
-  最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。旧的
-  Run Key 均不会读取或删除；有效的 `profile:v1` 会迁移为 v2。`src/main.ts` 对快照驱动的
-  持久化进行防抖；改变结构时必须处理版本或恢复。
+  最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。有效的
+  `select-from-dungeon:run:v4` 会在内存中迁移为 v5，且默认没有已开启的挑战门；更旧 Run Key
+  不读取也不删除。有效的 `profile:v1` 会迁移为 v2。`src/main.ts` 对快照驱动的持久化进行
+  防抖；改变结构时必须处理版本或恢复。
 - 核心学习装备必须确定性掉落，随机性不得阻塞课程进度；战斗伤害保持确定，便于检查 SQL 锁定。
 - 新 Run 以两颗心开始。普通、精英、魔王胜利分别获得 1、3、5 经验；累计经验达到 2、4、6、8，
   后续每 4 XP 一档直到 24 时升级。每升一级增加一颗生命上限，并恢复一颗心。
 - 一次 SQL 提交等于一个战斗回合；思考和输入没有倒计时。正确结果只触发玩家攻击，结果错误或
   语法错误才触发预告的怪物反击。空输入不得消耗回合。
+- 站在锁定 Boss 门旁按 `E` 会打开可选的 `QUERY BREACH` 机关终端。第一层固定考察
+  `JOIN + WHERE + COUNT + GROUP BY + HAVING + ORDER BY`，第二层增加 `LEFT JOIN`、
+  `COUNT(DISTINCT ...)` 与 `LIMIT`；判定同时检查查询特征和精确结果语义。成功只打开当前物理门，
+  不增加课程掌握、练习次数、XP 或战利品；结果错误和语法错误损失一颗心，空输入与 `Escape`
+  不产生代价。
 - 64×48 `MazeFloor` 记录 16×16 技术分区，完成基础雕刻后确定性增加环路以减少死路。玩家必须
   实际走过连续世界；发现式小地图不是导航控件。移动进入存活必修怪物所在格，或成功移动触发
   遭遇计量时，会自动进入独立战斗场景；战后安全步数避免连续伏击。地图普通怪缓慢巡逻，魔王

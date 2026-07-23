@@ -564,10 +564,13 @@ export function isMazeWalkable(
   x: number,
   y: number,
   completedLessons: ReadonlySet<LessonId> = new Set<LessonId>(),
+  openedGateIds: ReadonlySet<string> = new Set<string>(),
 ): boolean {
   if (mazeTileAt(floor, x, y) !== ".") return false;
   const gate = mazeGateAt(floor, { x, y });
-  return !gate || gate.requires.every((lesson) => completedLessons.has(lesson));
+  return !gate ||
+    openedGateIds.has(gate.id) ||
+    gate.requires.every((lesson) => completedLessons.has(lesson));
 }
 
 export function revealAround(

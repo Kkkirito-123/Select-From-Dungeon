@@ -291,13 +291,17 @@ export class DungeonScene extends Phaser.Scene {
 
     const openedGate = newlyOpenedGate(previous, snapshot);
     if (openedGate) {
+      const openedByChallenge = !previous.openedGateIds.includes(openedGate.id)
+        && snapshot.openedGateIds.includes(openedGate.id);
       const newlyLearnedRequirements = openedGate.requires.filter(
         (lesson) => !previous.completedLessons.includes(lesson)
           && snapshot.completedLessons.includes(lesson),
       );
       this.feedback.dispatch({
         type: "gate-open",
-        message: newlyLearnedRequirements.length > 0
+        message: openedByChallenge
+          ? "越级 SQL 校验通过，当前机关门已永久开启。"
+          : newlyLearnedRequirements.length > 0
           ? `${openedGate.requires.map((lesson) => lesson.toUpperCase()).join(" + ")} 知识门已开启。`
           : "聚合战锤已共鸣，GROUP BY 知识门开启。",
       });
@@ -628,6 +632,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private syncGateViews(): void {
+    const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
     this.snapshot.mazeFloor.gates.forEach((gate) => {
       const view = this.gateViews.get(gate.id);
       if (!view) return;
@@ -635,10 +640,16 @@ export class DungeonScene extends Phaser.Scene {
         (lesson) => !this.snapshot.completedLessons.includes(lesson),
       );
       const open = this.snapshot.availableRoomIds.includes(gate.roomNodeId);
-      view.block.setFillStyle(open ? COLORS.query : COLORS.ember, open ? 0.24 : 0.78);
-      view.block.setStrokeStyle(2, open ? COLORS.query : COLORS.gold, 0.82);
+      const challengeGate = gate.id === this.snapshot.challengeGateId;
+      view.block.setFillStyle(
+        open ? colors.query : challengeGate ? colors.plum : colors.ember,
+        open ? 0.24 : 0.78,
+      );
+      view.block.setStrokeStyle(2, open ? colors.query : colors.gold, 0.82);
       view.label.setText(open
         ? ""
+        : challengeGate
+          ? "E · QUERY BREACH"
         : missing.length > 0
           ? missing.map((lesson) => lesson.toUpperCase()).join(" + ")
           : "需要聚合战锤");
