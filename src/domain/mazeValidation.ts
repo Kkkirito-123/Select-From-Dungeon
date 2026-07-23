@@ -27,8 +27,15 @@ function key(position: Position): string {
 export function reachableMazeCells(
   floor: MazeFloor,
   completedLessons: ReadonlySet<LessonId>,
+  openedGateIds: ReadonlySet<string> = new Set<string>(),
 ): Set<string> {
-  if (!isMazeWalkable(floor, floor.spawn.x, floor.spawn.y, completedLessons)) return new Set();
+  if (!isMazeWalkable(
+    floor,
+    floor.spawn.x,
+    floor.spawn.y,
+    completedLessons,
+    openedGateIds,
+  )) return new Set();
   const visited = new Set<string>([key(floor.spawn)]);
   const pending: Position[] = [{ ...floor.spawn }];
   while (pending.length > 0) {
@@ -37,7 +44,10 @@ export function reachableMazeCells(
     DIRECTIONS.forEach((direction) => {
       const next = { x: current.x + direction.x, y: current.y + direction.y };
       const nextKey = key(next);
-      if (!visited.has(nextKey) && isMazeWalkable(floor, next.x, next.y, completedLessons)) {
+      if (
+        !visited.has(nextKey) &&
+        isMazeWalkable(floor, next.x, next.y, completedLessons, openedGateIds)
+      ) {
         visited.add(nextKey);
         pending.push(next);
       }

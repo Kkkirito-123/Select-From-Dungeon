@@ -356,7 +356,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().roomGraph).toEqual(session.snapshot().roomGraph);
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
-    expect(restored.toSavedRun()).toMatchObject({ version: 4, generatorVersion: 4, floor: 1 });
+    expect(restored.toSavedRun()).toMatchObject({ version: 5, generatorVersion: 4, floor: 1 });
 
     restored.reset("new-run");
     expect(restored.snapshot().runSeed).toBe("new-run");
@@ -365,7 +365,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().profile.masteredLessons).toContain("select");
   });
 
-  it("v4 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
+  it("v5 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
     const session = new GameSession(null, null, "actor-gate-recovery");
     const saved = session.toSavedRun();
     const actor = saved.worldActors.find((entry) => entry.behavior !== "anchored");
@@ -380,5 +380,77 @@ describe("GameSession SQL 魔王城 Run", () => {
       (entry) => entry.monsterId === actor.monsterId,
     );
     expect(restoredActor).toMatchObject(actor.home);
+  });
+
+  it("Boss 门可用高难 SQL 越级破解，但不会伪造课程、XP 或战利品", () => {
+    const session = new GameSession(null, null, "gate-breach");
+    const initial = session.snapshot();
+    const bossGate = initial.mazeFloor.gates.find(
+      (gate) => gate.id === initial.challengeGateId,
+    );
+    if (!bossGate) throw new Error("缺少 Boss 机关门");
+
+    expect(session.setPlayerPosition(bossGate.outside.x, bossGate.outside.y)).toBe(true);
+    expect(session.interact()).toMatchObject({ ok: true, kind: "challenge" });
+    expect(session.snapshot()).toMatchObject({
+      mode: "challenge",
+      activeGateChallenge: { id: "aggregate-breach", gateId: bossGate.id },
+      openedGateIds: [],
+    });
+    const restoredInChallenge = new GameSession(session.toSavedRun());
+    expect(restoredInChallenge.snapshot()).toMatchObject({
+      mode: "challenge",
+      activeGateChallenge: { id: "aggregate-breach", gateId: bossGate.id },
+      openedGateIds: [],
+    });
+
+    const wrong = result(
+      "SELECT id FROM monsters ORDER BY id",
+      ["id"],
+      [{ id: 101 }],
+    );
+    expect(session.resolveGateChallenge(wrong)).toMatchObject({
+      accepted: false,
+      playerDamage: 1,
+      mode: "challenge",
+    });
+    expect(session.snapshot().player.hp).toBe(1);
+    expect(session.cancelGateChallenge()).toBe(true);
+    expect(session.snapshot().mode).toBe("explore");
+
+    expect(session.interact()).toMatchObject({ ok: true, kind: "challenge" });
+    const correct = result(
+      `SELECT m.id, m.name, COUNT(s.id) AS echo_count, SUM(s.charge) AS total_charge
+       FROM monsters AS m
+       JOIN monster_signals AS s ON s.monster_id = m.id
+       WHERE s.channel = 'echo'
+       GROUP BY m.id, m.name
+       HAVING COUNT(s.id) >= 3 AND SUM(s.charge) >= 24
+       ORDER BY total_charge DESC, m.id ASC`,
+      ["id", "name", "echo_count", "total_charge"],
+      [
+        { id: 800, name: "聚合执行官 · 四路钟", echo_count: 3, total_charge: 24 },
+        { id: 900, name: "查询监视者 · 魔王核心", echo_count: 3, total_charge: 24 },
+      ],
+    );
+    expect(session.resolveGateChallenge(correct)).toMatchObject({
+      accepted: true,
+      opened: true,
+      gateId: bossGate.id,
+      playerDamage: 0,
+      mode: "explore",
+    });
+    const breached = session.snapshot();
+    expect(breached.openedGateIds).toEqual([bossGate.id]);
+    expect(breached.availableRoomIds).toContain(bossGate.roomNodeId);
+    expect(breached.completedLessons).toEqual([]);
+    expect(breached.profile.masteredLessons).toEqual([]);
+    expect(breached.profile.attempts).toEqual(initial.profile.attempts);
+    expect(breached.player).toMatchObject({ xp: 0, level: 1 });
+    expect(breached.groundItems).toEqual(initial.groundItems);
+
+    const restored = new GameSession(session.toSavedRun());
+    expect(restored.snapshot().openedGateIds).toEqual([bossGate.id]);
+    expect(restored.travelToRoom(bossGate.roomNodeId).ok).toBe(true);
   });
 });

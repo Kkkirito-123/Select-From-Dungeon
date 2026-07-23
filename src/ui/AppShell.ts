@@ -43,12 +43,16 @@ export function canOpenCombatTerminal(
 
 export class AppShell {
   private textarea!: HTMLTextAreaElement;
+  private gateTextarea!: HTMLTextAreaElement;
   private queryStatus!: HTMLElement;
+  private gateQueryStatus!: HTMLElement;
   private resultRoot!: HTMLElement;
   private planRoot!: HTMLElement;
   private hintsRoot!: HTMLElement;
   private terminal!: HTMLElement;
+  private gateTerminal!: HTMLElement;
   private executeButton!: HTMLButtonElement;
+  private gateExecuteButton!: HTMLButtonElement;
   private sqlButton!: HTMLButtonElement;
   private audioButton!: HTMLButtonElement;
   private lastStageId: GameSnapshot["lessonStageId"] | null = null;
@@ -71,13 +75,30 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly keydownHandler = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.isGateTerminalOpen()) {
+      event.preventDefault();
+      this.closeGateTerminal();
+      return;
+    }
     if (event.key === "Escape" && this.isTerminalOpen()) {
       event.preventDefault();
       this.closeTerminal();
       return;
     }
-    if (event.key === "Tab" && this.isTerminalOpen()) {
-      this.trapTerminalFocus(event);
+    if (event.key === "Tab" && (this.isTerminalOpen() || this.isGateTerminalOpen())) {
+      this.trapDialogFocus(
+        event,
+        this.isGateTerminalOpen() ? this.gateTerminal : this.terminal,
+      );
+      return;
+    }
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key === "Enter" &&
+      this.isGateTerminalOpen()
+    ) {
+      event.preventDefault();
+      void this.executeGateChallenge();
       return;
     }
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && this.isTerminalOpen()) {
@@ -258,6 +279,47 @@ export class AppShell {
                   </div>
                 </details>
               </section>
+
+              <section id="gate-terminal" class="combat-terminal gate-terminal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="gate-terminal-title" inert>
+                <div class="terminal-topline gate-terminal__topline">
+                  <div>
+                    <span class="terminal-prompt">OPTIONAL BREACH / 越级机关</span>
+                    <strong id="gate-terminal-title">高难 SQL 机关</strong>
+                  </div>
+                  <button id="close-gate-terminal" type="button" class="icon-action" aria-label="退出机关破解">ESC 安全退出</button>
+                </div>
+
+                <div class="terminal-grid gate-terminal__grid">
+                  <section class="terminal-brief gate-terminal__brief">
+                    <div class="breach-risk"><span>RISK</span><strong>错误查询 −1 生命</strong></div>
+                    <p id="gate-terminal-objective"></p>
+                    <div id="gate-challenge-schema" class="schema-list"></div>
+                    <details class="breach-hints">
+                      <summary>分级破解提示 / 不直接给答案</summary>
+                      <div id="gate-challenge-hints" class="hint-list"></div>
+                    </details>
+                    <p class="breach-note">成功只打开这一扇物理门；不会获得课程掌握、XP 或战利品。</p>
+                  </section>
+
+                  <section class="terminal-editor gate-terminal__editor">
+                    <label class="sr-only" for="gate-sql-editor">输入机关破解 SQL</label>
+                    <textarea id="gate-sql-editor" spellcheck="false" autocomplete="off" placeholder="写出完整查询计划，破解结果集校验…"></textarea>
+                    <div class="action-row">
+                      <button id="execute-gate-query" type="button" class="primary-action breach-action">执行越级校验 <kbd>Ctrl ↵</kbd></button>
+                      <button id="cancel-gate-query" type="button" class="quiet-action">断开连接，不扣血</button>
+                    </div>
+                    <p id="gate-query-status" class="query-status">空输入不触发反噬；语法或结果错误才扣除 1 点生命。</p>
+                  </section>
+                </div>
+
+                <details class="terminal-evidence">
+                  <summary>查看机关返回值与 SQLite 查询路径</summary>
+                  <div class="evidence-grid">
+                    <div id="gate-query-result" class="table-wrap empty-state">尚未执行机关查询。</div>
+                    <div id="gate-query-plan" class="plan-list empty-state">等待 EXPLAIN QUERY PLAN。</div>
+                  </div>
+                </details>
+              </section>
             </div>
 
             <div class="touch-controls" aria-label="游戏控制">
@@ -309,7 +371,7 @@ export class AppShell {
             <section class="control-card">
               <div class="card-heading"><span>行动规则</span><span>无倒计时</span></div>
               <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　走到松散掉落上自动拾取</p>
-              <p><kbd>E</kbd> 只调查祭坛、篝火和宝箱，不会用于拾取怪物掉落。</p>
+              <p><kbd>E</kbd> 调查祭坛、篝火和宝箱；靠近 Boss 机关门时可接入高难越级查询。</p>
               <p><kbd>Q + S</kbd> 打开终端　<kbd>Ctrl + Enter</kbd> 执行完整 SQL</p>
               <p>死亡只重置当前 Run；知识图鉴与练习次数永久保留。</p>
               <button id="replay-onboarding-control" type="button" class="guide-replay">↺ 重新教学</button>
@@ -331,18 +393,37 @@ export class AppShell {
     `;
 
     this.textarea = requiredElement(this.root, "#sql-editor");
+    this.gateTextarea = requiredElement(this.root, "#gate-sql-editor");
     this.queryStatus = requiredElement(this.root, "#query-status");
+    this.gateQueryStatus = requiredElement(this.root, "#gate-query-status");
     this.resultRoot = requiredElement(this.root, "#query-result");
     this.planRoot = requiredElement(this.root, "#query-plan");
     this.hintsRoot = requiredElement(this.root, "#hint-list");
     this.terminal = requiredElement(this.root, "#combat-terminal");
+    this.gateTerminal = requiredElement(this.root, "#gate-terminal");
     this.executeButton = requiredElement(this.root, "#execute-query");
+    this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
     this.sqlButton = requiredElement(this.root, "#open-sql");
     this.audioButton = requiredElement(this.root, "#audio-toggle");
 
     const listenerOptions = { signal: this.listenerController.signal };
     this.executeButton.addEventListener("click", () => void this.executeQuery(), listenerOptions);
+    this.gateExecuteButton.addEventListener(
+      "click",
+      () => void this.executeGateChallenge(),
+      listenerOptions,
+    );
     requiredElement(this.root, "#close-terminal").addEventListener("click", () => this.closeTerminal(), listenerOptions);
+    requiredElement(this.root, "#close-gate-terminal").addEventListener(
+      "click",
+      () => this.closeGateTerminal(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#cancel-gate-query").addEventListener(
+      "click",
+      () => this.closeGateTerminal(),
+      listenerOptions,
+    );
     requiredElement(this.root, "#request-hint").addEventListener("click", () => this.requestHint(), listenerOptions);
     requiredElement(this.root, "#interact").addEventListener("click", dispatchInteract, listenerOptions);
     this.sqlButton.addEventListener("click", () => this.openTerminal(), listenerOptions);
@@ -404,7 +485,7 @@ export class AppShell {
     this.pickupTimer = null;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
     this.floorTransitionTimer = null;
-    this.root.classList.remove("terminal-active");
+    this.root.classList.remove("terminal-active", "gate-terminal-active");
     void this.audio.dispose();
   }
 
@@ -490,6 +571,62 @@ export class AppShell {
     }
   }
 
+  private async executeGateChallenge(): Promise<void> {
+    if (this.busy || !this.isGateTerminalOpen()) return;
+    if (!this.gateTextarea.value.trim()) {
+      const message = "先写一条完整 SELECT；空输入不会触发机关反噬。";
+      this.gateQueryStatus.textContent = message;
+      this.gateQueryStatus.dataset.kind = "warning";
+      this.showFeedbackNotice({ message, tone: "info" });
+      return;
+    }
+
+    this.busy = true;
+    this.gateExecuteButton.disabled = true;
+    requiredElement(this.root, ".game-stage").classList.add("is-resolving");
+    try {
+      this.feedback.dispatch({ type: "query-cast" });
+      let result: SqlQueryResult | null = null;
+      let queryError: unknown = null;
+      try {
+        result = this.sql.executeSelect(this.gateTextarea.value);
+      } catch (error) {
+        queryError = error;
+      }
+
+      const resolution = result
+        ? this.session.resolveGateChallenge(result)
+        : this.session.registerGateChallengeError(
+            queryError instanceof Error ? queryError.message : "查询执行失败。",
+          );
+      if (result) {
+        this.renderResultInto(
+          result,
+          requiredElement(this.root, "#gate-query-result"),
+          requiredElement(this.root, "#gate-query-plan"),
+        );
+      }
+      this.gateQueryStatus.textContent = resolution.message;
+      this.gateQueryStatus.dataset.kind = resolution.accepted ? "success" : "error";
+      if (resolution.playerDamage > 0) {
+        this.feedback.dispatch({ type: "player-hurt", amount: resolution.playerDamage });
+      }
+      if (!resolution.accepted && resolution.playerDamage === 0) {
+        this.showFeedbackNotice({ message: resolution.message, tone: "info" });
+      }
+    } catch (error) {
+      console.error("机关查询结算失败", error);
+      const message = "机关终端发生内部错误，本次没有扣除生命。请关闭后重新接入。";
+      this.gateQueryStatus.textContent = message;
+      this.gateQueryStatus.dataset.kind = "error";
+      this.showFeedbackNotice({ message, tone: "danger" });
+    } finally {
+      this.busy = false;
+      this.gateExecuteButton.disabled = false;
+      requiredElement(this.root, ".game-stage").classList.remove("is-resolving");
+    }
+  }
+
   private openTerminal(): void {
     if (this.busy) return;
     if (!canOpenCombatTerminal(this.lastSnapshot?.mode, this.busy)) {
@@ -514,7 +651,9 @@ export class AppShell {
     if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
     this.terminalFocusTimer = window.setTimeout(() => {
       this.terminalFocusTimer = null;
-      if (!this.busy && this.isTerminalOpen()) this.textarea.focus();
+      if (!this.busy && this.isTerminalOpen()) {
+        this.textarea.focus({ preventScroll: true });
+      }
     }, 60);
   }
 
@@ -522,7 +661,7 @@ export class AppShell {
     if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
     this.terminalFocusTimer = null;
     this.terminal.classList.remove("is-open");
-    this.root.classList.remove("terminal-active");
+    if (!this.isGateTerminalOpen()) this.root.classList.remove("terminal-active");
     this.terminal.inert = true;
     this.terminal.setAttribute("aria-hidden", "true");
     if (returnFocus) {
@@ -545,22 +684,75 @@ export class AppShell {
     return this.terminal.classList.contains("is-open");
   }
 
-  private trapTerminalFocus(event: KeyboardEvent): void {
-    const focusable = Array.from(this.terminal.querySelectorAll<HTMLElement>(
+  private closeGateTerminal(): void {
+    if (this.busy) return;
+    this.session.cancelGateChallenge();
+  }
+
+  private openGateTerminal(): void {
+    if (this.busy || !this.lastSnapshot?.activeGateChallenge) return;
+    if (!this.isGateTerminalOpen()) {
+      this.focusBeforeTerminal = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    }
+    void this.audio.resume();
+    this.gateTerminal.classList.add("is-open");
+    this.root.classList.add("terminal-active", "gate-terminal-active");
+    this.gateTerminal.inert = false;
+    this.gateTerminal.setAttribute("aria-hidden", "false");
+    if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
+    this.terminalFocusTimer = window.setTimeout(() => {
+      this.terminalFocusTimer = null;
+      if (!this.busy && this.isGateTerminalOpen()) {
+        this.gateTextarea.focus({ preventScroll: true });
+      }
+    }, 60);
+  }
+
+  private hideGateTerminal(returnFocus = true): void {
+    if (this.terminalFocusTimer !== null) window.clearTimeout(this.terminalFocusTimer);
+    this.terminalFocusTimer = null;
+    this.gateTerminal.classList.remove("is-open");
+    this.root.classList.remove("gate-terminal-active");
+    if (!this.isTerminalOpen()) this.root.classList.remove("terminal-active");
+    this.gateTerminal.inert = true;
+    this.gateTerminal.setAttribute("aria-hidden", "true");
+    if (!returnFocus) return;
+    this.gateTextarea.blur();
+    const focusTarget = this.focusBeforeTerminal;
+    this.focusBeforeTerminal = null;
+    if (
+      focusTarget?.isConnected &&
+      !focusTarget.matches(":disabled") &&
+      !this.gateTerminal.contains(focusTarget)
+    ) {
+      focusTarget.focus();
+    } else {
+      requiredElement<HTMLElement>(this.root, "#game-root").focus();
+    }
+  }
+
+  private isGateTerminalOpen(): boolean {
+    return this.gateTerminal.classList.contains("is-open");
+  }
+
+  private trapDialogFocus(event: KeyboardEvent, dialog: HTMLElement): void {
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
       'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])',
     )).filter((element) => !element.closest("[inert]") && !element.hasAttribute("hidden"));
     const first = focusable[0];
     const last = focusable.at(-1);
     if (!first || !last) {
       event.preventDefault();
-      this.terminal.focus();
+      dialog.focus();
       return;
     }
     const active = document.activeElement;
-    if (event.shiftKey && (active === first || !this.terminal.contains(active))) {
+    if (event.shiftKey && (active === first || !dialog.contains(active))) {
       event.preventDefault();
       last.focus();
-    } else if (!event.shiftKey && (active === last || !this.terminal.contains(active))) {
+    } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
       event.preventDefault();
       first.focus();
     }
@@ -694,6 +886,7 @@ export class AppShell {
       : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId);
     const stageChanged = snapshot.lessonStageId !== this.lastStageId;
     const enteredCombat = snapshot.mode === "combat" && this.lastMode !== "combat";
+    const enteredChallenge = snapshot.mode === "challenge" && this.lastMode !== "challenge";
     this.lastSnapshot = snapshot;
 
     requiredElement(this.root, "#seed-value").textContent = snapshot.runSeed;
@@ -744,6 +937,7 @@ export class AppShell {
     this.renderMazeMap(snapshot);
     this.renderMastery(snapshot);
     this.renderRelics(snapshot);
+    this.renderGateChallenge(snapshot, enteredChallenge);
     const latestPickup = pickedItems.at(-1);
     if (latestPickup) this.showPickupCard(latestPickup, snapshot.banner);
 
@@ -756,6 +950,9 @@ export class AppShell {
       this.queryStatus.dataset.kind = "";
     }
     if (snapshot.mode !== "combat" && this.isTerminalOpen()) this.closeTerminal(true);
+    if (snapshot.mode !== "challenge" && this.isGateTerminalOpen()) {
+      this.hideGateTerminal(true);
+    }
 
     const musicMode = snapshot.mode === "combat"
       ? target?.isBoss ? "boss" : "combat"
@@ -765,6 +962,42 @@ export class AppShell {
 
     this.lastStageId = snapshot.lessonStageId;
     this.lastMode = snapshot.mode;
+  }
+
+  private renderGateChallenge(snapshot: GameSnapshot, entered: boolean): void {
+    const challenge = snapshot.activeGateChallenge;
+    if (!challenge) return;
+    requiredElement(this.root, "#gate-terminal-title").textContent = challenge.title;
+    requiredElement(this.root, "#gate-terminal-objective").textContent = challenge.objective;
+
+    const schemaRoot = requiredElement(this.root, "#gate-challenge-schema");
+    schemaRoot.replaceChildren();
+    challenge.schema.forEach((line) => {
+      const code = document.createElement("code");
+      code.textContent = line;
+      schemaRoot.append(code);
+    });
+
+    const hintRoot = requiredElement(this.root, "#gate-challenge-hints");
+    hintRoot.replaceChildren();
+    challenge.hints.forEach((hint, index) => {
+      const item = document.createElement("p");
+      item.textContent = `提示 ${index + 1} · ${hint}`;
+      hintRoot.append(item);
+    });
+
+    if (entered) {
+      this.gateTextarea.value = "";
+      this.gateQueryStatus.textContent = "空输入不触发反噬；语法或结果错误才扣除 1 点生命。";
+      this.gateQueryStatus.dataset.kind = "";
+      const resultRoot = requiredElement(this.root, "#gate-query-result");
+      const planRoot = requiredElement(this.root, "#gate-query-plan");
+      resultRoot.className = "table-wrap empty-state";
+      resultRoot.textContent = "尚未执行机关查询。";
+      planRoot.className = "plan-list empty-state";
+      planRoot.textContent = "等待 EXPLAIN QUERY PLAN。";
+    }
+    this.openGateTerminal();
   }
 
   private renderFloorTransition(snapshot: GameSnapshot): void {
@@ -953,11 +1186,19 @@ export class AppShell {
   }
 
   private renderResult(result: SqlQueryResult): void {
-    this.resultRoot.replaceChildren();
-    this.resultRoot.className = "table-wrap";
+    this.renderResultInto(result, this.resultRoot, this.planRoot);
+  }
+
+  private renderResultInto(
+    result: SqlQueryResult,
+    resultRoot: HTMLElement,
+    planRoot: HTMLElement,
+  ): void {
+    resultRoot.replaceChildren();
+    resultRoot.className = "table-wrap";
     if (result.rows.length === 0) {
-      this.resultRoot.classList.add("empty-state");
-      this.resultRoot.textContent = "查询返回 0 行。";
+      resultRoot.classList.add("empty-state");
+      resultRoot.textContent = "查询返回 0 行。";
     } else {
       const table = document.createElement("table");
       const head = document.createElement("thead");
@@ -981,11 +1222,11 @@ export class AppShell {
         body.append(rowElement);
       });
       table.append(body);
-      this.resultRoot.append(table);
+      resultRoot.append(table);
     }
 
-    this.planRoot.replaceChildren();
-    this.planRoot.className = "plan-list";
+    planRoot.replaceChildren();
+    planRoot.className = "plan-list";
     result.plan.forEach((detail, index) => {
       const line = document.createElement("div");
       line.className = "plan-line";
@@ -994,11 +1235,11 @@ export class AppShell {
       const text = document.createElement("code");
       text.textContent = detail;
       line.append(number, text);
-      this.planRoot.append(line);
+      planRoot.append(line);
     });
     if (result.plan.length === 0) {
-      this.planRoot.classList.add("empty-state");
-      this.planRoot.textContent = "SQLite 未返回查询计划。";
+      planRoot.classList.add("empty-state");
+      planRoot.textContent = "SQLite 未返回查询计划。";
     }
   }
 

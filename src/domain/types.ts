@@ -39,11 +39,14 @@ export type LessonStageId =
 
 export type PlayMode =
   | "explore"
+  | "challenge"
   | "combat"
   | "reward"
   | "transition"
   | "victory"
   | "defeat";
+
+export type GateChallengeId = "aggregate-breach" | "relation-breach";
 
 export type MonsterKind =
   | "projection-slime"
@@ -190,6 +193,15 @@ export interface ProfileProgress {
   bestRunQueries: number | null;
 }
 
+export interface GateChallengeBrief {
+  id: GateChallengeId;
+  gateId: string;
+  title: string;
+  objective: string;
+  schema: string[];
+  hints: string[];
+}
+
 export interface GameSnapshot {
   mode: PlayMode;
   lessonId: LessonId;
@@ -211,6 +223,9 @@ export interface GameSnapshot {
   completedRoomIds: string[];
   availableRoomIds: string[];
   completedLessons: LessonId[];
+  challengeGateId: string;
+  openedGateIds: string[];
+  activeGateChallenge: GateChallengeBrief | null;
   relics: Relic[];
   profile: ProfileProgress;
   availableLoot: LootDrop | null;
@@ -233,7 +248,7 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 4;
+  version: 5;
   generatorVersion: 4;
   floor: FloorNumber;
   graph: RoomGraph;
@@ -249,6 +264,8 @@ export interface SavedRun {
   visitedRoomIds: string[];
   completedRoomIds: string[];
   completedLessons: LessonId[];
+  openedGateIds: string[];
+  activeGateChallengeId: GateChallengeId | null;
   relics: Relic[];
   availableLoot: LootDrop | null;
   claimableReward: ClaimableReward | null;
@@ -287,7 +304,7 @@ export interface PatrolBatchResolution {
 
 export interface InteractionResolution {
   ok: boolean;
-  kind: "none" | "combat" | "loot" | "reward";
+  kind: "none" | "challenge" | "combat" | "loot" | "reward";
   message: string;
 }
 
@@ -338,4 +355,13 @@ export interface TurnResolution {
   mode: PlayMode;
   stageAdvanced: boolean;
   lessonCompleted: LessonId | null;
+}
+
+export interface GateChallengeResolution {
+  accepted: boolean;
+  opened: boolean;
+  gateId: string;
+  message: string;
+  playerDamage: number;
+  mode: PlayMode;
 }

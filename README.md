@@ -30,6 +30,10 @@ and turn the correct result into an animated attack.
 - Execute real read-only SQLite WASM queries and inspect result rows plus
   `EXPLAIN QUERY PLAN`. Correct results attack; wrong results and syntax errors
   trigger the telegraphed counter. Empty input consumes no turn.
+- Stand beside either locked Boss gate and press `E` to attempt an optional
+  high-difficulty `QUERY BREACH`. Its fixed composite query can open that
+  physical gate early, but grants no mastery, XP, or loot. A wrong result or
+  syntax error costs one heart; empty input and safe exit cost nothing.
 - Start each Run with two hearts. Normal, elite, and Boss victories grant 1, 3,
   and 5 XP; levels unlock at 2, 4, 6, 8, then every four XP through 24, adding
   one maximum heart while restoring one heart.
@@ -138,6 +142,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ MazeValidation ── topology, reachability, and save invariants
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
   ├─ MonsterRoaming ── deterministic slow patrol decisions
+  ├─ gateChallenges ── optional Boss-gate feature and result contracts
   ├─ lessonEvaluator ── result semantics + concept locks
   ├─ SqlEngine ── read-only SQLite WASM execution and four-table teaching schema
   ├─ DungeonScene ── continuous exploration, fog, collision, patrol
@@ -163,19 +168,21 @@ I/O heat are SQLite teaching signals, not evidence about the MySQL optimizer.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v4`: disposable current Run, including the current
+- `select-from-dungeon:run:v5`: disposable current Run, including the current
   floor, generated maze, world actors, ground items, discovered fog cells, HP,
-  level/XP, encounter meter, gear, relics, and combat progress.
+  level/XP, encounter meter, gear, relics, combat progress, opened challenge
+  gates, and the active gate challenge.
 - `select-from-dungeon:profile:v2`: ten mastered lessons, attempts, victories, and
   best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-Legacy Run keys are not loaded or deleted, so this version begins a fresh v4
-Run. A valid `profile:v1` migrates to v2, preserving first-floor mastery while
-adding second-floor counters. Snapshot persistence is debounced in `src/main.ts`
-so movement and patrol updates do not force a synchronous storage write for
-every emitted state.
+A valid `run:v4` is migrated in memory into v5 with its progress preserved and
+no challenge gates opened; earlier Run keys remain unread and undeleted. A valid
+`profile:v1` migrates to v2, preserving first-floor mastery while adding
+second-floor counters. Snapshot persistence is debounced in `src/main.ts` so
+movement and patrol updates do not force a synchronous storage write for every
+emitted state.
 
 ## Validation and Build
 
@@ -192,15 +199,17 @@ into `dist/`; do not maintain separate hand-written copies. Deploy that director
 to a static host that serves WASM with the correct MIME type.
 
 Fresh browser evidence is intentionally narrower than the feature list. This
-revision verified startup, the first-floor canvas, ten mastery chips, HUD, touch
-controls, and no console errors on desktop and a 390x844 viewport. Earlier
-evidence covered same-tile combat, pickups, patrol contact, counters, and
-same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
-Reduced Motion, subjective audio/timing, and the 10-second performance/save-rate
-checks have not yet been run. Unit tests and a successful build do not
-substitute for those checks. Domain automation physically walks both floor-one
-branch orders, the automatic transition, and all five floor-two lessons without
-Session travel or positioning helpers; that is still not a manual browser Run.
+revision verified the first-floor challenge prompt, safe exit, one-heart failure,
+successful semantic breach, walking through the opened gate, reload recovery,
+focus without page jumping, and no horizontal overflow at 390x844. Earlier
+evidence covered startup, HUD, touch controls, same-tile combat, pickups, patrol
+contact, counters, and same-seed reload. A complete two-floor manual browser
+Run, 200%/320px layout, Reduced Motion, subjective audio/timing, and the
+10-second performance/save-rate checks have not yet been run. Unit tests and a
+successful build do not substitute for those checks. Domain automation
+physically walks both floor-one branch orders, the automatic transition, and all
+five floor-two lessons without Session travel or positioning helpers; that is
+still not a manual browser Run.
 
 To embed a deployed build in a blog:
 

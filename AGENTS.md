@@ -41,7 +41,10 @@ XP, explains acquired loot, automatically opens a short non-interactive portal
 after the first-floor `HAVING` Boss, and ends at a second-floor composite
 `JOIN` Boss.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
-exploration is active.
+exploration is active. Each floor's locked Boss gate also exposes one optional
+high-difficulty SQL breach: a correct composite query opens only that physical
+gate, while a wrong or invalid query costs one heart and never grants mastery,
+XP, or loot.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
@@ -75,7 +78,7 @@ player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
-  -> debounced v4 Run save + permanent v2 profile save
+  -> debounced v5 Run save + permanent v2 profile save
 ```
 
 `GameSession` owns physical movement, encounter meter, lesson, actor, fog,
@@ -100,7 +103,8 @@ sorting and join lessons, whose relationship predicates are checked as part of
 the concept lock. Shared curriculum data and fixed drops live in
 `src/content/mvpLevel.ts`, with second-floor content in
 `src/content/floor2Level.ts`; room flavor and run rewards live in
-`src/content/runContent.ts`; onboarding copy lives in
+`src/content/runContent.ts`; optional Boss-gate questions and semantic result
+contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
 
 ## Repository Map
@@ -158,14 +162,16 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   SQLite evidence, not a MySQL execution plan. Future MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
 - Save data is browser-local and split between
-  `select-from-dungeon:run:v4` (current floor, maze, actors, ground items, fog,
-  encounter meter, level/XP, and disposable current Run state),
+  `select-from-dungeon:run:v5` (current floor, maze, actors, ground items, fog,
+  encounter meter, level/XP, opened challenge gates, active gate challenge, and
+  disposable current Run state),
   `select-from-dungeon:profile:v2` (ten mastered lessons, attempts, victories, best
   query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
-  state). Legacy Run keys are neither loaded nor deleted; a valid
-  `select-from-dungeon:profile:v1` is migrated into v2. Snapshot-driven
-  persistence is debounced in `src/main.ts`; changing a shape requires a version
-  or recovery decision.
+  state). A valid `select-from-dungeon:run:v4` is migrated in memory into v5
+  with no challenge gates opened; older Run keys remain unread and undeleted.
+  A valid `select-from-dungeon:profile:v1` is migrated into v2. Snapshot-driven
+  persistence is debounced in `src/main.ts`; changing a shape requires a
+  version or recovery decision.
 - Core learning drops are deterministic. Randomness must never block curriculum
   progress. Combat damage is deterministic so SQL targeting remains inspectable.
 - A new Run starts at two hearts. Normal, elite, and Boss victories award 1, 3,
@@ -175,6 +181,13 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - One SQL submission is one combat turn, with no timer while thinking or typing.
   Correct results only trigger the player attack; wrong results and syntax
   errors trigger the telegraphed enemy counter. Empty input consumes no turn.
+- Standing beside a locked Boss gate and pressing `E` opens an optional
+  `QUERY BREACH` terminal. Floor one requires a composite
+  `JOIN + WHERE + COUNT + GROUP BY + HAVING + ORDER BY` query; floor two adds
+  `LEFT JOIN`, `COUNT(DISTINCT ...)`, and `LIMIT`. Both query features and exact
+  result semantics are validated. Success opens only that physical gate and
+  grants no mastery, attempts, XP, or loot. Wrong results and syntax errors cost
+  one heart; empty input and `Escape` consume nothing.
 - The 64x48 `MazeFloor` records 16x16 technical partitions and adds deterministic
   loops after carving to reduce dead ends. Players must walk through the
   continuous world; the discovery minimap is not a navigation control. Moving
