@@ -29,7 +29,7 @@ function result(
 const SELECT_NAME = result(
   "SELECT name FROM monsters WHERE id = 101",
   ["name"],
-  [{ name: "投影史莱姆 · 青页" }],
+  [{ name: "史莱姆" }],
 );
 const SELECT_WEAKNESS = result(
   "SELECT weakness FROM monsters WHERE id = 101",
@@ -56,7 +56,7 @@ const NULL_TARGET = result(
 const NULL_NAME = result(
   "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
   ["name"],
-  [{ name: "NULL 幽灵 · 无主者" }],
+  [{ name: "幽灵" }],
 );
 const GROUP_RESULT = result(
   "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 800 GROUP BY channel",
@@ -379,7 +379,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     const wrong = result(
       "SELECT name FROM monsters",
       ["name"],
-      [{ name: "投影史莱姆 · 青页" }, { name: "猎犬" }],
+      [{ name: "史莱姆" }, { name: "猎犬" }],
     );
     expect(session.resolveQuery(wrong).playerDamage).toBe(1);
     expect(session.snapshot().player.hp).toBe(1);
@@ -471,8 +471,8 @@ describe("GameSession SQL 魔王城 Run", () => {
        ORDER BY total_charge DESC, m.id ASC`,
       ["id", "name", "echo_count", "total_charge"],
       [
-        { id: 800, name: "聚合执行官 · 四路钟", echo_count: 3, total_charge: 24 },
-        { id: 900, name: "查询监视者 · 魔王核心", echo_count: 3, total_charge: 24 },
+        { id: 800, name: "石巨人", echo_count: 3, total_charge: 24 },
+        { id: 900, name: "魔王", echo_count: 3, total_charge: 24 },
       ],
     );
     expect(session.resolveGateChallenge(correct)).toMatchObject({

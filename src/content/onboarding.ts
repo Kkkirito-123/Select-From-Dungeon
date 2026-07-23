@@ -30,7 +30,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     id: "find-monster",
     title: "跟随青色信标",
-    body: "找到正在巡逻的投影史莱姆。真正碰到怪物所在格才会进入战斗。",
+    body: "找到正在巡逻的史莱姆。真正碰到怪物所在格才会进入战斗。",
     shortcut: "触碰怪物",
   },
   {

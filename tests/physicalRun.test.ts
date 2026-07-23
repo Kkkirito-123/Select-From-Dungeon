@@ -42,7 +42,7 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT name FROM monsters WHERE id = 101",
       ["name"],
-      [{ name: "投影史莱姆 · 青页" }],
+      [{ name: "史莱姆" }],
     ),
     teachingResult(
       "SELECT weakness FROM monsters WHERE id = 101",
@@ -73,7 +73,7 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
       ["name"],
-      [{ name: "NULL 幽灵 · 无主者" }],
+      [{ name: "幽灵" }],
     ),
   ],
   "group-by": [
@@ -127,12 +127,12 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400",
       ["name", "room_name"],
-      [{ name: "连接蛛后 · 双表桥", room_name: "双表桥" }],
+      [{ name: "蛛后", room_name: "双表桥" }],
     ),
     teachingResult(
       "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400",
       ["name", "sector"],
-      [{ name: "连接蛛后 · 双表桥", sector: "bridge" }],
+      [{ name: "蛛后", sector: "bridge" }],
     ),
   ],
   "left-join": [
@@ -155,7 +155,7 @@ const LESSON_QUERIES: Record<LessonId, SqlQueryResult[]> = {
     teachingResult(
       "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 1900 ORDER BY g.power DESC LIMIT 1",
       ["name", "power"],
-      [{ name: "JOIN 指挥家 · 雷鸣主核", power: 21 }],
+      [{ name: "雷王", power: 21 }],
     ),
   ],
 };
@@ -164,7 +164,7 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult> = {
   111: teachingResult(
     "SELECT name FROM monsters WHERE id = 111",
     ["name"],
-    [{ name: "投影史莱姆 · 余像" }],
+    [{ name: "幻影" }],
   ),
   211: teachingResult(
     "SELECT id FROM monsters WHERE room_id = 12 AND status = 'lurking'",
@@ -175,7 +175,7 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult> = {
   311: teachingResult(
     "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'faded'",
     ["name"],
-    [{ name: "NULL 幽灵 · 残响" }],
+    [{ name: "鬼火" }],
   ),
   810: teachingResult(
     "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 810 GROUP BY channel",
@@ -198,7 +198,7 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult> = {
   1410: teachingResult(
     "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1410",
     ["name", "room_name"],
-    [{ name: "连接幼蛛 · 外键丝", room_name: "伏击桥" }],
+    [{ name: "幼蛛", room_name: "伏击桥" }],
   ),
   1510: teachingResult(
     "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL",

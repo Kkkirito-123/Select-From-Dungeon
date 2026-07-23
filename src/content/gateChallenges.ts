@@ -53,8 +53,8 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "name", "echo_count", "total_charge"],
   expectedRows: [
-    { id: 800, name: "聚合执行官 · 四路钟", echo_count: 3, total_charge: 24 },
-    { id: 900, name: "查询监视者 · 魔王核心", echo_count: 3, total_charge: 24 },
+    { id: 800, name: "石巨人", echo_count: 3, total_charge: 24 },
+    { id: 900, name: "魔王", echo_count: 3, total_charge: 24 },
   ],
 };
 
