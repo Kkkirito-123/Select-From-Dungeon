@@ -299,7 +299,7 @@ export class AppShell {
             <p class="title-sub">SELECT * FROM DUNGEON</p>
           </div>
           <div class="run-console">
-            <div><span>FLOOR</span><strong id="floor-value">01</strong></div>
+            <div><span>FLOOR</span><strong id="floor-value">01 / 08</strong></div>
             <div><span>SEED</span><strong id="seed-value">—</strong></div>
             <button id="open-review" type="button" class="review-toggle">▤ 答题复盘</button>
             <button id="audio-toggle" type="button" class="audio-toggle" aria-pressed="false">♪ 声音开启</button>
@@ -1775,7 +1775,8 @@ export class AppShell {
     }
 
     requiredElement(this.root, "#seed-value").textContent = snapshot.runSeed;
-    requiredElement(this.root, "#floor-value").textContent = String(snapshot.floor).padStart(2, "0");
+    requiredElement(this.root, "#floor-value").textContent =
+      `${String(snapshot.campaign.currentFloor).padStart(2, "0")} / 08`;
     this.root.dataset.floor = String(snapshot.floor);
     requiredElement(this.root, "#hp-value").textContent = `${snapshot.player.hp} / ${snapshot.player.maxHp}`;
     this.renderProgress(

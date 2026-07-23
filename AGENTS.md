@@ -85,6 +85,12 @@ Chinese characters such as `史莱姆`, `幻影`, or `幼龙`, without middle-do
 epithets or SQL-concept suffixes. Future floors must follow the same rule; SQL
 meaning belongs in fields, objectives, and encounter mechanics rather than the
 display name.
+The v0.6 campaign framework defines and validates all eight future floors,
+including their ordered lesson prerequisites, three exercise tiers, five
+encounter roles, theme/topology, monster/equipment/loot pools, deterministic
+completion rewards, and runtime evidence boundary. The current executable
+content remains floors one and two; the other six slots are saved scaffolding,
+not a claim that those floors are playable yet.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
@@ -103,7 +109,9 @@ index.html -> src/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
+  -> FloorContracts (eight-floor curriculum, encounter, theme, and loot schema)
   -> GameSession (authoritative maze, combat, loot, answer log, profile)
+  -> CampaignDomain (ordered eight-floor slots and transition invariants)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
   -> CampfireDomain (three seeded checkpoints and shared safe-cell masks)
@@ -124,7 +132,7 @@ player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
-  -> debounced v8 Run save + permanent v2 profile save
+  -> debounced v9 Run save + permanent v2 profile save
 ```
 
 `GameSession` owns physical movement, campfires/checkpoints, guided-map
@@ -163,6 +171,11 @@ contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 weapon/armor/consumable catalog, and per-floor optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls, rank minimums,
 same-battle deduplication, unique-equipment conversion, and the three-item cap.
+`src/content/floorContracts.ts` is the canonical eight-floor future-content
+schema. `src/domain/campaign.ts` owns its serializable ordered floor slots and
+must reject skipped, duplicated, or rerolled transitions. This campaign
+scaffolding must not silently route an unimplemented floor through floor-two
+content.
 `src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
 complete canonical schema, current task context, and MVP SQL vocabulary. It may
 replace only the active token after explicit keyboard or pointer acceptance; it
@@ -238,17 +251,19 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   SQLite evidence, not a MySQL execution plan. Future MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
 - Save data is browser-local and split between
-  `select-from-dungeon:run:v8` (current floor, maze, actors, ground items, loot
+  `select-from-dungeon:run:v9` (eight-floor campaign slots plus current floor,
+  maze, actors, ground items, loot
   bundles, inventory, armor, consumables, unique-item history, key items, fog,
   three campfires, the active checkpoint, encounter meter, level/XP, opened
   challenge gates/shortcuts/dead-end caches, active gate challenge, at most 200
   local answer records, and disposable current Run state),
   `select-from-dungeon:profile:v2` (ten mastered lessons, attempts, victories, best
   query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
-  state). A valid `select-from-dungeon:run:v7` is migrated in memory into v8
-  with empty inventory/loot state and acquired equipped gear registered.
-  Valid `run:v6`, `run:v5`, and `run:v4` data continue through the existing
-  migrations before v8. Legacy keys remain undeleted; older Run keys remain
+  state). A valid `select-from-dungeon:run:v8` is migrated in memory into v9
+  with deterministic eight-floor campaign slots. A valid `run:v7` is then
+  migrated with empty inventory/loot state and acquired equipped gear
+  registered; valid `run:v6`, `run:v5`, and `run:v4` data continue through the
+  existing migrations before v9. Legacy keys remain undeleted; older Run keys remain
   unread.
   A valid `select-from-dungeon:profile:v1` is migrated into v2. Snapshot-driven
   persistence is debounced in `src/main.ts`; changing a shape requires a

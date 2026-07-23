@@ -356,6 +356,10 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot()).toMatchObject({
       mode: "explore",
       floor: 2,
+      campaign: {
+        currentFloor: 2,
+        status: "active",
+      },
       runSeed: expect.stringContaining(":floor-2"),
       player: {
         level: beforePortal.player.level,
@@ -370,6 +374,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(isSavedRun(floorTwoSave)).toBe(true);
     expect(new GameSession(floorTwoSave).snapshot()).toMatchObject({
       floor: 2,
+      campaign: { currentFloor: 2 },
       runSeed: floorTwoSave.graph.seed,
       player: floorTwoSave.player,
     });
@@ -598,7 +603,12 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().roomGraph).toEqual(session.snapshot().roomGraph);
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
-    expect(restored.toSavedRun()).toMatchObject({ version: 8, generatorVersion: 4, floor: 1 });
+    expect(restored.toSavedRun()).toMatchObject({
+      version: 9,
+      generatorVersion: 4,
+      floor: 1,
+      campaign: { currentFloor: 1, status: "active" },
+    });
 
     restored.reset("new-run");
     expect(restored.snapshot().runSeed).toBe("new-run");
@@ -607,7 +617,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().profile.masteredLessons).toContain("select");
   });
 
-  it("v8 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
+  it("v9 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
     const session = new GameSession(null, null, "actor-gate-recovery");
     const saved = session.toSavedRun();
     const actor = saved.worldActors.find((entry) => entry.behavior !== "anchored");

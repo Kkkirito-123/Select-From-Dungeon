@@ -18,6 +18,10 @@ import {
   generateGuidedMapPlan,
   validateGuidedMapPlan,
 } from "../domain/guidedMap";
+import {
+  createCampaignProgress,
+  isCampaignProgress,
+} from "../domain/campaign";
 import type { WorldActor } from "../domain/monsterRoaming";
 import {
   lessonsForFloor,
@@ -51,15 +55,16 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v8";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v9";
 export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
-const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
-const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
-const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
-const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
+const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
+const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
+const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
-// v7, v6, v5 and v4 are read as compatible baselines and upgraded in memory.
-// Legacy keys are never deleted, so v8 recovery cannot mutate a previous Run.
+// v8 through v4 are read as compatible baselines and upgraded in memory.
+// Legacy keys are never deleted, so v9 recovery cannot mutate a previous Run.
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -805,7 +810,7 @@ function validatedCampfires(
   return JSON.stringify(campfires) === JSON.stringify(expected) ? campfires : null;
 }
 
-function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean {
+function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8 | 9): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
   const candidateVersion: unknown = run.version;
@@ -817,6 +822,13 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
   ) return false;
   const graph = run.graph;
   if (run.floor !== graph.floor) return false;
+  if (
+    version >= 9 &&
+    (
+      !isCampaignProgress(run.campaign) ||
+      run.campaign.currentFloor !== run.floor
+    )
+  ) return false;
   if (!isMazeFloor(run.mazeFloor, graph)) return false;
   const mazeFloor = run.mazeFloor;
   const challengeGateId = `gate:${graph.bossId}`;
@@ -841,7 +853,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
   ) return false;
   const activeCampfireId = version >= 7 ? run.activeCampfireId : null;
   const respawnCampfireId = version >= 7 ? run.respawnCampfireId : null;
-  const activeLootBundleId = version === 8 ? run.activeLootBundleId : null;
+  const activeLootBundleId = version >= 8 ? run.activeLootBundleId : null;
   if (
     !PLAY_MODES.includes(run.mode as (typeof PLAY_MODES)[number]) ||
     (version === 4 && run.mode === "challenge") ||
@@ -872,7 +884,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
     (activeGateChallengeId !== null && openedGateIds.includes(challengeGateId)) ||
     typeof run.currentRoomId !== "string" ||
     !graph.nodes.some((node) => node.id === run.currentRoomId) ||
-    !isPlayer(run.player, version === 8) ||
+    !isPlayer(run.player, version >= 8) ||
     !Array.isArray(run.monsters) ||
     !run.monsters.every(isMonster) ||
     !hasUniqueValues(run.monsters.map((monster) => monster.id)) ||
@@ -1005,7 +1017,7 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
       run.groundItems.some((item) => fireCells.has(positionKey(item)))
     ) return false;
   }
-  if (version === 8) {
+  if (version >= 8) {
     if (
       !Array.isArray(run.lootBundles) ||
       !run.lootBundles.every((bundle) => isLootBundle(
@@ -1098,13 +1110,17 @@ function isSavedRunVersion(value: unknown, version: 4 | 5 | 6 | 7 | 8): boolean 
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 8);
+  return isSavedRunVersion(value, 9);
 }
 
 type LegacyPlayerState = Omit<PlayerState, "armor" | "armorHp">;
 
+type SavedRunV8 = Omit<SavedRun, "version" | "campaign"> & {
+  version: 8;
+};
+
 type SavedRunV7 = Omit<
-  SavedRun,
+  SavedRunV8,
   | "version"
   | "player"
   | "activeLootBundleId"
@@ -1128,6 +1144,18 @@ type SavedRunV5 = Omit<
   "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
 > & { version: 5 };
 
+function migrateV8Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 8)) return null;
+  const legacy = value as SavedRunV8;
+  const migrated: SavedRun = {
+    ...legacy,
+    version: 9,
+    campaign: createCampaignProgress(legacy.graph.seed, legacy.floor),
+    banner: `${legacy.banner} 八层课程框架已接入，当前双层进度保持不变。`,
+  };
+  return isSavedRun(migrated) ? migrated : null;
+}
+
 function migrateV7Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 7)) return null;
   const legacy = value as SavedRunV7;
@@ -1136,7 +1164,7 @@ function migrateV7Run(value: unknown): SavedRun | null {
     legacy.player.weapon.id,
     ...legacy.groundItems.flatMap((item) => item.weapon ? [item.weapon.id] : []),
   ])];
-  const migrated: SavedRun = {
+  const migrated: SavedRunV8 = {
     ...legacy,
     version: 8,
     activeLootBundleId: null,
@@ -1153,7 +1181,7 @@ function migrateV7Run(value: unknown): SavedRun | null {
     },
     banner: `${legacy.banner} 背包系统已升级，旧版装备与局内进度均已保留。`,
   };
-  return isSavedRun(migrated) ? migrated : null;
+  return isSavedRunVersion(migrated, 8) ? migrateV8Run(migrated) : null;
 }
 
 function migrateV6Run(value: unknown): SavedRun | null {
@@ -1329,10 +1357,11 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
 export function loadRun(storage: StorageLike): SavedRun | null {
   const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
   if (isSavedRun(value)) return value;
-  return migrateV7Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
-    ?? migrateV6Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
-    ?? migrateV5Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)))
-    ?? migrateV4Run(parseJson(safeGetItem(storage, ANCIENT_RUN_SAVE_KEY)));
+  return migrateV8Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
+    ?? migrateV7Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
+    ?? migrateV6Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)))
+    ?? migrateV5Run(parseJson(safeGetItem(storage, ANCIENT_RUN_SAVE_KEY)))
+    ?? migrateV4Run(parseJson(safeGetItem(storage, ARCHAIC_RUN_SAVE_KEY)));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {

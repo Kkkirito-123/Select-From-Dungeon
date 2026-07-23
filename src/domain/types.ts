@@ -8,6 +8,7 @@ import type {
 import type { MazeFloor } from "./mazeGenerator";
 import type { GuidedMapPlan } from "./guidedMap";
 import type { WorldActor } from "./monsterRoaming";
+import type { CampaignProgress } from "./campaign";
 
 export type LessonId = RunLessonId;
 
@@ -303,6 +304,7 @@ export interface AnswerAttemptRecord {
 
 export interface GameSnapshot {
   mode: PlayMode;
+  campaign: CampaignProgress;
   lessonId: LessonId;
   lessonStageId: LessonStageId;
   lessonStageIndex: number;
@@ -361,8 +363,9 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 8;
+  version: 9;
   generatorVersion: 4;
+  campaign: CampaignProgress;
   floor: FloorNumber;
   graph: RoomGraph;
   mazeFloor: MazeFloor;
