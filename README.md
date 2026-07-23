@@ -4,6 +4,7 @@
 
 [Eight-floor curriculum blueprint](docs/CURRICULUM.md) |
 [Floor map and art direction](docs/FLOOR_THEMES.md) |
+[Document index and roadmap](docs/README.md) |
 [中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
 
@@ -46,6 +47,10 @@ and turn the correct result into an animated attack.
 - Execute real read-only SQLite WASM queries and inspect result rows plus
   `EXPLAIN QUERY PLAN`. Correct results attack; wrong results and syntax errors
   trigger the telegraphed counter. Empty input consumes no turn.
+- Open `答题复盘` from the top console to review every submitted SQL statement,
+  its reference answer, error category, hint level, and battle outcome for the
+  latest battle or current floor. The local-only log keeps at most 200 SQL turns
+  and never records movement or key presses or uploads the log.
 - Stand beside either locked Boss gate and press `E` to attempt an optional
   high-difficulty `QUERY BREACH`. Its fixed composite query can open that
   physical gate early, but grants no mastery, XP, or loot. A wrong result or
@@ -189,19 +194,20 @@ I/O heat are SQLite teaching signals, not evidence about the MySQL optimizer.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v5`: disposable current Run, including the current
+- `select-from-dungeon:run:v6`: disposable current Run, including the current
   floor, generated maze, world actors, ground items, discovered fog cells, HP,
   level/XP, encounter meter, gear, relics, combat progress, opened challenge
-  gates, and the active gate challenge.
+  gates, the active gate challenge, and up to 200 local SQL answer records.
 - `select-from-dungeon:profile:v2`: ten mastered lessons, attempts, victories, and
   best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-A valid `run:v4` is migrated in memory into v5 with its progress preserved and
-no challenge gates opened; earlier Run keys remain unread and undeleted. A valid
-`profile:v1` migrates to v2, preserving first-floor mastery while adding
-second-floor counters. Snapshot persistence is debounced in `src/main.ts` so
+A valid `run:v5` is migrated in memory into v6 with an empty answer history. A
+valid `run:v4` retains its progress, starts with no challenge gates opened, and
+then migrates into v6. Legacy keys are not deleted; earlier Run keys remain
+unread. A valid `profile:v1` migrates to v2, preserving first-floor mastery
+while adding second-floor counters. Snapshot persistence is debounced in `src/main.ts` so
 movement and patrol updates do not force a synchronous storage write for every
 emitted state.
 
@@ -238,7 +244,11 @@ automatically, recovered the floor-two state after reload, and rechecked the
 verified an ambush-only `+1 XP` settlement with no chest, a curriculum victory
 that advanced `1 → 2 XP`, raised `LV.1 → LV.2` and maximum hearts `2 → 3`,
 spawned an `E`-opened Filter Bow chest, applied damage `6 → 7` and heat
-reduction `0 → 1`, and retained zero horizontal overflow at 390×844. Earlier evidence covered startup,
+reduction `0 → 1`, and retained zero horizontal overflow at 390×844. The
+v0.2.0 review pass verified the top-console entry, two-column empty state,
+close-button focus, and `Escape` close at 1280×720. Populated records and the
+narrow-screen review overlay are covered by automation and CSS inspection but
+have not yet received a manual post-answer browser visual pass. Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
 Reduced Motion, subjective audio/timing, and the 10-second

@@ -7,6 +7,7 @@ import {
 import {
   INITIAL_MONSTERS,
   LESSONS,
+  PRACTICE_STAGES,
   practiceStageFor,
 } from "../src/content/mvpLevel";
 import type { SqlQueryResult } from "../src/domain/types";
@@ -54,6 +55,18 @@ describe("detectQueryFeatures", () => {
 });
 
 describe("课程文案", () => {
+  it("每个课程与突发练习都提供独立参考 SQL", () => {
+    const stages = [
+      ...LESSONS.flatMap((lesson) => lesson.stages),
+      ...Object.values(PRACTICE_STAGES),
+    ];
+    expect(stages).toHaveLength(25);
+    stages.forEach((stage) => {
+      expect(stage.answerSql).toMatch(/^SELECT\b/i);
+      expect(stage.answerSql.endsWith(";")).toBe(true);
+    });
+  });
+
   it("所有怪物使用不带装饰后缀的二到三字名称", () => {
     expect(Object.fromEntries(
       INITIAL_MONSTERS.map((monster) => [monster.id, monster.name]),

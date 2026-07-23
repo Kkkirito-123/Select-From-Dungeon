@@ -351,6 +351,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.toProfile().victories).toBe(0);
 
     const beforePortal = session.snapshot();
+    expect(beforePortal.floorReview.length).toBeGreaterThan(0);
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({
       mode: "explore",
@@ -362,6 +363,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         weapon: beforePortal.player.weapon,
       },
     });
+    expect(session.snapshot().floorReview).toEqual([]);
+    expect(session.snapshot().battleReview).toEqual(beforePortal.battleReview);
     expect(session.snapshot().roomGraph.nodes.some((node) => node.lessonId === "order-by")).toBe(true);
     const floorTwoSave = session.toSavedRun();
     expect(isSavedRun(floorTwoSave)).toBe(true);
@@ -376,6 +379,7 @@ describe("GameSession SQL 魔王城 Run", () => {
   it("错误结果和语法错误各只结算一次确定性反击", () => {
     const session = new GameSession(null, null, "counter");
     enterLesson(session, "select");
+    expect(session.requestHint()).toContain("SELECT");
     const wrong = result(
       "SELECT name FROM monsters",
       ["name"],
@@ -383,9 +387,38 @@ describe("GameSession SQL 魔王城 Run", () => {
     );
     expect(session.resolveQuery(wrong).playerDamage).toBe(1);
     expect(session.snapshot().player.hp).toBe(1);
-    expect(session.registerQueryError("near FROM：语法错误").playerDamage).toBe(1);
+    expect(session.registerQueryError(
+      "near FROM：语法错误",
+      "SELECT name FORM monsters",
+    ).playerDamage).toBe(1);
     expect(session.snapshot().player.hp).toBe(0);
     expect(session.toProfile().attempts.select).toBe(2);
+    expect(session.snapshot().battleReview).toEqual([
+      expect.objectContaining({
+        id: 1,
+        battleId: 1,
+        monsterName: "史莱姆",
+        lessonId: "select",
+        stageId: "select-name",
+        sql: "SELECT name FROM monsters",
+        answerSql: "SELECT name FROM monsters WHERE id = 101;",
+        result: "wrong-result",
+        outcome: "countered",
+        hintLevel: 1,
+      }),
+      expect.objectContaining({
+        id: 2,
+        battleId: 1,
+        sql: "SELECT name FORM monsters",
+        result: "syntax-error",
+        outcome: "defeat",
+        feedback: "near FROM：语法错误",
+      }),
+    ]);
+    expect(session.snapshot().floorReview).toEqual(session.snapshot().battleReview);
+    expect(new GameSession(session.toSavedRun()).snapshot().battleReview).toEqual(
+      session.snapshot().battleReview,
+    );
   });
 
   it("Run 存档恢复同一张图，重开只清局内状态而保留永久图鉴", () => {
@@ -398,7 +431,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().roomGraph).toEqual(session.snapshot().roomGraph);
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
-    expect(restored.toSavedRun()).toMatchObject({ version: 5, generatorVersion: 4, floor: 1 });
+    expect(restored.toSavedRun()).toMatchObject({ version: 6, generatorVersion: 4, floor: 1 });
 
     restored.reset("new-run");
     expect(restored.snapshot().runSeed).toBe("new-run");
@@ -407,7 +440,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().profile.masteredLessons).toContain("select");
   });
 
-  it("v5 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
+  it("v6 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
     const session = new GameSession(null, null, "actor-gate-recovery");
     const saved = session.toSavedRun();
     const actor = saved.worldActors.find((entry) => entry.behavior !== "anchored");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ExperienceSettlement } from "../src/domain/types";
+import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/types";
+import { answerReviewSummary } from "../src/ui/AnswerReviewView";
 import {
   canOpenCombatTerminal,
   combatSettlementCopy,
@@ -11,6 +12,59 @@ describe("canOpenCombatTerminal", () => {
     expect(canOpenCombatTerminal("combat", true)).toBe(false);
     expect(canOpenCombatTerminal("explore", false)).toBe(false);
     expect(canOpenCombatTerminal(undefined, false)).toBe(false);
+  });
+});
+
+describe("answerReviewSummary", () => {
+  const base: AnswerAttemptRecord = {
+    id: 1,
+    battleId: 1,
+    floor: 1,
+    monsterId: 101,
+    monsterName: "史莱姆",
+    lessonId: "select",
+    stageId: "select-name",
+    stageObjective: "查询史莱姆名字",
+    round: 1,
+    sql: "SELECT name FROM monsters WHERE id = 101",
+    answerSql: "SELECT name FROM monsters WHERE id = 101;",
+    result: "correct",
+    outcome: "hit",
+    feedback: "查询正确",
+    hintLevel: 0,
+  };
+
+  it("汇总正确率、错误数和使用提示的作答次数", () => {
+    expect(answerReviewSummary([
+      base,
+      {
+        ...base,
+        id: 2,
+        result: "wrong-result",
+        outcome: "countered",
+        hintLevel: 2,
+      },
+      {
+        ...base,
+        id: 3,
+        result: "syntax-error",
+        outcome: "defeat",
+        hintLevel: 1,
+      },
+    ])).toEqual({
+      total: 3,
+      correct: 1,
+      errors: 2,
+      hintUses: 2,
+      accuracy: 33,
+    });
+    expect(answerReviewSummary([])).toEqual({
+      total: 0,
+      correct: 0,
+      errors: 0,
+      hintUses: 0,
+      accuracy: 0,
+    });
   });
 });
 
