@@ -244,7 +244,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "where-weakness":
       return (
         projectsOnlyColumn(normalizedSql, "weakness") &&
-        columnEqualsString(whereClause, "name", "条件猎犬 · 逐行") &&
+        columnEqualsString(whereClause, "name", "猎犬") &&
         columnEqualsString(whereClause, "status", "escaped") &&
         !filtersByDirectId(whereClause) &&
         hasSingleValue(result, "weakness", "focus")
