@@ -4,8 +4,8 @@ import { safeZoneCellKeys } from "../src/domain/campfire";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isSavedRun } from "../src/storage/localProgress";
 import type {
-  GroundItem,
   LessonId,
+  LootItem,
   SqlQueryResult,
   TurnResolution,
 } from "../src/domain/types";
@@ -102,46 +102,31 @@ function enterLesson(session: GameSession, lessonId: LessonId): void {
   expect(session.snapshot().lessonId).toBe(lessonId);
 }
 
-function collectGroundItem(
+function collectLootItem(
   session: GameSession,
-  predicate: (item: GroundItem) => boolean,
-): GroundItem {
+  itemId: string,
+  preferredAction: "store" | "equip" | "claim" = "equip",
+): LootItem {
   const snapshot = session.snapshot();
-  const item = snapshot.groundItems.find(predicate);
-  if (!item) throw new Error("缺少预期的地面掉落");
-  if (item.collection === "interact") {
-    expect(session.setPlayerPosition(item.x, item.y)).toBe(true);
-    const resolution = session.interact();
-    expect(resolution.ok).toBe(true);
-    if (item.id.startsWith("lesson-drop:")) {
-      expect(resolution.message).toContain("打开战利品宝箱");
+  const bundle = snapshot.lootBundles.find((entry) => (
+    entry.items.some((item) => item.itemId === itemId)
+  ));
+  const item = bundle?.items.find((entry) => entry.itemId === itemId);
+  if (!bundle || !item) throw new Error(`缺少预期战利品：${itemId}`);
+  expect(session.setPlayerPosition(bundle.x, bundle.y)).toBe(true);
+  expect(session.interact()).toMatchObject({ ok: true, kind: "loot-bundle" });
+  if (item.rewardId === "floor-key") {
+    expect(session.takeAllLoot(bundle.id).ok).toBe(true);
+  } else {
+    const action = item.kind === "weapon" || item.kind === "armor"
+      ? preferredAction
+      : "claim";
+    expect(session.takeLootItem(bundle.id, item.dropId, action).ok).toBe(true);
+    if (session.snapshot().mode === "loot") {
+      session.takeAllLoot(bundle.id);
+      if (session.snapshot().mode === "loot") session.closeLootBundle();
     }
-    return item;
   }
-  const directions = [
-    { x: -1, y: 0 },
-    { x: 1, y: 0 },
-    { x: 0, y: -1 },
-    { x: 0, y: 1 },
-  ];
-  const approach = directions
-    .map((direction) => ({
-      x: item.x + direction.x,
-      y: item.y + direction.y,
-      moveX: -direction.x,
-      moveY: -direction.y,
-    }))
-    .find((candidate) => snapshot.mazeFloor.tiles[candidate.y]?.[candidate.x] === "#"
-      ? false
-      : !snapshot.worldActors.some((actor) => {
-          const monster = snapshot.monsters.find((entry) => entry.id === actor.monsterId);
-          return monster && monster.hp > 0 && actor.x === candidate.x && actor.y === candidate.y;
-        }));
-  if (!approach) throw new Error(`掉落 ${item.id} 周围没有可用格`);
-  expect(session.setPlayerPosition(approach.x, approach.y)).toBe(true);
-  const resolution = session.attemptPlayerMove(approach.moveX, approach.moveY);
-  expect(resolution.ok).toBe(true);
-  expect(resolution.pickedItemIds).toContain(item.id);
   return item;
 }
 
@@ -164,10 +149,10 @@ function clearSelect(session: GameSession): TurnResolution {
     currentLevel: 1,
   });
   expect(session.snapshot().mode).toBe("explore");
-  expect(session.snapshot().groundItems.find(
-    (item) => item.id === "lesson-drop:select",
-  )?.collection).toBe("interact");
-  collectGroundItem(session, (item) => item.id === "lesson-drop:select");
+  expect(session.snapshot().lootBundles.some(
+    (bundle) => bundle.items.some((item) => item.itemId === "filter-bow"),
+  )).toBe(true);
+  collectLootItem(session, "filter-bow");
   expect(session.snapshot().player.weapon.id).toBe("filter-bow");
   return second;
 }
@@ -186,7 +171,7 @@ function clearBranch(
     expect(session.resolveQuery(NULL_TARGET).accepted).toBe(true);
     const completed = session.resolveQuery(NULL_NAME);
     expect(completed.lessonCompleted).toBe("is-null");
-    collectGroundItem(session, (item) => item.id === "lesson-drop:is-null");
+    collectLootItem(session, "null-lantern");
     expect(session.snapshot().player.weapon.id).toBe("null-lantern");
     return completed;
   }
@@ -340,7 +325,16 @@ describe("GameSession SQL 魔王城 Run", () => {
     enterLesson(session, "group-by");
     expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
     expect(session.snapshot().mode).toBe("explore");
-    collectGroundItem(session, (item) => item.id === "lesson-drop:group-by");
+    const groupBundle = session.snapshot().lootBundles.find(
+      (bundle) => bundle.sourceMonsterId === 800,
+    );
+    const groupItem = groupBundle?.items[0];
+    if (!groupItem) throw new Error("GROUP BY 精英没有生成战利品包");
+    collectLootItem(
+      session,
+      groupItem.itemId,
+      groupItem.kind === "weapon" || groupItem.kind === "armor" ? "equip" : "claim",
+    );
 
     enterLesson(session, "having");
     expect(session.resolveQuery(HAVING_SHIELD).accepted).toBe(true);
@@ -348,7 +342,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().monsters.find((monster) => monster.id === 900)?.hp).toBe(12);
     expect(session.resolveQuery(HAVING_CORE).lessonCompleted).toBe("having");
     expect(session.snapshot().mode).toBe("explore");
-    collectGroundItem(session, (item) => item.id === "lesson-drop:having");
+    collectLootItem(session, "floor-key", "claim");
     expect(session.snapshot()).toMatchObject({
       mode: "transition",
       floor: 1,
@@ -604,7 +598,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().roomGraph).toEqual(session.snapshot().roomGraph);
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
-    expect(restored.toSavedRun()).toMatchObject({ version: 7, generatorVersion: 4, floor: 1 });
+    expect(restored.toSavedRun()).toMatchObject({ version: 8, generatorVersion: 4, floor: 1 });
 
     restored.reset("new-run");
     expect(restored.snapshot().runSeed).toBe("new-run");
@@ -613,7 +607,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().profile.masteredLessons).toContain("select");
   });
 
-  it("v7 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
+  it("v8 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
     const session = new GameSession(null, null, "actor-gate-recovery");
     const saved = session.toSavedRun();
     const actor = saved.worldActors.find((entry) => entry.behavior !== "anchored");

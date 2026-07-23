@@ -318,12 +318,22 @@ function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
     expect(resolution.accepted, resolution.message).toBe(true);
     expect(resolution.lessonCompleted).toBe(index === queries.length - 1 ? lessonId : null);
   });
-  const drop = session.snapshot().groundItems.find(
-    (item) => item.id === `lesson-drop:${lessonId}`,
+  const snapshot = session.snapshot();
+  const monster = snapshot.monsters.find((entry) => entry.lessonId === lessonId);
+  const bundle = snapshot.lootBundles.find(
+    (entry) => entry.sourceMonsterId === monster?.id,
   );
-  if (!drop) throw new Error(`${lessonId} 应产生课程战利品宝箱`);
-  expect(drop.collection).toBe("interact");
-  collectItemByWalking(session, drop);
+  if (!bundle) throw new Error(`${lessonId} 应产生课程战利品包`);
+  walkTo(session, bundle);
+  expect(session.interact()).toMatchObject({ ok: true, kind: "loot-bundle" });
+  const protectedWeapon = bundle.items.find((item) => item.kind === "weapon" && item.protected);
+  if (protectedWeapon) {
+    expect(session.takeLootItem(bundle.id, protectedWeapon.dropId, "equip").ok).toBe(true);
+  }
+  if (session.snapshot().mode === "loot") {
+    expect(session.takeAllLoot(bundle.id).ok).toBe(true);
+  }
+  if (session.snapshot().mode === "loot") session.closeLootBundle();
 }
 
 function collectAggregateHammer(session: GameSession): void {

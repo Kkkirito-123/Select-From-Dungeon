@@ -785,7 +785,10 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private syncItemViews(): void {
-    const currentIds = new Set(this.snapshot.groundItems.map((item) => item.id));
+    const currentIds = new Set([
+      ...this.snapshot.groundItems.map((item) => item.id),
+      ...this.snapshot.lootBundles.map((bundle) => `loot-bundle:${bundle.id}`),
+    ]);
     this.itemViews.forEach((view, id) => {
       if (currentIds.has(id)) return;
       view.tween?.destroy();
@@ -852,6 +855,46 @@ export class DungeonScene extends Phaser.Scene {
         this.itemViews.set(item.id, view);
       }
       view.container.setVisible(this.snapshot.discoveredCells.includes(positionKey(item)));
+    });
+    this.snapshot.lootBundles.forEach((bundle) => {
+      const viewId = `loot-bundle:${bundle.id}`;
+      let view = this.itemViews.get(viewId);
+      if (!view) {
+        const pixel = gridToPixels(bundle);
+        const container = this.add.container(pixel.x, pixel.y).setDepth(24);
+        const colors = this.snapshot.floor === 2 ? FLOOR_TWO_COLORS : COLORS;
+        const parts: Phaser.GameObjects.GameObject[] = [
+          this.add.rectangle(0, 3, 28, 16, 0x8f6338)
+            .setStrokeStyle(2, colors.gold),
+          this.add.rectangle(0, -7, 28, 9, 0xb88745)
+            .setStrokeStyle(2, colors.paper),
+          this.add.rectangle(0, 1, 6, 8, colors.gold)
+            .setStrokeStyle(1, colors.paper),
+          this.add.text(0, -27, `E · 战利品 ×${bundle.items.length}`, {
+            color: "#ffe09a",
+            fontFamily: "monospace",
+            fontSize: "7px",
+            fontStyle: "bold",
+            backgroundColor: "#08090cdd",
+            padding: { x: 4, y: 2 },
+          }).setOrigin(0.5),
+        ];
+        container.add(parts);
+        this.entityLayer.add(container);
+        const tween = this.reducedMotion
+          ? undefined
+          : this.tweens.add({
+              targets: container,
+              y: pixel.y - 3,
+              yoyo: true,
+              repeat: -1,
+              duration: 720,
+              ease: "Sine.inOut",
+            });
+        view = { container, tween };
+        this.itemViews.set(viewId, view);
+      }
+      view.container.setVisible(this.snapshot.discoveredCells.includes(positionKey(bundle)));
     });
   }
 

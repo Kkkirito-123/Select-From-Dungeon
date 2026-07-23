@@ -228,7 +228,7 @@ h1 span {
 
 .hud-strip {
   display: grid;
-  grid-template-columns: auto minmax(66px, 1fr) minmax(108px, auto) auto minmax(54px, 0.56fr) minmax(120px, auto) auto;
+  grid-template-columns: auto minmax(66px, 1fr) minmax(108px, auto) auto minmax(54px, 0.56fr) minmax(108px, auto) minmax(104px, auto) auto;
   gap: 10px;
   align-items: center;
   min-height: 58px;
@@ -275,6 +275,7 @@ h1 span {
 }
 
 .weapon-chip,
+.armor-chip,
 .level-chip,
 .relic-chip {
   min-width: 104px;
@@ -637,7 +638,7 @@ h1 span {
 .campfire-menu__actions {
   display: grid;
   width: 100%;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 9px;
 }
 
@@ -659,6 +660,194 @@ h1 span {
 
 .campfire-menu__leave:hover {
   color: #ffe0a3;
+}
+
+.loadout-menu {
+  position: absolute;
+  z-index: 26;
+  inset: 4% 4%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  border: 2px solid var(--query);
+  border-top: 4px solid var(--gold);
+  padding: 16px;
+  background:
+    linear-gradient(rgba(120, 201, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 201, 184, 0.035) 1px, transparent 1px),
+    rgba(8, 10, 13, 0.988);
+  background-size: 24px 24px;
+  box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.68);
+}
+
+.loadout-menu[hidden] {
+  display: none;
+}
+
+.loadout-menu__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 11px;
+}
+
+.loadout-menu__header span {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+.loadout-menu__header h2 {
+  margin: 4px 0 0;
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(22px, 3vw, 34px);
+}
+
+.equipped-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.equipped-summary article {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #4a5160;
+  border-left: 3px solid var(--gold);
+  padding: 10px;
+  background: #151922;
+}
+
+.equipped-summary span,
+.equipped-summary small,
+.inventory-item code {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+}
+
+.equipped-summary strong {
+  color: var(--paper);
+  font-size: 14px;
+}
+
+.loadout-menu__section + .loadout-menu__section {
+  margin-top: 13px;
+}
+
+.inventory-grid,
+.loot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.inventory-grid--consumables {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inventory-item,
+.loot-item {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #414754;
+  padding: 10px;
+  background: rgba(20, 23, 30, 0.96);
+}
+
+.inventory-item > strong,
+.loot-item strong {
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+}
+
+.inventory-item p,
+.loot-item p,
+.loadout-menu__note,
+.inventory-empty,
+.loot-item label {
+  margin: 0;
+  color: #b9bdc6;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.inventory-empty {
+  grid-column: 1 / -1;
+  border: 1px dashed #464c59;
+  padding: 14px;
+  text-align: center;
+}
+
+.inventory-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.inventory-item__actions button,
+.loot-menu__take-all {
+  min-height: 35px;
+  border: 1px solid #566071;
+  padding: 6px 10px;
+  background: #252b37;
+  color: var(--paper);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.inventory-item__actions button:first-child {
+  border-color: var(--query);
+  color: #baf4e8;
+}
+
+.loot-item > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.loot-item > div:first-child span {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+}
+
+.loot-item label {
+  display: grid;
+  gap: 5px;
+}
+
+.loot-item select {
+  min-height: 36px;
+  border: 1px solid #5a6170;
+  padding: 5px 7px;
+  background: #0d1016;
+  color: var(--paper);
+}
+
+.loot-menu__take-all {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.loadout-menu__note {
+  margin-top: 10px;
+  color: var(--muted);
 }
 
 .run-state-overlay {
@@ -1669,6 +1858,7 @@ h1 span {
 }
 
 .interact-action { border-top: 3px solid var(--gold); }
+.inventory-action { border-top: 3px solid var(--plum-light); }
 .sql-action { border-top: 3px solid var(--query); }
 
 .castle-rail {
@@ -1904,6 +2094,13 @@ h1 span {
 
 .minimap-item.is-key {
   fill: #fff4b5;
+}
+
+.minimap-item.is-loot-bundle {
+  fill: #b88745;
+  stroke: var(--gold-light);
+  stroke-width: 0.2;
+  vector-effect: non-scaling-stroke;
 }
 
 .map-legend {
@@ -2405,6 +2602,7 @@ h1 span {
   }
 
   .weapon-chip,
+  .armor-chip,
   .level-chip,
   .relic-chip {
     grid-column: span 2;
@@ -2484,6 +2682,21 @@ h1 span {
   }
 
   .campfire-menu__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .loadout-menu {
+    position: fixed;
+    inset: 7px;
+    max-height: calc(100dvh - 14px);
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .inventory-grid,
+  .inventory-grid--consumables,
+  .loot-grid,
+  .equipped-summary {
     grid-template-columns: 1fr;
   }
 
@@ -2581,7 +2794,7 @@ h1 span {
 
   .touch-controls {
     display: grid;
-    grid-template-columns: 1fr 86px 86px;
+    grid-template-columns: 1fr 74px 74px 74px;
   }
 
   .dpad {
@@ -2636,7 +2849,7 @@ h1 span {
   .audio-toggle,
   .review-toggle { padding-inline: 5px !important; }
   .target-card { width: 57%; }
-  .touch-controls { grid-template-columns: 1fr 72px 72px; }
+  .touch-controls { grid-template-columns: 1fr 62px 62px 62px; }
   .onboarding-card__actions { grid-template-columns: 1fr; }
 }
 

@@ -13,6 +13,7 @@ import type {
   ExperienceSettlement,
   GameSnapshot,
   GroundItem,
+  LootItem,
   Monster,
   PatrolMove,
   SqlQueryResult,
@@ -71,7 +72,7 @@ export interface CombatSettlementCopy {
 
 export function combatSettlementCopy(
   experience: ExperienceSettlement,
-  chestDropped: boolean,
+  lootDropped: boolean,
 ): CombatSettlementCopy {
   const nextXp = LEVEL_XP_THRESHOLDS[experience.currentLevel];
   const progress = nextXp === undefined
@@ -85,9 +86,9 @@ export function combatSettlementCopy(
     xp: `+${experience.gained} XP`,
     progress,
     levelUp,
-    reward: chestDropped
-      ? "战利品宝箱已出现在怪物位置 · 靠近后按 E 打开"
-      : "随机遭遇只结算经验 · 不会掉落课程宝箱",
+    reward: lootDropped
+      ? "战利品包已出现在怪物位置 · 靠近后按 E 打开"
+      : "本次没有物品掉落 · 经验已正常结算",
   };
 }
 
@@ -102,6 +103,8 @@ export class AppShell {
   private terminal!: HTMLElement;
   private gateTerminal!: HTMLElement;
   private campfireMenu!: HTMLElement;
+  private inventoryMenu!: HTMLElement;
+  private lootMenu!: HTMLElement;
   private answerReview!: AnswerReviewView;
   private executeButton!: HTMLButtonElement;
   private gateExecuteButton!: HTMLButtonElement;
@@ -139,6 +142,16 @@ export class AppShell {
       this.closeReview();
       return;
     }
+    if (event.key === "Escape" && this.isLootMenuOpen()) {
+      event.preventDefault();
+      this.closeLootMenu();
+      return;
+    }
+    if (event.key === "Escape" && this.isInventoryMenuOpen()) {
+      event.preventDefault();
+      this.closeInventoryMenu();
+      return;
+    }
     if (event.key === "Escape" && this.isCampfireMenuOpen()) {
       event.preventDefault();
       this.leaveCampfire();
@@ -158,6 +171,8 @@ export class AppShell {
       event.key === "Tab" &&
       (
         this.isReviewOpen() ||
+        this.isLootMenuOpen() ||
+        this.isInventoryMenuOpen() ||
         this.isCampfireMenuOpen() ||
         this.isTerminalOpen() ||
         this.isGateTerminalOpen()
@@ -167,6 +182,10 @@ export class AppShell {
         event,
         this.isReviewOpen()
           ? this.answerReview.element
+          : this.isLootMenuOpen()
+            ? this.lootMenu
+          : this.isInventoryMenuOpen()
+            ? this.inventoryMenu
           : this.isCampfireMenuOpen()
             ? this.campfireMenu
           : this.isGateTerminalOpen() ? this.gateTerminal : this.terminal,
@@ -188,6 +207,17 @@ export class AppShell {
       return;
     }
     const activeTag = document.activeElement?.tagName.toLowerCase();
+    if (
+      event.code === "KeyB" &&
+      activeTag !== "textarea" &&
+      activeTag !== "input" &&
+      activeTag !== "select" &&
+      (this.lastSnapshot?.mode === "explore" || this.lastSnapshot?.mode === "campfire")
+    ) {
+      event.preventDefault();
+      this.session.openInventory();
+      return;
+    }
     if (
       this.lastSnapshot?.mode === "combat" &&
       activeTag !== "textarea" &&
@@ -286,6 +316,7 @@ export class AppShell {
               <div><span class="hud-label">I/O 热量</span><strong id="heat-value">0</strong></div>
               <div id="heat-progress" class="meter heat" role="progressbar" aria-label="I/O 热量" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100"><span id="heat-meter"></span></div>
               <div class="weapon-chip"><span class="hud-label">武器</span><strong id="weapon-name">数据之刃</strong></div>
+              <div class="armor-chip"><span class="hud-label">防具</span><strong id="armor-name">无防具</strong></div>
               <div class="relic-chip"><span class="hud-label">遗物</span><strong id="relic-count">0</strong></div>
             </div>
 
@@ -337,8 +368,36 @@ export class AppShell {
                 <div class="campfire-menu__actions">
                   <button id="rest-at-campfire" type="button" class="primary-action">在此休息</button>
                   <button id="review-at-campfire" type="button" class="quiet-action">答案复盘</button>
+                  <button id="open-campfire-inventory" type="button" class="quiet-action">打开背包</button>
                 </div>
                 <button id="leave-campfire" type="button" class="campfire-menu__leave">ESC · 返回探索</button>
+              </section>
+
+              <section id="inventory-menu" class="loadout-menu" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="inventory-menu-title" inert hidden>
+                <header class="loadout-menu__header">
+                  <div><span>LOADOUT / 本轮构筑</span><h2 id="inventory-menu-title">装备背包</h2></div>
+                  <button id="close-inventory" type="button" class="icon-action">ESC ×</button>
+                </header>
+                <div id="equipped-summary" class="equipped-summary"></div>
+                <div class="loadout-menu__section">
+                  <div class="card-heading"><span>装备背包</span><span id="equipment-capacity">0 / 12</span></div>
+                  <div id="equipment-inventory" class="inventory-grid"></div>
+                </div>
+                <div class="loadout-menu__section">
+                  <div class="card-heading"><span>恢复品</span><span id="consumable-capacity">0 / 3</span></div>
+                  <div id="consumable-inventory" class="inventory-grid inventory-grid--consumables"></div>
+                </div>
+                <p class="loadout-menu__note">战斗中不能换装。丢弃的普通物品会留在脚下，本层结束后消失。</p>
+              </section>
+
+              <section id="loot-menu" class="loadout-menu loot-menu" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="loot-menu-title" inert hidden>
+                <header class="loadout-menu__header">
+                  <div><span>LOOT BUNDLE / 独立掉落判定</span><h2 id="loot-menu-title">战利品包</h2></div>
+                  <button id="close-loot" type="button" class="icon-action">ESC ×</button>
+                </header>
+                <p id="loot-menu-status" class="loadout-menu__note">选择收入背包或立即装备；未处理物品会保留在地图。</p>
+                <div id="loot-items" class="loot-grid"></div>
+                <button id="take-all-loot" type="button" class="primary-action loot-menu__take-all">尽量全部收入背包</button>
               </section>
 
               <section id="floor-portal" class="floor-portal" aria-live="assertive" hidden>
@@ -419,7 +478,7 @@ export class AppShell {
 
                 <div class="terminal-grid gate-terminal__grid">
                   <section class="terminal-brief gate-terminal__brief">
-                    <div class="breach-risk"><span>RISK</span><strong>错误查询 −1 生命</strong></div>
+                    <div class="breach-risk"><span>RISK</span><strong>错误查询造成 1 点伤害 · 护甲优先</strong></div>
                     <p id="gate-terminal-objective"></p>
                     <div id="gate-challenge-schema" class="schema-list"></div>
                     <details class="terminal-schema-reference terminal-schema-reference--gate">
@@ -469,6 +528,7 @@ export class AppShell {
                 <button type="button" data-move="right" aria-label="向右">▶</button>
               </div>
               <button id="interact" type="button" class="touch-action interact-action">E<br><span>调查交互物</span></button>
+              <button id="open-inventory" type="button" class="touch-action inventory-action">B<br><span>背包 / 换装</span></button>
               <button id="open-sql" type="button" class="touch-action sql-action">Q+S<br><span>SQL 战斗</span></button>
             </div>
           </section>
@@ -521,8 +581,9 @@ export class AppShell {
 
             <section class="control-card">
               <div class="card-heading"><span>行动规则</span><span>无倒计时</span></div>
-              <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　随机遭遇只结算 XP</p>
-              <p><kbd>E</kbd> 打开课程战利品宝箱，或调查祭坛、篝火；靠近 Boss 机关门时可接入高难越级查询。</p>
+              <p><kbd>WASD</kbd> 探索迷宫　触碰怪物所在格进入对战　随机遭遇可能掉落低概率物品</p>
+              <p><kbd>E</kbd> 打开战利品包，或调查祭坛、篝火；靠近 Boss 机关门时可接入高难越级查询。</p>
+              <p><kbd>B</kbd> 在探索或篝火处打开背包；战斗中不能换装。</p>
               <p><kbd>Q + S</kbd> 打开终端　<kbd>Ctrl + Enter</kbd> 执行完整 SQL</p>
               <p>死亡后返回最近休息的篝火；未记录篝火时返回本层出生安全区，局内进度保留。</p>
               <button id="replay-onboarding-control" type="button" class="guide-replay">↺ 重新教学</button>
@@ -582,6 +643,8 @@ export class AppShell {
     this.terminal = requiredElement(this.root, "#combat-terminal");
     this.gateTerminal = requiredElement(this.root, "#gate-terminal");
     this.campfireMenu = requiredElement(this.root, "#campfire-menu");
+    this.inventoryMenu = requiredElement(this.root, "#inventory-menu");
+    this.lootMenu = requiredElement(this.root, "#loot-menu");
     this.answerReview = new AnswerReviewView(this.root);
     this.executeButton = requiredElement(this.root, "#execute-query");
     this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
@@ -635,6 +698,63 @@ export class AppShell {
     requiredElement(this.root, "#leave-campfire").addEventListener(
       "click",
       () => this.leaveCampfire(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#open-campfire-inventory").addEventListener(
+      "click",
+      () => this.session.openInventory(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#open-inventory").addEventListener(
+      "click",
+      () => this.session.openInventory(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#close-inventory").addEventListener(
+      "click",
+      () => this.closeInventoryMenu(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#close-loot").addEventListener(
+      "click",
+      () => this.closeLootMenu(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#take-all-loot").addEventListener(
+      "click",
+      () => {
+        const bundleId = this.lastSnapshot.activeLootBundleId;
+        if (!bundleId) return;
+        const before = this.lastSnapshot.lootBundles
+          .find((bundle) => bundle.id === bundleId)
+          ?.items ?? [];
+        const resolution = this.session.takeAllLoot(bundleId);
+        const remaining = new Set(resolution.remainingItemIds);
+        const acquired = before.filter((item) => !remaining.has(item.dropId));
+        if (resolution.ok) {
+          this.presentLootAcquisition(acquired, resolution.message);
+        } else {
+          this.showFeedbackNotice({
+            message: resolution.message,
+            tone: "info",
+          });
+        }
+      },
+      listenerOptions,
+    );
+    requiredElement(this.root, "#equipment-inventory").addEventListener(
+      "click",
+      (event) => this.handleInventoryAction(event),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#consumable-inventory").addEventListener(
+      "click",
+      (event) => this.handleInventoryAction(event),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#loot-items").addEventListener(
+      "click",
+      (event) => this.handleLootAction(event),
       listenerOptions,
     );
     requiredElement(this.root, "#interact").addEventListener("click", dispatchInteract, listenerOptions);
@@ -731,6 +851,8 @@ export class AppShell {
       "terminal-active",
       "gate-terminal-active",
       "campfire-active",
+      "inventory-active",
+      "loot-active",
       "review-active",
     );
     void this.audio.dispose();
@@ -858,10 +980,11 @@ export class AppShell {
       }
       this.gateQueryStatus.textContent = resolution.message;
       this.gateQueryStatus.dataset.kind = resolution.accepted ? "success" : "error";
-      if (resolution.playerDamage > 0) {
-        this.feedback.dispatch({ type: "player-hurt", amount: resolution.playerDamage });
+      const receivedDamage = resolution.playerDamage + resolution.armorDamage;
+      if (receivedDamage > 0) {
+        this.feedback.dispatch({ type: "player-hurt", amount: receivedDamage });
       }
-      if (!resolution.accepted && resolution.playerDamage === 0) {
+      if (!resolution.accepted && receivedDamage === 0) {
         this.showFeedbackNotice({ message: resolution.message, tone: "info" });
       }
     } catch (error) {
@@ -947,6 +1070,294 @@ export class AppShell {
     });
   }
 
+  private closeInventoryMenu(): void {
+    if (!this.session.closeInventory()) return;
+    if (this.session.snapshot().mode === "explore") {
+      requiredElement<HTMLElement>(this.root, "#game-root").focus({ preventScroll: true });
+    }
+  }
+
+  private closeLootMenu(): void {
+    if (!this.session.closeLootBundle()) return;
+    requiredElement<HTMLElement>(this.root, "#game-root").focus({ preventScroll: true });
+  }
+
+  private isInventoryMenuOpen(): boolean {
+    return this.inventoryMenu?.classList.contains("is-open") ?? false;
+  }
+
+  private isLootMenuOpen(): boolean {
+    return this.lootMenu?.classList.contains("is-open") ?? false;
+  }
+
+  private handleInventoryAction(event: Event): void {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-inventory-action]",
+    );
+    if (!button) return;
+    const action = button.dataset.inventoryAction;
+    const itemId = button.dataset.itemId;
+    if (!itemId) return;
+    const equipment = this.lastSnapshot.equipmentInventory.find(
+      (item) => item.instanceId === itemId,
+    );
+    const consumable = this.lastSnapshot.consumables.find(
+      (stack) => stack.item.id === itemId,
+    );
+    const resolution = action === "equip" && equipment
+      ? this.session.equipInventoryItem(equipment.instanceId)
+      : action === "discard-equipment" && equipment
+        ? this.session.discardInventoryItem(equipment.instanceId)
+        : action === "use" && consumable
+          ? this.session.useConsumable(consumable.item.id)
+          : action === "discard-consumable" && consumable
+            ? this.session.discardConsumable(consumable.item.id)
+            : null;
+    if (!resolution) return;
+    this.showFeedbackNotice({
+      message: resolution.message,
+      tone: resolution.ok ? "success" : "info",
+    });
+  }
+
+  private handleLootAction(event: Event): void {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-loot-action]");
+    if (!button) return;
+    const bundleId = this.lastSnapshot.activeLootBundleId;
+    const dropId = button.dataset.dropId;
+    const action = button.dataset.lootAction;
+    if (
+      !bundleId ||
+      !dropId ||
+      (action !== "store" && action !== "equip" && action !== "claim")
+    ) return;
+    const card = button.closest<HTMLElement>("[data-loot-card]");
+    const replaceInstanceId = card
+      ?.querySelector<HTMLSelectElement>("[data-loot-replacement]")
+      ?.value || undefined;
+    const item = this.lastSnapshot.lootBundles
+      .find((bundle) => bundle.id === bundleId)
+      ?.items.find((entry) => entry.dropId === dropId);
+    const resolution = this.session.takeLootItem(
+      bundleId,
+      dropId,
+      action,
+      replaceInstanceId,
+    );
+    if (resolution.ok && item) {
+      this.presentLootAcquisition([item], resolution.message);
+    } else {
+      this.showFeedbackNotice({
+        message: resolution.message,
+        tone: "info",
+      });
+    }
+  }
+
+  private renderInventoryMenu(snapshot: GameSnapshot, entered: boolean): void {
+    const open = snapshot.mode === "inventory";
+    this.inventoryMenu.hidden = !open;
+    this.inventoryMenu.inert = !open;
+    this.inventoryMenu.setAttribute("aria-hidden", String(!open));
+    this.inventoryMenu.classList.toggle("is-open", open);
+    this.root.classList.toggle("inventory-active", open);
+    if (!open) return;
+
+    requiredElement(this.inventoryMenu, "#equipment-capacity").textContent =
+      `${snapshot.equipmentInventory.length} / 12`;
+    requiredElement(this.inventoryMenu, "#consumable-capacity").textContent =
+      `${snapshot.consumables.length} / 3`;
+
+    const equippedRoot = requiredElement(this.inventoryMenu, "#equipped-summary");
+    equippedRoot.replaceChildren();
+    const equippedEntries = [
+      {
+        slot: "武器",
+        name: snapshot.player.weapon.name,
+        detail: `伤害 ${snapshot.player.weapon.damage}`,
+      },
+      {
+        slot: "防具",
+        name: snapshot.player.armor?.name ?? "未装备",
+        detail: snapshot.player.armor
+          ? `护甲 ${snapshot.player.armorHp}/${snapshot.player.armor.maxArmor}`
+          : "先获得防具，再用护甲承受错误反击",
+      },
+    ];
+    equippedEntries.forEach((entry) => {
+      const article = document.createElement("article");
+      const slot = document.createElement("span");
+      slot.textContent = entry.slot;
+      const name = document.createElement("strong");
+      name.textContent = entry.name;
+      const detail = document.createElement("small");
+      detail.textContent = entry.detail;
+      article.append(slot, name, detail);
+      equippedRoot.append(article);
+    });
+
+    const equipmentRoot = requiredElement(this.inventoryMenu, "#equipment-inventory");
+    equipmentRoot.replaceChildren();
+    if (snapshot.equipmentInventory.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "inventory-empty";
+      empty.textContent = "装备背包为空。怪物掉落会以一个战利品包出现在地图上。";
+      equipmentRoot.append(empty);
+    }
+    snapshot.equipmentInventory.forEach((item) => {
+      const article = document.createElement("article");
+      article.className = "inventory-item";
+      const title = document.createElement("strong");
+      title.textContent = item.weapon?.name ?? item.armor?.name ?? "未知装备";
+      const description = document.createElement("p");
+      description.textContent = item.weapon?.description ?? item.armor?.description ?? "";
+      const stats = document.createElement("code");
+      stats.textContent = item.weapon
+        ? `武器 · 伤害 ${item.weapon.damage}`
+        : `防具 · 护甲 ${item.armorHp ?? 0}/${item.armor?.maxArmor ?? 0}`;
+      const actions = document.createElement("div");
+      actions.className = "inventory-item__actions";
+      const equip = document.createElement("button");
+      equip.type = "button";
+      equip.dataset.inventoryAction = "equip";
+      equip.dataset.itemId = item.instanceId;
+      equip.textContent = "装备";
+      const discard = document.createElement("button");
+      discard.type = "button";
+      discard.dataset.inventoryAction = "discard-equipment";
+      discard.dataset.itemId = item.instanceId;
+      discard.textContent = item.protected ? "课程装备 · 受保护" : "丢到脚下";
+      discard.disabled = item.protected;
+      actions.append(equip, discard);
+      article.append(title, description, stats, actions);
+      equipmentRoot.append(article);
+    });
+
+    const consumableRoot = requiredElement(this.inventoryMenu, "#consumable-inventory");
+    consumableRoot.replaceChildren();
+    if (snapshot.consumables.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "inventory-empty";
+      empty.textContent = "恢复品栏为空（3 格，每格最多堆叠 5 个）。";
+      consumableRoot.append(empty);
+    }
+    snapshot.consumables.forEach((stack) => {
+      const article = document.createElement("article");
+      article.className = "inventory-item";
+      const title = document.createElement("strong");
+      title.textContent = `${stack.item.name} × ${stack.quantity}`;
+      const description = document.createElement("p");
+      description.textContent = stack.item.description;
+      const actions = document.createElement("div");
+      actions.className = "inventory-item__actions";
+      const use = document.createElement("button");
+      use.type = "button";
+      use.dataset.inventoryAction = "use";
+      use.dataset.itemId = stack.item.id;
+      use.textContent = "使用";
+      const discard = document.createElement("button");
+      discard.type = "button";
+      discard.dataset.inventoryAction = "discard-consumable";
+      discard.dataset.itemId = stack.item.id;
+      discard.textContent = "丢 1 个";
+      actions.append(use, discard);
+      article.append(title, description, actions);
+      consumableRoot.append(article);
+    });
+
+    if (entered) {
+      requiredElement<HTMLButtonElement>(this.inventoryMenu, "#close-inventory")
+        .focus({ preventScroll: true });
+    }
+  }
+
+  private renderLootMenu(snapshot: GameSnapshot, entered: boolean): void {
+    const bundle = snapshot.activeLootBundleId
+      ? snapshot.lootBundles.find((entry) => entry.id === snapshot.activeLootBundleId)
+      : null;
+    const open = snapshot.mode === "loot" && Boolean(bundle);
+    this.lootMenu.hidden = !open;
+    this.lootMenu.inert = !open;
+    this.lootMenu.setAttribute("aria-hidden", String(!open));
+    this.lootMenu.classList.toggle("is-open", open);
+    this.root.classList.toggle("loot-active", open);
+    if (!open || !bundle) return;
+
+    requiredElement(this.lootMenu, "#loot-menu-title").textContent =
+      `战利品包 · ${bundle.items.length} 件`;
+    requiredElement(this.lootMenu, "#loot-menu-status").textContent =
+      `装备 ${snapshot.equipmentInventory.length}/12 · 恢复品 ${snapshot.consumables.length}/3。每件掉落独立判定，同一战斗不重复。`;
+    const root = requiredElement(this.lootMenu, "#loot-items");
+    root.replaceChildren();
+    const replaceable = snapshot.equipmentInventory.filter((item) => !item.protected);
+    bundle.items.forEach((item) => {
+      const article = document.createElement("article");
+      article.className = `loot-item loot-item--${item.kind}`;
+      article.dataset.lootCard = item.dropId;
+      const header = document.createElement("div");
+      const kind = document.createElement("span");
+      kind.textContent = item.guaranteed
+        ? "固定奖励"
+        : `${Math.round(item.probability * 10_000) / 100}% 独立掉落`;
+      const title = document.createElement("strong");
+      title.textContent = item.name;
+      header.append(kind, title);
+      const description = document.createElement("p");
+      description.textContent = item.description;
+      article.append(header, description);
+
+      if (
+        (item.kind === "weapon" || item.kind === "armor") &&
+        snapshot.equipmentInventory.length >= 12
+      ) {
+        const label = document.createElement("label");
+        label.textContent = "背包已满，选择留在战利品包中的装备：";
+        const select = document.createElement("select");
+        select.dataset.lootReplacement = item.dropId;
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = replaceable.length > 0 ? "请选择普通装备" : "没有可替换的普通装备";
+        select.append(placeholder);
+        replaceable.forEach((entry) => {
+          const option = document.createElement("option");
+          option.value = entry.instanceId;
+          option.textContent = entry.weapon?.name ?? entry.armor?.name ?? entry.instanceId;
+          select.append(option);
+        });
+        label.append(select);
+        article.append(label);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "inventory-item__actions";
+      if (item.kind === "weapon" || item.kind === "armor") {
+        const store = document.createElement("button");
+        store.type = "button";
+        store.dataset.lootAction = "store";
+        store.dataset.dropId = item.dropId;
+        store.textContent = "收入背包";
+        const equip = document.createElement("button");
+        equip.type = "button";
+        equip.dataset.lootAction = "equip";
+        equip.dataset.dropId = item.dropId;
+        equip.textContent = "立即装备";
+        actions.append(store, equip);
+      } else {
+        const claim = document.createElement("button");
+        claim.type = "button";
+        claim.dataset.lootAction = "claim";
+        claim.dataset.dropId = item.dropId;
+        claim.textContent = item.rewardId === "floor-key" ? "领取钥匙" : "领取";
+        actions.append(claim);
+      }
+      article.append(actions);
+      root.append(article);
+    });
+    if (entered) {
+      root.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    }
+  }
+
   private renderCampfireMenu(snapshot: GameSnapshot, entered: boolean): void {
     const open = snapshot.mode === "campfire" && snapshot.activeCampfireId !== null;
     this.campfireMenu.hidden = !open;
@@ -966,7 +1377,7 @@ export class AppShell {
         : "后段篝火";
     requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
     requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
-      `生命 ${snapshot.player.hp} / ${snapshot.player.maxHp}。休息会恢复满生命，并把这里设为复活点。`;
+      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点。`;
     if (entered && !this.isReviewOpen()) {
       requiredElement<HTMLButtonElement>(
         this.campfireMenu,
@@ -1154,6 +1565,48 @@ export class AppShell {
     card.classList.add("is-visible");
   }
 
+  private presentLootAcquisition(items: readonly LootItem[], effect: string): void {
+    if (items.length === 0) return;
+    this.onboarding.advance("item-pickup");
+    const single = items.length === 1 ? items[0] : null;
+    const feedbackKind = single?.kind === "weapon"
+      ? "weapon"
+      : single?.kind === "consumable"
+        ? "heal"
+        : single?.rewardId === "floor-key"
+          ? "key"
+          : single?.kind === "armor"
+            ? "relic"
+            : "event";
+    this.feedback.dispatch({
+      type: "item-pickup",
+      itemName: items.map((item) => item.name).join("、"),
+      kind: feedbackKind,
+      message: effect,
+    });
+    const card = requiredElement<HTMLElement>(this.root, "#pickup-card");
+    const kindLabel = single
+      ? single.kind === "weapon"
+        ? "WEAPON / 已处理"
+        : single.kind === "armor"
+          ? "ARMOR / 已处理"
+          : single.kind === "consumable"
+            ? "RECOVERY / 已入栏"
+            : single.rewardId === "floor-key"
+              ? "KEY ITEM / 已记录"
+              : "REWARD / 已领取"
+      : `LOOT ×${items.length} / 已处理`;
+    requiredElement(card, "#pickup-kind").textContent = kindLabel;
+    requiredElement(card, "#pickup-name").textContent =
+      items.map((item) => item.name).join("、");
+    requiredElement(card, "#pickup-description").textContent =
+      items.map((item) => `${item.name}：${item.description}`).join("；");
+    requiredElement(card, "#pickup-effect").textContent = effect;
+    this.pickupShownAtMove = this.lastSnapshot.totalMoves;
+    card.hidden = false;
+    card.classList.add("is-visible");
+  }
+
   private showCombatSettlement(resolution: TurnResolution): void {
     if (!resolution.experience) return;
     const card = requiredElement<HTMLElement>(this.root, "#combat-result-card");
@@ -1285,6 +1738,8 @@ export class AppShell {
     const enteredCombat = snapshot.mode === "combat" && this.lastMode !== "combat";
     const enteredChallenge = snapshot.mode === "challenge" && this.lastMode !== "challenge";
     const enteredCampfire = snapshot.mode === "campfire" && this.lastMode !== "campfire";
+    const enteredInventory = snapshot.mode === "inventory" && this.lastMode !== "inventory";
+    const enteredLoot = snapshot.mode === "loot" && this.lastMode !== "loot";
     const enteredDefeat = snapshot.mode === "defeat" && this.lastMode !== "defeat";
     const enteredDeathReview =
       snapshot.mode === "death-review" && this.lastMode !== "death-review";
@@ -1316,6 +1771,9 @@ export class AppShell {
       `${snapshot.player.heat} / 100`,
     );
     requiredElement(this.root, "#weapon-name").textContent = snapshot.player.weapon.name;
+    requiredElement(this.root, "#armor-name").textContent = snapshot.player.armor
+      ? `${snapshot.player.armor.name} ${snapshot.player.armorHp}/${snapshot.player.armor.maxArmor}`
+      : "无防具";
     const nextXp = LEVEL_XP_THRESHOLDS[snapshot.player.level];
     requiredElement(this.root, "#level-value").textContent = nextXp === undefined
       ? `LV.${snapshot.player.level} · ${snapshot.player.xp} XP · MAX`
@@ -1333,6 +1791,8 @@ export class AppShell {
     requiredElement(this.root, "#victory-count").textContent = `通关 ${snapshot.profile.victories}`;
     requiredElement(this.root, ".game-stage").classList.toggle("is-combat", snapshot.mode === "combat");
     this.sqlButton.disabled = snapshot.mode !== "combat" || this.busy;
+    requiredElement<HTMLButtonElement>(this.root, "#open-inventory").disabled =
+      snapshot.mode !== "explore" && snapshot.mode !== "campfire";
     requiredElement<HTMLButtonElement>(this.root, "#reset-game").disabled =
       snapshot.mode === "transition" ||
       snapshot.mode === "defeat" ||
@@ -1340,6 +1800,8 @@ export class AppShell {
     this.renderFloorTransition(snapshot);
     this.renderDefeatTransition(snapshot, enteredDefeat);
     this.renderCampfireMenu(snapshot, enteredCampfire);
+    this.renderInventoryMenu(snapshot, enteredInventory);
+    this.renderLootMenu(snapshot, enteredLoot);
 
     this.renderTarget(target, snapshot);
     this.renderLocks(snapshot);
@@ -1750,6 +2212,16 @@ export class AppShell {
       marker.setAttribute("width", "0.56");
       marker.setAttribute("height", "0.56");
       marker.setAttribute("transform", `rotate(45 ${item.x + 0.5} ${item.y + 0.5})`);
+      svg.append(marker);
+    });
+    snapshot.lootBundles.forEach((bundle) => {
+      if (!discovered.has(`${bundle.x}:${bundle.y}`)) return;
+      const marker = document.createElementNS(SVG_NS, "rect");
+      marker.classList.add("minimap-item", "is-loot-bundle");
+      marker.setAttribute("x", String(bundle.x + 0.15));
+      marker.setAttribute("y", String(bundle.y + 0.2));
+      marker.setAttribute("width", "0.7");
+      marker.setAttribute("height", "0.6");
       svg.append(marker);
     });
 

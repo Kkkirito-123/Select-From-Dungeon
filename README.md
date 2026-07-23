@@ -62,23 +62,33 @@ and turn the correct result into an animated attack.
   returns at full HP to the last rested campfire or the floor entrance and
   automatically sees the battle that caused the defeat. Mastery, XP, gear,
   doors, defeated enemies, and the surviving enemy's remaining HP stay intact.
+- Press `B` during exploration or at a campfire to manage the current build:
+  a 12-slot equipment inventory, one weapon, one armor, and three consumable
+  stacks capped at five items each. Inventory pauses movement and patrols and
+  cannot be opened during combat. Armor HP absorbs counters before base HP and
+  is restored by campfire rest or respawn.
 - Stand beside either locked Boss gate and press `E` to attempt an optional
   high-difficulty `QUERY BREACH`. Its fixed composite query can open that
   physical gate early, but grants no mastery, XP, or loot. A wrong result or
-  syntax error costs one heart; empty input and safe exit cost nothing.
+  syntax error deals one damage to armor first; empty input and safe exit cost
+  nothing.
 - Start each Run with two hearts. Normal, elite, and Boss victories grant 1, 3,
   and 5 XP; levels unlock at 2, 4, 6, 8, then every four XP through 24, adding
   one maximum heart while restoring one heart. A post-battle card shows the
   defeated monster, exact XP change, level progress, and any level-up.
-- Every curriculum victory leaves a deterministic reward chest on the monster's
-  tile; approach it and press `E` to open it. Step-meter ambushes grant XP but
-  no curriculum chest. Altars, treasure rooms, and campfires also use `E`.
-  Guaranteed curriculum weapons remain
-  deterministic: Filter Bow after `SELECT`, Null Lantern after `IS NULL`, and
-  Aggregate Hammer before `GROUP BY`. Floor two adds the Sort Saber and Join
-  Chain. Every acquisition opens a non-blocking card with the item's description
-  and exact effect. Acquisition and XP-settlement cards disappear after three
-  later successful movement steps instead of covering exploration indefinitely.
+- Every victory evaluates low-probability candidates independently from the Run
+  seed, floor, monster, and item. A non-empty result leaves one `E`-opened loot
+  bundle with at most three non-key items, no same-battle duplicates, and no
+  reroll on reload, rest, or death. Most normal monsters drop nothing, elites
+  guarantee at least one item, Bosses at least two, and keys are extra.
+  Curriculum rewards remain guaranteed: Filter Bow after `SELECT`, Null Lantern
+  after `IS NULL`, Aggregate Hammer before `GROUP BY`, then Sort Saber and Join
+  Chain on floor two. Duplicate unique equipment converts to a consumable.
+  Full equipment inventory requires explicit replacement and keeps leftovers in
+  the bundle. Ordinary items can be dropped at the player's feet and recovered
+  before floor transition; protected base/course items and keys cannot be
+  discarded. Acquisition and XP-settlement cards disappear after three later
+  successful movement steps.
 - Hear electronic-classical Web Audio: floor one rotates four original lyrical
   patterns, while floor two rotates three new chiptune arrangements of
   public-domain Beethoven compositions. Battles use original high-energy space
@@ -88,7 +98,7 @@ and turn the correct result into an animated attack.
   clears, drops, pickups, gate openings, victory, and defeat receive distinct
   cues. No third-party music or audio asset is bundled.
 - Follow an optional step-by-step guide through movement, finding a monster,
-  opening the terminal, casting the first query, and opening the first reward chest.
+  opening the terminal, casting the first query, and opening the first loot bundle.
   It can be skipped or replayed without changing SQL mastery.
 - Resume the maze, actors, ground items, fog, three campfires, checkpoint, and
   combat state separately from permanent mastery, attempt counts, victories,
@@ -164,8 +174,8 @@ Start at the castle gate and follow the onboarding card or cyan beacon through
 the actual maze. The minimap only reveals where you have explored: it cannot be
 clicked to travel. Move into the projection slime's tile, press `Q + S`, type
 the complete query, and use `Ctrl/Cmd + Enter` to attack. After victory, read
-the XP settlement, approach the chest left on the monster's tile, and press
-`E` to claim its deterministic reward.
+the XP settlement, approach the loot bundle left on the monster's tile, and
+press `E` to process its items.
 
 ## Architecture and Storage
 
@@ -179,6 +189,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ CampfireDomain ── seeded checkpoints and shared visible safe-cell masks
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
   ├─ MonsterRoaming ── deterministic slow patrol decisions
+  ├─ LootDirector ── independent candidates, rank minimums, deduplication
   ├─ gateChallenges ── optional Boss-gate feature and result contracts
   ├─ lessonEvaluator ── result semantics + concept locks
   ├─ SqlSchemaCatalog ── canonical four-table metadata and generated DDL
@@ -198,8 +209,8 @@ resolved by `GameSession` against the maze.
 
 The maze generator currently isolates `topology` and `decor` random streams.
 Actors and fixed curriculum drops are derived deterministically from course
-anchors; there are no separate `theme`, `loot`, or `spawn` streams and no
-independent content-version field in this MVP.
+anchors; optional loot uses independent stable hashes, but there are no separate
+`theme` or `spawn` streams and no independent content-version field in this MVP.
 
 The terminal accepts one `SELECT` statement and displays at most 50 rows. DML,
 DDL, `PRAGMA`, `ATTACH`, and multiple statements are rejected. Query plans and
@@ -207,23 +218,24 @@ I/O heat are SQLite teaching signals, not evidence about the MySQL optimizer.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v7`: disposable current Run, including the current
-  floor, generated maze, world actors, ground items, discovered fog cells,
-  three campfires, the active checkpoint, HP, level/XP, encounter meter, gear,
-  relics, combat progress, opened challenge gates, the active gate challenge,
-  and up to 200 local SQL answer records.
+- `select-from-dungeon:run:v8`: disposable current Run, including the current
+  floor, generated maze, world actors, ground items, pending loot bundles,
+  equipment inventory, armor/armor HP, consumables, unique-item history, key
+  items, discovered fog cells, three campfires, the active checkpoint, HP,
+  level/XP, encounter meter, relics, combat progress, opened challenge gates,
+  the active gate challenge, and up to 200 local SQL answer records.
 - `select-from-dungeon:profile:v2`: ten mastered lessons, attempts, victories, and
   best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-A valid `run:v6` is migrated in memory into v7 with stable generated campfires
-and no rested checkpoint. Valid `run:v5` and `run:v4` data continue through the
-existing migrations before v7. Legacy keys are not deleted; earlier Run keys
-remain unread. A valid `profile:v1` migrates to v2, preserving first-floor
-mastery while adding second-floor counters. Snapshot persistence is debounced
-in `src/main.ts` so movement and patrol updates do not force a synchronous
-storage write for every emitted state.
+A valid `run:v7` is migrated in memory into v8 with empty inventory/loot state
+and currently equipped gear registered. Valid `run:v6`, `run:v5`, and `run:v4`
+data continue through the existing migrations before v8. Legacy keys are not
+deleted; earlier Run keys remain unread. A valid `profile:v1` migrates to v2,
+preserving first-floor mastery while adding second-floor counters. Snapshot
+persistence is debounced in `src/main.ts` so movement and patrol updates do not
+force a synchronous storage write for every emitted state.
 
 ## Validation and Build
 
@@ -270,7 +282,13 @@ review, checkpoint replacement after resting, and two invalid queries leading
 to `YOU DIED`, full-health checkpoint return, and a battle-only death review
 containing both attempts. The console remained free of warnings and errors.
 The gold floor-clear presentation and the 390×844 campfire menu still need a
-fresh browser visual pass. Earlier evidence covered startup,
+fresh browser visual pass. The v0.4 desktop pass verified `B`/`Escape` inventory
+open and close, 12/3 capacity copy, weapon/armor summary, disabled gameplay
+controls while inventory is active, and no functional console error. Full-bag
+replacement, armor absorption, recoverable discards, and stable loot are covered
+by domain/storage tests. At 390×844 the inventory stayed inside the safe viewport
+with no horizontal overflow; a populated loot bundle still needs a manual
+browser pass. Earlier evidence covered startup,
 HUD, touch controls, same-tile combat, pickups, patrol contact, counters, and
 same-seed reload. A complete two-floor manual browser Run, 200%/320px layout,
 Reduced Motion, subjective audio/timing, and the 10-second
@@ -304,9 +322,9 @@ has unit coverage, not a completed browser iframe acceptance run.
 This MVP covers ten lesson groups across two floors, ending with `LEFT JOIN` and
 a composite `JOIN` challenge. Subqueries, window functions, transactions, index
 internals, isolation levels, and the wider MySQL interview curriculum remain
-future floors, not claims of this release. The planned 12-slot inventory,
-equippable armor, generic seeded multi-drop system, biome-specific loot, and
-floors three through eight are also not implemented.
+future floors, not claims of this release. The 12-slot inventory, equippable
+armor, and generic seeded multi-drop system are implemented; biome-specific loot
+and floors three through eight are not.
 
 Original code and prose use the [MIT License](LICENSE), copyright
 `Kkkirito-123`. Runtime notices and design references are listed in
