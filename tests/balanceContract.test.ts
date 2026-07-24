@@ -45,15 +45,13 @@ describe("v0.11 balance contract", () => {
     );
   });
 
-  it("普通怪候选保持低掉落：恢复品不超过 6%，装备不超过 0.75%", () => {
+  it("普通怪只有 2% 恢复品候选，不再随机掉装备", () => {
     FLOORS.forEach((floor) => {
       const candidates = lootCandidatesForFloor(floor);
+      expect(candidates).toHaveLength(1);
       candidates.forEach((candidate) => {
-        if (candidate.item.kind === "consumable") {
-          expect(candidate.probability).toBeLessThanOrEqual(0.06);
-        } else {
-          expect(candidate.probability).toBeLessThanOrEqual(0.0075);
-        }
+        expect(candidate.item.kind).toBe("consumable");
+        expect(candidate.probability).toBe(0.02);
       });
     });
   });

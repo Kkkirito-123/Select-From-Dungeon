@@ -23,6 +23,7 @@ describe("progress persistence", () => {
           listenerRef.current = null;
         };
       },
+      snapshot: () => session.snapshot(),
       toSavedRun: () => session.toSavedRun(),
       toProfile: () => session.toProfile(),
     };
@@ -67,6 +68,49 @@ describe("progress persistence", () => {
     expect(writes).toHaveLength(3);
     controller.destroy();
     expect(listenerRef.current).toBeNull();
+  });
+
+  it("进入管理员预览前先保存待写的正式移动，之后不再覆盖正式 Run", () => {
+    const session = new GameSession(null, createEmptyProfile(), "admin-persistence");
+    const writes: string[] = [];
+    const storage: StorageLike = {
+      getItem: () => null,
+      setItem: (key) => writes.push(key),
+      removeItem: () => undefined,
+    };
+    const controller = startProgressPersistence(
+      session,
+      storage,
+      JSON.stringify(createEmptyProfile()),
+      {
+        setTimeout: () => 1,
+        clearTimeout: () => undefined,
+      },
+    );
+    expect(writes).toHaveLength(1);
+
+    const beforeMove = session.snapshot();
+    const direction = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ].find(({ x, y }) => (
+      beforeMove.mazeFloor.tiles[beforeMove.player.y + y]?.[
+        beforeMove.player.x + x
+      ] === "."
+    ));
+    expect(direction).toBeDefined();
+    expect(session.attemptPlayerMove(direction?.x ?? 0, direction?.y ?? 0).moved)
+      .toBe(true);
+    expect(writes).toHaveLength(1);
+
+    expect(session.enableAdminMode().ok).toBe(true);
+    expect(writes).toHaveLength(2);
+    expect(session.adminLoadFloor(8).ok).toBe(true);
+    controller.flush();
+    expect(writes).toHaveLength(2);
+    controller.destroy();
   });
 
   it("只有会改变恢复结果的字段才判定为关键变化", () => {

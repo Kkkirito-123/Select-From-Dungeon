@@ -805,10 +805,11 @@ const PRACTICE_NULL: LessonStageDefinition = {
 
 const PRACTICE_GROUP: LessonStageDefinition = {
   id: "practice-group",
-  objective: "按 channel 统计 monster_id = 810 的信号数，别名为 total。",
+  objective: "从 monster_signals 按 channel 统计 monster_id = 810 的信号数，别名为 total。",
   queryTemplate: "",
   answerSql: "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 810 GROUP BY channel;",
   hints: [
+    "数据表是 monster_signals。",
     "读取 channel 和计数。",
     "计数写作 COUNT(*) AS total。",
     "按 channel 分组。",
@@ -837,7 +838,7 @@ const PRACTICE_GROUP_CORE: LessonStageDefinition = {
 
 const PRACTICE_ORDER: LessonStageDefinition = {
   id: "practice-order",
-  objective: "按 charge 从高到低，取出 monster_id = 1210 的最强 channel。",
+  objective: "从 monster_signals 按 charge 从高到低，取出 monster_id = 1210 的最强 channel。",
   queryTemplate: "",
   answerSql: "SELECT channel FROM monster_signals WHERE monster_id = 1210 ORDER BY charge DESC LIMIT 1;",
   hints: [
@@ -853,10 +854,11 @@ const PRACTICE_ORDER: LessonStageDefinition = {
 
 const PRACTICE_DISTINCT: LessonStageDefinition = {
   id: "practice-distinct",
-  objective: "去重查询 monster_id = 1310 的 channel，并按 channel 排序。",
+  objective: "从 monster_signals 去重查询 monster_id = 1310 的 channel，并按 channel 排序。",
   queryTemplate: "",
   answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1310 ORDER BY channel;",
   hints: [
+    "数据表是 monster_signals。",
     "SELECT 后加入 DISTINCT。",
     "读取 channel。",
     "按 channel 排序。",
@@ -1221,7 +1223,7 @@ const PRACTICE_SPARK: LessonStageDefinition = {
 
 const FORGE_BOSS_SCAN: LessonStageDefinition = {
   id: "forge-boss-scan",
-  objective: "炉主第一击：用 CTE 保存 power >= 19 的 monster_id，返回 id = 22 的 name。",
+  objective: "炉主第一击：从 monster_gear 用 CTE 保存 power >= 19 的 monster_id，返回 monsters.id = 22 的 name。",
   queryTemplate: "",
   answerSql: "WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.name FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 22;",
   hints: [

@@ -277,6 +277,110 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().combat?.targetId).toBe(101);
   });
 
+  it("战斗可撤退到复活点，双方生命和课程进度都不被重置", () => {
+    const session = new GameSession(null, null, "retreat");
+    const spawn = session.snapshot().mazeFloor.spawn;
+    enterLesson(session, "select");
+    expect(session.resolveQuery(SELECT_NAME).accepted).toBe(true);
+    const hpBeforeRetreat = session.snapshot().monsters.find(
+      (monster) => monster.id === 101,
+    )?.hp;
+    expect(session.retreatFromCombat()).toMatchObject({ ok: true });
+    expect(session.snapshot()).toMatchObject({
+      mode: "explore",
+      player: spawn,
+      combat: null,
+    });
+    expect(session.snapshot().monsters.find(
+      (monster) => monster.id === 101,
+    )?.hp).toBe(hpBeforeRetreat);
+    expect(session.snapshot().completedLessons).not.toContain("select");
+  });
+
+  it("区域门不会越过知识门，并把玩家送到无怪物占位的目标生态", () => {
+    const session = new GameSession(null, null, "portal-access");
+    const portal = session.snapshot().biomePlan.portals[0];
+    const targetRegion = session.snapshot().biomePlan.regions.find(
+      (region) => region.id === portal.toRegionId,
+    );
+    const placeBesideEntry = (): void => {
+      const candidates = [
+        portal.entry,
+        { x: portal.entry.x + 1, y: portal.entry.y },
+        { x: portal.entry.x - 1, y: portal.entry.y },
+        { x: portal.entry.x, y: portal.entry.y + 1 },
+        { x: portal.entry.x, y: portal.entry.y - 1 },
+      ];
+      expect(candidates.some((position) => (
+        session.setPlayerPosition(position.x, position.y)
+      ))).toBe(true);
+    };
+
+    placeBesideEntry();
+    const beforeBlockedTravel = session.snapshot().player;
+    expect(session.interact()).toMatchObject({
+      ok: false,
+      kind: "none",
+    });
+    expect(session.snapshot().player).toEqual(beforeBlockedTravel);
+
+    clearSelect(session);
+    placeBesideEntry();
+    expect(session.interact()).toMatchObject({
+      ok: true,
+      kind: "region-portal",
+    });
+    const arrived = session.snapshot();
+    expect(arrived.currentBiome).toBe(targetRegion?.kind);
+    expect(arrived.regionTransfer?.toName).toBe(targetRegion?.name);
+    expect(arrived.worldActors.some((actor) => (
+      actor.x === arrived.player.x &&
+      actor.y === arrived.player.y &&
+      arrived.monsters.some((monster) => (
+        monster.id === actor.monsterId && monster.hp > 0
+      ))
+    ))).toBe(false);
+  });
+
+  it("管理员视图可预览八层全图并定位生态区", () => {
+    const session = new GameSession(null, null, "admin-overview");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    const floorOne = session.snapshot();
+    expect(floorOne.adminMode).toBe(true);
+    expect(floorOne.discoveredCells).toHaveLength(
+      floorOne.mazeFloor.width * floorOne.mazeFloor.height,
+    );
+    expect(session.setAdminPanelOpen(true)).toBe(true);
+    expect(session.attemptPlayerMove(1, 0)).toMatchObject({
+      moved: false,
+      blockedBy: "mode",
+    });
+    expect(session.advanceMonsterPatrols()).toEqual({
+      moves: [],
+      encounterId: null,
+    });
+    expect(session.setAdminPanelOpen(false)).toBe(true);
+
+    expect(session.adminLoadFloor(8)).toMatchObject({ ok: true });
+    const floorEight = session.snapshot();
+    expect(floorEight).toMatchObject({
+      adminMode: true,
+      floor: 8,
+      campaign: { currentFloor: 8 },
+    });
+    expect(floorEight.biomePlan.regions).toHaveLength(3);
+    expect(floorEight.biomePlan.portals).toHaveLength(2);
+
+    const targetRegion = floorEight.biomePlan.regions[2];
+    expect(session.adminTravelToRegion(targetRegion.id)).toMatchObject({ ok: true });
+    expect(session.snapshot()).toMatchObject({
+      currentBiome: targetRegion.kind,
+      regionTransfer: {
+        toName: targetRegion.name,
+      },
+    });
+  });
+
   it("WHERE 与 IS NULL 两种顺序都能完成且不会锁死 GROUP BY 路线", () => {
     for (const order of [
       ["where", "is-null"],
@@ -437,9 +541,9 @@ describe("GameSession SQL 魔王城 Run", () => {
       },
     });
     expect(session.snapshot().completedLessons).toEqual(["order-by"]);
-    expect(session.snapshot().lootBundles.find(
+    expect(session.snapshot().lootBundles.some(
       (bundle) => bundle.sourceMonsterId === 1810,
-    )?.items.length).toBeGreaterThanOrEqual(2);
+    )).toBe(false);
     expect(session.advanceFloor()).toBe(false);
   });
 
@@ -788,5 +892,27 @@ describe("GameSession SQL 魔王城 Run", () => {
     const restored = new GameSession(session.toSavedRun());
     expect(restored.snapshot().openedGateIds).toEqual([bossGate.id]);
     expect(restored.travelToRoom(bossGate.roomNodeId).ok).toBe(true);
+  });
+
+  it("管理员模式可检查八层与三区，但不会写入 SavedRun", () => {
+    const session = new GameSession(null, null, "admin-overview");
+    const formalSave = session.toSavedRun();
+
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.snapshot().adminMode).toBe(true);
+    expect(session.snapshot().discoveredCells.length).toBeGreaterThan(1_000);
+    expect(session.adminLoadFloor(8)).toMatchObject({ ok: true });
+    const floorEight = session.snapshot();
+    expect(floorEight.floor).toBe(8);
+    expect(floorEight.biomePlan.regions).toHaveLength(3);
+    expect(floorEight.biomePlan.portals).toHaveLength(2);
+
+    const targetRegion = floorEight.biomePlan.regions[2];
+    expect(session.adminTravelToRegion(targetRegion.id)).toMatchObject({ ok: true });
+    expect(session.snapshot().currentBiome).toBe(targetRegion.kind);
+    expect(session.snapshot().regionTransfer?.toName).toBe(targetRegion.name);
+
+    expect(formalSave.floor).toBe(1);
+    expect(formalSave.graph.seed).toBe("admin-overview");
   });
 });

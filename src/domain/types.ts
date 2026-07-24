@@ -491,6 +491,13 @@ export interface AnswerAttemptRecord {
 
 export interface GameSnapshot {
   mode: PlayMode;
+  adminMode: boolean;
+  adminPanelOpen: boolean;
+  regionTransfer: {
+    sequence: number;
+    fromName: string;
+    toName: string;
+  } | null;
   campaign: CampaignProgress;
   biomePlan: BiomePlan;
   currentBiome: BiomeKind;
@@ -629,7 +636,8 @@ export interface InteractionResolution {
     | "loot"
     | "reward"
     | "loot-bundle"
-    | "shortcut";
+    | "shortcut"
+    | "region-portal";
   message: string;
 }
 
@@ -665,10 +673,17 @@ export interface QueryEvaluation {
 }
 
 export interface CombatEvent {
-  type: "query-cast" | "player-hit" | "enemy-hit" | "death" | "loot-drop";
+  type:
+    | "query-cast"
+    | "player-hit"
+    | "enemy-hit"
+    | "death"
+    | "loot-drop"
+    | "auto-heal";
   sourceId?: number;
   targetId?: number;
   amount?: number;
+  itemName?: string;
 }
 
 export interface ExperienceSettlement {

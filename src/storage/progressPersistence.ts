@@ -28,7 +28,7 @@ interface TimerApi {
 
 type ProgressSource = Pick<
   GameSession,
-  "subscribe" | "toSavedRun" | "toProfile"
+  "subscribe" | "snapshot" | "toSavedRun" | "toProfile"
 >;
 
 export function persistenceFingerprint(
@@ -83,15 +83,14 @@ export function startProgressPersistence(
   let lastProfileJson = initialProfileJson;
   let previousFingerprint: PersistenceFingerprint | null = null;
   let destroyed = false;
+  let adminPreview = false;
 
   const clearPending = (): void => {
     if (timer === null) return;
     timerApi.clearTimeout(timer);
     timer = null;
   };
-  const flush = (): void => {
-    if (destroyed) return;
-    clearPending();
+  const persistCurrent = (): void => {
     saveRun(storage, source.toSavedRun());
     lastProfileJson = persistProfileIfChanged(
       storage,
@@ -99,12 +98,25 @@ export function startProgressPersistence(
       lastProfileJson,
     );
   };
+  const flush = (): void => {
+    if (destroyed) return;
+    clearPending();
+    if (adminPreview || source.snapshot().adminMode) return;
+    persistCurrent();
+  };
   const schedule = (): void => {
     clearPending();
     timer = timerApi.setTimeout(flush, PROGRESS_SAVE_DEBOUNCE_MS);
   };
   const unsubscribe = source.subscribe((snapshot) => {
     if (destroyed) return;
+    if (snapshot.adminMode) {
+      const hadPendingFormalSave = timer !== null;
+      clearPending();
+      if (!adminPreview && hadPendingFormalSave) persistCurrent();
+      adminPreview = true;
+      return;
+    }
     const current = persistenceFingerprint(snapshot);
     const critical = isCriticalPersistenceChange(previousFingerprint, current);
     previousFingerprint = current;

@@ -32,8 +32,8 @@ export interface SqlRelationDefinition {
 export const SQL_TABLES: readonly SqlTableDefinition[] = [
   {
     name: "monsters",
-    title: "怪物档案",
-    description: "每条记录对应当前 Run 中一只真实怪物。",
+    title: "怪物主表",
+    description: "查怪物名字、血量或状态时使用。锁定某只怪物统一写 monsters.id。",
     columns: [
       column("id", "INTEGER", "怪物唯一编号", { primaryKey: true }),
       column("room_id", "INTEGER", "怪物所在房间编号"),
@@ -49,18 +49,18 @@ export const SQL_TABLES: readonly SqlTableDefinition[] = [
   },
   {
     name: "monster_signals",
-    title: "怪物信号",
-    description: "怪物释放的频道记录，用于统计、分组和排序。",
+    title: "信号明细表",
+    description: "一只怪物可有多条信号；monster_id 只在这张关联表中表示所属怪物。",
     columns: [
       column("id", "INTEGER", "信号唯一编号", { primaryKey: true }),
-      column("monster_id", "INTEGER", "释放信号的怪物编号"),
+      column("monster_id", "INTEGER", "所属怪物编号；关联 monsters.id，不是 monsters 表字段"),
       column("channel", "TEXT", "信号频道名称"),
       column("charge", "INTEGER", "信号电荷强度"),
     ],
   },
   {
     name: "rooms",
-    title: "房间档案",
+    title: "房间主表",
     description: "八层魔王城的房间、区域与楼层信息。",
     columns: [
       column("id", "INTEGER", "房间唯一编号", { primaryKey: true }),
@@ -71,11 +71,11 @@ export const SQL_TABLES: readonly SqlTableDefinition[] = [
   },
   {
     name: "monster_gear",
-    title: "怪物装备",
-    description: "怪物与其装备记录；没有记录表示该怪物未装备物品。",
+    title: "装备明细表",
+    description: "一只怪物可有装备记录；monster_id 只在这张关联表中表示持有者。",
     columns: [
       column("id", "INTEGER", "装备记录唯一编号", { primaryKey: true }),
-      column("monster_id", "INTEGER", "持有装备的怪物编号"),
+      column("monster_id", "INTEGER", "持有者编号；关联 monsters.id，不是 monsters 表字段"),
       column("gear_name", "TEXT", "装备名称"),
       column("power", "INTEGER", "装备力量数值"),
     ],
@@ -154,4 +154,10 @@ export function sqlSchemaLine(name: SqlTableName): string {
 
 export const COMPLETE_SCHEMA_LINES = SQL_TABLES.map((table) => (
   sqlSchemaLine(table.name)
+));
+
+export const COMPLETE_RELATION_LINES = SQL_RELATIONS.map((relation) => (
+  `关系：${relation.fromTable}.${relation.fromColumn} = ${
+    relation.toTable
+  }.${relation.toColumn}`
 ));

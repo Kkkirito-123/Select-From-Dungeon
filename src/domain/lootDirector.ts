@@ -42,20 +42,15 @@ function duplicateReplacement(item: LootItem): LootItem {
   };
 }
 
-function minimumDrops(rank: Monster["rank"]): number {
-  if (rank === "boss") return 2;
-  if (rank === "elite") return 1;
-  return 0;
-}
-
 function isKey(item: LootItem): boolean {
   return item.rewardId === "floor-key";
 }
 
 /**
  * Every candidate has its own deterministic roll. Guaranteed curriculum items
- * are inserted first, rank guarantees fill from the candidate order, and keys
- * never consume the three visible non-key loot slots.
+ * are inserted first, and keys never consume the three visible non-key loot
+ * slots. The optional minimum is retained for explicit authored callers and
+ * tests; production combat omits it, so rank never creates a random drop.
  */
 export function rollLootItems(input: LootRollInput): LootItem[] {
   const rolled = input.candidates
@@ -88,10 +83,7 @@ export function rollLootItems(input: LootRollInput): LootItem[] {
     normalized.push(item);
   });
 
-  const minimum = Math.max(
-    minimumDrops(input.monster.rank),
-    input.minimumNonKeyDrops ?? 0,
-  );
+  const minimum = input.minimumNonKeyDrops ?? 0;
   for (const candidate of input.candidates) {
     if (normalized.filter((item) => !isKey(item)).length >= minimum) break;
     let item: LootItem = {

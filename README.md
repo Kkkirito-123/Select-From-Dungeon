@@ -8,7 +8,7 @@
 [中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
 
-**Release baseline: `v1.0.0`** · [Changelog](CHANGELOG.md) ·
+**Release baseline: `v1.1.0`** · [Changelog](CHANGELOG.md) ·
 [Release checklist](docs/RELEASE_CHECKLIST.md)
 
 A Chinese browser roguelite for SQL beginners and interview review. SQL is the
@@ -36,8 +36,10 @@ and turn the correct result into an animated attack.
   seconds and automatically enters the next floor—no extra pathfinding, `E`
   press, or menu choice. Level, XP, equipment, inventory, relics, and query
   count carry across.
-- Reveal the discovery minimap by walking through fog. It records explored
-  regions and course gates; it is not clickable and never teleports the player.
+- Reveal the discovery minimap by walking through fog. The minimap itself is
+  not clickable. Two physical region portals connect each floor's front,
+  middle, and rear biomes without bypassing curriculum gates; defeating the
+  middle area Boss automatically transfers the player into the rear main path.
 - The same seed deterministically rebuilds course-route beacons, distance-based
   front/middle/rear campfires, dead-end caches, and one two-way shortcut.
   Visible route interests stay within 18 steps on the main course route. Every
@@ -60,15 +62,17 @@ and turn the correct result into an animated attack.
   progress from slimes, wetland creatures, undead, and elementals to fortress
   troops, dragons, index beasts, and demon-castle guards.
   Authored visible area Bosses require floor-appropriate multi-stage exercises,
-  award 3 XP, and guarantee at least two themed drops without blocking
-  curriculum progress.
+  award 3 XP, and do not block curriculum progress. Optional random loot is no
+  longer guaranteed.
 - Press `Q + S` (or the touch button) to open the in-game terminal. Every stage
   starts blank: the player writes the complete statement. Floors one through
   five and seven through eight use `SELECT`/`WITH`; floor six accepts controlled
   writes and transaction scripts against a disposable `repair_queue`.
 - Use the embedded `PLAN ASSIST` completion stack without leaving the game.
-  Prefixes rank SQL keywords, functions, all four canonical tables, and all 22
-  fields; aliases such as `m.` narrow the list to that table. Use arrows plus
+  Prefixes rank SQL keywords, functions, all four canonical tables, all 22
+  fields, and real JOIN relationships. Task cards distinguish primary and
+  detail tables: monster targets use `monsters.id`, while `monster_id` is only
+  a detail-table relationship field. Aliases such as `m.` narrow the list to that table. Use arrows plus
   `Enter`/`Tab`, click or tap, or open it explicitly with `Ctrl/Command +
   Space`. Accepting a suggestion never executes the query or fills the complete
   answer.
@@ -112,26 +116,24 @@ and turn the correct result into an animated attack.
   and 5 XP; levels unlock at 2, 4, 6, 8, then every four XP through 24, adding
   one maximum heart while restoring one heart. A post-battle card shows the
   defeated monster, exact XP change, level progress, and any level-up.
-- Every victory evaluates low-probability candidates independently from the Run
-  seed, floor, monster, and item. A non-empty result leaves one `E`-opened loot
-  bundle with at most three non-key items, no same-battle duplicates, and no
-  reroll on reload, rest, or death. Most normal monsters drop nothing, elites
-  guarantee at least one item, Bosses at least two, and keys are extra.
+- Optional random loot is now limited to an immediately consumed recovery item:
+  2% for normal/curriculum monsters, 5% for mini-elites, 10% for area Bosses,
+  and 0% for floor Bosses. Most victories award XP only; random loot has no
+  minimum count and never occupies the inventory.
   Curriculum rewards remain guaranteed: Filter Bow after `SELECT`, Null Lantern
   after `IS NULL`, Aggregate Hammer before `GROUP BY`, Sort Saber and Join
   Chain on floor two, Bone Blade on floor three, Rune Staff on floor four,
   Iron Axe on floor five, Dragon Spear on floor six, Crystal Blade on floor
   seven, and Royal Sword on floor eight.
-  Biome pools can also yield low-probability armor, consumables, and the next
-  floor's weapon. Duplicate unique equipment converts to a consumable.
   Full equipment inventory requires explicit replacement and keeps leftovers in
   the bundle. Ordinary items can be dropped at the player's feet and recovered
   before floor transition; protected base/course items and keys cannot be
   discarded. Acquisition and XP-settlement cards disappear after three later
   successful movement steps.
-- Hear electronic-classical Web Audio: floor one rotates four original lyrical
-  patterns, while floor two rotates three new chiptune arrangements of
-  public-domain Beethoven compositions. Battles use original high-energy space
+- Hear electronic-classical Web Audio: floor one uses original lyrical
+  patterns, while later biome regions map to three chiptune arrangements of
+  public-domain Beethoven compositions. Region portals switch the exploration
+  track; battles use original high-energy space
   arcade patterns. No third-party recording or other game's melody is bundled.
   Steps, wall bumps,
   encounters, query casts, hits, damage, stage
@@ -145,6 +147,9 @@ and turn the correct result into an animated attack.
   and best query count. Starting a new Run preserves the profile.
 - Play with WASD/arrow keys on desktop or visible touch controls and a full-screen
   SQL terminal on narrow screens.
+- Retreat from any battle to the current checkpoint without healing or resetting
+  the enemy. The admin overview can preview all eight maps and jump among their
+  three regions; its snapshots are never written over the formal Run.
 
 ## First-Floor Learning Route
 
@@ -288,7 +293,7 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ BiomeDomain ── derived regions, static features, safe area-Boss anchors
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
   ├─ MonsterRoaming ── deterministic slow patrol decisions
-  ├─ LootDirector ── independent candidates, rank minimums, deduplication
+  ├─ LootDirector ── independent recovery candidates and deduplication
   ├─ gateChallenges ── optional Boss-gate feature and result contracts
   ├─ lessonEvaluator ── result semantics + concept locks
   ├─ SqlSchemaCatalog ── canonical four-table metadata and generated DDL
@@ -422,7 +427,9 @@ drainage palette, biome label, species-specific pixel actor, full SQL objective,
 and touch controls at desktop and 390×844. The narrow layout showed the complete
 arena and controls without horizontal clipping; the console reported zero
 errors. Seed breadth, biome exclusivity, area-Boss placement, two-stage
-resolution, XP, and minimum loot are covered by domain tests.
+resolution, XP, and the then-current minimum-loot rules were covered by domain
+tests. v1.1 removes those random minimums; its current probabilities are covered
+by the release checklist and loot-domain tests.
 The v0.8.0 pass used the production `GameSession` and SQLite WASM engine to
 continue through floors three and four. It verified the grave-city and elemental
 forge arenas, player-facing monster IDs `1–22`, the five-step

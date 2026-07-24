@@ -70,6 +70,20 @@ describe("ArcadeAudio", () => {
     expect(audio.trackId).toBe("conductor-singularity");
   });
 
+  it("探索跨生态区时切换对应电子古典曲，战斗曲不受区域覆盖", () => {
+    const audio = new ArcadeAudio({ mode: "explore" });
+    audio.setFloor(2);
+    audio.setRegion(0);
+    expect(audio.trackId).toBe("beethoven-fifth-thunder-bus");
+    audio.setRegion(1);
+    expect(audio.trackId).toBe("beethoven-elise-packet");
+    audio.setRegion(2);
+    expect(audio.trackId).toBe("beethoven-moonlight-voltage");
+    audio.setMode("combat");
+    audio.setRegion(0);
+    expect(audio.trackId).toBe("relation-storm-pursuit");
+  });
+
   it("所有新反馈与旧别名在静音状态都可无设备调用", async () => {
     const audio = new ArcadeAudio({ muted: true });
     const results = await Promise.all(ALL_SFX.map((effect) => audio.playSfx(effect)));

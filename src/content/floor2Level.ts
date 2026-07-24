@@ -162,10 +162,11 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     stages: [
       {
         id: "order-peak",
-        objective: "第一击：查询 monster_id = 1200 的最高 charge 对应 channel。",
+        objective: "第一击：从 monster_signals 查询 monster_id = 1200 的最高 charge 对应 channel。",
         queryTemplate: "",
         answerSql: "SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 1;",
         hints: [
+          "数据表是 monster_signals。",
           "按 charge 降序排列。",
           "LIMIT 1 只保留最高值。",
           "完整写法：SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 1;",
@@ -200,10 +201,11 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     primaryMonsterId: 1300,
     stages: [{
       id: "distinct-status",
-      objective: "查询 monster_id = 1300 的不同 channel，并按 channel 升序排列。",
+      objective: "从 monster_signals 查询 monster_id = 1300 的不同 channel，并按 channel 升序排列。",
       queryTemplate: "",
       answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1300 ORDER BY channel;",
       hints: [
+        "数据表是 monster_signals。",
         "SELECT 后加入 DISTINCT channel。",
         "WHERE 锁定 monster_id = 1300。",
         "完整写法：SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1300 ORDER BY channel;",
@@ -242,7 +244,8 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         queryTemplate: "",
         answerSql: "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400;",
         hints: [
-          "连接条件保持不变。",
+          "仍连接 monsters m 与 rooms r。",
+          "连接条件保持为 ON m.room_id = r.id。",
           "这次读取 r.sector。",
           "完整写法：SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400;",
         ],
@@ -290,6 +293,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         answerSql: "SELECT r.sector, COUNT(*) AS total FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 2 ORDER BY total DESC;",
         hints: [
           "连接 monsters m 与 rooms r。",
+          "连接条件是 ON m.room_id = r.id。",
           "WHERE r.floor = 2，GROUP BY r.sector。",
           "HAVING COUNT(*) >= 2，最后 ORDER BY total DESC。",
           "完整写法：SELECT r.sector, COUNT(*) AS total FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 2 ORDER BY total DESC;",
@@ -305,6 +309,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
         answerSql: "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 1900 ORDER BY g.power DESC LIMIT 1;",
         hints: [
           "连接 monsters m 与 monster_gear g。",
+          "连接条件是 ON m.id = g.monster_id。",
           "WHERE m.id = 1900。",
           "按 g.power 降序并 LIMIT 1。",
           "完整写法：SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 1900 ORDER BY g.power DESC LIMIT 1;",

@@ -1,4 +1,9 @@
-export type SqlSuggestionKind = "keyword" | "function" | "table" | "column";
+export type SqlSuggestionKind =
+  | "keyword"
+  | "function"
+  | "table"
+  | "column"
+  | "relation";
 
 export interface SqlSuggestion {
   label: string;
@@ -19,6 +24,18 @@ interface SchemaTable {
   columns: string[];
 }
 
+interface SchemaRelation {
+  leftTable: string;
+  leftColumn: string;
+  rightTable: string;
+  rightColumn: string;
+}
+
+interface SqlTableReference {
+  table: string;
+  alias: string;
+}
+
 const KEYWORD_SUGGESTIONS: SqlSuggestion[] = [
   keyword("SELECT", "选择返回字段"),
   keyword("FROM", "指定数据表"),
@@ -26,6 +43,7 @@ const KEYWORD_SUGGESTIONS: SqlSuggestion[] = [
   keyword("AND", "组合过滤条件"),
   keyword("IS NULL", "判断空值"),
   keyword("DISTINCT", "去除重复记录"),
+  keyword("INNER JOIN", "只保留两表中能匹配的记录"),
   keyword("JOIN", "连接相关数据表"),
   keyword("LEFT JOIN", "保留左表全部记录"),
   keyword("ON", "声明表连接关系"),
@@ -115,6 +133,21 @@ export function parseSchemaLines(lines: readonly string[]): SchemaTable[] {
   return [...tables].map(([name, columns]) => ({ name, columns: [...columns] }));
 }
 
+export function parseSchemaRelations(lines: readonly string[]): SchemaRelation[] {
+  return lines.flatMap((line) => {
+    const match = line.match(
+      /([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)\s*=\s*([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)/,
+    );
+    if (!match) return [];
+    return [{
+      leftTable: match[1],
+      leftColumn: match[2],
+      rightTable: match[3],
+      rightColumn: match[4],
+    }];
+  });
+}
+
 function isInsideSqlLiteralOrComment(sql: string, cursor: number): boolean {
   const beforeCursor = sql.slice(0, cursor);
   const currentLine = beforeCursor.slice(beforeCursor.lastIndexOf("\n") + 1);
@@ -175,6 +208,7 @@ function candidateScore(
   suggestion: SqlSuggestion,
   prefix: string,
   context: ReturnType<typeof contextBefore>,
+  preferredKeywords: ReadonlySet<string>,
 ): number | null {
   const query = normalized(prefix);
   const label = normalized(suggestion.label);
@@ -187,7 +221,8 @@ function candidateScore(
     context === "value" &&
     !query &&
     suggestion.kind !== "column" &&
-    suggestion.kind !== "function"
+    suggestion.kind !== "function" &&
+    suggestion.kind !== "relation"
   ) return null;
 
   if (query) {
@@ -212,6 +247,13 @@ function candidateScore(
   if (suggestion.kind === "function") score += 2;
   if (suggestion.kind === "table") score += 3;
   if (suggestion.kind === "column") score += 4;
+  if (suggestion.kind === "relation") score -= 70;
+  if (
+    suggestion.kind === "keyword" &&
+    preferredKeywords.has(suggestion.label.toLocaleUpperCase())
+  ) {
+    score -= 60;
+  }
   return score;
 }
 
@@ -219,6 +261,7 @@ function schemaSuggestions(
   tables: readonly SchemaTable[],
   sql: string,
   token: string,
+  context: ReturnType<typeof contextBefore>,
 ): SqlSuggestion[] {
   const dotIndex = token.indexOf(".");
   if (dotIndex >= 0) {
@@ -233,20 +276,84 @@ function schemaSuggestions(
     }));
   }
 
+  const referencedTables = new Set(aliasMap(sql, tables).values());
+  const columnTables = referencedTables.size > 0
+    ? tables.filter((table) => referencedTables.has(table))
+    : tables;
+  const availableTables = context === "table" && referencedTables.size > 0
+    ? tables.filter((table) => !referencedTables.has(table))
+    : tables;
+
   return [
-    ...tables.map((table) => ({
+    ...availableTables.map((table) => ({
       label: table.name,
       insertText: table.name,
       kind: "table" as const,
       detail: `数据表 · ${table.columns.join(", ")}`,
     })),
-    ...tables.flatMap((table) => table.columns.map((column) => ({
+    ...columnTables.flatMap((table) => table.columns.map((column) => ({
       label: column,
       insertText: column,
       kind: "column" as const,
-      detail: `${table.name} · 字段`,
+      detail: `${table.name}.${column} · 字段`,
     }))),
   ];
+}
+
+function relationSuggestions(
+  sql: string,
+  schemaLines: readonly string[],
+  tables: readonly SchemaTable[],
+  context: ReturnType<typeof contextBefore>,
+): SqlSuggestion[] {
+  if (context !== "value" || !/\bON\s*$/i.test(sql.trimEnd())) return [];
+  const tableNames = new Set(tables.map((table) => table.name.toLocaleLowerCase()));
+  const references: SqlTableReference[] = [];
+  const relationPattern = /\b(?:FROM|JOIN)\s+([A-Za-z_][\w]*)(?:\s+(?:AS\s+)?([A-Za-z_][\w]*))?/gi;
+  for (const match of sql.matchAll(relationPattern)) {
+    const table = match[1].toLocaleLowerCase();
+    if (!tableNames.has(table)) continue;
+    const alias = match[2] && !RESERVED_WORDS.has(match[2].toLocaleUpperCase())
+      ? match[2]
+      : match[1];
+    references.push({ table, alias });
+  }
+
+  const current = references.at(-1);
+  if (!current || references.length < 2) return [];
+  const previous = references.slice(0, -1).reverse();
+  return parseSchemaRelations(schemaLines).flatMap((relation) => {
+    const leftTable = relation.leftTable.toLocaleLowerCase();
+    const rightTable = relation.rightTable.toLocaleLowerCase();
+    const pairs: Array<{
+      left: SqlTableReference;
+      right: SqlTableReference;
+    }> = [];
+
+    previous.forEach((reference) => {
+      if (reference.table === leftTable && current.table === rightTable) {
+        pairs.push({ left: reference, right: current });
+      }
+      if (
+        leftTable !== rightTable &&
+        current.table === leftTable &&
+        reference.table === rightTable
+      ) {
+        pairs.push({ left: current, right: reference });
+      }
+    });
+
+    return pairs.map(({ left, right }) => {
+      const predicate =
+        `${left.alias}.${relation.leftColumn} = ${right.alias}.${relation.rightColumn}`;
+      return {
+        label: predicate,
+        insertText: `${predicate} `,
+        kind: "relation" as const,
+        detail: `JOIN 关系 · ${relation.leftTable} ↔ ${relation.rightTable}`,
+      };
+    });
+  });
 }
 
 export function getSqlCompletions(
@@ -255,6 +362,7 @@ export function getSqlCompletions(
   selectionEnd: number,
   schemaLines: readonly string[],
   force = false,
+  preferredKeywords: readonly string[] = [],
 ): SqlCompletionResult {
   const cursor = Math.max(0, Math.min(selectionStart, sql.length));
   const replaceEnd = Math.max(cursor, Math.min(selectionEnd, sql.length));
@@ -268,14 +376,22 @@ export function getSqlCompletions(
     ? token.value.slice(token.value.indexOf(".") + 1)
     : token.value;
   const context = contextBefore(sql, token.start);
-  const schemaCandidates = schemaSuggestions(tables, sql, token.value);
+  const schemaCandidates = schemaSuggestions(tables, sql, token.value, context);
+  const relationCandidates = relationSuggestions(
+    sql.slice(0, token.start),
+    schemaLines,
+    tables,
+    context,
+  );
   const candidates = token.value.includes(".")
     ? schemaCandidates
     : [
+        ...relationCandidates,
         ...KEYWORD_SUGGESTIONS,
         ...FUNCTION_SUGGESTIONS,
         ...schemaCandidates,
       ];
+  const preferred = new Set(preferredKeywords.map((entry) => entry.toLocaleUpperCase()));
   const deduplicated = new Map<string, SqlSuggestion>();
   candidates.forEach((suggestion) => {
     const key = `${suggestion.kind}:${suggestion.insertText}:${suggestion.detail}`;
@@ -285,7 +401,7 @@ export function getSqlCompletions(
   const suggestions = [...deduplicated.values()]
     .map((suggestion) => ({
       suggestion,
-      score: candidateScore(suggestion, prefix, context),
+      score: candidateScore(suggestion, prefix, context, preferred),
     }))
     .filter((entry): entry is { suggestion: SqlSuggestion; score: number } => (
       entry.score !== null
@@ -325,10 +441,12 @@ const KIND_LABELS: Record<SqlSuggestionKind, string> = {
   function: "FN",
   table: "TABLE",
   column: "FIELD",
+  relation: "LINK",
 };
 
 export class SqlAutocompleteController {
   private schemaLines: string[] = [];
+  private preferredKeywords: string[] = [];
   private completion: SqlCompletionResult = {
     suggestions: [],
     replaceStart: 0,
@@ -357,6 +475,11 @@ export class SqlAutocompleteController {
 
   setSchemaLines(lines: readonly string[]): void {
     this.schemaLines = [...lines];
+    if (document.activeElement === this.textarea) this.refresh(false);
+  }
+
+  setPreferredKeywords(keywords: readonly string[]): void {
+    this.preferredKeywords = [...keywords];
     if (document.activeElement === this.textarea) this.refresh(false);
   }
 
@@ -413,6 +536,7 @@ export class SqlAutocompleteController {
       this.textarea.selectionEnd,
       this.schemaLines,
       force,
+      this.preferredKeywords,
     );
     this.selectedIndex = 0;
     this.render();

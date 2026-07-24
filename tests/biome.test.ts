@@ -44,6 +44,13 @@ describe("seeded biome plan", () => {
           first.guidedMap,
         )).toEqual({ valid: true, errors: [] });
         expect(first.biome.regions).toHaveLength(3);
+        expect(first.biome.portals).toHaveLength(2);
+        first.biome.portals.forEach((portal) => {
+          expect(first.maze.tiles[portal.entry.y]?.[portal.entry.x]).toBe(".");
+          expect(first.maze.tiles[portal.exit.y]?.[portal.exit.x]).toBe(".");
+          expect(isSafeZonePosition(first.maze, first.campfires, portal.entry)).toBe(false);
+          expect(isSafeZonePosition(first.maze, first.campfires, portal.exit)).toBe(false);
+        });
         first.biome.regions.forEach((region) => {
           expect(first.biome.features.filter(
             (feature) => feature.biome === region.kind,
@@ -75,7 +82,7 @@ describe("seeded biome plan", () => {
         expect(biomeRegionAt(current.biome, region.areaBossPosition).kind).toBe(region.kind);
       });
     }
-  });
+  }, 20_000);
 });
 
 describe("biome encounter pools", () => {

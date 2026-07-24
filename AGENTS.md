@@ -63,11 +63,11 @@ The Run also has a 12-slot equipment inventory, one equipped weapon, one
 equipped armor, and three consumable stacks capped at five items each. `B`
 opens inventory management only during exploration or from a campfire and
 pauses movement and patrols. Armor HP absorbs counters before base HP and is
-restored by campfire rest or respawn. Defeated monsters resolve independent
-seeded low-probability candidates into one `E`-opened loot bundle with at most
-three non-key items; elites and Bosses enforce minimum loot, course rewards and
-keys stay deterministic, and reload, rest, or death never rerolls an existing
-bundle. Full bags require explicit replacement, ordinary discards remain
+restored by campfire rest or respawn. In v1.1, optional random loot is limited
+to an immediately consumed recovery item: 2% for normal monsters, 5% for
+mini-elites, 10% for area Bosses, and 0% for floor Bosses. Random loot has no
+minimum count; course rewards, explicit chests, and keys stay deterministic.
+Full bags require explicit replacement, ordinary discards remain
 recoverable on the current floor, and protected base/course/key items cannot be
 discarded.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
@@ -97,8 +97,10 @@ elemental forge, iron fortress, dragon nest, crystal index forest, and the
 obsidian data throne. Ambushes draw only from the current biome pool, with
 seeded 5%, 7%, 9%, 11%, 13%, 15%, 17%, and 19% mini-elite weights by floor.
 Authored optional area Bosses use multi-stage floor-appropriate exercises, award
-3 XP, and guarantee at least two themed drops. These actors never enter
-entrance/campfire safe zones and do not gate curriculum completion.
+3 XP, but do not guarantee random items. Two physical region portals connect
+the three biomes on each floor; defeating the middle area Boss transfers the
+player into the rear main-path region. These actors never enter entrance or
+campfire safe zones and do not gate curriculum completion.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
@@ -132,7 +134,7 @@ index.html -> src/main.ts
   -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
-  -> LootDirector (seeded independent candidates, rank minimums, deduplication)
+  -> LootDirector (seeded independent candidates and same-battle deduplication)
   -> SqlEngine (in-memory SQLite WASM, seed data, SELECT/WITH execution, HP sync)
   -> lessonEvaluator (query features, lesson locks, result semantics)
   -> DungeonScene (continuous maze, fog, collision, patrol, same-tile encounter)
@@ -183,12 +185,14 @@ contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
 `src/content/inventoryCatalog.ts` owns inventory capacities, the current
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
-`src/domain/lootDirector.ts` owns deterministic independent rolls, rank minimums,
-same-battle deduplication, unique-equipment conversion, and the three-item cap.
+`src/domain/lootDirector.ts` owns deterministic independent rolls and
+same-battle deduplication. Runtime optional candidates are immediate recovery
+items only; explicit curriculum bundles still use the inventory flow.
 `src/content/biomeContent.ts` owns the executable eight-floor biome encounter
 pools and optional multi-stage exercises. `src/domain/biome.ts` derives region
-ownership, static features, and area-Boss positions from the maze, campfires,
-guided map, and seed; this plan is rebuilt during load and is not serialized.
+ownership, static features, area-Boss positions, and two region portals from
+the maze, campfires, guided map, and seed; this plan is rebuilt during load and
+is not serialized.
 `src/content/floorContracts.ts` is the canonical eight-floor content schema.
 `src/domain/campaign.ts` owns its serializable ordered floor slots and
 must reject skipped, duplicated, or rerolled transitions. This campaign
@@ -288,10 +292,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   coalesces non-critical movement/patrol snapshots while flushing query, loot,
   inventory, mode, and topology changes immediately; changing a shape requires
   a version or recovery decision.
-- Core learning drops and keys are deterministic. Optional items use independent
-  deterministic candidate rolls, rank-based minimums, same-battle deduplication,
-  and at most three non-key items per bundle. Randomness must never block
-  curriculum progress or reroll an existing bundle. Combat damage is
+- Core learning drops and keys are deterministic. Runtime optional candidates
+  are immediate recovery items only, with no rank-based minimum or loot bundle.
+  Randomness must never block curriculum progress. Combat damage is
   deterministic so SQL targeting remains inspectable.
 - A new Run starts at two hearts. Normal, elite, and Boss victories award 1, 3,
   and 5 XP; cumulative level thresholds are 2, 4, 6, 8, then continue in

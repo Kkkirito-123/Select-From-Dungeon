@@ -78,6 +78,7 @@ import {
   biomeRegionAt,
   cloneBiomePlan,
   generateBiomePlan,
+  type BiomePortal,
   type BiomePlan,
 } from "./biome";
 import {
@@ -124,6 +125,11 @@ import type {
 } from "./types";
 
 type SessionListener = (snapshot: GameSnapshot) => void;
+
+interface LootSpawnResolution {
+  bundleCount: number;
+  recoveryNames: string[];
+}
 
 const LESSON_ORDER: readonly LessonId[] = [
   "select",
@@ -257,6 +263,12 @@ function cloneLootBundle(bundle: LootBundle): LootBundle {
 
 function distance(a: Position, b: Position): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function allMapCellKeys(floor: MazeFloor): string[] {
+  return floor.tiles.flatMap((row, y) => (
+    [...row].map((_tile, x) => `${x}:${y}`)
+  ));
 }
 
 function positionKey(position: Position): string {
@@ -464,6 +476,10 @@ export class GameSession {
   private battleSequence = 0;
   private reviewBattleId: number | null = null;
   private banner = "迷宫已经生成。沿青色信标寻找 SELECT 数据石碑。";
+  private adminMode = false;
+  private adminPanelOpen = false;
+  private regionTransferSequence = 0;
+  private regionTransfer: GameSnapshot["regionTransfer"] = null;
   private profile: ProfileProgress;
   private readonly listeners = new Set<SessionListener>();
 
@@ -669,6 +685,9 @@ export class GameSession {
 
     return {
       mode: this.mode,
+      adminMode: this.adminMode,
+      adminPanelOpen: this.adminPanelOpen,
+      regionTransfer: this.regionTransfer ? { ...this.regionTransfer } : null,
       campaign: cloneCampaignProgress(this.campaign),
       biomePlan: cloneBiomePlan(this.biomePlan),
       currentBiome: biomeRegionAt(this.biomePlan, this.player).kind,
@@ -701,7 +720,9 @@ export class GameSession {
       consumables: this.consumables.map(cloneConsumableStack),
       keyItems: [...this.keyItems],
       acquiredUniqueItemIds: [...this.acquiredUniqueItemIds],
-      discoveredCells: [...this.discoveredCells],
+      discoveredCells: this.adminMode
+        ? allMapCellKeys(this.mazeFloor)
+        : [...this.discoveredCells],
       currentRoomId: this.currentRoomId,
       currentRoomTitle: room.title,
       currentRoomType: room.type,
@@ -806,7 +827,7 @@ export class GameSession {
   attemptPlayerMove(dx: number, dy: number): MoveResolution {
     const from = { x: this.player.x, y: this.player.y };
     const to = { x: from.x + dx, y: from.y + dy };
-    if ([
+    if (this.adminPanelOpen || [
       "campfire",
       "inventory",
       "loot",
@@ -1018,6 +1039,31 @@ export class GameSession {
     return { ok: true, kind: "none", message: this.banner };
   }
 
+  retreatFromCombat(): InteractionResolution {
+    if (this.mode !== "combat" || !this.combat) {
+      return this.interactionFailure("当前没有可以撤退的战斗。");
+    }
+    const campfire = this.respawnCampfireId
+      ? this.campfires.find((entry) => entry.id === this.respawnCampfireId)
+      : null;
+    const destination = campfire?.restPosition ?? this.mazeFloor.spawn;
+    this.player.x = destination.x;
+    this.player.y = destination.y;
+    this.combat = null;
+    this.selectedMonsterId = null;
+    this.mode = "explore";
+    this.hintLevel = 0;
+    this.regionTransfer = null;
+    this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
+    this.updateCurrentRoom(destination);
+    this.revealAt(destination);
+    this.banner = campfire
+      ? `已撤退到${this.campfirePhaseName(campfire)}复活点。生命与护甲保持当前值，怪物生命也不会重置。`
+      : "已撤退到本层出生安全区。生命与护甲保持当前值，怪物生命也不会重置。";
+    this.emit();
+    return { ok: true, kind: "none", message: this.banner };
+  }
+
   interact(): InteractionResolution {
     if (["transition", "victory", "defeat", "death-review", "inventory", "loot"].includes(this.mode)) {
       if (this.mode === "transition") {
@@ -1087,6 +1133,10 @@ export class GameSession {
       this.banner = `打开死路补给：${reward?.name ?? "补给"}。${reward?.description ?? "本层探索收益已结算。"}`;
       this.emit();
       return { ok: true, kind: "reward", message: this.banner };
+    }
+    const regionPortal = this.nearbyRegionPortal();
+    if (regionPortal) {
+      return this.travelThroughRegionPortal(regionPortal.portal, regionPortal.side);
     }
     const nearbyGuidedShortcut = nearbyShortcut(this.guidedMap, this.player);
     if (nearbyGuidedShortcut) {
@@ -1497,7 +1547,9 @@ export class GameSession {
   }
 
   advanceMonsterPatrols(): PatrolBatchResolution {
-    if (this.mode !== "explore") return { moves: [], encounterId: null };
+    if (this.mode !== "explore" || this.adminPanelOpen) {
+      return { moves: [], encounterId: null };
+    }
     const moves: PatrolBatchResolution["moves"] = [];
     const blocked = new Set([
       ...this.groundItems.map(positionKey),
@@ -1512,6 +1564,10 @@ export class GameSession {
       ...this.guidedMap.deadEndCaches
         .filter((cache) => !this.openedGateIds.has(cache.id))
         .map(positionKey),
+      ...this.biomePlan.portals.flatMap((portal) => [
+        positionKey(portal.entry),
+        positionKey(portal.exit),
+      ]),
     ]);
     const occupied = new Set(
       this.worldActors
@@ -1752,7 +1808,7 @@ export class GameSession {
   }
 
   advanceFloor(): boolean {
-    if (this.mode !== "transition" || this.floorNumber >= 8) return false;
+    if (this.adminMode || this.mode !== "transition" || this.floorNumber >= 8) return false;
     const fromFloor = this.floorNumber;
     const transition = advanceCampaignProgress(this.campaign);
     const nextFloor = transition.to;
@@ -1816,6 +1872,7 @@ export class GameSession {
       safeStepsRemaining: INITIAL_SAFE_STEPS,
     };
     this.hintLevel = 0;
+    this.regionTransfer = null;
     const floorNames: Record<FloorNumber, string> = {
       1: "余烬地窖",
       2: "湖沼森林",
@@ -1833,6 +1890,11 @@ export class GameSession {
   }
 
   reset(seed = `${this.graph.seed}-next`): void {
+    if (this.adminMode) {
+      this.banner = "管理员预览不会覆盖正式 Run。刷新页面后再生成新迷宫。";
+      this.emit();
+      return;
+    }
     this.campaign = createCampaignProgress(seed);
     this.floorNumber = 1;
     this.graph = generateRoomGraph(seed, 1);
@@ -1897,6 +1959,7 @@ export class GameSession {
     this.answerHistory = [];
     this.battleSequence = 0;
     this.reviewBattleId = null;
+    this.regionTransfer = null;
     this.banner = "新的种子迷宫已经生成。局内装备已清空，SQL 图鉴保持不变。";
     this.revealAt(this.player);
     this.emit();
@@ -2326,6 +2389,10 @@ export class GameSession {
     const keyId = `floor-${this.floorNumber}-key`;
     if (!this.keyItems.includes(keyId)) this.keyItems.push(keyId);
     this.completedRoomIds.add(this.currentRoomId);
+    if (this.adminMode) {
+      this.mode = "explore";
+      return `管理员预览已击败第 ${this.floorNumber} 层层主；不会推进或写入正式 Run。`;
+    }
     if (this.floorNumber < 8) {
       this.mode = "transition";
       return `第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，正在自动进入第 ${this.floorNumber + 1} 层。`;
@@ -2343,21 +2410,70 @@ export class GameSession {
     events: CombatEvent[],
     experienceMessage: string,
   ): void {
-    const dropCount = this.spawnLootBundle(
+    const loot = this.spawnLootBundle(
       monster,
       this.currentRoomId,
       { x: this.player.x, y: this.player.y },
       [],
     );
-    if (dropCount > 0) events.push({ type: "loot-drop", targetId: monster.id });
+    if (loot.bundleCount > 0) {
+      events.push({ type: "loot-drop", targetId: monster.id });
+    }
+    loot.recoveryNames.forEach((itemName) => {
+      events.push({ type: "auto-heal", targetId: monster.id, itemName });
+    });
     this.combat = null;
     this.selectedMonsterId = null;
     this.mode = "explore";
     this.hintLevel = 0;
     this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
-    this.banner = dropCount > 0
-      ? `${monster.name} 已清除。${experienceMessage} 掉落 1 个含 ${dropCount} 件物品的战利品包。`
-      : `${monster.name} 已清除。${experienceMessage} 本次没有物品掉落；接下来 5 步不会再次遭遇。`;
+    this.banner = loot.bundleCount > 0
+      ? `${monster.name} 已清除。${experienceMessage} 掉落 1 个含 ${loot.bundleCount} 件物品的战利品包。`
+      : loot.recoveryNames.length > 0
+        ? `${monster.name} 已清除。${experienceMessage} ${loot.recoveryNames.join("、")}已直接使用，不占背包。`
+        : `${monster.name} 已清除。${experienceMessage} 本次没有物品掉落；接下来 5 步不会再次遭遇。`;
+    const transferMessage = this.autoTransferAfterAreaBoss(monster);
+    if (transferMessage) this.banner = `${this.banner} ${transferMessage}`;
+  }
+
+  private autoTransferAfterAreaBoss(monster: Monster): string | null {
+    const portal = this.biomePlan.portals.find(
+      (entry) => entry.requiredBossId === monster.id,
+    );
+    if (!portal) return null;
+    const fromRegion = this.biomePlan.regions.find(
+      (region) => region.id === portal.fromRegionId,
+    );
+    const targetRegion = this.biomePlan.regions.find(
+      (region) => region.id === portal.toRegionId,
+    );
+    if (!fromRegion || !targetRegion) return null;
+    const targetRoom = this.graph.nodes.find(
+      (room) => room.id === targetRegion.sourceRoomNodeId,
+    );
+    const accessMessage = targetRoom ? this.roomAccessMessage(targetRoom) : null;
+    if (accessMessage) {
+      return `区域首领通道已供能，但主线门仍锁定：${accessMessage}完成后可在区域门旁按 E 进入。`;
+    }
+    const destination = this.safeRegionPortalDestination(
+      portal.exit,
+      targetRegion.id,
+    );
+    if (!destination) {
+      return "区域首领通道已供能，但出口暂被占用；离开再回来后可在区域门旁按 E 进入。";
+    }
+    this.player.x = destination.x;
+    this.player.y = destination.y;
+    this.updateCurrentRoom(destination);
+    this.revealAt(destination);
+    this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
+    this.regionTransferSequence += 1;
+    this.regionTransfer = {
+      sequence: this.regionTransferSequence,
+      fromName: fromRegion.name,
+      toName: targetRegion.name,
+    };
+    return `区域首领通道已开启，已自动送入 ${targetRegion.name} 主线区域。`;
   }
 
   private completeLesson(
@@ -2381,19 +2497,166 @@ export class GameSession {
     const target = this.monsters.find((monster) => monster.id === lesson.primaryMonsterId);
     if (target && dropPosition) {
       const fixedItems = this.fixedLootItemsForLesson(lesson);
-      const dropCount = this.spawnLootBundle(
+      const loot = this.spawnLootBundle(
         target,
         this.currentRoomId,
         dropPosition,
         fixedItems,
       );
-      if (dropCount > 0) {
+      loot.recoveryNames.forEach((itemName) => {
+        events.push({ type: "auto-heal", targetId: lesson.primaryMonsterId, itemName });
+      });
+      if (loot.bundleCount > 0) {
         events.push({ type: "loot-drop", targetId: lesson.primaryMonsterId });
-        this.banner = `${lesson.title} 完成，含 ${dropCount} 件物品的战利品包已掉落。${experienceMessage} 靠近后按 E 打开。`;
+        this.banner = `${lesson.title} 完成，含 ${loot.bundleCount} 件固定奖励的战利品包已掉落。${experienceMessage}${
+          loot.recoveryNames.length > 0
+            ? ` ${loot.recoveryNames.join("、")}已直接使用。`
+            : ""
+        } 靠近后按 E 打开。`;
+        return;
+      }
+      if (loot.recoveryNames.length > 0) {
+        this.banner = `${lesson.title} 已掌握。${experienceMessage} ${loot.recoveryNames.join("、")}已直接使用，不占背包。`;
         return;
       }
     }
     this.banner = `${lesson.title} 已掌握。${experienceMessage} 本次没有额外物品掉落。`;
+  }
+
+  enableAdminMode(): InteractionResolution {
+    if (this.adminMode) {
+      return { ok: true, kind: "none", message: "管理员视图已经开启。" };
+    }
+    if (this.mode !== "explore") {
+      return this.interactionFailure("请先退出战斗、篝火或背包，再开启管理员视图。");
+    }
+    this.adminMode = true;
+    this.emit();
+    return {
+      ok: true,
+      kind: "none",
+      message: "管理员视图已开启：全图、怪物与区域门均可见；预览操作不会写入正式存档。",
+    };
+  }
+
+  setAdminPanelOpen(open: boolean): boolean {
+    if (!this.adminMode) return false;
+    if (this.adminPanelOpen === open) return true;
+    this.adminPanelOpen = open;
+    this.emit();
+    return true;
+  }
+
+  adminLoadFloor(floor: FloorNumber): InteractionResolution {
+    if (!this.adminMode) {
+      return this.interactionFailure("请先开启管理员视图。");
+    }
+    if (this.mode !== "explore") {
+      return this.interactionFailure("管理员切层前请先退出当前交互。");
+    }
+    const campaign = createCampaignProgress(this.campaign.baseSeed, floor);
+    const floorSeed = campaign.floors.find((slot) => slot.floor === floor)?.seed;
+    if (!floorSeed) return this.interactionFailure("管理员预览层缺少 Seed。");
+
+    this.campaign = campaign;
+    this.floorNumber = floor;
+    this.graph = generateRoomGraph(floorSeed, floor);
+    this.mazeFloor = generateMazeFloor(this.graph);
+    this.campfires = generateCampfires(this.graph, this.mazeFloor);
+    this.guidedMap = generateGuidedMapPlan(this.graph, this.mazeFloor, this.campfires);
+    this.biomePlan = generateBiomePlan(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
+    this.activeCampfireId = null;
+    this.respawnCampfireId = null;
+    this.activeLootBundleId = null;
+    this.mode = "explore";
+    this.currentRoomId = this.graph.entryId;
+    this.player = {
+      ...this.player,
+      ...this.mazeFloor.spawn,
+      hp: this.player.maxHp,
+      heat: 0,
+      weapon: { ...this.player.weapon },
+      armor: this.player.armor ? { ...this.player.armor } : null,
+    };
+    this.monsters = monstersForFloor(floor);
+    this.worldActors = initialActors(
+      this.graph,
+      this.mazeFloor,
+      this.monsters,
+      this.biomePlan,
+    );
+    this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.lootBundles = [];
+    this.discoveredCells = new Set();
+    this.combat = null;
+    this.visitedRoomIds = new Set([this.currentRoomId]);
+    this.completedRoomIds = new Set([this.currentRoomId]);
+    this.completedLessons = new Set();
+    this.openedGateIds = new Set();
+    this.activeGateChallengeId = null;
+    this.selectedMonsterId = null;
+    this.encounterMeter = {
+      totalMoves: 0,
+      stepsSinceEncounter: 0,
+      safeStepsRemaining: INITIAL_SAFE_STEPS,
+    };
+    this.hintLevel = 0;
+    this.regionTransfer = null;
+    this.revealAt(this.player);
+    this.banner = `管理员预览：第 ${floor} 层全图已载入。刷新页面可回到最后一次正式存档。`;
+    this.emit();
+    return { ok: true, kind: "none", message: this.banner };
+  }
+
+  adminTravelToRegion(regionId: string): InteractionResolution {
+    if (!this.adminMode || this.mode !== "explore") {
+      return this.interactionFailure("管理员区域跳转当前不可用。");
+    }
+    const region = this.biomePlan.regions.find((entry) => entry.id === regionId);
+    if (!region) return this.interactionFailure("未知生态区域。");
+    const candidates = [
+      region.anchor,
+      ...this.biomePlan.portals.flatMap((portal) => {
+        const positions: Position[] = [];
+        if (portal.fromRegionId === regionId) positions.push(portal.entry);
+        if (portal.toRegionId === regionId) positions.push(portal.exit);
+        return positions;
+      }),
+      ...allMapCellKeys(this.mazeFloor)
+        .map((key) => {
+          const [x, y] = key.split(":").map(Number);
+          return { x, y };
+        })
+        .filter((position) => this.mazeFloor.tiles[position.y]?.[position.x] === ".")
+        .sort((left, right) => distance(left, region.anchor) - distance(right, region.anchor)),
+    ];
+    const destination = candidates.find((position) => (
+      this.mazeFloor.tiles[position.y]?.[position.x] === "." &&
+      !this.livingActorAt(position) &&
+      !this.campfires.some(
+        (campfire) => campfire.x === position.x && campfire.y === position.y,
+      )
+    ));
+    if (!destination) return this.interactionFailure("该区域没有可用的管理员落点。");
+    const fromRegion = biomeRegionAt(this.biomePlan, this.player);
+    this.player.x = destination.x;
+    this.player.y = destination.y;
+    this.updateCurrentRoom(destination);
+    this.revealAt(destination);
+    this.regionTransferSequence += 1;
+    this.regionTransfer = {
+      sequence: this.regionTransferSequence,
+      fromName: fromRegion.name,
+      toName: region.name,
+    };
+    this.banner = `管理员跳转：已定位 ${region.name}。`;
+    this.emit();
+    return { ok: true, kind: "none", message: this.banner };
   }
 
   private fixedLootItemsForLesson(lesson: LessonDefinition): LootItem[] {
@@ -2448,7 +2711,7 @@ export class GameSession {
     sourceRoomId: string,
     position: Position,
     fixedItems: readonly LootItem[],
-  ): number {
+  ): LootSpawnResolution {
     const biome = biomeRegionAt(this.biomePlan, position).kind;
     const encounter = biomeEncounterFor(monster.id);
     const role = monster.isBoss
@@ -2461,14 +2724,28 @@ export class GameSession {
       candidates: lootCandidatesForBiome(this.floorNumber, biome, role),
       fixedItems,
       acquiredUniqueItemIds: this.acquiredUniqueItemIds,
-      minimumNonKeyDrops: role === "area-boss"
-        ? 2
-        : role === "mini-elite" ? 1 : undefined,
     });
-    if (items.length === 0) return 0;
+    const recoveryNames: string[] = [];
+    const bundleItems = items.filter((item) => {
+      if (item.guaranteed || item.kind !== "consumable" || !item.consumable) {
+        return true;
+      }
+      const previousHp = this.player.hp;
+      const previousArmor = this.player.armorHp;
+      this.applyConsumable(item.consumable);
+      const effect = `生命 ${previousHp}→${this.player.hp}，护甲 ${previousArmor}→${this.player.armorHp}`;
+      recoveryNames.push(`${item.name}（${effect}）`);
+      return false;
+    });
+    if (bundleItems.length === 0) {
+      return { bundleCount: 0, recoveryNames };
+    }
     const id = `loot:${this.floorNumber}:${monster.id}`;
     if (this.lootBundles.some((bundle) => bundle.id === id)) {
-      return this.lootBundles.find((bundle) => bundle.id === id)?.items.length ?? 0;
+      return {
+        bundleCount: this.lootBundles.find((bundle) => bundle.id === id)?.items.length ?? 0,
+        recoveryNames: [],
+      };
     }
     this.lootBundles.push({
       id,
@@ -2476,9 +2753,9 @@ export class GameSession {
       sourceRoomId,
       floor: this.floorNumber,
       ...position,
-      items,
+      items: bundleItems,
     });
-    return items.length;
+    return { bundleCount: bundleItems.length, recoveryNames };
   }
 
   private nextLootBundleId(baseId: string): string {
@@ -2629,6 +2906,113 @@ export class GameSession {
     }
   }
 
+  private nearbyRegionPortal(): {
+    portal: BiomePortal;
+    side: "entry" | "exit";
+  } | null {
+    for (const portal of this.biomePlan.portals) {
+      if (distance(portal.entry, this.player) <= 1) {
+        return { portal, side: "entry" };
+      }
+      if (distance(portal.exit, this.player) <= 1) {
+        return { portal, side: "exit" };
+      }
+    }
+    return null;
+  }
+
+  private travelThroughRegionPortal(
+    portal: BiomePortal,
+    side: "entry" | "exit",
+  ): InteractionResolution {
+    const destination = side === "entry" ? portal.exit : portal.entry;
+    const targetRegionId = side === "entry" ? portal.toRegionId : portal.fromRegionId;
+    const fromRegionId = side === "entry" ? portal.fromRegionId : portal.toRegionId;
+    const fromRegion = this.biomePlan.regions.find((region) => region.id === fromRegionId);
+    const targetRegion = this.biomePlan.regions.find((region) => region.id === targetRegionId);
+    if (!fromRegion || !targetRegion) {
+      return this.interactionFailure("区域传送门的生态记录已经失效。");
+    }
+    if (side === "entry" && portal.requiredBossId !== null) {
+      const blocker = this.monsters.find((monster) => monster.id === portal.requiredBossId);
+      if (blocker && blocker.hp > 0) {
+        return this.interactionFailure(
+          `${portal.name} 尚未供能：先击败 ${blocker.name}（ID #${blocker.id}）。`,
+        );
+      }
+    }
+    const targetRoom = this.graph.nodes.find(
+      (room) => room.id === targetRegion.sourceRoomNodeId,
+    );
+    const accessMessage = targetRoom ? this.roomAccessMessage(targetRoom) : null;
+    if (accessMessage) {
+      return this.interactionFailure(`区域传送门拒绝越级：${accessMessage}`);
+    }
+    const safeDestination = this.safeRegionPortalDestination(
+      destination,
+      targetRegion.id,
+    );
+    if (!safeDestination) {
+      return this.interactionFailure("区域传送门出口暂被怪物或物品占用，请稍后再试。");
+    }
+    this.player.x = safeDestination.x;
+    this.player.y = safeDestination.y;
+    this.updateCurrentRoom(safeDestination);
+    this.revealAt(safeDestination);
+    this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
+    this.regionTransferSequence += 1;
+    this.regionTransfer = {
+      sequence: this.regionTransferSequence,
+      fromName: fromRegion.name,
+      toName: targetRegion.name,
+    };
+    this.banner = `区域传送完成：${fromRegion.name} → ${targetRegion.name}。接下来 5 步不会触发随机遭遇。`;
+    this.emit();
+    return { ok: true, kind: "region-portal", message: this.banner };
+  }
+
+  private safeRegionPortalDestination(
+    origin: Position,
+    targetRegionId: string,
+  ): Position | null {
+    const candidates: Position[] = [];
+    for (let radius = 0; radius <= 3; radius += 1) {
+      for (let y = origin.y - radius; y <= origin.y + radius; y += 1) {
+        for (let x = origin.x - radius; x <= origin.x + radius; x += 1) {
+          if (Math.abs(x - origin.x) + Math.abs(y - origin.y) !== radius) continue;
+          candidates.push({ x, y });
+        }
+      }
+    }
+    return candidates.find((position) => {
+      if (
+        !isMazeWalkable(
+          this.mazeFloor,
+          position.x,
+          position.y,
+          this.completedLessons,
+          this.openedGateIds,
+        ) ||
+        biomeRegionAt(this.biomePlan, position).id !== targetRegionId ||
+        this.livingActorAt(position) ||
+        this.campfires.some((campfire) => (
+          campfire.x === position.x && campfire.y === position.y
+        )) ||
+        this.groundItems.some((item) => (
+          item.x === position.x && item.y === position.y
+        )) ||
+        this.lootBundles.some((bundle) => (
+          bundle.x === position.x && bundle.y === position.y
+        ))
+      ) return false;
+      const zone = mazeZoneAt(this.mazeFloor, position);
+      const room = zone
+        ? this.graph.nodes.find((entry) => entry.id === zone.roomNodeId)
+        : null;
+      return !room || this.roomAccessMessage(room) === null;
+    }) ?? null;
+  }
+
   private revealAt(position: Position): void {
     revealAround(this.mazeFloor, position, 5).forEach((cell) => this.discoveredCells.add(cell));
   }
@@ -2674,6 +3058,24 @@ export class GameSession {
         : this.keyItems.includes(guidedShortcut.shortcut.keyId)
           ? `E  使用捷径钥匙 · ${guidedShortcut.shortcut.name}`
           : `E  检查锁住的${guidedShortcut.shortcut.name}`;
+    }
+    const regionPortal = this.nearbyRegionPortal();
+    if (regionPortal) {
+      const targetRegion = this.biomePlan.regions.find((region) => (
+        region.id === (
+          regionPortal.side === "entry"
+            ? regionPortal.portal.toRegionId
+            : regionPortal.portal.fromRegionId
+        )
+      ));
+      const boss = regionPortal.portal.requiredBossId === null
+        ? null
+        : this.monsters.find(
+            (monster) => monster.id === regionPortal.portal.requiredBossId && monster.hp > 0,
+          );
+      return boss && regionPortal.side === "entry"
+        ? `E  区域门未供能 · 先击败 ${boss.name}`
+        : `E  传送到 ${targetRegion?.name ?? "相邻区域"}`;
     }
     const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
     if (lootBundle) return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
