@@ -1,7 +1,8 @@
 import { ArcadeAudio } from "../audio/ArcadeAudio";
 import type { OnboardingMilestone } from "../content/onboarding";
-import { LESSONS } from "../content/mvpLevel";
+import { LESSONS, practiceStagesFor } from "../content/mvpLevel";
 import {
+  COMPLETE_RELATION_LINES,
   COMPLETE_SCHEMA_LINES,
   SQL_RELATIONS,
   SQL_TABLES,
@@ -9,6 +10,7 @@ import {
   type SqlTableName,
 } from "../content/sqlSchema";
 import { GameSession, LEVEL_XP_THRESHOLDS } from "../domain/GameSession";
+import type { FloorNumber } from "../domain/runGraph";
 import type {
   ExperienceSettlement,
   GameSnapshot,
@@ -29,7 +31,10 @@ import {
   AnswerReviewView,
   type AnswerReviewScope,
 } from "./AnswerReviewView";
-import { SqlAutocompleteController } from "./sqlAutocomplete";
+import {
+  parseSchemaLines,
+  SqlAutocompleteController,
+} from "./sqlAutocomplete";
 import { SqlChordTracker } from "./SqlChordTracker";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -62,6 +67,100 @@ export function shouldDismissTransientCard(
   return shownAtMove !== null && currentTotalMoves - shownAtMove >= 3;
 }
 
+export type SchemaTaskRole = "primary" | "related";
+
+export function schemaRenderSignature(
+  snapshot: Pick<
+    GameSnapshot,
+    | "focusMonsterId"
+    | "lessonIntro"
+    | "lessonStageId"
+    | "locks"
+    | "missionBody"
+    | "schema"
+  >,
+): string {
+  return [
+    String(snapshot.focusMonsterId ?? ""),
+    snapshot.lessonStageId,
+    snapshot.lessonIntro,
+    snapshot.missionBody,
+    snapshot.locks.join("\u0000"),
+    snapshot.schema.join("\u0000"),
+  ].join("\u0001");
+}
+
+export function schemaTaskTableRoles(
+  snapshot: Pick<
+    GameSnapshot,
+    "focusMonsterId" | "lessonIntro" | "lessonStageId" | "missionBody" | "schema"
+  >,
+): ReadonlyMap<string, SchemaTaskRole> {
+  const authoredStage = LESSONS
+    .flatMap((lesson) => lesson.stages)
+    .find((stage) => stage.id === snapshot.lessonStageId);
+  const encounterStage = snapshot.focusMonsterId === null
+    ? undefined
+    : practiceStagesFor(snapshot.focusMonsterId)
+      .find((stage) => stage.id === snapshot.lessonStageId);
+  const answerSql = encounterStage?.answerSql ?? authoredStage?.answerSql ?? "";
+  const availableTables = new Set(
+    parseSchemaLines(snapshot.schema).map((table) => table.name.toLocaleLowerCase()),
+  );
+  const references: Array<{
+    table: string;
+    depth: number;
+    index: number;
+  }> = [];
+  const tableNames = [...availableTables]
+    .map((table) => table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  if (tableNames !== "") {
+    const pattern = new RegExp(
+      `\\b(?:FROM|JOIN|UPDATE|INTO)\\s+(${tableNames})\\b`,
+      "gi",
+    );
+    for (const match of answerSql.matchAll(pattern)) {
+      const index = match.index ?? 0;
+      let depth = 0;
+      for (let cursor = 0; cursor < index; cursor += 1) {
+        if (answerSql[cursor] === "(") depth += 1;
+        if (answerSql[cursor] === ")") depth = Math.max(0, depth - 1);
+      }
+      references.push({
+        table: match[1].toLocaleLowerCase(),
+        depth,
+        index,
+      });
+    }
+  }
+  if (references.length === 0) {
+    const fallback = `${snapshot.missionBody} ${snapshot.lessonIntro}`.toLocaleLowerCase();
+    [...availableTables].forEach((table, index) => {
+      if (fallback.includes(table)) {
+        references.push({ table, depth: 0, index });
+      }
+    });
+  }
+  if (references.length === 0 && availableTables.size === 1) {
+    references.push({
+      table: [...availableTables][0],
+      depth: 0,
+      index: 0,
+    });
+  }
+  const shallowestDepth = Math.min(...references.map((reference) => reference.depth));
+  const primary = references
+    .filter((reference) => reference.depth === shallowestDepth)
+    .sort((left, right) => left.index - right.index)[0]?.table;
+  const roles = new Map<string, SchemaTaskRole>();
+  references.forEach(({ table }) => {
+    if (!availableTables.has(table)) return;
+    roles.set(table, table === primary ? "primary" : "related");
+  });
+  return roles;
+}
+
 export interface CombatSettlementCopy {
   title: string;
   xp: string;
@@ -73,6 +172,7 @@ export interface CombatSettlementCopy {
 export function combatSettlementCopy(
   experience: ExperienceSettlement,
   lootDropped: boolean,
+  recoveryName?: string,
 ): CombatSettlementCopy {
   const nextXp = LEVEL_XP_THRESHOLDS[experience.currentLevel];
   const progress = nextXp === undefined
@@ -86,9 +186,13 @@ export function combatSettlementCopy(
     xp: `+${experience.gained} XP`,
     progress,
     levelUp,
-    reward: lootDropped
-      ? "战利品包已出现在怪物位置 · 靠近后按 E 打开"
-      : "本次没有物品掉落 · 经验已正常结算",
+    reward: recoveryName
+      ? `${recoveryName} 已自动使用 · 不占背包${
+        lootDropped ? "；固定奖励包已出现在怪物位置" : ""
+      }`
+      : lootDropped
+        ? "固定奖励包已出现在怪物位置 · 靠近后按 E 打开"
+        : "本次没有物品掉落 · 经验已正常结算",
   };
 }
 
@@ -105,6 +209,7 @@ export class AppShell {
   private campfireMenu!: HTMLElement;
   private inventoryMenu!: HTMLElement;
   private lootMenu!: HTMLElement;
+  private adminMenu!: HTMLElement;
   private answerReview!: AnswerReviewView;
   private executeButton!: HTMLButtonElement;
   private gateExecuteButton!: HTMLButtonElement;
@@ -130,6 +235,8 @@ export class AppShell {
   private settlementShownAtMove: number | null = null;
   private floorTransitionTimer: number | null = null;
   private defeatRespawnTimer: number | null = null;
+  private regionTransitionTimer: number | null = null;
+  private lastRegionTransferSequence = 0;
   private lastLocksSignature: string | null = null;
   private lastSchemaSignature: string | null = null;
   private lastHintsSignature: string | null = null;
@@ -142,6 +249,11 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly keydownHandler = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.isAdminMenuOpen()) {
+      event.preventDefault();
+      this.closeAdminMenu();
+      return;
+    }
     if (event.key === "Escape" && this.isReviewOpen()) {
       event.preventDefault();
       this.closeReview();
@@ -176,6 +288,7 @@ export class AppShell {
       event.key === "Tab" &&
       (
         this.isReviewOpen() ||
+        this.isAdminMenuOpen() ||
         this.isLootMenuOpen() ||
         this.isInventoryMenuOpen() ||
         this.isCampfireMenuOpen() ||
@@ -187,6 +300,8 @@ export class AppShell {
         event,
         this.isReviewOpen()
           ? this.answerReview.element
+          : this.isAdminMenuOpen()
+            ? this.adminMenu
           : this.isLootMenuOpen()
             ? this.lootMenu
           : this.isInventoryMenuOpen()
@@ -306,6 +421,7 @@ export class AppShell {
           <div class="run-console">
             <div><span>FLOOR</span><strong id="floor-value">01 / 08</strong></div>
             <div><span>SEED</span><strong id="seed-value">—</strong></div>
+            <button id="open-admin" type="button" class="admin-toggle">⌘ 管理员</button>
             <button id="open-review" type="button" class="review-toggle">▤ 答题复盘</button>
             <button id="audio-toggle" type="button" class="audio-toggle" aria-pressed="false">♪ 声音开启</button>
             <label class="volume-control"><span>音量</span><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.55"></label>
@@ -344,6 +460,9 @@ export class AppShell {
                   <b id="target-intent">等待遭遇</b>
                 </div>
               </article>
+              <button id="retreat-combat" type="button" class="retreat-action" hidden>
+                ESCAPE / 撤退到复活点
+              </button>
 
               <aside id="pickup-card" class="pickup-card" role="status" aria-live="polite" aria-atomic="true" hidden>
                 <span id="pickup-kind">LOOT / 自动生效</span>
@@ -425,6 +544,12 @@ export class AppShell {
                 <p>正在返回最近休息的篝火…</p>
               </section>
 
+              <section id="region-transition" class="region-transition" aria-live="polite" hidden>
+                <span>REGION TRANSFER</span>
+                <strong id="region-transition-route">区域切换</strong>
+                <p>生态音乐与地图色调正在切换…</p>
+              </section>
+
               <div id="interaction-prompt" class="interaction-prompt">用 WASD 探索迷宫</div>
 
               <section id="combat-terminal" class="combat-terminal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="terminal-title" inert>
@@ -443,7 +568,7 @@ export class AppShell {
                     <div id="lock-list" class="lock-list"></div>
                     <div id="schema-list" class="schema-list"></div>
                     <details class="terminal-schema-reference">
-                      <summary>完整字段速查 <span>${SQL_TABLES.length} TABLES</span></summary>
+                      <summary>完整字段速查 <span id="terminal-schema-table-count">${SQL_TABLES.length} TABLES</span></summary>
                       <div id="terminal-schema-reference" class="schema-reference-grid"></div>
                     </details>
                   </section>
@@ -567,7 +692,7 @@ export class AppShell {
             <section class="castle-map-card" aria-label="魔王城发现式迷宫地图">
               <div class="card-heading"><span>迷宫勘测</span><span id="map-explored">探索后显形</span></div>
               <div id="castle-map" class="castle-map"></div>
-              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-route">◇ 路标</span><span class="legend-campfire">♨ 篝火</span><span class="legend-shortcut">▣ 捷径</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
+              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-route">◇ 路标</span><span class="legend-campfire">♨ 篝火</span><span class="legend-portal">◉ 区域门</span><span class="legend-shortcut">▣ 捷径</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
             </section>
 
             <section class="mastery-card">
@@ -631,6 +756,23 @@ export class AppShell {
           </div>
         </section>
 
+        <section id="admin-menu" class="admin-menu" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="admin-menu-title" inert hidden>
+          <div class="admin-menu__panel">
+            <header class="admin-menu__header">
+              <div>
+                <span>DEBUG OVERVIEW / 只读存档边界</span>
+                <h2 id="admin-menu-title">管理员全局视图</h2>
+                <p>可预览 1–8 层全图、怪物与三个生态区。预览状态不写入正式 Run；刷新页面恢复最后存档。</p>
+              </div>
+              <button id="close-admin" type="button" class="icon-action">ESC ×</button>
+            </header>
+            <div id="admin-summary" class="admin-summary"></div>
+            <div id="admin-floor-list" class="admin-floor-list" aria-label="选择预览楼层"></div>
+            <div id="admin-region-list" class="admin-region-list"></div>
+            <p class="admin-menu__warning">管理员模式只用于 Debug。关闭面板仍保持全图可见；刷新页面才退出预览并恢复正式进度。</p>
+          </div>
+        </section>
+
         <footer class="page-footer">
           <span>真实执行：SQLite WASM</span>
           <span>地图：64×48 Seeded 迷宫</span>
@@ -654,6 +796,7 @@ export class AppShell {
     this.campfireMenu = requiredElement(this.root, "#campfire-menu");
     this.inventoryMenu = requiredElement(this.root, "#inventory-menu");
     this.lootMenu = requiredElement(this.root, "#loot-menu");
+    this.adminMenu = requiredElement(this.root, "#admin-menu");
     this.answerReview = new AnswerReviewView(this.root);
     this.executeButton = requiredElement(this.root, "#execute-query");
     this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
@@ -692,7 +835,32 @@ export class AppShell {
       listenerOptions,
     );
     requiredElement(this.root, "#request-hint").addEventListener("click", () => this.requestHint(), listenerOptions);
+    requiredElement(this.root, "#retreat-combat").addEventListener(
+      "click",
+      () => this.retreatFromCombat(),
+      listenerOptions,
+    );
     requiredElement(this.root, "#open-review").addEventListener("click", () => this.openReview(), listenerOptions);
+    requiredElement(this.root, "#open-admin").addEventListener(
+      "click",
+      () => this.openAdminMenu(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#close-admin").addEventListener(
+      "click",
+      () => this.closeAdminMenu(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#admin-floor-list").addEventListener(
+      "click",
+      (event) => this.handleAdminFloorAction(event),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#admin-region-list").addEventListener(
+      "click",
+      (event) => this.handleAdminRegionAction(event),
+      listenerOptions,
+    );
     requiredElement(this.root, "#close-review").addEventListener("click", () => this.closeReview(), listenerOptions);
     requiredElement(this.root, "#rest-at-campfire").addEventListener(
       "click",
@@ -856,6 +1024,8 @@ export class AppShell {
     this.floorTransitionTimer = null;
     if (this.defeatRespawnTimer !== null) window.clearTimeout(this.defeatRespawnTimer);
     this.defeatRespawnTimer = null;
+    if (this.regionTransitionTimer !== null) window.clearTimeout(this.regionTransitionTimer);
+    this.regionTransitionTimer = null;
     this.root.classList.remove(
       "terminal-active",
       "gate-terminal-active",
@@ -863,6 +1033,7 @@ export class AppShell {
       "inventory-active",
       "loot-active",
       "review-active",
+      "admin-active",
     );
     void this.audio.dispose();
   }
@@ -1068,6 +1239,113 @@ export class AppShell {
     return this.answerReview?.isOpen() ?? false;
   }
 
+  private openAdminMenu(): void {
+    if (this.busy || this.isTerminalOpen() || this.isGateTerminalOpen()) return;
+    if (!this.lastSnapshot.adminMode) {
+      const resolution = this.session.enableAdminMode();
+      if (!resolution.ok) {
+        this.showFeedbackNotice({ message: resolution.message, tone: "info" });
+        return;
+      }
+    }
+    this.session.setAdminPanelOpen(true);
+    this.renderAdminMenu(this.session.snapshot());
+    this.adminMenu.hidden = false;
+    this.adminMenu.inert = false;
+    this.adminMenu.setAttribute("aria-hidden", "false");
+    this.adminMenu.classList.add("is-open");
+    this.root.classList.add("admin-active");
+    requiredElement<HTMLButtonElement>(this.adminMenu, "#close-admin").focus({
+      preventScroll: true,
+    });
+  }
+
+  private closeAdminMenu(): void {
+    if (!this.isAdminMenuOpen()) return;
+    this.adminMenu.classList.remove("is-open");
+    this.adminMenu.hidden = true;
+    this.adminMenu.inert = true;
+    this.adminMenu.setAttribute("aria-hidden", "true");
+    this.root.classList.remove("admin-active");
+    this.session.setAdminPanelOpen(false);
+    requiredElement<HTMLButtonElement>(this.root, "#open-admin").focus({
+      preventScroll: true,
+    });
+  }
+
+  private isAdminMenuOpen(): boolean {
+    return this.adminMenu?.classList.contains("is-open") ?? false;
+  }
+
+  private handleAdminFloorAction(event: Event): void {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-admin-floor]",
+    );
+    const value = Number(button?.dataset.adminFloor);
+    if (!Number.isInteger(value) || value < 1 || value > 8) return;
+    const resolution = this.session.adminLoadFloor(value as FloorNumber);
+    if (!resolution.ok) {
+      this.showFeedbackNotice({ message: resolution.message, tone: "info" });
+      return;
+    }
+    const snapshot = this.session.snapshot();
+    this.sql.reset(snapshot.monsters);
+    this.getBattleScene()?.abortEncounter();
+    this.clearQueryArtifacts();
+    this.renderAdminMenu(snapshot);
+  }
+
+  private handleAdminRegionAction(event: Event): void {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-admin-region]",
+    );
+    const regionId = button?.dataset.adminRegion;
+    if (!regionId) return;
+    const resolution = this.session.adminTravelToRegion(regionId);
+    this.showFeedbackNotice({
+      message: resolution.message,
+      tone: resolution.ok ? "success" : "info",
+    });
+  }
+
+  private renderAdminMenu(snapshot: GameSnapshot): void {
+    if (!this.adminMenu) return;
+    const living = snapshot.monsters.filter((monster) => monster.hp > 0);
+    const bosses = living.filter((monster) => monster.isBoss);
+    requiredElement(this.adminMenu, "#admin-summary").textContent =
+      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length} · 区域门 ${snapshot.biomePlan.portals.length}`;
+    const floors = requiredElement(this.adminMenu, "#admin-floor-list");
+    floors.replaceChildren();
+    for (let floor = 1; floor <= 8; floor += 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.adminFloor = String(floor);
+      button.className = floor === snapshot.floor ? "is-active" : "";
+      button.textContent = `F${String(floor).padStart(2, "0")}`;
+      floors.append(button);
+    }
+    const regions = requiredElement(this.adminMenu, "#admin-region-list");
+    regions.replaceChildren();
+    snapshot.biomePlan.regions.forEach((region, index) => {
+      const article = document.createElement("article");
+      const boss = region.areaBossId === null
+        ? null
+        : snapshot.monsters.find((monster) => monster.id === region.areaBossId);
+      const heading = document.createElement("strong");
+      heading.textContent = `${index + 1}. ${region.name}`;
+      const detail = document.createElement("p");
+      detail.textContent = boss
+        ? `区域首领：${boss.name} · ID #${boss.id} · ${boss.hp}/${boss.maxHp} HP`
+        : "区域首领：无 · 课程探索区";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.adminRegion = region.id;
+      button.textContent = "定位到该区域";
+      article.append(heading, detail, button);
+      regions.append(article);
+    });
+  }
+
   private restAtCampfire(): void {
     const resolution = this.session.restAtCampfire();
     this.showFeedbackNotice({
@@ -1083,6 +1361,21 @@ export class AppShell {
 
   private leaveCampfire(): void {
     if (!this.session.leaveCampfire()) return;
+    requiredElement<HTMLElement>(this.root, "#game-root").focus({
+      preventScroll: true,
+    });
+  }
+
+  private retreatFromCombat(): void {
+    if (this.busy) return;
+    if (this.isTerminalOpen()) this.closeTerminal(false);
+    const resolution = this.session.retreatFromCombat();
+    if (!resolution.ok) {
+      this.showFeedbackNotice({ message: resolution.message, tone: "info" });
+      return;
+    }
+    this.getBattleScene()?.abortEncounter();
+    this.showFeedbackNotice({ message: resolution.message, tone: "success" });
     requiredElement<HTMLElement>(this.root, "#game-root").focus({
       preventScroll: true,
     });
@@ -1647,6 +1940,7 @@ export class AppShell {
     const copy = combatSettlementCopy(
       resolution.experience,
       resolution.events.some((event) => event.type === "loot-drop"),
+      resolution.events.find((event) => event.type === "auto-heal")?.itemName,
     );
     requiredElement(card, "#combat-result-title").textContent = copy.title;
     requiredElement(card, "#combat-result-xp").textContent = copy.xp;
@@ -1720,6 +2014,12 @@ export class AppShell {
   }
 
   private reset(): void {
+    if (this.lastSnapshot.adminMode) {
+      const message = "管理员预览不会覆盖正式 Run。刷新页面后再生成新迷宫。";
+      requiredElement(this.root, "#banner").textContent = message;
+      this.showFeedbackNotice({ message, tone: "info" });
+      return;
+    }
     if (this.busy) {
       const message = "当前回合动画正在结算，结束后再开始新 Run。";
       requiredElement(this.root, "#banner").textContent = message;
@@ -1771,6 +2071,12 @@ export class AppShell {
     const biomeName = snapshot.biomePlan.regions.find(
       (region) => region.kind === snapshot.currentBiome,
     )?.name ?? "未知生态";
+    const biomeIndex = Math.max(
+      0,
+      snapshot.biomePlan.regions.findIndex(
+        (region) => region.kind === snapshot.currentBiome,
+      ),
+    );
     const target = snapshot.focusMonsterId === null
       ? undefined
       : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId);
@@ -1793,7 +2099,10 @@ export class AppShell {
 
     requiredElement(this.root, "#seed-value").textContent = snapshot.runSeed;
     requiredElement(this.root, "#floor-value").textContent =
-      `${String(snapshot.campaign.currentFloor).padStart(2, "0")} / 08`;
+      `${String(snapshot.floor).padStart(2, "0")} / 08`;
+    const adminButton = requiredElement<HTMLButtonElement>(this.root, "#open-admin");
+    adminButton.textContent = snapshot.adminMode ? "⌘ 管理员 · ON" : "⌘ 管理员";
+    adminButton.classList.toggle("is-active", snapshot.adminMode);
     this.root.dataset.floor = String(snapshot.floor);
     this.root.dataset.biome = snapshot.currentBiome;
     this.textarea.placeholder = snapshot.floor === 6
@@ -1844,13 +2153,18 @@ export class AppShell {
     requiredElement(this.root, "#victory-count").textContent = `通关 ${snapshot.profile.victories}`;
     requiredElement(this.root, ".game-stage").classList.toggle("is-combat", snapshot.mode === "combat");
     this.sqlButton.disabled = snapshot.mode !== "combat" || this.busy;
+    const retreatButton = requiredElement<HTMLButtonElement>(this.root, "#retreat-combat");
+    retreatButton.hidden = snapshot.mode !== "combat";
+    retreatButton.disabled = snapshot.mode !== "combat" || this.busy;
     requiredElement<HTMLButtonElement>(this.root, "#open-inventory").disabled =
       snapshot.mode !== "explore" && snapshot.mode !== "campfire";
     requiredElement<HTMLButtonElement>(this.root, "#reset-game").disabled =
+      snapshot.adminMode ||
       snapshot.mode === "transition" ||
       snapshot.mode === "defeat" ||
       snapshot.mode === "death-review";
     this.renderFloorTransition(snapshot);
+    this.renderRegionTransition(snapshot);
     this.renderDefeatTransition(snapshot, enteredDefeat);
     this.renderCampfireMenu(snapshot, enteredCampfire);
     this.renderInventoryMenu(snapshot, enteredInventory);
@@ -1862,10 +2176,10 @@ export class AppShell {
       this.lastLocksSignature = locksSignature;
       this.renderLocks(snapshot);
     }
-    const schemaSignature = snapshot.schema.join("\u0000");
+    const schemaSignature = schemaRenderSignature(snapshot);
     if (schemaSignature !== this.lastSchemaSignature) {
       this.lastSchemaSignature = schemaSignature;
-      this.renderSchema(snapshot.schema);
+      this.renderSchema(snapshot);
     }
     const hintsSignature = snapshot.hints.join("\u0000");
     if (hintsSignature !== this.lastHintsSignature) {
@@ -1914,7 +2228,9 @@ export class AppShell {
       ? target?.isBoss ? "boss" : "combat"
       : "explore";
     this.audio.setFloor(snapshot.floor);
+    this.audio.setRegion(biomeIndex);
     this.audio.setMode(musicMode);
+    if (this.isAdminMenuOpen()) this.renderAdminMenu(snapshot);
     if (this.isReviewOpen()) this.answerReview.render(snapshot, this.reviewScope);
     if (enteredDeathReview || (snapshot.mode === "death-review" && !this.isReviewOpen())) {
       this.openReview("battle", "death");
@@ -1969,7 +2285,14 @@ export class AppShell {
     this.gateAutocomplete.setSchemaLines([
       ...challenge.schema,
       ...COMPLETE_SCHEMA_LINES,
+      ...COMPLETE_RELATION_LINES,
     ]);
+    this.gateAutocomplete.setPreferredKeywords(
+      challenge.hints.flatMap((hint) => (
+        ["INNER JOIN", "LEFT JOIN", "JOIN", "ON", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT"]
+          .filter((keyword) => hint.toLocaleUpperCase().includes(keyword))
+      )),
+    );
     requiredElement(this.root, "#gate-terminal-title").textContent = challenge.title;
     requiredElement(this.root, "#gate-terminal-objective").textContent = challenge.objective;
 
@@ -2045,6 +2368,26 @@ export class AppShell {
     }, delay);
   }
 
+  private renderRegionTransition(snapshot: GameSnapshot): void {
+    const transfer = snapshot.regionTransfer;
+    if (!transfer || transfer.sequence <= this.lastRegionTransferSequence) return;
+    this.lastRegionTransferSequence = transfer.sequence;
+    const overlay = requiredElement<HTMLElement>(this.root, "#region-transition");
+    requiredElement(overlay, "#region-transition-route").textContent =
+      `${transfer.fromName} → ${transfer.toName}`;
+    overlay.hidden = false;
+    if (this.regionTransitionTimer !== null) {
+      window.clearTimeout(this.regionTransitionTimer);
+    }
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 350
+      : 850;
+    this.regionTransitionTimer = window.setTimeout(() => {
+      overlay.hidden = true;
+      this.regionTransitionTimer = null;
+    }, delay);
+  }
+
   private renderDefeatTransition(snapshot: GameSnapshot, entered: boolean): void {
     const overlay = requiredElement<HTMLElement>(this.root, "#run-state-overlay");
     const defeated = snapshot.mode === "defeat";
@@ -2113,28 +2456,77 @@ export class AppShell {
     });
   }
 
-  private renderSchema(lines: string[]): void {
+  private renderSchema(snapshot: GameSnapshot): void {
+    const lines = snapshot.schema;
     this.combatAutocomplete.setSchemaLines([
       ...lines,
       ...COMPLETE_SCHEMA_LINES,
+      ...COMPLETE_RELATION_LINES,
     ]);
+    this.combatAutocomplete.setPreferredKeywords(snapshot.locks);
     const root = requiredElement(this.root, "#schema-list");
     root.replaceChildren();
-    lines.forEach((line) => {
-      const code = document.createElement("code");
-      code.textContent = line;
-      root.append(code);
+    const tables = parseSchemaLines(lines);
+    const roles = schemaTaskTableRoles(snapshot);
+    requiredElement(this.root, "#terminal-schema-table-count").textContent =
+      `${tables.length} TABLES`;
+    this.renderCompactSchema(
+      requiredElement(this.root, "#terminal-schema-reference"),
+      lines,
+    );
+
+    const primaryNote = document.createElement("p");
+    primaryNote.className = "schema-task-note";
+    const primaryTable = tables.find((table) => (
+      roles.get(table.name.toLocaleLowerCase()) === "primary"
+    ));
+    const relatedTables = tables.filter((table) => (
+      roles.get(table.name.toLocaleLowerCase()) === "related"
+    ));
+    primaryNote.textContent = tables.some((table) => table.name === "monsters")
+      ? "怪物主表按 monsters.id 定位；monster_id 仅属于信号/装备明细表，可用于过滤明细行，也可关联 monsters.id。"
+      : primaryTable
+        ? `本题先读取 ${primaryTable.name}；${
+          relatedTables.length > 0
+            ? `需要关联 ${relatedTables.map((table) => table.name).join("、")}。`
+            : "其余专用表仅作字段参考。"
+        }`
+        : "本题使用当前事故表字段；未参与查询的表仅作参考。";
+    root.append(primaryNote);
+    tables.forEach((table) => {
+      const definition = SQL_TABLES.find((entry) => entry.name === table.name);
+      const article = document.createElement("article");
+      const roleName = roles.get(table.name.toLocaleLowerCase());
+      const active = roleName !== undefined;
+      article.className = active ? "schema-task-table is-active" : "schema-task-table";
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = table.name;
+      const subtitle = document.createElement("span");
+      subtitle.textContent = definition?.title ?? "数据表";
+      const role = document.createElement("i");
+      role.textContent = active
+        ? roleName === "primary" ? "本题主表" : "本题关联表"
+        : "字段参考";
+      heading.append(title, subtitle, role);
+      const fields = document.createElement("code");
+      fields.textContent = table.columns.join(", ");
+      article.append(heading, fields);
+      root.append(article);
     });
   }
 
-  private renderCompactSchema(root: HTMLElement): void {
+  private renderCompactSchema(
+    root: HTMLElement,
+    schemaLines: readonly string[] = COMPLETE_SCHEMA_LINES,
+  ): void {
     root.replaceChildren();
-    SQL_TABLES.forEach((table) => {
+    parseSchemaLines(schemaLines).forEach((table) => {
       const article = document.createElement("article");
       const title = document.createElement("strong");
       title.textContent = table.name;
       const fields = document.createElement("code");
-      fields.textContent = table.columns.map((column) => column.name).join(", ");
+      fields.textContent = table.columns.join(", ");
       article.append(title, fields);
       root.append(article);
     });
@@ -2316,6 +2708,17 @@ export class AppShell {
         marker.setAttribute("y", String(position.y + 0.14));
         marker.setAttribute("width", "0.72");
         marker.setAttribute("height", "0.72");
+        svg.append(marker);
+      });
+    });
+    snapshot.biomePlan.portals.forEach((portal) => {
+      [portal.entry, portal.exit].forEach((position) => {
+        if (!discovered.has(`${position.x}:${position.y}`)) return;
+        const marker = document.createElementNS(SVG_NS, "circle");
+        marker.classList.add("minimap-region-portal");
+        marker.setAttribute("cx", String(position.x + 0.5));
+        marker.setAttribute("cy", String(position.y + 0.5));
+        marker.setAttribute("r", "0.42");
         svg.append(marker);
       });
     });

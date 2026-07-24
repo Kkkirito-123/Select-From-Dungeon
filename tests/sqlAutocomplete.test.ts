@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applySqlSuggestion,
   getSqlCompletions,
+  parseSchemaRelations,
   parseSchemaLines,
 } from "../src/ui/sqlAutocomplete";
 
@@ -86,6 +87,109 @@ describe("SQL autocomplete", () => {
     expect(completion.suggestions.every((suggestion) => (
       suggestion.detail.startsWith("monsters")
     ))).toBe(true);
+  });
+
+  it("进入 monsters WHERE 后只提示主表字段，不把明细表 monster_id 混进来", () => {
+    const sql = "SELECT name, hp FROM monsters WHERE ";
+    const completion = getSqlCompletions(sql, sql.length, sql.length, SCHEMA, true);
+    const fieldLabels = completion.suggestions
+      .filter((suggestion) => suggestion.kind === "column")
+      .map((suggestion) => suggestion.label);
+    expect(fieldLabels).toContain("id");
+    expect(fieldLabels).not.toContain("monster_id");
+  });
+
+  it("本题锁定 INNER JOIN 时优先于更短的 IN，并在 ON 后给出真实关系", () => {
+    const joinPrefix = "SELECT m.name FROM monsters m in";
+    const keywordCompletion = getSqlCompletions(
+      joinPrefix,
+      joinPrefix.length,
+      joinPrefix.length,
+      SCHEMA,
+      false,
+      ["INNER JOIN", "ON"],
+    );
+    expect(keywordCompletion.suggestions[0]?.label).toBe("INNER JOIN");
+
+    const onSql = "SELECT m.name, r.name FROM monsters m INNER JOIN rooms r ON ";
+    const schemaWithRelation = [
+      ...SCHEMA,
+      "rooms(id, name, sector, floor)",
+      "关系：monsters.room_id = rooms.id",
+    ];
+    expect(getSqlCompletions(
+      onSql,
+      onSql.length,
+      onSql.length,
+      schemaWithRelation,
+      true,
+      ["INNER JOIN", "ON"],
+    ).suggestions[0]).toMatchObject({
+      label: "m.room_id = r.id",
+      kind: "relation",
+    });
+  });
+
+  it("从关系说明中提取两侧表与字段", () => {
+    expect(parseSchemaRelations([
+      "关系：monsters.room_id = rooms.id",
+    ])).toEqual([{
+      leftTable: "monsters",
+      leftColumn: "room_id",
+      rightTable: "rooms",
+      rightColumn: "id",
+    }]);
+  });
+
+  it("自连接保留同表两个别名，并用已有行的外键连接新加入的主记录", () => {
+    const sql =
+      "SELECT child.name, master.name FROM monsters child INNER JOIN monsters master ON ";
+    const schema = [
+      "monsters(id, master_id, name)",
+      "关系：monsters.master_id = monsters.id",
+    ];
+    const relations = getSqlCompletions(
+      sql,
+      sql.length,
+      sql.length,
+      schema,
+      true,
+      ["SELF JOIN", "ON"],
+    ).suggestions.filter((suggestion) => suggestion.kind === "relation");
+
+    expect(relations[0]).toMatchObject({
+      label: "child.master_id = master.id",
+      kind: "relation",
+    });
+    expect(relations.map((suggestion) => suggestion.label))
+      .not.toContain("master.master_id = master.id");
+  });
+
+  it("三表链式 JOIN 的新 ON 只提示涉及当前新表的尚未使用关系", () => {
+    const sql =
+      "SELECT r.name, m.name, g.power FROM rooms r " +
+      "INNER JOIN monsters m ON m.room_id = r.id " +
+      "INNER JOIN monster_gear g ON ";
+    const schema = [
+      "rooms(id, name)",
+      "monsters(id, room_id, name)",
+      "monster_gear(id, monster_id, power)",
+      "关系：monsters.room_id = rooms.id",
+      "关系：monster_gear.monster_id = monsters.id",
+    ];
+    const relationLabels = getSqlCompletions(
+      sql,
+      sql.length,
+      sql.length,
+      schema,
+      true,
+      ["INNER JOIN", "ON"],
+    ).suggestions
+      .filter((suggestion) => suggestion.kind === "relation")
+      .map((suggestion) => suggestion.label);
+
+    expect(relationLabels[0]).toBe("g.monster_id = m.id");
+    expect(relationLabels).not.toContain("m.room_id = r.id");
   });
 
   it("字符串字面量和行注释中不弹出建议", () => {

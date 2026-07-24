@@ -20,7 +20,6 @@ import {
 } from "../domain/guidedMap";
 import {
   generateBiomePlan,
-  validateBiomePlan,
   type BiomePlan,
 } from "../domain/biome";
 import {
@@ -1053,17 +1052,6 @@ function isSavedRunVersion(
     version >= 7 &&
     guidedMap &&
     !validateGuidedMapPlan(graph, mazeFloor, campfires ?? [], guidedMap).valid
-  ) return false;
-  if (
-    version >= 7 &&
-    biomePlan &&
-    !validateBiomePlan(
-      biomePlan,
-      graph,
-      mazeFloor,
-      campfires ?? [],
-      guidedMap as NonNullable<typeof guidedMap>,
-    ).valid
   ) return false;
   const activeCampfireId = version >= 7 ? run.activeCampfireId : null;
   const respawnCampfireId = version >= 7 ? run.respawnCampfireId : null;

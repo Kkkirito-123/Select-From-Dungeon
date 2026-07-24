@@ -59,12 +59,23 @@ export interface BiomeFeature extends Position {
   biome: BiomeKind;
 }
 
+export interface BiomePortal {
+  id: string;
+  name: string;
+  entry: Position;
+  exit: Position;
+  fromRegionId: string;
+  toRegionId: string;
+  requiredBossId: number | null;
+}
+
 export interface BiomePlan {
   version: 1;
   seed: string;
   floor: RoomGraph["floor"];
   regions: BiomeRegion[];
   features: BiomeFeature[];
+  portals: BiomePortal[];
 }
 
 interface RegionTemplate {
@@ -145,10 +156,23 @@ function nearestRegion(
   regions: readonly BiomeRegion[],
   position: Position,
 ): BiomeRegion {
-  return [...regions].sort((left, right) => (
-    distance(position, left.anchor) - distance(position, right.anchor) ||
-    left.id.localeCompare(right.id)
-  ))[0];
+  let nearest = regions[0];
+  let nearestDistance = distance(position, nearest.anchor);
+  for (let index = 1; index < regions.length; index += 1) {
+    const candidate = regions[index];
+    const candidateDistance = distance(position, candidate.anchor);
+    if (
+      candidateDistance < nearestDistance ||
+      (
+        candidateDistance === nearestDistance &&
+        candidate.id.localeCompare(nearest.id) < 0
+      )
+    ) {
+      nearest = candidate;
+      nearestDistance = candidateDistance;
+    }
+  }
+  return nearest;
 }
 
 function neighborCount(floor: MazeFloor, position: Position): number {
@@ -208,12 +232,18 @@ function chooseAreaBossPosition(
       candidates.push(position);
     }
   }
-  return candidates.sort((left, right) => (
-    stableStringHash(`${planSeed}:boss:${region.kind}:${positionKey(left)}`) -
-      stableStringHash(`${planSeed}:boss:${region.kind}:${positionKey(right)}`) ||
-    left.y - right.y ||
-    left.x - right.x
-  ))[0] ?? null;
+  return candidates
+    .map((position) => ({
+      position,
+      score: stableStringHash(
+        `${planSeed}:boss:${region.kind}:${positionKey(position)}`,
+      ),
+    }))
+    .sort((left, right) => (
+      left.score - right.score ||
+      left.position.y - right.position.y ||
+      left.position.x - right.position.x
+    ))[0]?.position ?? null;
 }
 
 function createFeatures(
@@ -239,19 +269,142 @@ function createFeatures(
       }
     }
     return candidates
+      .map((position) => ({
+        position,
+        score: stableStringHash(
+          `${planSeed}:feature:${region.kind}:${positionKey(position)}`,
+        ),
+      }))
       .sort((left, right) => (
-        stableStringHash(`${planSeed}:feature:${region.kind}:${positionKey(left)}`) -
-          stableStringHash(`${planSeed}:feature:${region.kind}:${positionKey(right)}`) ||
-        left.y - right.y ||
-        left.x - right.x
+        left.score - right.score ||
+        left.position.y - right.position.y ||
+        left.position.x - right.position.x
       ))
       .slice(0, 14)
-      .map((position, index) => ({
+      .map(({ position }, index) => ({
         id: `biome:${region.kind}:${index + 1}`,
         kind: featureKind,
         biome: region.kind,
         ...position,
       }));
+  });
+}
+
+function choosePortalPosition(
+  planSeed: string,
+  portalLabel: string,
+  region: BiomeRegion,
+  regions: readonly BiomeRegion[],
+  floor: MazeFloor,
+  excluded: ReadonlySet<string>,
+  focus: Position,
+): Position {
+  const maxRadius = floor.width + floor.height;
+  for (let radius = 0; radius <= maxRadius; radius += 1) {
+    let selected: Position | null = null;
+    let selectedHash = Number.POSITIVE_INFINITY;
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      const dy = radius - Math.abs(dx);
+      const candidates = dy === 0
+        ? [{ x: focus.x + dx, y: focus.y }]
+        : [
+            { x: focus.x + dx, y: focus.y - dy },
+            { x: focus.x + dx, y: focus.y + dy },
+          ];
+      for (const position of candidates) {
+        if (
+          position.x <= 0 ||
+          position.y <= 0 ||
+          position.x >= floor.width - 1 ||
+          position.y >= floor.height - 1 ||
+          mazeTileAt(floor, position.x, position.y) !== "." ||
+          excluded.has(positionKey(position)) ||
+          nearestRegion(regions, position).id !== region.id ||
+          neighborCount(floor, position) < 2
+        ) continue;
+        const hash = stableStringHash(
+          `${planSeed}:portal:${portalLabel}:${positionKey(position)}`,
+        );
+        if (
+          hash < selectedHash ||
+          (
+            hash === selectedHash &&
+            (
+              selected === null ||
+              position.y < selected.y ||
+              (position.y === selected.y && position.x < selected.x)
+            )
+          )
+        ) {
+          selected = position;
+          selectedHash = hash;
+        }
+      }
+    }
+    if (selected) return selected;
+  }
+  throw new Error(`生态 ${region.kind} 缺少区域传送门落点。`);
+}
+
+function createPortals(
+  planSeed: string,
+  floorNumber: RoomGraph["floor"],
+  regions: readonly BiomeRegion[],
+  floor: MazeFloor,
+  excluded: Set<string>,
+): BiomePortal[] {
+  const [front, middle, rear] = regions;
+  const definitions = [
+    {
+      id: `biome-portal:${floorNumber}:front-middle`,
+      name: `${front.name} ⇄ ${middle.name}`,
+      from: front,
+      to: middle,
+      entryFocus: floor.spawn,
+      exitFocus: middle.anchor,
+      requiredBossId: null,
+    },
+    {
+      id: `biome-portal:${floorNumber}:middle-rear`,
+      name: `${middle.name} ⇄ ${rear.name}`,
+      from: middle,
+      to: rear,
+      entryFocus: middle.areaBossPosition ?? middle.anchor,
+      exitFocus: rear.anchor,
+      requiredBossId: middle.areaBossId,
+    },
+  ] as const;
+
+  return definitions.map((definition) => {
+    const entry = choosePortalPosition(
+      planSeed,
+      `${definition.id}:entry`,
+      definition.from,
+      regions,
+      floor,
+      excluded,
+      definition.entryFocus,
+    );
+    excluded.add(positionKey(entry));
+    const exit = choosePortalPosition(
+      planSeed,
+      `${definition.id}:exit`,
+      definition.to,
+      regions,
+      floor,
+      excluded,
+      definition.exitFocus,
+    );
+    excluded.add(positionKey(exit));
+    return {
+      id: definition.id,
+      name: definition.name,
+      entry,
+      exit,
+      fromRegionId: definition.from.id,
+      toRegionId: definition.to.id,
+      requiredBossId: definition.requiredBossId,
+    };
   });
 }
 
@@ -290,12 +443,14 @@ export function generateBiomePlan(
     region.areaBossPosition = chooseAreaBossPosition(seed, region, regions, floor, excluded);
     if (region.areaBossPosition) excluded.add(positionKey(region.areaBossPosition));
   });
+  const portals = createPortals(seed, graph.floor, regions, floor, excluded);
   return {
     version: BIOME_PLAN_VERSION,
     seed,
     floor: graph.floor,
     regions,
     features: createFeatures(seed, regions, templates, floor, excluded),
+    portals,
   };
 }
 
@@ -310,6 +465,11 @@ export function cloneBiomePlan(plan: BiomePlan): BiomePlan {
         : null,
     })),
     features: plan.features.map((feature) => ({ ...feature })),
+    portals: plan.portals.map((portal) => ({
+      ...portal,
+      entry: { ...portal.entry },
+      exit: { ...portal.exit },
+    })),
   };
 }
 
@@ -345,6 +505,9 @@ export function validateBiomePlan(
   }
   if (plan.features.length !== 42) {
     errors.push("每个生态区域必须提供 14 个低成本地标。");
+  }
+  if (plan.portals.length !== 2) {
+    errors.push("每层必须提供两条区域快速通道。");
   }
   const bosses = plan.regions.filter((region) => region.areaBossId !== null);
   const expectedBosses = BIOME_ENCOUNTERS.filter((encounter) => (

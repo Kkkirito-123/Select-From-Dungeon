@@ -70,11 +70,11 @@ const weaponCandidate = candidate({
 }, 0);
 
 describe("rollLootItems", () => {
-  it("生态池给出对应恢复品，普通怪仍维持低概率掉落", () => {
+  it("生态池只给出 2% 的自动恢复品候选，不再随机掉装备", () => {
     expect(lootCandidatesForBiome(1, "slime-pool", "normal")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          probability: 0.06,
+          probability: 0.02,
           item: expect.objectContaining({ itemId: "slime-gel" }),
         }),
       ]),
@@ -82,33 +82,25 @@ describe("rollLootItems", () => {
     expect(lootCandidatesForBiome(2, "swamp", "normal")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          probability: 0.06,
+          probability: 0.02,
           item: expect.objectContaining({ itemId: "frog-potion" }),
         }),
       ]),
     );
-    expect(lootCandidatesForBiome(2, "forest", "normal")).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          probability: 0.0075,
-          item: expect.objectContaining({ itemId: "hunter-bow" }),
-        }),
-      ]),
-    );
+    expect(lootCandidatesForBiome(2, "forest", "normal").every(
+      (entry) => entry.item.kind === "consumable",
+    )).toBe(true);
   });
 
-  it("第三、四层旧楼层入口也返回本层候选，且不会重复符文杖", () => {
-    expect(lootCandidatesForFloor(3).map((entry) => entry.item.itemId)).toEqual(
-      expect.arrayContaining(["holy-water", "bone-blade", "bone-armor", "rune-staff"]),
-    );
+  it("八层旧楼层入口也只返回当前生态恢复品", () => {
+    expect(lootCandidatesForFloor(3).map((entry) => entry.item.itemId)).toEqual([
+      "holy-water",
+    ]);
     const floorFourIds = lootCandidatesForFloor(4).map((entry) => entry.item.itemId);
-    expect(floorFourIds).toEqual(
-      expect.arrayContaining(["fire-crystal", "rune-staff", "rune-armor"]),
-    );
-    expect(new Set(floorFourIds).size).toBe(floorFourIds.length);
+    expect(floorFourIds).toEqual(["fire-crystal"]);
   });
 
-  it("普通怪允许空掉落，精英和层主分别保证至少 1/2 件", () => {
+  it("普通怪、精英和层主都允许空随机掉落，固定课程奖励另行注入", () => {
     const base = {
       seed: "drop-minimum",
       floor: 1 as const,
@@ -117,19 +109,16 @@ describe("rollLootItems", () => {
       acquiredUniqueItemIds: new Set<string>(),
     };
     expect(rollLootItems({ ...base, monster: monster("normal") })).toEqual([]);
-    expect(rollLootItems({ ...base, monster: monster("elite") })).toHaveLength(1);
-    expect(rollLootItems({ ...base, monster: monster("boss") })).toHaveLength(2);
+    expect(rollLootItems({ ...base, monster: monster("elite") })).toEqual([]);
+    expect(rollLootItems({ ...base, monster: monster("boss") })).toEqual([]);
   });
 
-  it("区域首领即使概率均未命中也会稳定补足两件不重复战利品", () => {
+  it("显式要求最低掉落时仍可稳定补足，默认战斗不再调用该保底", () => {
     const items = rollLootItems({
       seed: "area-boss-minimum",
       floor: 2,
       monster: { ...monster("elite"), floor: 2, id: 1810 },
-      candidates: lootCandidatesForBiome(2, "lake", "area-boss").map((entry) => ({
-        ...entry,
-        probability: 0,
-      })),
+      candidates: [gelCandidate, armorCandidate, weaponCandidate],
       fixedItems: [],
       acquiredUniqueItemIds: new Set(),
       minimumNonKeyDrops: 2,

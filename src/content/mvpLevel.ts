@@ -379,7 +379,7 @@ export const LESSONS: readonly LessonDefinition[] = [
     stages: [
       {
         id: "group-signals",
-        objective: "按 channel 分组统计 monster_id = 800 的信号数，数量别名为 total。",
+        objective: "从 monster_signals 按 channel 分组统计 monster_id = 800 的信号数，数量别名为 total。",
         queryTemplate: "",
         answerSql: "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 800 GROUP BY channel;",
         hints: [

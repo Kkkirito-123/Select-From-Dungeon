@@ -268,6 +268,7 @@ export class ArcadeAudio {
   private nextMusicStepAt = 0;
   private musicStep = 0;
   private activeTrackIndex = 0;
+  private regionIndex = 0;
   private floorValue: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 1;
   private completedTrackCycles = 0;
   private readonly musicSources = new Set<AudioScheduledSourceNode>();
@@ -293,7 +294,9 @@ export class ArcadeAudio {
   constructor(options: ArcadeAudioOptions = {}) {
     this.modeValue = options.mode ?? "explore";
     const playlist = playlistFor(this.modeValue, this.floorValue);
-    this.activeTrackIndex = Math.floor(Math.random() * playlist.length);
+    this.activeTrackIndex = this.modeValue === "explore"
+      ? this.regionIndex % playlist.length
+      : Math.floor(Math.random() * playlist.length);
     this.mutedValue = options.muted ?? false;
     const initialVolume = options.volume ?? 0.55;
     this.volumeValue = clamp(Number.isFinite(initialVolume) ? initialVolume : 0, 0, 1);
@@ -413,11 +416,20 @@ export class ArcadeAudio {
     this.restartMusicPlaylist();
   }
 
+  setRegion(index: number): void {
+    const normalized = Math.max(0, Math.floor(index));
+    if (this.regionIndex === normalized || this.disposed) return;
+    this.regionIndex = normalized;
+    if (this.modeValue === "explore") this.restartMusicPlaylist();
+  }
+
   private restartMusicPlaylist(): void {
     this.musicStep = 0;
     this.completedTrackCycles = 0;
     const playlist = playlistFor(this.modeValue, this.floorValue);
-    this.activeTrackIndex = Math.floor(Math.random() * playlist.length);
+    this.activeTrackIndex = this.modeValue === "explore"
+      ? this.regionIndex % playlist.length
+      : Math.floor(Math.random() * playlist.length);
     this.nextMusicStepAt = 0;
 
     const context = this.context;

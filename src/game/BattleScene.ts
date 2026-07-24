@@ -4,6 +4,7 @@ import {
   biomeEncounterFor,
   type BiomeKind,
 } from "../content/biomeContent";
+import { monsterVisualArchetype } from "../content/monsterVisuals";
 import { GameSession } from "../domain/GameSession";
 import type { GameSnapshot, Monster, TurnResolution } from "../domain/types";
 
@@ -613,7 +614,8 @@ export class BattleScene extends Phaser.Scene {
       ? 1.35
       : encounterRole === "area-boss" ? 1.28 : encounterRole === "mini-elite" ? 1.12 : 1;
     const parts: Phaser.GameObjects.GameObject[] = [];
-    if (monster.kind === "projection-slime") {
+    const visual = monsterVisualArchetype(monster);
+    if (visual === "slime") {
       const bodyColor = monster.species.includes("poison")
         ? 0x8d5aa2
         : monster.species.includes("water")
@@ -634,8 +636,8 @@ export class BattleScene extends Phaser.Scene {
       if (monster.species.includes("king")) {
         parts.push(this.add.triangle(0, -48, -24, 16, 0, -15, 24, 16, COLORS.gold));
       }
-    } else if (monster.kind === "skeleton" || monster.kind === "zombie") {
-      const body = monster.kind === "skeleton" ? 0xd5c9a9 : 0x6f8059;
+    } else if (visual === "skeleton" || visual === "zombie") {
+      const body = visual === "skeleton" ? 0xd5c9a9 : 0x6f8059;
       parts.push(
         this.add.rectangle(0, 17, 54, 56, body).setStrokeStyle(6, 0x403a31),
         this.add.rectangle(0, -30, 55, 46, body + 0x101010),
@@ -644,24 +646,28 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(-21, 64, 13, 24, body),
         this.add.rectangle(21, 64, 13, 24, body),
       );
-    } else if (monster.kind === "ghost" || monster.kind === "necromancer") {
-      const spirit = monster.kind === "necromancer" ? 0x68447d : 0x74558f;
+    } else if (
+      visual === "ghost" ||
+      visual === "necromancer" ||
+      visual === "lich"
+    ) {
+      const spirit = visual === "lich"
+        ? 0x352b62
+        : visual === "necromancer" ? 0x68447d : 0x74558f;
       parts.push(
-        this.add.rectangle(0, 7, monster.kind === "necromancer" ? 78 : 62, 67, spirit, 0.93),
+        this.add.rectangle(0, 7, visual === "ghost" ? 62 : 78, 67, spirit, 0.93),
         this.add.triangle(-22, 58, -16, 17, 0, -13, 16, 17, spirit, 0.93),
         this.add.triangle(22, 58, -16, 17, 0, -13, 16, 17, spirit, 0.93),
         this.add.rectangle(-15, -9, 9, 11, 0xd5fff1),
         this.add.rectangle(15, -9, 9, 11, 0xd5fff1),
       );
-      if (monster.kind === "necromancer") {
+      if (visual === "necromancer" || visual === "lich") {
         parts.push(this.add.triangle(0, -66, -30, 19, 0, -19, 30, 19, 0xc2a45c));
       }
-    } else if (
-      monster.kind === "fire-spirit" ||
-      monster.kind === "ice-spirit" ||
-      monster.kind === "thunder-spirit" ||
-      monster.kind === "elemental-king"
-    ) {
+      if (visual === "lich") {
+        parts.push(this.add.rectangle(0, 22, 36, 8, 0x63e1cb));
+      }
+    } else if (visual === "elemental") {
       const element = monster.kind === "fire-spirit"
         ? 0xe45b3e
         : monster.kind === "ice-spirit"
@@ -675,13 +681,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(-16, 0, 9, 11, 0xfff8df),
         this.add.rectangle(16, 0, 9, 11, 0xfff8df),
       );
-    } else if (
-      monster.kind === "goblin" ||
-      monster.kind === "orc" ||
-      monster.kind === "knight" ||
-      monster.kind === "troll" ||
-      monster.kind === "castle-lord"
-    ) {
+    } else if (visual === "humanoid") {
       const armored = monster.kind === "knight" || monster.kind === "castle-lord";
       const large = monster.kind === "troll" || monster.kind === "castle-lord";
       const body = armored
@@ -700,12 +700,7 @@ export class BattleScene extends Phaser.Scene {
       if (monster.kind === "castle-lord") {
         parts.push(this.add.triangle(0, -80, -30, 20, 0, -21, 30, 20, COLORS.gold));
       }
-    } else if (
-      monster.kind === "hatchling" ||
-      monster.kind === "wyvern" ||
-      monster.kind === "dragon" ||
-      monster.kind === "dragon-king"
-    ) {
+    } else if (visual === "dragon") {
       const large = monster.kind === "dragon" || monster.kind === "dragon-king";
       const body = monster.species.includes("crystal")
         ? 0x558ca3
@@ -721,7 +716,7 @@ export class BattleScene extends Phaser.Scene {
       if (monster.kind === "dragon-king") {
         parts.push(this.add.triangle(0, -73, -32, 21, 0, -23, 32, 21, COLORS.gold));
       }
-    } else if (monster.species.includes("frog")) {
+    } else if (visual === "frog") {
       const poison = monster.species.includes("poison") || monster.species.includes("boss");
       const body = poison ? 0x78893b : 0x5da05c;
       parts.push(
@@ -732,7 +727,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(23, -19, 8, 8, 0x0b120d),
         this.add.rectangle(0, 26, 29, 6, poison ? 0xd2c85d : 0x254128),
       );
-    } else if (monster.species.includes("treant")) {
+    } else if (visual === "treant") {
       parts.push(
         this.add.rectangle(0, 9, 52, 76, 0x745037).setStrokeStyle(6, 0x35271e),
         this.add.rectangle(-35, -25, 47, 43, 0x3d7849),
@@ -741,10 +736,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(14, 1, 9, 9, 0xe2c76b),
         this.add.rectangle(0, 25, 25, 6, 0x2d221a),
       );
-    } else if (
-      monster.species.includes("lake") ||
-      monster.species.includes("water_snake")
-    ) {
+    } else if (visual === "water-beast") {
       parts.push(
         this.add.ellipse(0, 8, 84, 52, 0x397e9d).setStrokeStyle(6, 0x194c68),
         this.add.triangle(-51, 10, 0, 20, 31, 0, 31, 40, 0x5fb2c7),
@@ -752,7 +744,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(16, -9, 9, 9, 0xd9f7f2),
         this.add.rectangle(0, 31, 34, 6, 0x183a4b),
       );
-    } else if (monster.species.includes("jungle_king")) {
+    } else if (visual === "jungle-king") {
       parts.push(
         this.add.rectangle(0, 9, 100, 88, 0x69543a).setStrokeStyle(8, 0x2e261d),
         this.add.rectangle(-39, -45, 39, 29, 0x3f7645),
@@ -761,7 +753,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(21, -9, 13, 13, 0xe4c15c),
         this.add.triangle(0, -72, -34, 20, 0, -20, 34, 20, 0xd0a640),
       );
-    } else if (monster.kind === "filter-hound") {
+    } else if (visual === "hound") {
       parts.push(
         this.add.rectangle(-5, 9, 75, 40, 0x9b6747),
         this.add.rectangle(32, -17, 35, 35, 0xc08b5f),
@@ -770,15 +762,16 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(-27, 39, 10, 22, 0x6f4233),
         this.add.rectangle(24, 39, 10, 22, 0x6f4233),
       );
-    } else if (monster.kind === "null-ghost") {
+    } else if (visual === "golem") {
       parts.push(
-        this.add.rectangle(0, 3, 62, 58, COLORS.plum, 0.95),
-        this.add.rectangle(-20, 42, 20, 20, COLORS.plum, 0.95),
-        this.add.rectangle(20, 42, 20, 20, COLORS.plum, 0.95),
-        this.add.rectangle(-14, -8, 9, 11, COLORS.paper),
-        this.add.rectangle(14, -8, 9, 11, COLORS.paper),
+        this.add.rectangle(0, 8, 88, 76, 0x676c76).setStrokeStyle(7, 0x2e333b),
+        this.add.rectangle(-32, -39, 30, 25, 0x7f8792),
+        this.add.rectangle(32, -39, 30, 25, 0x7f8792),
+        this.add.rectangle(-20, -7, 11, 11, COLORS.gold),
+        this.add.rectangle(20, -7, 11, 11, COLORS.gold),
+        this.add.rectangle(0, 29, 42, 9, 0x282c34),
       );
-    } else if (monster.kind === "sort-drake") {
+    } else if (visual === "drake") {
       parts.push(
         this.add.rectangle(0, 7, 58, 43, 0x3f67a8).setStrokeStyle(6, 0x17275b),
         this.add.triangle(-55, 4, 0, 21, 38, 0, 38, 42, 0x5ad9df),
@@ -787,7 +780,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(14, -4, 8, 8, 0xdffcff),
         this.add.rectangle(0, 32, 35, 8, 0xd483ff),
       );
-    } else if (monster.kind === "distinct-mimic") {
+    } else if (visual === "mimic") {
       parts.push(
         this.add.rectangle(-20, 5, 49, 58, 0x6e4aa0).setStrokeStyle(6, 0x28184c),
         this.add.rectangle(20, -2, 49, 58, 0x465fc0).setStrokeStyle(6, 0x28184c),
@@ -795,7 +788,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(14, -16, 8, 8, 0xa8f8ff),
         this.add.rectangle(0, 35, 48, 8, 0x251638),
       );
-    } else if (monster.kind === "join-spider") {
+    } else if (visual === "spider") {
       parts.push(
         this.add.rectangle(0, 10, 60, 50, 0x68449a).setStrokeStyle(6, 0x211545),
         this.add.rectangle(0, -24, 43, 29, 0x4c6cca),
@@ -807,7 +800,7 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(-12, -26, 8, 8, 0xffffff),
         this.add.rectangle(12, -26, 8, 8, 0xffffff),
       );
-    } else if (monster.kind === "left-join-wraith") {
+    } else if (visual === "wraith") {
       parts.push(
         this.add.rectangle(-14, 4, 54, 68, 0x7547a7, 0.94),
         this.add.rectangle(24, 12, 26, 54, 0x2b2d65, 0.7),
@@ -821,7 +814,7 @@ export class BattleScene extends Phaser.Scene {
           fontStyle: "bold",
         }).setOrigin(0.5),
       );
-    } else if (monster.kind === "relation-titan") {
+    } else if (visual === "titan") {
       parts.push(
         this.add.rectangle(0, 5, 96, 86, 0x303e88).setStrokeStyle(7, 0x17163f),
         this.add.rectangle(-38, -42, 38, 24, 0x8d51bf),
@@ -832,16 +825,147 @@ export class BattleScene extends Phaser.Scene {
         this.add.rectangle(-64, 7, 29, 9, 0x68e8ee),
         this.add.rectangle(64, 7, 29, 9, 0xd483ff),
       );
+    } else if (visual === "index-guard") {
+      parts.push(
+        this.add.rectangle(0, 7, 78, 82, 0x285e65).setStrokeStyle(7, 0x102e35),
+        this.add.rectangle(0, -40, 63, 33, 0x498993),
+        this.add.rectangle(-19, -42, 10, 12, 0x8ff6e8),
+        this.add.rectangle(19, -42, 10, 12, 0x8ff6e8),
+        this.add.rectangle(-54, 9, 25, 62, 0x183f48).setStrokeStyle(4, 0x70d7c7),
+        this.add.text(0, 15, "IDX", {
+          color: "#9ff6e8",
+          fontFamily: "monospace",
+          fontSize: "15px",
+          fontStyle: "bold",
+        }).setOrigin(0.5),
+      );
+    } else if (visual === "root-beast") {
+      parts.push(
+        this.add.rectangle(0, 9, 93, 82, 0x69472e).setStrokeStyle(7, 0x2f2117),
+        this.add.rectangle(-35, -42, 37, 29, 0x43633a),
+        this.add.rectangle(35, -42, 37, 29, 0x43633a),
+        this.add.rectangle(-21, -8, 11, 12, 0xe2b95e),
+        this.add.rectangle(21, -8, 11, 12, 0xe2b95e),
+        this.add.rectangle(-63, 23, 43, 9, 0x835b35).setAngle(-28),
+        this.add.rectangle(63, 23, 43, 9, 0x835b35).setAngle(28),
+        this.add.rectangle(0, 33, 44, 8, 0x2a1e16),
+      );
+    } else if (visual === "crystal-spirit") {
+      parts.push(
+        this.add.polygon(
+          0,
+          4,
+          [0, -64, 43, -18, 31, 50, 0, 68, -31, 50, -43, -18],
+          0x56bfc2,
+          0.95,
+        ).setStrokeStyle(6, 0xa5fff2),
+        this.add.triangle(-42, 8, -8, 19, 0, -31, 8, 19, 0x75dfda, 0.9),
+        this.add.triangle(42, 8, -8, 19, 0, -31, 8, 19, 0x75dfda, 0.9),
+        this.add.rectangle(-14, -6, 8, 10, 0xffffff),
+        this.add.rectangle(14, -6, 8, 10, 0xffffff),
+      );
+    } else if (visual === "vine-witch") {
+      parts.push(
+        this.add.triangle(0, 17, -48, 54, 0, -48, 48, 54, 0x315d42)
+          .setStrokeStyle(6, 0x173222),
+        this.add.rectangle(0, -33, 48, 38, 0x80a45d),
+        this.add.triangle(0, -76, -38, 29, 0, -25, 38, 29, 0x4a754b),
+        this.add.rectangle(-14, -37, 8, 10, 0xf0d36a),
+        this.add.rectangle(14, -37, 8, 10, 0xf0d36a),
+        this.add.rectangle(-59, 4, 57, 7, 0x55945b).setAngle(-20),
+        this.add.rectangle(59, 4, 57, 7, 0x55945b).setAngle(20),
+      );
+    } else if (visual === "index-eye") {
+      parts.push(
+        this.add.ellipse(0, 5, 112, 77, 0x1d6b70).setStrokeStyle(8, 0x65d4cf),
+        this.add.ellipse(0, 5, 58, 58, 0xe3efe1),
+        this.add.rectangle(0, 5, 23, 53, 0x7842a3),
+        this.add.rectangle(0, 5, 9, 38, 0x0c1018),
+        this.add.rectangle(-49, -43, 28, 7, 0x5dbbb2).setAngle(-35),
+        this.add.rectangle(49, -43, 28, 7, 0x5dbbb2).setAngle(35),
+      );
+    } else if (visual === "index-tree") {
+      parts.push(
+        this.add.rectangle(0, 13, 57, 89, 0x495d3e).setStrokeStyle(7, 0x202d1d),
+        this.add.rectangle(-36, -42, 49, 45, 0x3b7f66),
+        this.add.rectangle(36, -42, 49, 45, 0x3b7f66),
+        this.add.rectangle(-16, -3, 10, 11, 0x90f0d4),
+        this.add.rectangle(16, -3, 10, 11, 0x90f0d4),
+        this.add.rectangle(0, 29, 35, 7, 0x1e2e23),
+        this.add.rectangle(0, 8, 7, 72, 0x68c9b1, 0.75),
+        this.add.rectangle(-25, 15, 43, 6, 0x68c9b1, 0.75),
+      );
+    } else if (visual === "demon") {
+      parts.push(
+        this.add.rectangle(0, 11, 78, 75, 0x8d3438).setStrokeStyle(7, 0x3b151b),
+        this.add.rectangle(0, -40, 58, 39, 0xa84443),
+        this.add.triangle(-34, -66, -20, 25, 0, -15, 20, 25, 0x4f1b27),
+        this.add.triangle(34, -66, -20, 25, 0, -15, 20, 25, 0x4f1b27),
+        this.add.rectangle(-16, -42, 10, 11, 0xffd36b),
+        this.add.rectangle(16, -42, 10, 11, 0xffd36b),
+        this.add.rectangle(0, 30, 38, 8, 0x361119),
+      );
+    } else if (visual === "dark-knight") {
+      parts.push(
+        this.add.rectangle(0, 14, 83, 85, 0x30313e).setStrokeStyle(7, 0x11121a),
+        this.add.rectangle(0, -43, 63, 41, 0x444656),
+        this.add.rectangle(-17, -44, 11, 12, 0xb54d62),
+        this.add.rectangle(17, -44, 11, 12, 0xb54d62),
+        this.add.rectangle(-53, 7, 25, 70, 0x252733).setStrokeStyle(4, 0x675577),
+        this.add.rectangle(55, -1, 7, 95, 0x8a708b).setAngle(11),
+      );
+    } else if (visual === "obsidian-golem") {
+      parts.push(
+        this.add.rectangle(0, 8, 104, 88, 0x201d29).setStrokeStyle(8, 0x08070b),
+        this.add.polygon(-38, -43, [0, -17, 27, 0, 17, 28, -14, 25, -28, 0], 0x3c3449),
+        this.add.polygon(38, -43, [0, -17, 27, 0, 17, 28, -14, 25, -28, 0], 0x3c3449),
+        this.add.rectangle(-23, -9, 12, 12, 0xb06cc5),
+        this.add.rectangle(23, -9, 12, 12, 0xb06cc5),
+        this.add.rectangle(0, 31, 49, 9, 0x09080d),
+        this.add.rectangle(0, 4, 7, 66, 0x6c4a78, 0.72),
+      );
+    } else if (visual === "replica-twin") {
+      parts.push(
+        this.add.rectangle(-28, 9, 54, 78, 0x4d4270).setStrokeStyle(6, 0x1a1628),
+        this.add.rectangle(28, 9, 54, 78, 0x705040).setStrokeStyle(6, 0x291b16),
+        this.add.rectangle(-28, -38, 42, 32, 0x68588d),
+        this.add.rectangle(28, -38, 42, 32, 0x916650),
+        this.add.rectangle(-36, -39, 9, 10, 0x9ee7eb),
+        this.add.rectangle(20, -39, 9, 10, 0xf5c16d),
+        this.add.rectangle(-28, 28, 27, 7, 0x171320),
+        this.add.rectangle(28, 28, 27, 7, 0x231712),
+      );
+    } else if (visual === "shard-beast") {
+      parts.push(
+        this.add.rectangle(0, 13, 92, 69, 0x315c72).setStrokeStyle(7, 0x132d3c),
+        this.add.polygon(-36, -39, [0, -28, 21, 8, 10, 35, -14, 29, -23, 4], 0x5ec5cc),
+        this.add.polygon(36, -39, [0, -28, 21, 8, 10, 35, -14, 29, -23, 4], 0x7d9de0),
+        this.add.rectangle(-19, -5, 11, 12, 0xe3ffff),
+        this.add.rectangle(19, -5, 11, 12, 0xe3ffff),
+        this.add.triangle(-60, 22, -7, 18, 0, -29, 7, 18, 0x60cbd0),
+        this.add.triangle(60, 22, -7, 18, 0, -29, 7, 18, 0x8067bd),
+      );
+    } else if (visual === "demon-king") {
+      parts.push(
+        this.add.rectangle(0, 12, 112, 96, 0x641f2a).setStrokeStyle(9, 0x21070e),
+        this.add.rectangle(0, -47, 78, 48, 0x8f3037),
+        this.add.triangle(-48, -76, -24, 29, 0, -20, 24, 29, 0x2c0912),
+        this.add.triangle(48, -76, -24, 29, 0, -20, 24, 29, 0x2c0912),
+        this.add.rectangle(-23, -49, 13, 14, 0xffc661),
+        this.add.rectangle(23, -49, 13, 14, 0xffc661),
+        this.add.triangle(0, -92, -39, 22, 0, -24, 39, 22, COLORS.gold),
+        this.add.rectangle(0, 35, 55, 10, 0x21070e),
+      );
     } else {
       parts.push(
-        this.add.rectangle(0, 4, 82, 78, 0x725a43).setStrokeStyle(7, 0x392e29),
-        this.add.rectangle(-26, -29, 24, 18, 0xb68a50),
-        this.add.rectangle(26, -29, 24, 18, 0xb68a50),
-        this.add.rectangle(-17, -7, 10, 10, COLORS.ember),
-        this.add.rectangle(17, -7, 10, 10, COLORS.ember),
-        this.add.rectangle(0, 27, 39, 9, 0x392e29),
-        this.add.rectangle(-51, 5, 10, 10, COLORS.query, 0.74),
-        this.add.rectangle(51, -9, 10, 10, COLORS.query, 0.74),
+        this.add.rectangle(0, 4, 88, 82, 0xff00b8, 0.92)
+          .setStrokeStyle(8, 0x5d003f),
+        this.add.text(0, 3, "?", {
+          color: "#ffffff",
+          fontFamily: "monospace",
+          fontSize: "64px",
+          fontStyle: "bold",
+        }).setOrigin(0.5),
       );
     }
     this.monsterContainer.add(parts);

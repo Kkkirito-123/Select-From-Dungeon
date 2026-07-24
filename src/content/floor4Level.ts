@@ -255,7 +255,7 @@ export const FLOOR_FOUR_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     primaryMonsterId: 16,
     stages: [{
       id: "f4-cte-armor",
-      objective: "用 CTE 保存 power >= 20 的 monster_id，再查询 id = 16 的怪物 name。",
+      objective: "从 monster_gear 用 CTE 保存 power >= 20 的 monster_id，再查询 monsters.id = 16 的怪物 name。",
       queryTemplate: "",
       answerSql: "WITH armored AS (SELECT monster_id FROM monster_gear WHERE power >= 20) SELECT m.name FROM monsters m INNER JOIN armored a ON m.id = a.monster_id WHERE m.id = 16;",
       hints: [

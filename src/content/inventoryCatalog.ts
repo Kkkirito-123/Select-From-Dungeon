@@ -226,34 +226,6 @@ export interface LootCandidate {
   probability: number;
 }
 
-function weaponCandidate(weapon: Weapon, probability: number): LootCandidate {
-  return {
-    probability,
-    item: {
-      itemId: weapon.id,
-      kind: "weapon",
-      name: weapon.name,
-      description: weapon.description,
-      protected: false,
-      weapon: { ...weapon },
-    },
-  };
-}
-
-function armorCandidate(armor: Armor, probability: number): LootCandidate {
-  return {
-    probability,
-    item: {
-      itemId: armor.id,
-      kind: "armor",
-      name: armor.name,
-      description: armor.description,
-      protected: false,
-      armor: { ...armor },
-    },
-  };
-}
-
 function consumableCandidate(
   consumable: Consumable,
   probability: number,
@@ -270,22 +242,6 @@ function consumableCandidate(
     },
   };
 }
-
-const FLOOR_ONE_CANDIDATES: readonly LootCandidate[] = [
-  consumableCandidate(CONSUMABLES["slime-gel"], 0.06),
-  consumableCandidate(CONSUMABLES.whetstone, 0.02),
-  weaponCandidate(FILTER_BOW, 0.0075),
-  armorCandidate(ARMORS["slime-vest"], 0.005),
-  weaponCandidate(SORT_SABER, 0.0025),
-];
-
-const FLOOR_TWO_CANDIDATES: readonly LootCandidate[] = [
-  consumableCandidate(CONSUMABLES["forest-fruit"], 0.05),
-  consumableCandidate(CONSUMABLES["repair-shard"], 0.02),
-  weaponCandidate(SORT_SABER, 0.0075),
-  armorCandidate(ARMORS["vine-armor"], 0.005),
-  weaponCandidate(BONE_BLADE, 0.0025),
-];
 
 const BIOME_CONSUMABLE: Readonly<Record<BiomeKind, Consumable>> = {
   drainage: CONSUMABLES["water-drop"],
@@ -314,55 +270,23 @@ const BIOME_CONSUMABLE: Readonly<Record<BiomeKind, Consumable>> = {
   "data-throne": CONSUMABLES["full-potion"],
 };
 
-function roleProbability(
+export function optionalRecoveryProbability(
   role: BiomeEncounterRole | "curriculum" | "floor-boss",
-  normal: number,
-  miniElite: number,
-  areaBoss: number,
-  floorBoss: number,
 ): number {
-  if (role === "mini-elite") return miniElite;
-  if (role === "area-boss") return areaBoss;
-  if (role === "floor-boss") return floorBoss;
-  return normal;
+  if (role === "mini-elite") return 0.05;
+  if (role === "area-boss") return 0.1;
+  if (role === "floor-boss") return 0;
+  return 0.02;
 }
 
 export function lootCandidatesForBiome(
-  floor: FloorNumber,
+  _floor: FloorNumber,
   biome: BiomeKind,
   role: BiomeEncounterRole | "curriculum" | "floor-boss",
 ): LootCandidate[] {
   const consumable = BIOME_CONSUMABLE[biome];
-  const weapon = floor === 1
-    ? SLIME_SWORD
-    : floor === 2 ? HUNTER_BOW : floor === 3 ? BONE_BLADE : floor === 4
-      ? RUNE_STAFF : floor === 5 ? IRON_AXE : floor === 6
-        ? DRAGON_SPEAR : floor === 7 ? CRYSTAL_BLADE : ROYAL_SWORD;
-  const armor = floor === 1
-    ? ARMORS["slime-vest"]
-    : floor === 2 ? ARMORS["vine-armor"] : floor === 3
-      ? ARMORS["bone-armor"] : floor === 4 ? ARMORS["rune-armor"] : floor === 5
-        ? ARMORS["iron-armor"] : floor === 6 ? ARMORS["dragon-armor"] : floor === 7
-          ? ARMORS["crystal-armor"] : ARMORS["royal-armor"];
-  const nextWeapon = floor === 1
-    ? SORT_SABER
-    : floor === 2 ? BONE_BLADE : floor === 3 ? RUNE_STAFF : floor === 4
-      ? IRON_AXE : floor === 5 ? DRAGON_SPEAR : floor === 6
-        ? CRYSTAL_BLADE : floor === 7 ? ROYAL_SWORD : null;
   const candidates = [
-    consumableCandidate(consumable, roleProbability(role, 0.06, 0.12, 0.24, 0.24)),
-    consumableCandidate(
-      CONSUMABLES["repair-shard"],
-      roleProbability(role, 0.02, 0.08, 0.16, 0.16),
-    ),
-    weaponCandidate(weapon, roleProbability(role, 0.0075, 0.03, 0.075, 0.075)),
-    armorCandidate(armor, roleProbability(role, 0.005, 0.025, 0.075, 0.075)),
-    ...(nextWeapon
-      ? [weaponCandidate(
-        nextWeapon,
-        roleProbability(role, 0.0025, 0.005, 0.01, 0.015),
-      )]
-      : []),
+    consumableCandidate(consumable, optionalRecoveryProbability(role)),
   ];
   return candidates.map((candidate) => ({
     probability: candidate.probability,
@@ -378,18 +302,16 @@ export function lootCandidatesForBiome(
 }
 
 export function lootCandidatesForFloor(floor: FloorNumber): LootCandidate[] {
-  const candidates = floor === 1
-    ? FLOOR_ONE_CANDIDATES
-    : floor === 2
-      ? FLOOR_TWO_CANDIDATES
-      : lootCandidatesForBiome(
-        floor,
-        floor === 3
-          ? "bone-yard"
-          : floor === 4 ? "fire-forge" : floor === 5 ? "iron-yard" : floor === 6
-            ? "magma-nest" : floor === 7 ? "crystal-grove" : "obsidian-hall",
-        "normal",
-      );
+  const candidates = lootCandidatesForBiome(
+    floor,
+    floor === 1
+      ? "drainage"
+      : floor === 2 ? "lake" : floor === 3
+        ? "bone-yard"
+        : floor === 4 ? "fire-forge" : floor === 5 ? "iron-yard" : floor === 6
+          ? "magma-nest" : floor === 7 ? "crystal-grove" : "obsidian-hall",
+    "normal",
+  );
   return candidates.map((candidate) => ({
     probability: candidate.probability,
     item: {
