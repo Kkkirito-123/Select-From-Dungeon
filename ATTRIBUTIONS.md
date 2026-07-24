@@ -166,6 +166,30 @@ SOFTWARE.
 
 ## Original procedural audio / 原创程序化音频
 
+The concept packs under `docs/design/assets/region-01/` and
+`docs/design/assets/music-ascent-v1/` contain project-original procedural WAV
+previews generated from declared note data by
+`scripts/generate-concept-audio.mjs` and
+`scripts/generate-music-ascent-previews.mjs`. They use no sample, SoundFont,
+external recording, imported MIDI, or third-party melody. The WAV files are
+review material and are not loaded by the runtime bundle. The first pair under
+`region-01/` is retained as a rejected sharpness reference; the ascent pack is
+the current candidate direction.
+
+The two concept PNG files in the same directory were generated from original
+project prompts and direction, then reviewed as visual references. No
+third-party image was provided as an input or copied. They are not production
+sprites, tiles, or runtime assets.
+
+`docs/design/assets/region-01/` 与 `docs/design/assets/music-ascent-v1/` 下的 WAV
+试听由 `scripts/generate-concept-audio.mjs` 和
+`scripts/generate-music-ascent-previews.mjs` 根据项目原创的声明式音符数据生成，不使用
+采样、SoundFont、外部录音、导入 MIDI 或第三方旋律；它们只用于评审，不进入运行时 Bundle。
+其中 `region-01/` 的首轮两首保留为尖锐感淘汰对照，音乐上升包是当前候选方向。
+
+同目录两张概念 PNG 来自项目原创提示词与方向，并经过人工用途审查；生成过程没有输入或复制
+第三方图片。它们不是正式 Sprite、Tile 或运行时素材。
+
 The four first-floor exploration patterns (`C Major Circuit`, `Moonlight Data
 Lake`, `Nocturne Cache`, and `Adagio Terminal`) use original note, rhythm,
 synthesis, and sequencing data authored in `src/audio/ArcadeAudio.ts`; their

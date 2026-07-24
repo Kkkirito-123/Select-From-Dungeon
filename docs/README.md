@@ -9,8 +9,8 @@
 |---|---|---|
 | [版本记录](../CHANGELOG.md) | `v1.1.0` | 各版本用户可见结果与 PR 归档 |
 | [v1.1 发布检查表](./RELEASE_CHECKLIST.md) | 当前发布证据 | 发布范围、自动化、浏览器、兼容与剩余人工边界 |
-| [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | 规划蓝图；当前实现全部八层 | 课程顺序、题型、掌握标准 |
-| [楼层地图与美术蓝图](./FLOOR_THEMES.zh-CN.md) / [English](./FLOOR_THEMES.md) | 规划蓝图；当前实现全部八层 | 八层主题、地标与视觉边界 |
+| [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | 八层均可运行；第一、二层课程分布与长期蓝图存在漂移 | 课程顺序、题型、掌握标准 |
+| [楼层地图与美术蓝图](./FLOOR_THEMES.zh-CN.md) / [English](./FLOOR_THEMES.md) | 八层均可运行；部分生态命名与目标蓝图存在漂移 | 八层主题、地标与视觉边界 |
 | [玩法演进总路线图](./GAMEPLAY_EVOLUTION_ROADMAP.md) | `v1.1.0` 已实现 | 版本顺序、MVP、非目标和验收标准 |
 | [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `v0.3.0` 篝火已实现，`v0.5.0` 引导地图与捷径已实现 | 三篝火、安全区、休息、死亡回归、复盘与捷径 |
 
@@ -19,6 +19,16 @@
 这些文档位于 [`design/`](./design/)；八层核心契约已经进入 `v1.0` 运行时，仍标为候选的细分
 规则必须按新版本确认：
 
+- [MVP 2.0 设计与实施基线](./design/MVP_2_0_MASTER_PLAN.md)（`APPROVED / IN_PROGRESS`；
+  当前目标真源、70% 首版设计覆盖、八层主线、实施阶段、验收与最终单 PR 边界）
+- [叙事与区域探索改造计划书](./design/NARRATIVE_EXPLORATION_REDESIGN_PLAN.md)（`READY_FOR_REVIEW`；
+  历史原型计划；实施权限和最终范围已由 MVP 2.0 基线替代）
+- [SQL 魔王城叙事圣经](./design/NARRATIVE_BIBLE.md)（共同评审草案；核心真相已确认，
+  MVP 2.0 只实现主线事实与 `MIGRATE` 结局，逐句文本仍可打磨）
+- [抄写员、第一层区域与音乐素材 Brief](./design/SCRIBE_REGION_ASSET_BRIEF.md)
+  （`CONCEPT_ONLY`；含角色/地图概念图与两首原创程序化音乐试听，尚未接入运行时）
+- [音乐与地图上升设计圣经](./design/MUSIC_MAP_ASCENT_BIBLE.md)
+  （目标方向已纳入 MVP 2.0；地下小调、海洋与冰原、夕阳王城、A 大调黑金高堂）
 - [怪物阶级与八层生物演化](./design/MONSTER_PROGRESSION_DESIGN.md)
 - [地图生态、探索密度与防具](./design/MAP_BIOME_AND_ARMOR_DESIGN.md)
 - [生态怪物与掉落](./design/BIOME_MONSTERS_AND_LOOT_DESIGN.md)
