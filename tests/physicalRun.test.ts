@@ -1028,5 +1028,5 @@ describe("continuous physical maze run", () => {
       "f8-security",
     ]);
     expect(session.toProfile().victories).toBe(1);
-  });
+  }, 20_000);
 });

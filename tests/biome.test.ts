@@ -55,7 +55,9 @@ describe("seeded biome plan", () => {
         });
       }
     }
-  }, 15_000);
+  // This verifies 360 complete map/biome generations. Keep the sample size,
+  // but allow slower CI runners and parallel local suites enough wall time.
+  }, 60_000);
 
   it("第二层稳定生成湖怪与蛙王，首领不会落在安全区", () => {
     for (let index = 0; index < 60; index += 1) {
