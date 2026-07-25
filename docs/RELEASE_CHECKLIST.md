@@ -1,6 +1,6 @@
 # MVP 2.0 / v2.0.0 发布检查表
 
-> 状态：`DRAFT PR #23 / LOCAL VALIDATED`
+> 状态：`DRAFT PR #23 / VALIDATED`
 >
 > 统一 Draft [PR #23](https://github.com/Kkkirito-123/select-from-dungeon/pull/23)
 > 已包含 MVP 2.0 基线；当前补丁收口怪物身份揭示、永久图鉴、课程宝箱、双篝火、
@@ -83,7 +83,7 @@
 - [x] 完整 Diff、未追踪文件、依赖、版权和归因审阅完成。
 - [x] 最终功能分支已推送并创建一个 MVP 2.0 Draft PR。
 - [x] PR 链接已回填至本表与 `CHANGELOG.md`。
-- [ ] 当前补丁推送后的 PR CI 通过。
+- [x] 当前补丁推送后的 PR CI 通过。
 
 ## 5. 已知人工边界
 
