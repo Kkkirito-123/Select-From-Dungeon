@@ -11,7 +11,7 @@ README、代码和测试共同为准；历史正文中的旧尺寸、旧音乐�
 | [English README](../README.md) / [中文](../README.zh-CN.md) | `2.0.0 RC` | 当前用户可见功能、架构与存档 |
 | [产品契约](../PRODUCT.md) | `2.0.0 RC` | 用户、定位、设计原则、运行规则与性能边界 |
 | [版本记录](../CHANGELOG.md) | `2.0.0 RC` | 各版本用户可见结果与 PR 归档 |
-| [MVP 2.0 发布检查表](./RELEASE_CHECKLIST.md) | `PR_OPEN / CI_PENDING` | 自动化、浏览器、兼容、版权与最终 PR 证据 |
+| [MVP 2.0 发布检查表](./RELEASE_CHECKLIST.md) | `PR_OPEN / VALIDATED` | 自动化、浏览器、兼容、版权与最终 PR 证据 |
 | [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | `CURRENT` | 当前 47 组课程顺序、题型与掌握标准 |
 | [MVP 2.0 设计与实施基线](./design/MVP_2_0_MASTER_PLAN.md) | `IMPLEMENTED / RELEASE_CANDIDATE` | 八层主线、48×36 地图、角色、叙事、音乐与交付边界 |
 | [音乐与地图上升设计圣经](./design/MUSIC_MAP_ASCENT_BIBLE.md) | `IMPLEMENTED / LISTENING_QA_PENDING` | 八层地理上升、原创程序化乐谱与抗疲劳边界；正文的候选试听 / 不接运行时段落是实现前记录 |

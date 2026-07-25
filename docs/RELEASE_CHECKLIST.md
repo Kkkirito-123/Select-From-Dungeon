@@ -1,10 +1,10 @@
 # MVP 2.0 / v2.0.0 发布检查表
 
-> 状态：`PR_OPEN / CI_PENDING`
+> 状态：`PR_OPEN / VALIDATED`
 >
 > 功能、自动化、生产构建和真实浏览器矩阵已经收口；统一 Draft
-> [PR #23](https://github.com/Kkkirito-123/select-from-dungeon/pull/23) 已创建，发布只剩
-> PR CI 与作者回归后的主观文字 / 音频调校。
+> [PR #23](https://github.com/Kkkirito-123/select-from-dungeon/pull/23) 已创建且 CI 通过。
+> 剩余项目只有作者回归后的主观文字 / 音频调校。
 
 ## 1. 目标与边界
 
@@ -81,7 +81,7 @@
 - [x] 完整 Diff、未追踪文件、依赖、版权和归因审阅完成。
 - [x] 最终功能分支已推送并创建一个 MVP 2.0 Draft PR。
 - [x] PR 链接已回填至本表与 `CHANGELOG.md`。
-- [ ] PR CI 通过。
+- [x] PR CI 通过。
 
 ## 5. 已知人工边界
 
