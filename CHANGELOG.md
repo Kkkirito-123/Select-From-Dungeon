@@ -19,7 +19,7 @@
 - 保持 47 组课程、真实 SQLite、`run:v10` / `profile:v2`、低概率即时恢复品、三篝火、
   撤退、背包、管理员模式和旧永久掌握进度。
 - 自动化、生产构建与浏览器证据见 [MVP 2.0 发布检查表](docs/RELEASE_CHECKLIST.md)；
-  最终 PR 链接在创建后补记。
+  归档候选：[PR #23](https://github.com/Kkkirito-123/select-from-dungeon/pull/23)。
 
 ## `1.1.0` — 2026-07-24
 
