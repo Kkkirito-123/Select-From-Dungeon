@@ -53,8 +53,8 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "name", "echo_count", "total_charge"],
   expectedRows: [
-    { id: 800, name: "铁胶怪", echo_count: 3, total_charge: 24 },
-    { id: 900, name: "泥王", echo_count: 3, total_charge: 24 },
+    { id: 4, name: "铁胶怪", echo_count: 3, total_charge: 24 },
+    { id: 5, name: "泥王", echo_count: 3, total_charge: 24 },
   ],
 };
 
@@ -111,8 +111,8 @@ const FLOOR_THREE_CHALLENGE: GateChallengeDefinition = {
   requiredFeatures: ["select", "from", "where", "join", "on", "order-by", "limit"],
   expectedColumns: ["id", "name", "room_name", "power"],
   expectedRows: [
-    { id: 6, name: "死灵王", room_name: "死灵王庭", power: 24 },
-    { id: 11, name: "墓主", room_name: "墓主祭坛", power: 22 },
+    { id: 28, name: "死灵王", room_name: "死灵王庭", power: 24 },
+    { id: 33, name: "墓主", room_name: "墓主祭坛", power: 22 },
   ],
 };
 
@@ -144,9 +144,9 @@ const FLOOR_FOUR_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "name", "max_power"],
   expectedRows: [
-    { id: 17, name: "元素王", max_power: 26 },
-    { id: 22, name: "炉主", max_power: 22 },
-    { id: 16, name: "炎王", max_power: 20 },
+    { id: 39, name: "元素王", max_power: 26 },
+    { id: 44, name: "炉主", max_power: 22 },
+    { id: 38, name: "炎王", max_power: 20 },
   ],
 };
 
@@ -214,9 +214,9 @@ const FLOOR_SIX_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "name", "power"],
   expectedRows: [
-    { id: 39, name: "龙王", power: 32 },
-    { id: 44, name: "古龙", power: 30 },
-    { id: 42, name: "雷龙", power: 29 },
+    { id: 61, name: "龙王", power: 32 },
+    { id: 66, name: "古龙", power: 30 },
+    { id: 64, name: "雷龙", power: 29 },
   ],
 };
 

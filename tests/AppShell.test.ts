@@ -1,14 +1,96 @@
 import { describe, expect, it } from "vitest";
 import { COMPLETE_SCHEMA_LINES } from "../src/content/sqlSchema";
+import { GameSession } from "../src/domain/GameSession";
 import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/types";
 import { answerReviewSummary } from "../src/ui/AnswerReviewView";
 import {
   canOpenCombatTerminal,
   combatSettlementCopy,
+  narrativeProgressForSnapshot,
   schemaRenderSignature,
   schemaTaskTableRoles,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+
+describe("narrativeProgressForSnapshot", () => {
+  it("入层先显示第一拍，中段、篝火与层主按真实进度逐步解锁", () => {
+    const snapshot = new GameSession(null, null, "narrative-runtime").snapshot();
+    const entry = narrativeProgressForSnapshot(snapshot);
+    expect(entry.seenBeatIds).toEqual(["narrative:f1:floor-entry"]);
+    expect(entry.latestBeat?.kind).toBe("floor-entry");
+
+    const midpoint = narrativeProgressForSnapshot({
+      ...snapshot,
+      completedLessons: ["select", "where", "is-null"],
+      respawnCampfireId: snapshot.campfires[0]?.id ?? null,
+    });
+    expect(midpoint.seenBeatIds).toEqual([
+      "narrative:f1:floor-entry",
+      "narrative:f1:midpoint-evidence",
+      "narrative:f1:campfire",
+    ]);
+    expect(midpoint.discoveredEvidenceIds).toContain(
+      "lost-name:f1:current-record",
+    );
+
+    const boss = snapshot.monsters.find(
+      (monster) =>
+        monster.isBoss &&
+        monster.rank === "boss",
+    );
+    if (!boss) throw new Error("第一层缺少层主");
+    const bossReached = narrativeProgressForSnapshot({
+      ...snapshot,
+      mode: "combat",
+      focusMonsterId: boss.id,
+      completedLessons: ["select", "where", "is-null", "group-by"],
+    });
+    expect(bossReached.latestBeat?.kind).toBe("boss");
+    expect(bossReached.discoveredEvidenceIds).toContain(
+      "lost-name:f1:restore-permission",
+    );
+  });
+
+  it("区域首领不会提前解锁本层层主剧情", () => {
+    const snapshot = new GameSession(null, null, "narrative-area-boss").snapshot();
+    const ordinaryMonster = snapshot.monsters.find((monster) => !monster.isBoss);
+    if (!ordinaryMonster) throw new Error("第一层缺少普通怪物");
+    const areaBoss = {
+      ...ordinaryMonster,
+      id: 99_001,
+      roomId: 99_001,
+      isBoss: true,
+      rank: "elite" as const,
+    };
+
+    const progress = narrativeProgressForSnapshot({
+      ...snapshot,
+      mode: "combat",
+      monsters: [...snapshot.monsters, areaBoss],
+      focusMonsterId: areaBoss.id,
+      completedLessons: ["select", "where", "is-null", "group-by"],
+    });
+
+    expect(progress.seenBeatIds).not.toContain("narrative:f1:boss");
+    expect(progress.latestBeat?.kind).not.toBe("boss");
+  });
+
+  it("层末结算实体上升路线，不把 MIGRATE 提前当作普通结局", () => {
+    const snapshot = new GameSession(null, null, "narrative-ascent").snapshot();
+    const progress = narrativeProgressForSnapshot({
+      ...snapshot,
+      mode: "transition",
+      completedLessons: ["select", "where", "is-null", "group-by", "having"],
+      completedRoomIds: [
+        ...snapshot.completedRoomIds,
+        snapshot.roomGraph.bossId,
+      ],
+    });
+    expect(progress.latestBeat?.kind).toBe("floor-end");
+    expect(progress.completedAscentIds).toEqual(["ascent:f1:f2"]);
+    expect(progress.completedMigrationStepIds).toEqual([]);
+  });
+});
 
 describe("canOpenCombatTerminal", () => {
   it("只在战斗且没有回合结算时允许打开终端", () => {
@@ -31,7 +113,7 @@ describe("shouldDismissTransientCard", () => {
 
 describe("schemaTaskTableRoles", () => {
   const base = {
-    focusMonsterId: 1200,
+    focusMonsterId: 10,
     lessonIntro: "",
     missionBody: "",
     schema: [...COMPLETE_SCHEMA_LINES],
@@ -49,7 +131,7 @@ describe("schemaTaskTableRoles", () => {
   it("INNER JOIN 题按真实 FROM/JOIN 顺序标记主表和关联表", () => {
     const roles = schemaTaskTableRoles({
       ...base,
-      focusMonsterId: 1400,
+      focusMonsterId: 12,
       lessonStageId: "inner-join-room",
     });
     expect(roles.get("monsters")).toBe("primary");
@@ -59,7 +141,7 @@ describe("schemaTaskTableRoles", () => {
   it("专用事故表也按关卡答案标记本题主表", () => {
     const roles = schemaTaskTableRoles({
       ...base,
-      focusMonsterId: 56,
+      focusMonsterId: 78,
       lessonStageId: "f8-mvcc-visible",
       schema: [
         "tx_versions(id, row_id, value, created_tx, expired_tx)",
@@ -73,7 +155,7 @@ describe("schemaTaskTableRoles", () => {
 
 describe("schemaRenderSignature", () => {
   const base = {
-    focusMonsterId: 1200,
+    focusMonsterId: 10,
     lessonIntro: "聚合训练",
     lessonStageId: "practice-group" as const,
     locks: ["COUNT", "GROUP BY"],
@@ -100,14 +182,14 @@ describe("answerReviewSummary", () => {
     id: 1,
     battleId: 1,
     floor: 1,
-    monsterId: 101,
+    monsterId: 1,
     monsterName: "史莱姆",
     lessonId: "select",
     stageId: "select-name",
     stageObjective: "查询史莱姆名字",
     round: 1,
-    sql: "SELECT name FROM monsters WHERE id = 101",
-    answerSql: "SELECT name FROM monsters WHERE id = 101;",
+    sql: "SELECT name FROM monsters WHERE id = 1",
+    answerSql: "SELECT name FROM monsters WHERE id = 1;",
     result: "correct",
     outcome: "hit",
     feedback: "查询正确",
@@ -150,7 +232,7 @@ describe("answerReviewSummary", () => {
 
 describe("combatSettlementCopy", () => {
   const base: ExperienceSettlement = {
-    monsterId: 101,
+    monsterId: 1,
     monsterName: "史莱姆",
     gained: 1,
     previousXp: 0,

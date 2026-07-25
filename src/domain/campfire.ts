@@ -49,7 +49,7 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
 }
 
 /**
- * The current two-floor graph always has at least three non-combat side rooms.
+ * Every floor graph has at least three optional non-combat side rooms.
  * Hosts are selected by their real walking distance from spawn so the three
  * checkpoints form front, middle, and rear route segments instead of merely
  * following authored room types. Exact corners remain seeded.
@@ -60,6 +60,7 @@ export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[
       const room = graph.nodes.find((node) => node.id === zone.roomNodeId);
       return Boolean(
         room &&
+        !room.required &&
         room.type !== "entry" &&
         room.type !== "boss" &&
         !room.lessonId,

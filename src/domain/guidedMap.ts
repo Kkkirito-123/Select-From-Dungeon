@@ -57,6 +57,21 @@ export interface GuidedMapValidation {
   emptyDeadEnds: number;
 }
 
+const SHORTCUT_NAMES: Readonly<Record<RoomGraph["floor"], string>> = {
+  1: "排水回廊捷径",
+  2: "月潮船闸捷径",
+  3: "王陵侧门捷径",
+  4: "升炉检修梯",
+  5: "城墙吊桥捷径",
+  6: "龙脊矿道捷径",
+  7: "根系晶门捷径",
+  8: "王座侍从门",
+};
+
+export function shortcutNameForFloor(floor: RoomGraph["floor"]): string {
+  return SHORTCUT_NAMES[floor];
+}
+
 const DIRECTIONS: readonly Position[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
@@ -212,7 +227,7 @@ function createShortcut(
   return {
     id: `shortcut:${graph.floor}:return`,
     keyId: `shortcut-key:${graph.floor}`,
-    name: graph.floor === 1 ? "排水回廊捷径" : "雷轨回路捷径",
+    name: shortcutNameForFloor(graph.floor),
     entry,
     exit,
     keyPosition: { ...keyPosition },

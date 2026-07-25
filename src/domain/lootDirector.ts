@@ -1,4 +1,5 @@
 import { CONSUMABLES, type LootCandidate } from "../content/inventoryCatalog";
+import { legacyMonsterIdForCurrent } from "../content/monsterIds";
 import type { LootItem, Monster } from "./types";
 import { stableStringHash, type FloorNumber } from "./runGraph";
 
@@ -53,9 +54,10 @@ function isKey(item: LootItem): boolean {
  * tests; production combat omits it, so rank never creates a random drop.
  */
 export function rollLootItems(input: LootRollInput): LootItem[] {
+  const stableMonsterId = legacyMonsterIdForCurrent(input.monster.id);
   const rolled = input.candidates
     .filter((candidate) => (
-      roll(`${input.seed}:loot:${input.floor}:${input.monster.id}:${candidate.item.itemId}`) <
+      roll(`${input.seed}:loot:${input.floor}:${stableMonsterId}:${candidate.item.itemId}`) <
       candidate.probability
     ))
     .map((candidate) => ({

@@ -1,4 +1,21 @@
-export type ArcadeMusicMode = "explore" | "combat" | "boss";
+import {
+  classifyScoreSceneTransition,
+  floorScoreProfile,
+  musicPatternsForScene,
+  normalizeScoreScene,
+  type ArcadeMusicMode,
+  type DungeonFloor,
+  type MusicPattern,
+  type ScoreFocus,
+  type ScoreScene,
+} from "./musicScore";
+
+export type {
+  ArcadeMusicMode,
+  DungeonFloor,
+  ScoreFocus,
+  ScoreScene,
+} from "./musicScore";
 
 export type ArcadeSfx =
   | "step"
@@ -27,200 +44,18 @@ export interface ArcadeAudioOptions {
   volume?: number;
 }
 
-interface MusicPattern {
-  id: string;
-  title: string;
-  stepSeconds: number;
-  cyclesBeforeChange: number;
-  melody: readonly (number | null)[];
-  bass: readonly (number | null)[];
-  kicks: readonly number[];
-  hats: readonly number[];
-  melodyWave: OscillatorType;
-  bassWave: OscillatorType;
-}
-
 type AudioContextConstructor = new () => AudioContext;
 
 const SILENCE = 0.0001;
-const MUSIC_GAIN_LEVEL = 0.42;
+const MUSIC_GAIN_LEVEL = 0.36;
 const SCHEDULE_AHEAD_SECONDS = 0.24;
 const SCHEDULER_INTERVAL_MS = 80;
 const MODE_FADE_SECONDS = 0.05;
 const MODE_FADE_MS = MODE_FADE_SECONDS * 1_000;
 
-// Exploration arrangements are original chip-synth miniatures built from the
-// public-domain harmonic language of the credited works. No recording or
-// third-party audio asset is bundled; every sound is synthesized at runtime.
-const EXPLORE_PLAYLIST: readonly MusicPattern[] = [
-  {
-    id: "bach-c-major-circuit",
-    title: "C 大调回路",
-    stepSeconds: 0.225,
-    cyclesBeforeChange: 4,
-    melody: [60, 64, 67, 72, 64, 67, 72, 76, 59, 62, 67, 71, 62, 67, 71, 74, 57, 60, 64, 69, 60, 64, 69, 72, 55, 59, 62, 67, 59, 62, 67, 71],
-    bass: [36, null, null, null, null, null, null, null, 35, null, null, null, null, null, null, null, 33, null, null, null, null, null, null, null, 31, null, null, null, null, null, null, null],
-    kicks: [0, 16],
-    hats: [],
-    melodyWave: "sine",
-    bassWave: "triangle",
-  },
-  {
-    id: "moonlight-data-lake",
-    title: "月光数据湖",
-    stepSeconds: 0.245,
-    cyclesBeforeChange: 4,
-    melody: [61, 64, 68, 61, 64, 68, 61, 64, 59, 64, 68, 59, 64, 68, 59, 64, 57, 61, 66, 57, 61, 66, 57, 61, 56, 60, 64, 56, 60, 64, 56, 60],
-    bass: [37, null, null, null, null, null, 32, null, 35, null, null, null, null, null, 32, null, 33, null, null, null, null, null, 28, null, 32, null, null, null, null, null, 27, null],
-    kicks: [0, 16],
-    hats: [],
-    melodyWave: "triangle",
-    bassWave: "sine",
-  },
-  {
-    id: "nocturne-cache",
-    title: "夜曲缓存",
-    stepSeconds: 0.235,
-    cyclesBeforeChange: 4,
-    melody: [67, null, 71, 74, 79, 78, 76, 74, 71, null, 74, 76, 78, 76, 74, 71, 69, null, 72, 76, 81, 79, 76, 72, 71, null, 74, 79, 78, 74, 71, 67],
-    bass: [31, null, null, null, 38, null, null, null, 35, null, null, null, 38, null, null, null, 33, null, null, null, 40, null, null, null, 35, null, null, null, 38, null, null, null],
-    kicks: [0, 16],
-    hats: [7, 15, 23, 31],
-    melodyWave: "sine",
-    bassWave: "triangle",
-  },
-  {
-    id: "mozart-adagio-terminal",
-    title: "柔板终端",
-    stepSeconds: 0.22,
-    cyclesBeforeChange: 4,
-    melody: [69, 72, 76, 74, 72, 71, 69, null, 67, 71, 74, 72, 71, 69, 67, null, 64, 67, 71, 69, 67, 66, 64, null, 62, 66, 69, 71, 69, 66, 64, null],
-    bass: [33, null, null, null, 40, null, null, null, 31, null, null, null, 38, null, null, null, 28, null, null, null, 35, null, null, null, 26, null, null, null, 33, null, null, null],
-    kicks: [0, 16],
-    hats: [],
-    melodyWave: "triangle",
-    bassWave: "sine",
-  },
-];
-
-const COMBAT_PLAYLIST: readonly MusicPattern[] = [{
-  id: "star-castle-overdrive",
-  title: "星城超频",
-  stepSeconds: 0.1,
-  cyclesBeforeChange: 99,
-  melody: [69, 72, 76, 81, 79, 76, 72, 74, 70, 74, 77, 82, 81, 77, 74, 72, 68, 71, 75, 80, 78, 75, 71, 73, 67, 70, 74, 79, 77, 74, 70, 67],
-  bass: [33, null, 33, 40, 33, null, 36, null, 34, null, 34, 41, 34, null, 38, null, 32, null, 32, 39, 32, null, 35, null, 31, null, 31, 38, 31, 35, 38, 43],
-  kicks: [0, 4, 8, 12, 16, 20, 24, 26, 28],
-  hats: [2, 6, 10, 14, 18, 22, 26, 30],
-  melodyWave: "square",
-  bassWave: "sawtooth",
-}];
-
-const BOSS_PLAYLIST: readonly MusicPattern[] = [{
-  id: "overseer-redline",
-  title: "监视者红线",
-  stepSeconds: 0.086,
-  cyclesBeforeChange: 99,
-  melody: [57, 58, 64, 69, 63, 58, 70, 64, 56, 57, 63, 68, 62, 57, 69, 63, 55, 61, 66, 72, 65, 60, 71, 65, 54, 60, 65, 71, 64, 59, 70, 64],
-  bass: [33, null, 34, 40, 27, null, 28, 34, 32, null, 33, 39, 26, null, 27, 33, 31, null, 37, 43, 25, null, 31, 37, 30, null, 36, 42, 24, 30, 36, 42],
-  kicks: [0, 3, 6, 8, 11, 14, 16, 19, 22, 24, 27, 30],
-  hats: [1, 5, 9, 13, 17, 21, 25, 29, 31],
-  melodyWave: "sawtooth",
-  bassWave: "square",
-}];
-
-// Floor-two exploration uses independently sequenced chip arrangements of
-// public-domain Beethoven scores. No recording, modern edition, stem, or game
-// soundtrack is imported. The combat patterns below are original compositions.
-const FLOOR_TWO_EXPLORE_PLAYLIST: readonly MusicPattern[] = [
-  {
-    id: "beethoven-fifth-thunder-bus",
-    title: "命运雷鸣总线",
-    stepSeconds: 0.16,
-    cyclesBeforeChange: 4,
-    melody: [67, 67, 67, 63, null, null, 65, 65, 65, 62, null, null, 67, 67, 67, 63, 68, 68, 68, 67, 63, 63, 63, 60],
-    bass: [36, null, 36, null, 31, null, 34, null, 34, null, 29, null, 36, null, 36, null, 32, null, 32, null, 27, null, 27, null],
-    kicks: [0, 6, 12, 18],
-    hats: [5, 11, 17, 23],
-    melodyWave: "triangle",
-    bassWave: "sawtooth",
-  },
-  {
-    id: "beethoven-elise-packet",
-    title: "致爱丽丝数据包",
-    stepSeconds: 0.175,
-    cyclesBeforeChange: 4,
-    melody: [76, 75, 76, 75, 76, 71, 74, 72, 69, null, 60, 64, 69, 71, null, 64, 68, 71, 72, null, 64, 76, 75, 76],
-    bass: [45, null, null, null, 40, null, null, null, 45, null, 33, null, null, null, 40, null, 32, null, null, null, 40, null, 45, null],
-    kicks: [0, 8, 16],
-    hats: [7, 15, 23],
-    melodyWave: "square",
-    bassWave: "triangle",
-  },
-  {
-    id: "beethoven-moonlight-voltage",
-    title: "月光电压",
-    stepSeconds: 0.205,
-    cyclesBeforeChange: 4,
-    melody: [61, 64, 68, 61, 64, 68, 61, 64, 59, 64, 68, 59, 64, 68, 59, 64, 57, 61, 66, 57, 61, 66, 57, 61],
-    bass: [37, null, null, null, null, null, 32, null, 35, null, null, null, null, null, 32, null, 33, null, null, null, null, null, 28, null],
-    kicks: [0, 8, 16],
-    hats: [],
-    melodyWave: "sine",
-    bassWave: "triangle",
-  },
-];
-
-const FLOOR_TWO_COMBAT_PLAYLIST: readonly MusicPattern[] = [{
-  id: "relation-storm-pursuit",
-  title: "关系风暴追击",
-  stepSeconds: 0.092,
-  cyclesBeforeChange: 99,
-  melody: [69, 76, 72, 81, 74, 79, 71, 83, 68, 75, 71, 80, 73, 78, 70, 82, 67, 74, 70, 79, 72, 77, 69, 81, 66, 73, 69, 78, 71, 76, 68, 80],
-  bass: [33, null, 40, 33, 36, null, 43, 36, 32, null, 39, 32, 35, null, 42, 35, 31, null, 38, 31, 34, null, 41, 34, 30, null, 37, 30, 33, 40, 45, 40],
-  kicks: [0, 3, 6, 8, 11, 14, 16, 19, 22, 24, 27, 30],
-  hats: [1, 5, 9, 13, 17, 21, 25, 29],
-  melodyWave: "square",
-  bassWave: "sawtooth",
-}];
-
-const FLOOR_TWO_BOSS_PLAYLIST: readonly MusicPattern[] = [{
-  id: "conductor-singularity",
-  title: "指挥家奇点",
-  stepSeconds: 0.078,
-  cyclesBeforeChange: 99,
-  melody: [57, 64, 70, 75, 63, 69, 76, 82, 56, 63, 69, 74, 62, 68, 75, 81, 55, 62, 68, 73, 61, 67, 74, 80, 54, 61, 67, 72, 60, 66, 73, 79],
-  bass: [33, 33, 40, 28, 34, 34, 41, 29, 32, 32, 39, 27, 33, 33, 40, 28, 31, 31, 38, 26, 32, 32, 39, 27, 30, 30, 37, 25, 31, 31, 38, 26],
-  kicks: [0, 2, 4, 7, 8, 10, 12, 15, 16, 18, 20, 23, 24, 26, 28, 30],
-  hats: [1, 3, 5, 9, 11, 13, 17, 19, 21, 25, 27, 29, 31],
-  melodyWave: "sawtooth",
-  bassWave: "square",
-}];
-
-const FLOOR_ONE_PLAYLISTS: Readonly<Record<ArcadeMusicMode, readonly MusicPattern[]>> = {
-  explore: EXPLORE_PLAYLIST,
-  combat: COMBAT_PLAYLIST,
-  boss: BOSS_PLAYLIST,
-};
-
 export const ARCADE_MUSIC_CREDITS = [
-  "J. S. Bach · C 大调前奏曲 BWV 846（公版作品的和声语汇）",
-  "L. van Beethoven · 月光奏鸣曲第一乐章（公版作品的分解和弦语汇）",
-  "F. Chopin · 夜曲体裁（公版作品的抒情语汇）",
-  "W. A. Mozart · 柔板体裁（公版作品的旋律语汇）",
-  "L. van Beethoven · 第五交响曲第一乐章（公版乐谱的原创芯片编曲）",
-  "L. van Beethoven · 致爱丽丝 WoO 59（公版乐谱的原创芯片编曲）",
+  "MVP 2.0 八层原创程序化配乐（项目内音级与节奏数据；不使用外部旋律或录音）",
 ] as const;
-
-function playlistFor(
-  mode: ArcadeMusicMode,
-  floor: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
-): readonly MusicPattern[] {
-  if (floor === 1) return FLOOR_ONE_PLAYLISTS[mode];
-  if (mode === "combat") return FLOOR_TWO_COMBAT_PLAYLIST;
-  if (mode === "boss") return FLOOR_TWO_BOSS_PLAYLIST;
-  return FLOOR_TWO_EXPLORE_PLAYLIST;
-}
 
 export function chooseNextTrackIndex(
   trackCount: number,
@@ -261,6 +96,7 @@ export class ArcadeAudio {
   private context: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  private musicFilter: BiquadFilterNode | null = null;
   private sfxGain: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private schedulerTimer: ReturnType<typeof setTimeout> | null = null;
@@ -268,8 +104,11 @@ export class ArcadeAudio {
   private nextMusicStepAt = 0;
   private musicStep = 0;
   private activeTrackIndex = 0;
-  private regionIndex = 0;
-  private floorValue: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 1;
+  private activePlaylist: readonly MusicPattern[];
+  private sceneValue: ScoreScene;
+  private renderedSceneValue: ScoreScene;
+  private pendingSceneValue: ScoreScene | null = null;
+  private focusValue: ScoreFocus = "world";
   private completedTrackCycles = 0;
   private readonly musicSources = new Set<AudioScheduledSourceNode>();
   private readonly sfxSources = new Set<AudioScheduledSourceNode>();
@@ -278,7 +117,6 @@ export class ArcadeAudio {
   private initializing: Promise<boolean> | null = null;
   private disposed = false;
   private pageHiddenValue = false;
-  private modeValue: ArcadeMusicMode;
   private mutedValue: boolean;
   private volumeValue: number;
 
@@ -292,11 +130,13 @@ export class ArcadeAudio {
   };
 
   constructor(options: ArcadeAudioOptions = {}) {
-    this.modeValue = options.mode ?? "explore";
-    const playlist = playlistFor(this.modeValue, this.floorValue);
-    this.activeTrackIndex = this.modeValue === "explore"
-      ? this.regionIndex % playlist.length
-      : Math.floor(Math.random() * playlist.length);
+    this.sceneValue = {
+      floor: 1,
+      region: 0,
+      mode: options.mode ?? "explore",
+    };
+    this.renderedSceneValue = this.sceneValue;
+    this.activePlaylist = musicPatternsForScene(this.renderedSceneValue);
     this.mutedValue = options.muted ?? false;
     const initialVolume = options.volume ?? 0.55;
     this.volumeValue = clamp(Number.isFinite(initialVolume) ? initialVolume : 0, 0, 1);
@@ -319,7 +159,15 @@ export class ArcadeAudio {
   }
 
   get mode(): ArcadeMusicMode {
-    return this.modeValue;
+    return this.sceneValue.mode;
+  }
+
+  get scene(): Readonly<ScoreScene> {
+    return { ...this.sceneValue };
+  }
+
+  get focus(): ScoreFocus {
+    return this.focusValue;
   }
 
   get trackId(): string {
@@ -404,32 +252,62 @@ export class ArcadeAudio {
     return running;
   }
 
-  setMode(mode: ArcadeMusicMode): void {
-    if (this.modeValue === mode || this.disposed) return;
-    this.modeValue = mode;
-    this.restartMusicPlaylist();
+  /**
+   * Atomically changes the score target. Floor or mode changes restart once;
+   * same-floor region changes retarget at the next phrase when audio is live.
+   */
+  setScene(scene: ScoreScene): void {
+    if (this.disposed) return;
+    const normalized = normalizeScoreScene(scene);
+    const transition = classifyScoreSceneTransition(this.sceneValue, normalized);
+    if (transition === "none") return;
+
+    this.sceneValue = normalized;
+    if (
+      transition === "retarget" &&
+      this.context?.state === "running" &&
+      !this.mutedValue &&
+      !this.pageHiddenValue
+    ) {
+      this.pendingSceneValue = normalized;
+      return;
+    }
+
+    this.pendingSceneValue = null;
+    this.applyRenderedScene(normalized);
+    if (transition === "restart") this.restartMusicPlaylist();
   }
 
-  setFloor(floor: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8): void {
-    if (this.floorValue === floor || this.disposed) return;
-    this.floorValue = floor;
-    this.restartMusicPlaylist();
+  setFocus(focus: ScoreFocus): void {
+    if (this.disposed || this.focusValue === focus) return;
+    this.focusValue = focus;
+    this.applyMusicCharacter();
+  }
+
+  setMode(mode: ArcadeMusicMode): void {
+    this.setScene({ ...this.sceneValue, mode });
+  }
+
+  setFloor(floor: DungeonFloor): void {
+    this.setScene({ ...this.sceneValue, floor });
   }
 
   setRegion(index: number): void {
-    const normalized = Math.max(0, Math.floor(index));
-    if (this.regionIndex === normalized || this.disposed) return;
-    this.regionIndex = normalized;
-    if (this.modeValue === "explore") this.restartMusicPlaylist();
+    this.setScene({ ...this.sceneValue, region: index });
+  }
+
+  private applyRenderedScene(scene: ScoreScene): void {
+    this.renderedSceneValue = scene;
+    this.activePlaylist = musicPatternsForScene(scene);
+    this.activeTrackIndex = scene.mode === "explore"
+      ? scene.region % this.activePlaylist.length
+      : 0;
+    this.applyMusicCharacter();
   }
 
   private restartMusicPlaylist(): void {
     this.musicStep = 0;
     this.completedTrackCycles = 0;
-    const playlist = playlistFor(this.modeValue, this.floorValue);
-    this.activeTrackIndex = this.modeValue === "explore"
-      ? this.regionIndex % playlist.length
-      : Math.floor(Math.random() * playlist.length);
     this.nextMusicStepAt = 0;
 
     const context = this.context;
@@ -465,7 +343,7 @@ export class ArcadeAudio {
       musicGain.gain.cancelScheduledValues(fadeInAt);
       musicGain.gain.setValueAtTime(SILENCE, fadeInAt);
       musicGain.gain.linearRampToValueAtTime(
-        MUSIC_GAIN_LEVEL,
+        this.musicGainTarget(),
         fadeInAt + MODE_FADE_SECONDS,
       );
       this.startMusicScheduler();
@@ -545,9 +423,11 @@ export class ArcadeAudio {
     }
     this.masterGain?.disconnect();
     this.musicGain?.disconnect();
+    this.musicFilter?.disconnect();
     this.sfxGain?.disconnect();
     this.masterGain = null;
     this.musicGain = null;
+    this.musicFilter = null;
     this.sfxGain = null;
     this.noiseBuffer = null;
     this.context = null;
@@ -579,15 +459,21 @@ export class ArcadeAudio {
 
     let masterGain: GainNode;
     let musicGain: GainNode;
+    let musicFilter: BiquadFilterNode;
     let sfxGain: GainNode;
     let noiseBuffer: AudioBuffer;
     try {
       masterGain = context.createGain();
       musicGain = context.createGain();
+      musicFilter = context.createBiquadFilter();
       sfxGain = context.createGain();
-      musicGain.gain.value = MUSIC_GAIN_LEVEL;
+      musicGain.gain.value = this.musicGainTarget();
+      musicFilter.type = "lowpass";
+      musicFilter.Q.value = 0.55;
+      musicFilter.frequency.value = this.musicLowPassTarget();
       sfxGain.gain.value = 0.66;
-      musicGain.connect(masterGain);
+      musicGain.connect(musicFilter);
+      musicFilter.connect(masterGain);
       sfxGain.connect(masterGain);
       masterGain.connect(context.destination);
       noiseBuffer = this.createNoiseBuffer(context);
@@ -599,10 +485,12 @@ export class ArcadeAudio {
     this.context = context;
     this.masterGain = masterGain;
     this.musicGain = musicGain;
+    this.musicFilter = musicFilter;
     this.sfxGain = sfxGain;
     this.noiseBuffer = noiseBuffer;
     context.addEventListener("statechange", this.contextStateHandler);
     this.applyMasterVolume();
+    this.applyMusicCharacter(true);
 
     if (context.state !== "running") {
       try {
@@ -625,6 +513,42 @@ export class ArcadeAudio {
     gain.cancelScheduledValues(now);
     gain.setValueAtTime(Math.max(0, gain.value), now);
     gain.linearRampToValueAtTime(target, now + 0.025);
+  }
+
+  private musicGainTarget(): number {
+    if (this.focusValue === "thinking") return MUSIC_GAIN_LEVEL * 0.58;
+    if (this.focusValue === "resolving") return MUSIC_GAIN_LEVEL * 0.78;
+    return MUSIC_GAIN_LEVEL;
+  }
+
+  private musicLowPassTarget(): number {
+    const profile = floorScoreProfile(this.renderedSceneValue.floor);
+    const base = profile.movements[this.renderedSceneValue.mode].lowPassHz;
+    if (this.focusValue === "thinking") return base * 0.68;
+    if (this.focusValue === "resolving") return base * 0.84;
+    return base;
+  }
+
+  private applyMusicCharacter(immediate = false): void {
+    const context = this.context;
+    const musicGain = this.musicGain;
+    const musicFilter = this.musicFilter;
+    if (!context || context.state === "closed" || !musicGain || !musicFilter) return;
+
+    const now = context.currentTime;
+    const duration = immediate ? 0 : 0.12;
+    musicGain.gain.cancelScheduledValues(now);
+    musicGain.gain.setValueAtTime(Math.max(SILENCE, musicGain.gain.value), now);
+    musicGain.gain.linearRampToValueAtTime(this.musicGainTarget(), now + duration);
+    musicFilter.frequency.cancelScheduledValues(now);
+    musicFilter.frequency.setValueAtTime(
+      Math.max(200, musicFilter.frequency.value),
+      now,
+    );
+    musicFilter.frequency.linearRampToValueAtTime(
+      this.musicLowPassTarget(),
+      now + duration,
+    );
   }
 
   private startMusicScheduler(): void {
@@ -691,70 +615,96 @@ export class ArcadeAudio {
     if (resetGain && context && context.state !== "closed" && musicGain) {
       const now = context.currentTime;
       musicGain.gain.cancelScheduledValues(now);
-      musicGain.gain.setValueAtTime(MUSIC_GAIN_LEVEL, now);
+      musicGain.gain.setValueAtTime(this.musicGainTarget(), now);
     }
   }
 
   private scheduleMusicStep(startAt: number): void {
     if (!this.musicGain) return;
     const pattern = this.currentMusicPattern();
-    const step = this.musicStep % pattern.melody.length;
+    const step = this.musicStep % pattern.phraseSteps;
     const melodyNote = pattern.melody[step];
     const bassNote = pattern.bass[step];
+    let scheduledVoices = 0;
+    const claimVoice = (): boolean => {
+      if (scheduledVoices >= pattern.voiceLimit) return false;
+      scheduledVoices += 1;
+      return true;
+    };
 
-    if (melodyNote !== null) {
-      this.scheduleTone(
-        this.musicGain,
-        this.musicSources,
-        startAt,
-        midiToFrequency(melodyNote),
-        pattern.stepSeconds * 0.72,
-        pattern.melodyWave,
-        this.modeValue === "boss" ? 0.065 : 0.052,
-      );
+    if (step === 0 && pattern.mode === "explore") {
+      pattern.bed.forEach((note) => {
+        if (!claimVoice()) return;
+        this.schedulePadTone(
+          this.musicGain!,
+          this.musicSources,
+          startAt,
+          midiToFrequency(note),
+          pattern.bedDurationSeconds,
+          pattern.padWave,
+          pattern.padLevel,
+        );
+      });
     }
-    if (bassNote !== null) {
+    if (bassNote !== null && claimVoice()) {
       this.scheduleTone(
         this.musicGain,
         this.musicSources,
         startAt,
         midiToFrequency(bassNote),
-        pattern.stepSeconds * 1.8,
+        pattern.stepSeconds * 1.7,
         pattern.bassWave,
-        this.modeValue === "explore" ? 0.055 : 0.072,
+        pattern.bassLevel,
       );
     }
-    if (pattern.kicks.includes(step)) {
+    if (melodyNote !== null && claimVoice()) {
       this.scheduleTone(
         this.musicGain,
         this.musicSources,
         startAt,
-        95,
-        0.09,
-        "sine",
-        0.12,
-        43,
+        midiToFrequency(melodyNote),
+        pattern.stepSeconds * 0.82,
+        pattern.melodyWave,
+        pattern.melodyLevel,
       );
     }
-    if (pattern.hats.includes(step)) {
+    if (pattern.kicks.includes(step) && claimVoice()) {
+      this.scheduleTone(
+        this.musicGain,
+        this.musicSources,
+        startAt,
+        82,
+        0.075,
+        "sine",
+        pattern.kickLevel,
+        46,
+      );
+    }
+    if (pattern.hats.includes(step) && claimVoice()) {
       this.scheduleNoise(
         this.musicGain,
         this.musicSources,
         startAt,
-        0.035,
-        this.modeValue === "boss" ? 0.038 : 0.025,
+        0.018,
+        pattern.hatLevel,
       );
     }
 
-    this.musicStep = (step + 1) % pattern.melody.length;
+    this.musicStep = (step + 1) % pattern.phraseSteps;
     if (this.musicStep === 0) {
       this.completedTrackCycles += 1;
+      if (this.pendingSceneValue) {
+        const nextScene = this.pendingSceneValue;
+        this.pendingSceneValue = null;
+        this.applyRenderedScene(nextScene);
+        this.completedTrackCycles = 0;
+      }
       if (
-        this.modeValue === "explore" &&
+        this.renderedSceneValue.mode === "explore" &&
         this.completedTrackCycles >= pattern.cyclesBeforeChange
       ) {
         this.activeTrackIndex = chooseNextTrackIndex(
-          playlistFor("explore", this.floorValue).length,
+          this.activePlaylist.length,
           this.activeTrackIndex,
           Math.random(),
         );
@@ -765,8 +715,7 @@ export class ArcadeAudio {
   }
 
   private currentMusicPattern(): MusicPattern {
-    const playlist = playlistFor(this.modeValue, this.floorValue);
-    return playlist[this.activeTrackIndex] ?? playlist[0];
+    return this.activePlaylist[this.activeTrackIndex] ?? this.activePlaylist[0];
   }
 
   private scheduleEffect(effect: ArcadeSfx, startAt: number): void {
@@ -887,6 +836,36 @@ export class ArcadeAudio {
     }
     envelope.gain.setValueAtTime(SILENCE, startAt);
     envelope.gain.linearRampToValueAtTime(level, startAt + Math.min(0.008, duration * 0.2));
+    envelope.gain.exponentialRampToValueAtTime(SILENCE, endAt);
+    oscillator.connect(envelope);
+    envelope.connect(output);
+    this.trackSource(oscillator, envelope, sourceSet);
+    oscillator.start(startAt);
+    oscillator.stop(endAt + 0.015);
+  }
+
+  private schedulePadTone(
+    output: GainNode,
+    sourceSet: Set<AudioScheduledSourceNode>,
+    startAt: number,
+    frequency: number,
+    duration: number,
+    wave: OscillatorType,
+    level: number,
+  ): void {
+    const context = this.context;
+    if (!context || context.state === "closed") return;
+
+    const oscillator = context.createOscillator();
+    const envelope = context.createGain();
+    const endAt = startAt + Math.max(0.5, duration);
+    const attackEnd = startAt + Math.min(0.28, duration * 0.12);
+    const releaseStart = Math.max(attackEnd, endAt - Math.min(0.36, duration * 0.14));
+    oscillator.type = wave;
+    oscillator.frequency.setValueAtTime(Math.max(1, frequency), startAt);
+    envelope.gain.setValueAtTime(SILENCE, startAt);
+    envelope.gain.linearRampToValueAtTime(level, attackEnd);
+    envelope.gain.setValueAtTime(level, releaseStart);
     envelope.gain.exponentialRampToValueAtTime(SILENCE, endAt);
     oscillator.connect(envelope);
     envelope.connect(output);

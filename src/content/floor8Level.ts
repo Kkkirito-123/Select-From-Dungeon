@@ -14,49 +14,49 @@ export const ROYAL_SWORD: Weapon = {
 
 export const FLOOR_EIGHT_MONSTERS: readonly Monster[] = [
   {
-    floor: 8, id: 56, lessonId: "f8-mvcc", roomId: 91, name: "幽魂",
+    floor: 8, id: 78, lessonId: "f8-mvcc", roomId: 91, name: "幽魂",
     species: "version_ghost", kind: "lich", x: 1, y: 1, hp: 24, maxHp: 24,
     armor: 1, damage: 4, attackName: "旧版侵蚀", status: "reading",
-    weakness: "snapshot", masterId: 62, isBoss: false, rank: "normal",
+    weakness: "snapshot", masterId: 84, isBoss: false, rank: "normal",
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 57, lessonId: "f8-lock", roomId: 92, name: "锁骑",
+    floor: 8, id: 79, lessonId: "f8-lock", roomId: 92, name: "锁骑",
     species: "lock_knight", kind: "dark-knight", x: 1, y: 1, hp: 28, maxHp: 28,
     armor: 1, damage: 4, attackName: "锁链", status: "waiting",
-    weakness: "deadlock", masterId: 62, isBoss: false, rank: "normal",
+    weakness: "deadlock", masterId: 84, isBoss: false, rank: "normal",
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 58, lessonId: "f8-isolation", roomId: 93, name: "巫妖",
+    floor: 8, id: 80, lessonId: "f8-isolation", roomId: 93, name: "巫妖",
     species: "isolation_lich", kind: "lich", x: 1, y: 1, hp: 28, maxHp: 28,
     armor: 1, damage: 4, attackName: "幻读", status: "shifting",
-    weakness: "serializable", masterId: 62, isBoss: false, rank: "normal",
+    weakness: "serializable", masterId: 84, isBoss: false, rank: "normal",
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 59, lessonId: "f8-modeling", roomId: 94, name: "魔像",
+    floor: 8, id: 81, lessonId: "f8-modeling", roomId: 94, name: "魔像",
     species: "schema_golem", kind: "obsidian-golem", x: 1, y: 1, hp: 28, maxHp: 28,
     armor: 2, damage: 4, attackName: "重复重压", status: "duplicating",
-    weakness: "normalization", masterId: 62, isBoss: false, rank: "elite",
+    weakness: "normalization", masterId: 84, isBoss: false, rank: "elite",
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 60, lessonId: "f8-replication", roomId: 95, name: "双子",
+    floor: 8, id: 82, lessonId: "f8-replication", roomId: 95, name: "双子",
     species: "replica_twins", kind: "replica-twin", x: 1, y: 1, hp: 28, maxHp: 28,
     armor: 2, damage: 5, attackName: "延迟回声", status: "replicating",
-    weakness: "lag", masterId: 62, isBoss: false, rank: "elite",
+    weakness: "lag", masterId: 84, isBoss: false, rank: "elite",
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 61, lessonId: "f8-sharding", roomId: 96, name: "巨兽",
+    floor: 8, id: 83, lessonId: "f8-sharding", roomId: 96, name: "巨兽",
     species: "shard_beast", kind: "shard-beast", x: 1, y: 1, hp: 28, maxHp: 28,
     armor: 2, damage: 5, attackName: "分片冲撞", status: "routing",
-    weakness: "balance", masterId: 62, isBoss: false, rank: "elite",
+    weakness: "balance", masterId: 84, isBoss: false, rank: "elite",
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 62, lessonId: "f8-security", roomId: 97, name: "魔王",
+    floor: 8, id: 84, lessonId: "f8-security", roomId: 97, name: "魔王",
     species: "data_demon_king", kind: "demon-king", x: 1, y: 1, hp: 140, maxHp: 140,
     armor: 3, damage: 5, attackName: "数据终焉", status: "ruling",
     weakness: "evidence", masterId: null, isBoss: true, rank: "boss",
@@ -82,7 +82,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "版本厅 · 快照可见行",
     intro: "教学表显式记录创建与过期事务。用事务号 12 重建快照可见版本，不把夹具冒充 SQLite 内部实现。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 56,
+    primaryMonsterId: 78,
     stages: [{
       id: "f8-mvcc-visible",
       objective: "查询事务 12 可见的 row_id、value：created_tx <= 12，且 expired_tx 为空或大于 12；按 row_id。",
@@ -97,7 +97,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
       ],
       locks: ["WHERE", "AND", "IS NULL", "ORDER BY"],
       requiredFeatures: ["where", "and", "is-null", "order-by"],
-      attackTargetIds: [56],
+      attackTargetIds: [78],
     }],
   },
   {
@@ -106,7 +106,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "双骑门 · 找出互相等待",
     intro: "死锁是等待图中的环。本题从锁等待记录自连接，找出两条方向相反的边。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 57,
+    primaryMonsterId: 79,
     stages: [{
       id: "f8-lock-cycle",
       objective: "自连接 lock_waits，找出互相等待的一对 waiter_tx、blocker_tx，只保留 waiter_tx 较小的一行。",
@@ -121,7 +121,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
       ],
       locks: ["JOIN", "ON", "WHERE"],
       requiredFeatures: ["join", "on", "where"],
-      attackTargetIds: [57],
+      attackTargetIds: [79],
     }],
   },
   {
@@ -130,7 +130,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "幻境 · 识别隔离异常",
     intro: "同一条件两次计数变多，说明范围内出现新行。根据事故记录选择能阻止它的隔离策略。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 58,
+    primaryMonsterId: 80,
     stages: [{
       id: "f8-isolation-phantom",
       objective: "查询 second_count 大于 first_count 的 phenomenon、prevented_by，按 id 排序。",
@@ -145,7 +145,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
       ],
       locks: ["WHERE", "ORDER BY"],
       requiredFeatures: ["where", "order-by"],
-      attackTargetIds: [58],
+      attackTargetIds: [80],
     }],
   },
   {
@@ -154,7 +154,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "石像庭 · 选择安全模型",
     intro: "模型不是越拆越好；先确保稳定主键、业务唯一约束与零重复组，再比较综合评分。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 59,
+    primaryMonsterId: 81,
     stages: [{
       id: "f8-modeling-safe",
       objective: "筛出有主键、有唯一邮箱且无重复组的 model，按 score 降序只取一行。",
@@ -169,7 +169,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
       ],
       locks: ["WHERE", "AND", "ORDER BY", "LIMIT"],
       requiredFeatures: ["where", "and", "order-by", "limit"],
-      attackTargetIds: [59],
+      attackTargetIds: [81],
     }],
   },
   {
@@ -178,7 +178,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "双塔 · 选择新鲜副本",
     intro: "复制题只查询教学状态表。先过滤健康只读副本，再选择延迟最低的节点。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 60,
+    primaryMonsterId: 82,
     stages: [{
       id: "f8-replication-fresh",
       objective: "查询健康 replica 的 node、lag_ms，按 lag_ms 升序只取一行。",
@@ -193,7 +193,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
       ],
       locks: ["WHERE", "AND", "ORDER BY", "LIMIT"],
       requiredFeatures: ["where", "and", "order-by", "limit"],
-      attackTargetIds: [60],
+      attackTargetIds: [82],
     }],
   },
   {
@@ -202,7 +202,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "巨兽桥 · 审计路由",
     intro: "分片记录已经给出路由结果。按 shard_id 统计有效路由，找出至少承载两户的分片。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 61,
+    primaryMonsterId: 83,
     stages: [{
       id: "f8-sharding-balance",
       objective: "统计 route_ok = 1 的每个 shard_id 账户数 total，只保留 total >= 2，按 shard_id。",
@@ -217,7 +217,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
       ],
       locks: ["WHERE", "GROUP BY", "HAVING", "ORDER BY"],
       requiredFeatures: ["where", "group-by", "having", "order-by"],
-      attackTargetIds: [61],
+      attackTargetIds: [83],
     }],
   },
   {
@@ -226,7 +226,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
     title: "魔王座 · 五阶段事故响应",
     intro: "最终战把本层五类证据串成一次事故响应。每阶段仍是可复现的 SQLite 查询，最后用参数化与最小权限关闭入口。",
     schema: INCIDENT_SCHEMA,
-    primaryMonsterId: 62,
+    primaryMonsterId: 84,
     stages: [
       {
         id: "f8-final-snapshot",
@@ -242,7 +242,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
         ],
         locks: ["WHERE", "AND", "IS NULL"],
         requiredFeatures: ["where", "and", "is-null"],
-        attackTargetIds: [62],
+        attackTargetIds: [84],
       },
       {
         id: "f8-final-deadlock",
@@ -257,7 +257,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
         ],
         locks: ["WHERE", "ORDER BY"],
         requiredFeatures: ["where", "order-by"],
-        attackTargetIds: [62],
+        attackTargetIds: [84],
       },
       {
         id: "f8-final-anomaly",
@@ -272,7 +272,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
         ],
         locks: ["WHERE"],
         requiredFeatures: ["where"],
-        attackTargetIds: [62],
+        attackTargetIds: [84],
       },
       {
         id: "f8-final-route",
@@ -288,7 +288,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
         ],
         locks: ["WHERE", "AND", "ORDER BY"],
         requiredFeatures: ["where", "and", "order-by"],
-        attackTargetIds: [62],
+        attackTargetIds: [84],
       },
       {
         id: "f8-final-security",
@@ -304,7 +304,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
         ],
         locks: ["WHERE", "AND", "ORDER BY"],
         requiredFeatures: ["where", "and", "order-by"],
-        attackTargetIds: [62],
+        attackTargetIds: [84],
       },
     ],
   },

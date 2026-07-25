@@ -57,12 +57,12 @@ function sandboxResult(
 const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   select: [
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 101",
+      "SELECT name FROM monsters WHERE id = 1",
       ["name"],
       [{ name: "史莱姆" }],
     ),
     teachingResult(
-      "SELECT weakness FROM monsters WHERE id = 101",
+      "SELECT weakness FROM monsters WHERE id = 1",
       ["weakness"],
       [{ weakness: "slash" }],
     ),
@@ -71,8 +71,8 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     teachingResult(
       "SELECT id FROM monsters WHERE room_id = 2 AND status = 'escaped'",
       ["id"],
-      [{ id: 201 }],
-      [201],
+      [{ id: 2 }],
+      [2],
     ),
     teachingResult(
       "SELECT weakness FROM monsters WHERE name = '水胶怪' AND status = 'escaped'",
@@ -84,8 +84,8 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     teachingResult(
       "SELECT id FROM monsters WHERE room_id = 3 AND master_id IS NULL",
       ["id"],
-      [{ id: 301 }],
-      [301],
+      [{ id: 3 }],
+      [3],
     ),
     teachingResult(
       "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
@@ -95,7 +95,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   ],
   "group-by": [
     teachingResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 800 GROUP BY channel",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 4 GROUP BY channel",
       ["channel", "total"],
       [
         { channel: "echo", total: 3 },
@@ -105,7 +105,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   ],
   having: [
     teachingResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 900 GROUP BY channel HAVING COUNT(*) >= 2",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 2",
       ["channel", "total"],
       [
         { channel: "echo", total: 3 },
@@ -113,19 +113,19 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       ],
     ),
     teachingResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 900 GROUP BY channel HAVING COUNT(*) >= 3",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 3",
       ["channel", "total"],
       [{ channel: "echo", total: 3 }],
     ),
   ],
   "order-by": [
     teachingResult(
-      "SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 1",
+      "SELECT channel FROM monster_signals WHERE monster_id = 10 ORDER BY charge DESC LIMIT 1",
       ["channel"],
       [{ channel: "surge" }],
     ),
     teachingResult(
-      "SELECT channel, charge FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 2",
+      "SELECT channel, charge FROM monster_signals WHERE monster_id = 10 ORDER BY charge DESC LIMIT 2",
       ["channel", "charge"],
       [
         { channel: "surge", charge: 13 },
@@ -135,19 +135,19 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   ],
   distinct: [
     teachingResult(
-      "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1300 ORDER BY channel",
+      "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11 ORDER BY channel",
       ["channel"],
       [{ channel: "echo" }, { channel: "mirror" }],
     ),
   ],
   "inner-join": [
     teachingResult(
-      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400",
+      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 12",
       ["name", "room_name"],
       [{ name: "树妖", room_name: "古树桥" }],
     ),
     teachingResult(
-      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1400",
+      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 12",
       ["name", "sector"],
       [{ name: "树妖", sector: "forest-bridge" }],
     ),
@@ -156,8 +156,8 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     teachingResult(
       "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 24 AND g.monster_id IS NULL",
       ["id"],
-      [{ id: 1500 }],
-      [1500],
+      [{ id: 13 }],
+      [13],
     ),
   ],
   "join-boss": [
@@ -170,36 +170,36 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       ],
     ),
     teachingResult(
-      "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 1900 ORDER BY g.power DESC LIMIT 1",
+      "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1",
       ["name", "power"],
       [{ name: "丛林王", power: 21 }],
     ),
   ],
   "f3-inner": [teachingResult(
-    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1",
+    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 23",
     ["name", "room_name"],
     [{ name: "骷髅", room_name: "骨桥前庭" }],
   )],
   "f3-left": [teachingResult(
     "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 42 AND g.monster_id IS NULL",
     ["id"],
-    [{ id: 2 }],
-    [2],
+    [{ id: 24 }],
+    [24],
   )],
   "f3-self": [teachingResult(
-    "SELECT child.name AS child_name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 3",
+    "SELECT child.name AS child_name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 25",
     ["child_name", "master_name"],
     [{ child_name: "幽灵", master_name: "死灵王" }],
   )],
   "f3-chain": [teachingResult(
-    "SELECT r.name AS room_name, m.name, g.power FROM rooms r INNER JOIN monsters m ON r.id = m.room_id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 4",
+    "SELECT r.name AS room_name, m.name, g.power FROM rooms r INNER JOIN monsters m ON r.id = m.room_id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 26",
     ["room_name", "name", "power"],
     [{ room_name: "骑士墓", name: "铠骷髅", power: 18 }],
   )],
   "f3-union": [teachingResult(
     "SELECT id, name FROM monsters WHERE room_id = 41 UNION SELECT id, name FROM monsters WHERE room_id = 43 ORDER BY id",
     ["id", "name"],
-    [{ id: 1, name: "骷髅" }, { id: 3, name: "幽灵" }],
+    [{ id: 23, name: "骷髅" }, { id: 25, name: "幽灵" }],
   )],
   "f3-audit": [
     teachingResult(
@@ -228,17 +228,17 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     [{ name: "冰灵" }],
   )],
   "f4-exists": [teachingResult(
-    "SELECT m.name FROM monsters m WHERE m.id = 14 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
+    "SELECT m.name FROM monsters m WHERE m.id = 36 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
     ["name"],
     [{ name: "雷灵" }],
   )],
   "f4-correlated": [teachingResult(
-    "SELECT m.name FROM monsters m WHERE m.id = 15 AND (SELECT MAX(g.power) FROM monster_gear g WHERE g.monster_id = m.id) >= 18",
+    "SELECT m.name FROM monsters m WHERE m.id = 37 AND (SELECT MAX(g.power) FROM monster_gear g WHERE g.monster_id = m.id) >= 18",
     ["name"],
     [{ name: "石巨人" }],
   )],
   "f4-cte": [teachingResult(
-    "WITH armored AS (SELECT monster_id FROM monster_gear WHERE power >= 20) SELECT m.name FROM monsters m INNER JOIN armored a ON m.id = a.monster_id WHERE m.id = 16",
+    "WITH armored AS (SELECT monster_id FROM monster_gear WHERE power >= 20) SELECT m.name FROM monsters m INNER JOIN armored a ON m.id = a.monster_id WHERE m.id = 38",
     ["name"],
     [{ name: "炎王" }],
   )],
@@ -249,7 +249,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       [{ room_name: "火室" }, { room_name: "冰库" }, { room_name: "雷池" }],
     ),
     teachingResult(
-      "WITH RECURSIVE lineage(id, name, master_id, depth) AS (SELECT id, name, master_id, 1 FROM monsters WHERE id = 12 UNION ALL SELECT m.id, m.name, m.master_id, l.depth + 1 FROM monsters m INNER JOIN lineage l ON m.id = l.master_id WHERE l.depth < 3) SELECT name, depth FROM lineage ORDER BY depth",
+      "WITH RECURSIVE lineage(id, name, master_id, depth) AS (SELECT id, name, master_id, 1 FROM monsters WHERE id = 34 UNION ALL SELECT m.id, m.name, m.master_id, l.depth + 1 FROM monsters m INNER JOIN lineage l ON m.id = l.master_id WHERE l.depth < 3) SELECT name, depth FROM lineage ORDER BY depth",
       ["name", "depth"],
       [
         { name: "火灵", depth: 1 },
@@ -259,7 +259,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     ),
   ],
   "f5-over": [teachingResult(
-    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 23 AND 25 ORDER BY id",
+    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 45 AND 47 ORDER BY id",
     ["name", "guard_total"],
     [
       { name: "哥布林", guard_total: 3 },
@@ -268,7 +268,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     ],
   )],
   "f5-row-number": [teachingResult(
-    "SELECT m.name, r.sector, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 26 ORDER BY r.sector, pos",
+    "SELECT m.name, r.sector, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 45 AND 48 ORDER BY r.sector, pos",
     ["name", "sector", "pos"],
     [
       { name: "铁骑", sector: "arena", pos: 1 },
@@ -278,7 +278,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     ],
   )],
   "f5-rank": [teachingResult(
-    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no, DENSE_RANK() OVER (ORDER BY g.power DESC) AS dense_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 24 AND 26 ORDER BY g.power DESC, m.id",
+    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no, DENSE_RANK() OVER (ORDER BY g.power DESC) AS dense_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 46 AND 48 ORDER BY g.power DESC, m.id",
     ["name", "power", "rank_no", "dense_no"],
     [
       { name: "铁骑", power: 22, rank_no: 1, dense_no: 1 },
@@ -287,7 +287,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     ],
   )],
   "f5-lag-lead": [teachingResult(
-    "SELECT m.name, g.power, LAG(g.power) OVER (ORDER BY m.id) AS prev_power, LEAD(g.power) OVER (ORDER BY m.id) AS next_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 27 ORDER BY m.id",
+    "SELECT m.name, g.power, LAG(g.power) OVER (ORDER BY m.id) AS prev_power, LEAD(g.power) OVER (ORDER BY m.id) AS next_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 45 AND 49 ORDER BY m.id",
     ["name", "power", "prev_power", "next_power"],
     [
       { name: "哥布林", power: 18, prev_power: null, next_power: 20 },
@@ -298,7 +298,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     ],
   )],
   "f5-frame": [teachingResult(
-    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 27 ORDER BY m.id",
+    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 45 AND 49 ORDER BY m.id",
     ["name", "running_power"],
     [
       { name: "哥布林", running_power: 18 },
@@ -310,7 +310,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   )],
   "f5-top-n": [
     teachingResult(
-      "WITH ranked AS (SELECT r.sector, m.name, g.power, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 28) SELECT sector, name, power FROM ranked WHERE rn = 1 ORDER BY sector",
+      "WITH ranked AS (SELECT r.sector, m.name, g.power, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 45 AND 50) SELECT sector, name, power FROM ranked WHERE rn = 1 ORDER BY sector",
       ["sector", "name", "power"],
       [
         { sector: "arena", name: "铁骑", power: 22 },
@@ -320,7 +320,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       ],
     ),
     teachingResult(
-      "WITH ranked AS (SELECT r.sector, m.name, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 23 AND 26) SELECT sector, name, rn FROM ranked WHERE rn <= 2 ORDER BY sector, rn",
+      "WITH ranked AS (SELECT r.sector, m.name, ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN rooms r ON m.room_id = r.id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 45 AND 48) SELECT sector, name, rn FROM ranked WHERE rn <= 2 ORDER BY sector, rn",
       ["sector", "name", "rn"],
       [
         { sector: "arena", name: "铁骑", rn: 1 },
@@ -484,25 +484,25 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
 };
 
 const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
-  111: [teachingResult(
-    "SELECT name FROM monsters WHERE id = 111",
+  6: [teachingResult(
+    "SELECT name FROM monsters WHERE id = 6",
     ["name"],
     [{ name: "软泥怪" }],
   )],
-  211: [teachingResult(
+  7: [teachingResult(
     "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
     ["id"],
-    [{ id: 211 }],
-    [211],
+    [{ id: 7 }],
+    [7],
   )],
-  311: [teachingResult(
+  8: [teachingResult(
     "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
     ["name"],
     [{ name: "毒胶怪" }],
   )],
-  810: [
+  9: [
     teachingResult(
-    "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 810 GROUP BY channel",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 9 GROUP BY channel",
     ["channel", "total"],
     [
       { channel: "echo", total: 2 },
@@ -510,130 +510,130 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     ],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 810",
+      "SELECT name FROM monsters WHERE id = 9",
       ["name"],
       [{ name: "铁胶怪" }],
     ),
   ],
-  1210: [teachingResult(
-    "SELECT channel FROM monster_signals WHERE monster_id = 1210 ORDER BY charge DESC LIMIT 1",
+  15: [teachingResult(
+    "SELECT channel FROM monster_signals WHERE monster_id = 15 ORDER BY charge DESC LIMIT 1",
     ["channel"],
     [{ channel: "surge" }],
   )],
-  1310: [teachingResult(
-    "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1310 ORDER BY channel",
+  16: [teachingResult(
+    "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16 ORDER BY channel",
     ["channel"],
     [{ channel: "echo" }, { channel: "mirror" }],
   )],
-  1410: [teachingResult(
-    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1410",
+  17: [teachingResult(
+    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17",
     ["name", "room_name"],
     [{ name: "青蛙", room_name: "泥沼石径" }],
   )],
-  1510: [
+  18: [
     teachingResult(
       "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL",
       ["id"],
-      [{ id: 1510 }],
-      [1510],
+      [{ id: 18 }],
+      [18],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 1510 AND status = 'toxic'",
+      "SELECT name FROM monsters WHERE id = 18 AND status = 'toxic'",
       ["name"],
       [{ name: "毒蛙" }],
     ),
   ],
-  1610: [teachingResult(
-    "SELECT name, hp FROM monsters WHERE id = 1610 ORDER BY hp DESC LIMIT 1",
+  19: [teachingResult(
+    "SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1",
     ["name", "hp"],
     [{ name: "猎犬", hp: 13 }],
   )],
-  1710: [
+  20: [
     teachingResult(
-      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1710",
+      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20",
       ["name", "room_name"],
       [{ name: "树妖", room_name: "树妖林地" }],
     ),
     teachingResult(
-      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 1710 ORDER BY r.sector LIMIT 1",
+      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1",
       ["name", "sector"],
       [{ name: "树妖", sector: "forest-treant" }],
     ),
   ],
-  7: [teachingResult(
-    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 7",
+  29: [teachingResult(
+    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 29",
     ["name", "room_name"],
     [{ name: "碎骨", room_name: "遗骨荒地" }],
   )],
-  8: [teachingResult(
-    "SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 8 AND g.monster_id IS NULL",
+  30: [teachingResult(
+    "SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 30 AND g.monster_id IS NULL",
     ["name"],
     [{ name: "腐尸" }],
   )],
-  9: [
+  31: [
     teachingResult(
-      "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 9",
+      "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31",
       ["name", "master_name"],
       [{ name: "鬼火", master_name: "墓主" }],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 9 AND status = 'haunting'",
+      "SELECT name FROM monsters WHERE id = 31 AND status = 'haunting'",
       ["name"],
       [{ name: "鬼火" }],
     ),
   ],
-  10: [teachingResult(
-    "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 10",
+  32: [teachingResult(
+    "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 32",
     ["name", "master_name"],
     [{ name: "游魂", master_name: "墓主" }],
   )],
-  18: [teachingResult(
+  40: [teachingResult(
     "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57)",
     ["name"],
     [{ name: "火苗" }],
   )],
-  19: [teachingResult(
+  41: [teachingResult(
     "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name",
     ["name"],
     [{ name: "冰晶" }],
   )],
-  20: [
+  42: [
     teachingResult(
-      "SELECT m.name FROM monsters m WHERE m.id = 20 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
+      "SELECT m.name FROM monsters m WHERE m.id = 42 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
       ["name"],
       [{ name: "雷兽" }],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 20 AND status = 'charged'",
+      "SELECT name FROM monsters WHERE id = 42 AND status = 'charged'",
       ["name"],
       [{ name: "雷兽" }],
     ),
   ],
-  21: [teachingResult(
-    "SELECT m.name FROM monsters m WHERE m.id = 21 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
+  43: [teachingResult(
+    "SELECT m.name FROM monsters m WHERE m.id = 43 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
     ["name"],
     [{ name: "电球" }],
   )],
-  29: [teachingResult(
-    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 29 AND 30 ORDER BY id",
+  51: [teachingResult(
+    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 51 AND 52 ORDER BY id",
     ["name", "guard_total"],
     [{ name: "小妖", guard_total: 2 }, { name: "战兽", guard_total: 2 }],
   )],
-  30: [teachingResult(
-    "SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 30 ORDER BY pos",
+  52: [teachingResult(
+    "SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 52 ORDER BY pos",
     ["name", "pos"],
     [{ name: "战兽", pos: 1 }, { name: "小妖", pos: 2 }],
   )],
-  31: [teachingResult(
-    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 30 AND 31 ORDER BY g.power DESC, m.id",
+  53: [teachingResult(
+    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 52 AND 53 ORDER BY g.power DESC, m.id",
     ["name", "power", "rank_no"],
     [
       { name: "铁卫", power: 24, rank_no: 1 },
       { name: "战兽", power: 20, rank_no: 2 },
     ],
   )],
-  32: [teachingResult(
-    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 29 AND 32 ORDER BY m.id",
+  54: [teachingResult(
+    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id",
     ["name", "running_power"],
     [
       { name: "小妖", running_power: 18 },
@@ -642,64 +642,64 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
       { name: "巨魔", running_power: 84 },
     ],
   )],
-  40: [sandboxResult(
+  62: [sandboxResult(
     "INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'ember', 1, 'ready')",
     [...SANDBOX_ROWS, { id: 7, item: "ember", quantity: 1, status: "ready" }],
   )],
-  41: [sandboxResult(
+  63: [sandboxResult(
     "UPDATE repair_queue SET quantity = 3 WHERE id = 1",
     SANDBOX_ROWS.map((row) => row.id === 1 ? { ...row, quantity: 3 } : row),
   )],
-  42: [sandboxResult(
+  64: [sandboxResult(
     "BEGIN; UPDATE repair_queue SET quantity = 8 WHERE id = 1; ROLLBACK",
     SANDBOX_ROWS,
   )],
-  43: [sandboxResult(
+  65: [sandboxResult(
     "INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (7, 'bad', -2, 'ready')",
     SANDBOX_ROWS,
   )],
-  51: [teachingResult(
+  73: [teachingResult(
     "SELECT code FROM index_records WHERE id = 1",
     ["code"],
     [{ code: "CRY-101" }],
   )],
-  52: [teachingResult(
+  74: [teachingResult(
     "SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 88 ORDER BY score DESC",
     ["code", "score"],
     [{ code: "CRY-106", score: 95 }, { code: "CRY-104", score: 88 }],
     [],
     ["SEARCH idx_index_records_realm_score"],
   )],
-  53: [teachingResult(
+  75: [teachingResult(
     "SELECT category, code FROM index_records WHERE category = 'charm' ORDER BY code",
     ["category", "code"],
     [{ category: "charm", code: "CRY-105" }, { category: "charm", code: "EMB-202" }],
     [],
     ["SEARCH USING COVERING INDEX idx_index_records_category_code"],
   )],
-  54: [teachingResult(
+  76: [teachingResult(
     "SELECT code FROM index_records WHERE code >= 'CRY-101' AND code < 'CRY-103' ORDER BY code",
     ["code"],
     [{ code: "CRY-101" }, { code: "CRY-102" }],
     [],
     ["SEARCH idx_index_records_code"],
   )],
-  63: [teachingResult(
+  85: [teachingResult(
     "SELECT value FROM tx_versions WHERE row_id = 3 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12)",
     ["value"],
     [{ value: "safe" }],
   )],
-  64: [teachingResult(
+  86: [teachingResult(
     "SELECT blocker_tx, resource FROM lock_waits WHERE waiter_tx = 'T3'",
     ["blocker_tx", "resource"],
     [{ blocker_tx: "T2", resource: "log:2" }],
   )],
-  65: [teachingResult(
+  87: [teachingResult(
     "SELECT first_count, second_count FROM isolation_cases WHERE phenomenon = 'phantom_read'",
     ["first_count", "second_count"],
     [{ first_count: 2, second_count: 4 }],
   )],
-  66: [teachingResult(
+  88: [teachingResult(
     "SELECT model, score FROM schema_choices WHERE duplicate_groups = 0 ORDER BY score DESC LIMIT 1",
     ["model", "score"],
     [{ model: "normalized", score: 95 }],
@@ -969,6 +969,14 @@ describe("continuous physical maze run", () => {
     clearLessonByWalking(session, "f8-security");
 
     expect(session.snapshot().mode).toBe("victory");
+    expect(session.snapshot().campaign).toMatchObject({
+      currentFloor: 8,
+      status: "completed",
+    });
+    expect(session.snapshot().campaign.floors.every(
+      (slot) => slot.status === "cleared",
+    )).toBe(true);
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
     expect(session.snapshot().completedLessons).toEqual([
       "f8-mvcc",
       "f8-lock",

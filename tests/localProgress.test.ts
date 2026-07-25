@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { legacyMonsterIdForCurrent } from "../src/content/monsterIds";
 import { GameSession } from "../src/domain/GameSession";
+import {
+  advanceCampaignProgress,
+  createCampaignProgress,
+} from "../src/domain/campaign";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import type { SavedRun, SqlQueryResult } from "../src/domain/types";
 import {
@@ -7,6 +12,7 @@ import {
   RUN_SAVE_KEY,
   clearRun,
   createEmptyProfile,
+  isSavedRun,
   loadProfile,
   loadRun,
   persistProfileIfChanged,
@@ -65,6 +71,45 @@ function freshRun(seed: string): SavedRun {
   return structuredClone(new GameSession(null, null, seed).toSavedRun());
 }
 
+function freshFloorEightRun(seed: string): SavedRun {
+  const preview = new GameSession(null, null, seed);
+  preview.enableAdminMode();
+  preview.adminLoadFloor(8);
+  return structuredClone(preview.toSavedRun());
+}
+
+function withLegacyMonsterIds(run: SavedRun): SavedRun {
+  const legacy = structuredClone(run);
+  legacy.monsters = legacy.monsters.map((monster) => ({
+    ...monster,
+    id: legacyMonsterIdForCurrent(monster.id),
+    masterId: monster.masterId === null
+      ? null
+      : legacyMonsterIdForCurrent(monster.masterId),
+  }));
+  legacy.worldActors = legacy.worldActors.map((actor) => ({
+    ...actor,
+    monsterId: legacyMonsterIdForCurrent(actor.monsterId),
+  }));
+  legacy.combat = legacy.combat
+    ? {
+        ...legacy.combat,
+        targetId: legacyMonsterIdForCurrent(legacy.combat.targetId),
+      }
+    : null;
+  legacy.answerHistory = legacy.answerHistory.map((record) => ({
+    ...record,
+    monsterId: legacyMonsterIdForCurrent(record.monsterId),
+  }));
+  legacy.lootBundles = legacy.lootBundles.map((bundle) => ({
+    ...bundle,
+    sourceMonsterId: bundle.sourceMonsterId === null
+      ? null
+      : legacyMonsterIdForCurrent(bundle.sourceMonsterId),
+  }));
+  return legacy;
+}
+
 function queryResult(
   sql: string,
   columns: string[],
@@ -93,12 +138,12 @@ function completeSelect(session: GameSession): void {
   if (!actor) throw new Error("测试迷宫缺少 SELECT Actor");
   expect(session.startEncounter(actor.monsterId).ok).toBe(true);
   expect(session.resolveQuery(queryResult(
-    "SELECT name FROM monsters WHERE id = 101",
+    "SELECT name FROM monsters WHERE id = 1",
     ["name"],
     [{ name: "史莱姆" }],
   )).accepted).toBe(true);
   expect(session.resolveQuery(queryResult(
-    "SELECT weakness FROM monsters WHERE id = 101",
+    "SELECT weakness FROM monsters WHERE id = 1",
     ["weakness"],
     [{ weakness: "slash" }],
   )).lessonCompleted).toBe("select");
@@ -328,12 +373,77 @@ describe("localProgress", () => {
 
   it("恢复旧存档时使用当前内容中的简短怪物名", () => {
     const saved = freshRun("canonical-monster-names");
-    const slime = saved.monsters.find((monster) => monster.id === 101);
+    const slime = saved.monsters.find((monster) => monster.id === 1);
     if (!slime) throw new Error("旧存档缺少史莱姆");
     slime.name = "旧版名称 · 装饰后缀";
 
     const restored = new GameSession(saved).snapshot();
-    expect(restored.monsters.find((monster) => monster.id === 101)?.name).toBe("史莱姆");
+    expect(restored.monsters.find((monster) => monster.id === 1)?.name).toBe("史莱姆");
+  });
+
+  it("旧怪物编号的 v10 Run 会同步迁移战斗、Actor、复盘和掉落引用", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "legacy-monster-id-v10");
+    completeSelect(session);
+    const whereRoom = session.snapshot().roomGraph.nodes.find((node) => (
+      node.lessonId === "where"
+    ));
+    if (!whereRoom) throw new Error("测试迷宫缺少 WHERE 区域");
+    expect(session.travelToRoom(whereRoom.id).ok).toBe(true);
+    const actor = session.snapshot().worldActors.find((entry) => (
+      entry.roomNodeId === whereRoom.id
+    ));
+    if (!actor) throw new Error("测试迷宫缺少 WHERE Actor");
+    expect(session.startEncounter(actor.monsterId).ok).toBe(true);
+    session.registerQueryError("历史查询错误", "SELECT missing FROM monsters");
+
+    const current = session.toSavedRun();
+    const legacy = withLegacyMonsterIds(current);
+    const historicMasterIds = new Map([
+      [101, 7],
+      [201, 11],
+      [800, 42],
+      [900, 0],
+    ]);
+    legacy.monsters.forEach((monster) => {
+      if (historicMasterIds.has(monster.id)) {
+        monster.masterId = historicMasterIds.get(monster.id) ?? null;
+      }
+    });
+    expect(legacy.monsters.some((monster) => monster.id === 101)).toBe(true);
+    expect(legacy.combat?.targetId).toBe(201);
+    expect(legacy.lootBundles.some((bundle) => bundle.sourceMonsterId === 101)).toBe(true);
+    storage.setItem(RUN_SAVE_KEY, JSON.stringify(legacy));
+
+    const migrated = loadRun(storage);
+    expect(migrated?.monsters.map((monster) => monster.id)).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    );
+    expect(migrated?.worldActors.some((entry) => entry.monsterId === 1)).toBe(true);
+    expect(migrated?.combat?.targetId).toBe(2);
+    expect(migrated?.answerHistory.map((record) => record.monsterId)).toEqual([1, 1, 2]);
+    expect(migrated?.lootBundles.some((bundle) => bundle.sourceMonsterId === 1)).toBe(true);
+    expect(migrated?.monsters.every((monster) => (
+      monster.masterId === null ||
+      migrated.monsters.some((candidate) => candidate.id === monster.masterId)
+    ))).toBe(true);
+
+    const restored = new GameSession(migrated).snapshot();
+    expect(restored.monsters.find((monster) => monster.id === 1)?.hp).toBe(0);
+    expect(restored.combat?.targetId).toBe(2);
+  });
+
+  it("混合或未知怪物编号不会被误判成可迁移存档", () => {
+    const storage = new MemoryStorage();
+    const mixed = freshRun("mixed-monster-ids");
+    mixed.monsters[0].id = 101;
+    storage.setItem(RUN_SAVE_KEY, JSON.stringify(mixed));
+    expect(loadRun(storage)).toBeNull();
+
+    const unknown = freshRun("unknown-monster-ids");
+    unknown.monsters[0].id = 999_999;
+    storage.setItem(RUN_SAVE_KEY, JSON.stringify(unknown));
+    expect(loadRun(storage)).toBeNull();
   });
 
   it("当前 v9 Run 会无损迁移到 v10，且保留原始存档作为回退", () => {
@@ -544,7 +654,7 @@ describe("localProgress", () => {
 
   it("当前 v5 Run 会迁移到 v10，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
-    const current = freshRun("migrate-run-v5");
+    const current = withLegacyMonsterIds(freshRun("migrate-run-v5"));
     const {
       campfires: _campfires,
       activeCampfireId: _activeCampfireId,
@@ -577,7 +687,7 @@ describe("localProgress", () => {
 
   it("当前 v4 Run 会迁移到 v10，且不会删除原始存档", () => {
     const storage = new MemoryStorage();
-    const current = freshRun("migrate-run-v4");
+    const current = withLegacyMonsterIds(freshRun("migrate-run-v4"));
     const {
       campfires: _campfires,
       activeCampfireId: _activeCampfireId,
@@ -713,6 +823,44 @@ describe("localProgress", () => {
     expectRunRejected(storage, duplicateActive);
   });
 
+  it("victory 与 completed 双向一致，旧 v10 终局异常会迁移且不丢档", () => {
+    const storage = new MemoryStorage();
+    const completedRun = freshFloorEightRun("victory-save");
+    const completion = advanceCampaignProgress(completedRun.campaign);
+    expect(completion).toMatchObject({ ok: true, completed: true });
+    completedRun.mode = "victory";
+    completedRun.campaign = completion.progress;
+
+    expect(isSavedRun(completedRun)).toBe(true);
+    saveRun(storage, completedRun);
+    expect(loadRun(storage)).toEqual(completedRun);
+
+    const legacyVictory = structuredClone(completedRun);
+    legacyVictory.campaign = createCampaignProgress(
+      legacyVictory.campaign.baseSeed,
+      8,
+    );
+    expect(isSavedRun(legacyVictory)).toBe(false);
+    storage.setItem(RUN_SAVE_KEY, JSON.stringify(legacyVictory));
+    const migrated = loadRun(storage);
+    expect(migrated).toMatchObject({
+      version: 10,
+      floor: 8,
+      mode: "victory",
+      campaign: {
+        currentFloor: 8,
+        status: "completed",
+      },
+    });
+    expect(migrated?.campaign.floors.every(
+      (slot) => slot.status === "cleared",
+    )).toBe(true);
+
+    const impossibleReverse = structuredClone(completedRun);
+    impossibleReverse.mode = "explore";
+    expectRunRejected(storage, impossibleReverse);
+  });
+
   it("答题历史损坏或超出查询序号时拒绝恢复整个 Run", () => {
     const storage = new MemoryStorage();
     const run = freshRun("broken-answer-history");
@@ -723,14 +871,14 @@ describe("localProgress", () => {
       id: 2,
       battleId: 1,
       floor: 1,
-      monsterId: 101,
+      monsterId: 1,
       monsterName: "史莱姆",
       lessonId: "select",
       stageId: "select-name",
       stageObjective: "查询史莱姆名字",
       round: 1,
       sql: "SELECT name FROM monsters",
-      answerSql: "SELECT name FROM monsters WHERE id = 101;",
+      answerSql: "SELECT name FROM monsters WHERE id = 1;",
       result: "wrong-result",
       outcome: "countered",
       feedback: "结果不匹配",

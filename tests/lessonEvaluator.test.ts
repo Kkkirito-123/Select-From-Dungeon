@@ -71,114 +71,114 @@ describe("课程文案", () => {
     expect(Object.fromEntries(
       INITIAL_MONSTERS.map((monster) => [monster.id, monster.name]),
     )).toEqual({
-      101: "史莱姆",
-      111: "软泥怪",
-      201: "水胶怪",
-      211: "水胶怪",
-      301: "毒胶怪",
-      311: "毒胶怪",
-      800: "铁胶怪",
-      810: "铁胶怪",
-      900: "泥王",
-      1200: "猎犬",
-      1210: "水怪",
-      1300: "水蛇",
-      1310: "水蛇",
-      1400: "树妖",
-      1410: "青蛙",
-      1500: "毒蛙",
-      1510: "毒蛙",
-      1610: "猎犬",
-      1710: "树妖",
-      1810: "湖怪",
-      1900: "丛林王",
-      1911: "蛙王",
-      1: "骷髅",
-      2: "僵尸",
-      3: "幽灵",
-      4: "铠骷髅",
-      5: "骨骑士",
-      7: "碎骨",
-      8: "腐尸",
-      9: "鬼火",
-      10: "游魂",
-      11: "墓主",
-      6: "死灵王",
-      12: "火灵",
-      13: "冰灵",
-      14: "雷灵",
-      15: "石巨人",
-      16: "炎王",
-      18: "火苗",
-      19: "冰晶",
-      20: "雷兽",
-      21: "电球",
-      22: "炉主",
-      17: "元素王",
-      23: "哥布林",
-      24: "兽人",
-      25: "骑士",
-      26: "铁骑",
-      27: "巨魔",
-      28: "城主",
-      29: "小妖",
-      30: "战兽",
-      31: "铁卫",
-      32: "巨魔",
-      33: "堡主",
-      34: "幼龙",
-      35: "飞龙",
-      36: "雷龙",
-      37: "晶龙",
-      38: "巨龙",
-      39: "龙王",
-      40: "小龙",
-      41: "翼龙",
-      42: "雷龙",
-      43: "晶龙",
-      44: "古龙",
-      45: "树卫",
-      46: "根兽",
-      47: "镜灵",
-      48: "藤巫",
-      49: "眼魔",
-      50: "古树",
-      51: "枝妖",
-      52: "根兽",
-      53: "晶灵",
-      54: "树魔",
-      55: "林王",
-      56: "幽魂",
-      57: "锁骑",
-      58: "巫妖",
-      59: "魔像",
-      60: "双子",
-      61: "巨兽",
-      62: "魔王",
-      63: "魔兵",
-      64: "黑骑",
-      65: "魔将",
-      66: "石像",
-      67: "王兽",
+      1: "史莱姆",
+      6: "软泥怪",
+      2: "水胶怪",
+      7: "水胶怪",
+      3: "毒胶怪",
+      8: "毒胶怪",
+      4: "铁胶怪",
+      9: "铁胶怪",
+      5: "泥王",
+      10: "猎犬",
+      15: "水怪",
+      11: "水蛇",
+      16: "水蛇",
+      12: "树妖",
+      17: "青蛙",
+      13: "毒蛙",
+      18: "毒蛙",
+      19: "猎犬",
+      20: "树妖",
+      21: "湖怪",
+      14: "丛林王",
+      22: "蛙王",
+      23: "骷髅",
+      24: "僵尸",
+      25: "幽灵",
+      26: "铠骷髅",
+      27: "骨骑士",
+      29: "碎骨",
+      30: "腐尸",
+      31: "鬼火",
+      32: "游魂",
+      33: "墓主",
+      28: "死灵王",
+      34: "火灵",
+      35: "冰灵",
+      36: "雷灵",
+      37: "石巨人",
+      38: "炎王",
+      40: "火苗",
+      41: "冰晶",
+      42: "雷兽",
+      43: "电球",
+      44: "炉主",
+      39: "元素王",
+      45: "哥布林",
+      46: "兽人",
+      47: "骑士",
+      48: "铁骑",
+      49: "巨魔",
+      50: "城主",
+      51: "小妖",
+      52: "战兽",
+      53: "铁卫",
+      54: "巨魔",
+      55: "堡主",
+      56: "幼龙",
+      57: "飞龙",
+      58: "雷龙",
+      59: "晶龙",
+      60: "巨龙",
+      61: "龙王",
+      62: "小龙",
+      63: "翼龙",
+      64: "雷龙",
+      65: "晶龙",
+      66: "古龙",
+      67: "树卫",
+      68: "根兽",
+      69: "镜灵",
+      70: "藤巫",
+      71: "眼魔",
+      72: "古树",
+      73: "枝妖",
+      74: "根兽",
+      75: "晶灵",
+      76: "树魔",
+      77: "林王",
+      78: "幽魂",
+      79: "锁骑",
+      80: "巫妖",
+      81: "魔像",
+      82: "双子",
+      83: "巨兽",
+      84: "魔王",
+      85: "魔兵",
+      86: "黑骑",
+      87: "魔将",
+      88: "石像",
+      89: "王兽",
     });
     expect(INITIAL_MONSTERS.every(
       (monster) => !monster.name.includes("·") && monster.name.length <= 3,
     )).toBe(true);
   });
 
-  it("第三到八层面向玩家的怪物编号从 1 连续到 67", () => {
+  it("第三到八层面向玩家的怪物编号从 23 连续到 89", () => {
     const advancedIds = INITIAL_MONSTERS
       .filter((monster) => monster.floor >= 3)
       .map((monster) => monster.id)
       .sort((left, right) => left - right);
 
     expect(advancedIds).toEqual(
-      Array.from({ length: 67 }, (_, index) => index + 1),
+      Array.from({ length: 67 }, (_, index) => index + 23),
     );
   });
 
   it("WHERE 使用短怪物名，并按信息量从短提示推进到完整 SQL", () => {
-    const monster = INITIAL_MONSTERS.find((candidate) => candidate.id === 201);
+    const monster = INITIAL_MONSTERS.find((candidate) => candidate.id === 2);
     const lesson = LESSONS.find((candidate) => candidate.id === "where");
     const secondStage = lesson?.stages[1];
 
@@ -199,31 +199,31 @@ describe("课程文案", () => {
 
 describe("evaluateLesson stages", () => {
   it("突发遭遇题仍检查真实结果与对应 SQL 核心", () => {
-    const stage = practiceStageFor(211);
+    const stage = practiceStageFor(7);
     if (!stage) throw new Error("缺少 WHERE 突发遭遇题");
     const exact = makeResult(
       "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
       ["id"],
-      [{ id: 211 }],
-      [211],
+      [{ id: 7 }],
+      [7],
     );
     const bypass = makeResult(
-      "SELECT id FROM monsters WHERE id = 211",
+      "SELECT id FROM monsters WHERE id = 7",
       ["id"],
-      [{ id: 211 }],
-      [211],
+      [{ id: 7 }],
+      [7],
     );
     expect(evaluateStage(stage, exact).accepted).toBe(true);
     expect(evaluateStage(stage, bypass).accepted).toBe(false);
   });
   it("SELECT 两阶段必须分别读出怪物名字与弱点", () => {
     const name = makeResult(
-      "select name from monsters where id=101",
+      "select name from monsters where id=1",
       ["name"],
       [{ name: "史莱姆" }],
     );
     const weakness = makeResult(
-      "SELECT weakness FROM monsters WHERE id = 101",
+      "SELECT weakness FROM monsters WHERE id = 1",
       ["weakness"],
       [{ weakness: "slash" }],
     );
@@ -234,7 +234,7 @@ describe("evaluateLesson stages", () => {
 
   it("SELECT 接受表别名限定的等价列引用", () => {
     const actual = makeResult(
-      "SELECT m.name FROM monsters AS m WHERE m.id = 101",
+      "SELECT m.name FROM monsters AS m WHERE m.id = 1",
       ["name"],
       [{ name: "史莱姆" }],
     );
@@ -254,24 +254,24 @@ describe("evaluateLesson stages", () => {
     const actual = makeResult(
       "SELECT id FROM monsters WHERE room_id >= 1 AND status = 'escaped'",
       ["id"],
-      [{ id: 201 }, { id: 301 }],
-      [201, 301],
+      [{ id: 2 }, { id: 3 }],
+      [2, 3],
     );
     expect(evaluateLesson("where", 0, actual).kind).toBe("wrong-result");
   });
 
   it("WHERE 与 IS NULL 拒绝 OR + 直接 id 的伪条件绕过", () => {
     const whereBypass = makeResult(
-      "SELECT id FROM monsters WHERE id=201 OR (room_id=2 AND status='bogus')",
+      "SELECT id FROM monsters WHERE id=2 OR (room_id=2 AND status='bogus')",
       ["id"],
-      [{ id: 201 }],
-      [201],
+      [{ id: 2 }],
+      [2],
     );
     const nullBypass = makeResult(
-      "SELECT id FROM monsters WHERE id=301 OR (room_id=3 AND master_id IS NULL AND 0)",
+      "SELECT id FROM monsters WHERE id=3 OR (room_id=3 AND master_id IS NULL AND 0)",
       ["id"],
-      [{ id: 301 }],
-      [301],
+      [{ id: 3 }],
+      [3],
     );
     expect(evaluateLesson("where", 0, whereBypass).accepted).toBe(false);
     expect(evaluateLesson("is-null", 0, nullBypass).accepted).toBe(false);
@@ -279,10 +279,10 @@ describe("evaluateLesson stages", () => {
 
   it("WHERE 第二阶段不能只用 id 与恒真条件绕过名字过滤", () => {
     const actual = makeResult(
-      "SELECT weakness, name, status FROM monsters WHERE id = 201 AND 1 = 1",
+      "SELECT weakness, name, status FROM monsters WHERE id = 2 AND 1 = 1",
       ["weakness", "name", "status"],
       [{ weakness: "focus", name: "水胶怪", status: "escaped" }],
-      [201],
+      [2],
     );
     expect(evaluateLesson("where", 1, actual).accepted).toBe(false);
   });
@@ -318,7 +318,7 @@ describe("evaluateLesson stages", () => {
 
   it("GROUP BY 接受调换列顺序且忽略结果行顺序", () => {
     const actual = makeResult(
-      "SELECT COUNT(*) AS total, channel FROM monster_signals WHERE monster_id=800 GROUP BY channel",
+      "SELECT COUNT(*) AS total, channel FROM monster_signals WHERE monster_id=4 GROUP BY channel",
       ["total", "channel"],
       [
         { total: 1, channel: "noise" },
@@ -330,7 +330,7 @@ describe("evaluateLesson stages", () => {
 
   it("HAVING 护盾与核心使用不同阈值", () => {
     const shield = makeResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=900 GROUP BY channel HAVING COUNT(*) >= 2",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=5 GROUP BY channel HAVING COUNT(*) >= 2",
       ["channel", "total"],
       [
         { channel: "echo", total: 3 },
@@ -338,7 +338,7 @@ describe("evaluateLesson stages", () => {
       ],
     );
     const core = makeResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=900 GROUP BY channel HAVING COUNT(*) >= 3",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=5 GROUP BY channel HAVING COUNT(*) >= 3",
       ["channel", "total"],
       [{ channel: "echo", total: 3 }],
     );
@@ -349,7 +349,7 @@ describe("evaluateLesson stages", () => {
 
   it("HAVING 接受使用题目要求的 total 别名过滤", () => {
     const shield = makeResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=900 GROUP BY channel HAVING total >= 2",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=5 GROUP BY channel HAVING total >= 2",
       ["channel", "total"],
       [
         { channel: "echo", total: 3 },
@@ -361,7 +361,7 @@ describe("evaluateLesson stages", () => {
 
   it("HAVING 1 = 1 即使结果碰巧正确也不能击破核心", () => {
     const actual = makeResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=900 AND channel='echo' GROUP BY channel HAVING 1 = 1",
+      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id=5 AND channel='echo' GROUP BY channel HAVING 1 = 1",
       ["channel", "total"],
       [{ channel: "echo", total: 3 }],
     );
@@ -370,12 +370,12 @@ describe("evaluateLesson stages", () => {
 
   it("第二层 ORDER BY / LIMIT 同时校验顺序与返回行", () => {
     const peak = makeResult(
-      "SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge DESC LIMIT 1",
+      "SELECT channel FROM monster_signals WHERE monster_id = 10 ORDER BY charge DESC LIMIT 1",
       ["channel"],
       [{ channel: "surge" }],
     );
     const wrongDirection = makeResult(
-      "SELECT channel FROM monster_signals WHERE monster_id = 1200 ORDER BY charge ASC LIMIT 1",
+      "SELECT channel FROM monster_signals WHERE monster_id = 10 ORDER BY charge ASC LIMIT 1",
       ["channel"],
       [{ channel: "surge" }],
     );
@@ -385,12 +385,12 @@ describe("evaluateLesson stages", () => {
 
   it("第二层 DISTINCT 必须真正去重并按要求排序", () => {
     const exact = makeResult(
-      "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 1300 ORDER BY channel",
+      "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11 ORDER BY channel",
       ["channel"],
       [{ channel: "echo" }, { channel: "mirror" }],
     );
     const withoutDistinct = makeResult(
-      "SELECT channel FROM monster_signals WHERE monster_id = 1300 ORDER BY channel",
+      "SELECT channel FROM monster_signals WHERE monster_id = 11 ORDER BY channel",
       ["channel"],
       [{ channel: "echo" }, { channel: "mirror" }],
     );
@@ -400,12 +400,12 @@ describe("evaluateLesson stages", () => {
 
   it("第二层 INNER JOIN 必须使用真实表关系，不能用恒真 ON 绕过", () => {
     const exact = makeResult(
-      "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 1400",
+      "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
       ["name", "room_name"],
       [{ name: "树妖", room_name: "古树桥" }],
     );
     const bypass = makeResult(
-      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON 1 = 1 WHERE m.id = 1400 AND r.id = 23",
+      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON 1 = 1 WHERE m.id = 12 AND r.id = 23",
       ["name", "room_name"],
       [{ name: "树妖", room_name: "古树桥" }],
     );
@@ -417,8 +417,8 @@ describe("evaluateLesson stages", () => {
     const exact = makeResult(
       "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 24 AND g.monster_id IS NULL",
       ["id"],
-      [{ id: 1500 }],
-      [1500],
+      [{ id: 13 }],
+      [13],
     );
     expect(evaluateLesson("left-join", 0, exact).accepted).toBe(true);
   });

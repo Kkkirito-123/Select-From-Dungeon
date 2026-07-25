@@ -1,4 +1,14 @@
 import { ArcadeAudio } from "../audio/ArcadeAudio";
+import {
+  NARRATIVE_ENDINGS,
+  NARRATIVE_FLOORS,
+  type NarrativeBeat,
+  type NarrativeEndingStep,
+} from "../content/narrativeContent";
+import {
+  floorMapBlueprint,
+  floorTransitPresentation,
+} from "../content/floorMapBlueprints";
 import type { OnboardingMilestone } from "../content/onboarding";
 import { LESSONS, practiceStagesFor } from "../content/mvpLevel";
 import {
@@ -10,6 +20,10 @@ import {
   type SqlTableName,
 } from "../content/sqlSchema";
 import { GameSession, LEVEL_XP_THRESHOLDS } from "../domain/GameSession";
+import {
+  buildScribeRecap,
+  narrativeFloorFor,
+} from "../domain/narrative";
 import type { FloorNumber } from "../domain/runGraph";
 import type {
   ExperienceSettlement,
@@ -31,6 +45,7 @@ import {
   AnswerReviewView,
   type AnswerReviewScope,
 } from "./AnswerReviewView";
+import { NarrativeCodexView } from "./NarrativeCodexView";
 import {
   parseSchemaLines,
   SqlAutocompleteController,
@@ -169,6 +184,80 @@ export interface CombatSettlementCopy {
   reward: string;
 }
 
+export interface NarrativeRuntimeProgress {
+  seenBeatIds: readonly string[];
+  discoveredEvidenceIds: readonly string[];
+  completedAscentIds: readonly string[];
+  completedMigrationStepIds: readonly NarrativeEndingStep["id"][];
+  latestBeat: NarrativeBeat | null;
+}
+
+export function narrativeProgressForSnapshot(
+  snapshot: Pick<
+    GameSnapshot,
+    | "completedLessons"
+    | "completedRoomIds"
+    | "floor"
+    | "focusMonsterId"
+    | "mode"
+    | "monsters"
+    | "respawnCampfireId"
+    | "roomGraph"
+  >,
+): NarrativeRuntimeProgress {
+  const floor = narrativeFloorFor(snapshot.floor);
+  const requiredLessonIds = snapshot.roomGraph.nodes
+    .filter((node) => node.required && node.lessonId)
+    .map((node) => node.lessonId!);
+  const completedRequiredCount = requiredLessonIds
+    .filter((lessonId) => snapshot.completedLessons.includes(lessonId))
+    .length;
+  const focusMonster = snapshot.focusMonsterId === null
+    ? null
+    : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId) ?? null;
+  const floorBossLessonId = snapshot.roomGraph.nodes.find(
+    (node) => node.id === snapshot.roomGraph.bossId,
+  )?.lessonId;
+  const bossReached = (
+    snapshot.mode === "combat" &&
+    focusMonster?.isBoss === true &&
+    focusMonster.rank === "boss" &&
+    focusMonster.lessonId === floorBossLessonId
+  ) || snapshot.completedRoomIds.includes(snapshot.roomGraph.bossId);
+  const floorCompleted = snapshot.mode === "transition" || snapshot.mode === "victory";
+
+  const seenBeats = floor.beats.filter((beat) => {
+    if (beat.kind === "floor-entry") return true;
+    if (completedRequiredCount < beat.trigger.completedRequiredCount) return false;
+    if (beat.kind === "midpoint-evidence") return true;
+    if (beat.kind === "campfire") return snapshot.respawnCampfireId !== null;
+    if (beat.kind === "boss") return bossReached;
+    return floorCompleted;
+  });
+  const completedAscentIds = NARRATIVE_FLOORS.flatMap((entry) => {
+    if (!entry.ascent) return [];
+    if (
+      entry.floor < snapshot.floor ||
+      (entry.floor === snapshot.floor && floorCompleted)
+    ) return [entry.ascent.id];
+    return [];
+  });
+  const completedMigrationStepIds = (
+    snapshot.floor === 8 &&
+    snapshot.mode === "victory"
+  )
+    ? NARRATIVE_ENDINGS[0].steps.map((step) => step.id)
+    : [];
+
+  return {
+    seenBeatIds: seenBeats.map((beat) => beat.id),
+    discoveredEvidenceIds: seenBeats.flatMap((beat) => beat.evidenceIds),
+    completedAscentIds,
+    completedMigrationStepIds,
+    latestBeat: seenBeats.at(-1) ?? null,
+  };
+}
+
 export function combatSettlementCopy(
   experience: ExperienceSettlement,
   lootDropped: boolean,
@@ -211,6 +300,7 @@ export class AppShell {
   private lootMenu!: HTMLElement;
   private adminMenu!: HTMLElement;
   private answerReview!: AnswerReviewView;
+  private narrativeCodex!: NarrativeCodexView;
   private executeButton!: HTMLButtonElement;
   private gateExecuteButton!: HTMLButtonElement;
   private sqlButton!: HTMLButtonElement;
@@ -233,6 +323,8 @@ export class AppShell {
   private terminalFocusTimer: number | null = null;
   private pickupShownAtMove: number | null = null;
   private settlementShownAtMove: number | null = null;
+  private narrativeBeatShownAtMove: number | null = null;
+  private lastNarrativeBeatId: string | null = null;
   private floorTransitionTimer: number | null = null;
   private defeatRespawnTimer: number | null = null;
   private regionTransitionTimer: number | null = null;
@@ -249,6 +341,11 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly keydownHandler = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.isNarrativeCodexOpen()) {
+      event.preventDefault();
+      this.narrativeCodex.close();
+      return;
+    }
     if (event.key === "Escape" && this.isAdminMenuOpen()) {
       event.preventDefault();
       this.closeAdminMenu();
@@ -288,20 +385,26 @@ export class AppShell {
       event.key === "Tab" &&
       (
         this.isReviewOpen() ||
+        this.isNarrativeCodexOpen() ||
         this.isAdminMenuOpen() ||
         this.isLootMenuOpen() ||
         this.isInventoryMenuOpen() ||
         this.isCampfireMenuOpen() ||
+        this.isVictoryPortalOpen() ||
         this.isTerminalOpen() ||
         this.isGateTerminalOpen()
       )
     ) {
       this.trapDialogFocus(
         event,
-        this.isReviewOpen()
+        this.isNarrativeCodexOpen()
+          ? this.narrativeCodex.element
+          : this.isReviewOpen()
           ? this.answerReview.element
           : this.isAdminMenuOpen()
             ? this.adminMenu
+          : this.isVictoryPortalOpen()
+            ? requiredElement(this.root, "#floor-portal")
           : this.isLootMenuOpen()
             ? this.lootMenu
           : this.isInventoryMenuOpen()
@@ -422,6 +525,7 @@ export class AppShell {
             <div><span>FLOOR</span><strong id="floor-value">01 / 08</strong></div>
             <div><span>SEED</span><strong id="seed-value">—</strong></div>
             <button id="open-admin" type="button" class="admin-toggle">⌘ 管理员</button>
+            <button id="open-narrative" type="button" class="narrative-toggle">▧ 失名录 1/5</button>
             <button id="open-review" type="button" class="review-toggle">▤ 答题复盘</button>
             <button id="audio-toggle" type="button" class="audio-toggle" aria-pressed="false">♪ 声音开启</button>
             <label class="volume-control"><span>音量</span><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.55"></label>
@@ -443,6 +547,13 @@ export class AppShell {
 
             <div class="game-stage">
               <div id="game-root" class="game-root" tabindex="-1"></div>
+
+              <aside id="narrative-beat-card" class="narrative-beat-card" role="status" aria-live="polite" aria-atomic="true" hidden>
+                <span id="narrative-beat-kind">LOST NAME / 入层</span>
+                <strong id="narrative-beat-title">没有名字的人</strong>
+                <div id="narrative-beat-lines"></div>
+                <small>移动 3 步后收起 · 可在失名录重读</small>
+              </aside>
 
               <article class="target-card" aria-label="当前怪物">
                 <div class="target-card__kicker">ENCOUNTER / 当前记录</div>
@@ -489,6 +600,10 @@ export class AppShell {
                 <span>CAMPFIRE / SAFE ZONE</span>
                 <h2 id="campfire-menu-title">篝火</h2>
                 <p id="campfire-menu-status">选择接下来的行动。</p>
+                <blockquote class="scribe-recap">
+                  <strong>抄写员</strong>
+                  <p id="scribe-recap">我会把这一层发生过的事整理好。你不必一次记住全部。</p>
+                </blockquote>
                 <div class="campfire-menu__actions">
                   <button id="rest-at-campfire" type="button" class="primary-action">在此休息</button>
                   <button id="review-at-campfire" type="button" class="quiet-action">答案复盘</button>
@@ -528,14 +643,20 @@ export class AppShell {
                 <button id="take-all-loot" type="button" class="primary-action loot-menu__take-all">尽量全部收入背包</button>
               </section>
 
-              <section id="floor-portal" class="floor-portal" aria-live="assertive" hidden>
+              <section id="floor-portal" class="floor-portal" aria-live="assertive" aria-hidden="true" hidden>
                 <div class="floor-portal__ring floor-portal__ring--outer"></div>
                 <div class="floor-portal__ring floor-portal__ring--inner"></div>
                 <div class="floor-portal__tables" aria-hidden="true">
-                  <span>MONSTERS</span><i>JOIN</i><span>ROOMS</span>
+                  <span id="floor-ascent-facility">上升设施</span>
+                  <i>↑</i>
+                  <span id="floor-ascent-destination">下一层</span>
                 </div>
                 <strong id="floor-clear-title">FLOOR 01 CLEARED</strong>
                 <p id="floor-clear-copy">CONGRATULATIONS!!</p>
+                <div id="floor-victory-actions" class="floor-portal__actions" hidden>
+                  <button id="open-ending-codex" type="button">查看 MIGRATE 终章</button>
+                  <button id="restart-after-victory" type="button">开始新 Run</button>
+                </div>
               </section>
 
               <section id="run-state-overlay" class="run-state-overlay" aria-live="assertive" hidden>
@@ -545,9 +666,9 @@ export class AppShell {
               </section>
 
               <section id="region-transition" class="region-transition" aria-live="polite" hidden>
-                <span>REGION TRANSFER</span>
+                <span id="region-transition-kind">REGION TRANSIT</span>
                 <strong id="region-transition-route">区域切换</strong>
-                <p>生态音乐与地图色调正在切换…</p>
+                <p id="region-transition-copy">生态音乐与地图色调正在切换…</p>
               </section>
 
               <div id="interaction-prompt" class="interaction-prompt">用 WASD 探索迷宫</div>
@@ -692,7 +813,7 @@ export class AppShell {
             <section class="castle-map-card" aria-label="魔王城发现式迷宫地图">
               <div class="card-heading"><span>迷宫勘测</span><span id="map-explored">探索后显形</span></div>
               <div id="castle-map" class="castle-map"></div>
-              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-route">◇ 路标</span><span class="legend-campfire">♨ 篝火</span><span class="legend-portal">◉ 区域门</span><span class="legend-shortcut">▣ 捷径</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
+              <div class="map-legend"><span class="legend-player">◆ 玩家</span><span class="legend-route">◇ 路标</span><span class="legend-campfire">♨ 篝火</span><span id="map-region-transit" class="legend-portal">◉ 区域交通</span><span class="legend-shortcut">▣ 捷径</span><span class="legend-gate">▮ 门</span><span class="legend-monster">■ 怪物</span><span class="legend-item">◆ 道具</span></div>
             </section>
 
             <section class="mastery-card">
@@ -775,8 +896,8 @@ export class AppShell {
 
         <footer class="page-footer">
           <span>真实执行：SQLite WASM</span>
-          <span>地图：64×48 Seeded 迷宫</span>
-          <span>音乐：公版古典语汇电子编曲 + 原创战斗曲</span>
+          <span>地图：48×36 八层手工轮廓 + Seeded 支路</span>
+          <span>音乐：八层原创程序化配乐 · 连续场景混音</span>
           <span>关键装备：固定掉落</span>
         </footer>
 
@@ -798,6 +919,12 @@ export class AppShell {
     this.lootMenu = requiredElement(this.root, "#loot-menu");
     this.adminMenu = requiredElement(this.root, "#admin-menu");
     this.answerReview = new AnswerReviewView(this.root);
+    this.narrativeCodex = new NarrativeCodexView(this.root, {
+      onClose: () => {
+        this.root.classList.remove("narrative-active");
+        this.syncAudioFocus();
+      },
+    });
     this.executeButton = requiredElement(this.root, "#execute-query");
     this.gateExecuteButton = requiredElement(this.root, "#execute-gate-query");
     this.sqlButton = requiredElement(this.root, "#open-sql");
@@ -841,6 +968,26 @@ export class AppShell {
       listenerOptions,
     );
     requiredElement(this.root, "#open-review").addEventListener("click", () => this.openReview(), listenerOptions);
+    requiredElement(this.root, "#open-narrative").addEventListener(
+      "click",
+      () => this.openNarrativeCodex(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#open-ending-codex").addEventListener(
+      "click",
+      () => this.openNarrativeCodex(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#restart-after-victory").addEventListener(
+      "click",
+      () => {
+        this.reset();
+        requiredElement<HTMLElement>(this.root, "#game-root").focus({
+          preventScroll: true,
+        });
+      },
+      listenerOptions,
+    );
     requiredElement(this.root, "#open-admin").addEventListener(
       "click",
       () => this.openAdminMenu(),
@@ -1012,6 +1159,7 @@ export class AppShell {
     this.releaseAudioGesture?.();
     this.releaseAudioGesture = null;
     this.listenerController.abort();
+    this.narrativeCodex.destroy();
     if (this.toastTimer !== null) window.clearTimeout(this.toastTimer);
     this.toastTimer = null;
     this.activeNotice = null;
@@ -1020,6 +1168,8 @@ export class AppShell {
     this.terminalFocusTimer = null;
     this.pickupShownAtMove = null;
     this.settlementShownAtMove = null;
+    this.narrativeBeatShownAtMove = null;
+    this.lastNarrativeBeatId = null;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
     this.floorTransitionTimer = null;
     if (this.defeatRespawnTimer !== null) window.clearTimeout(this.defeatRespawnTimer);
@@ -1034,6 +1184,8 @@ export class AppShell {
       "loot-active",
       "review-active",
       "admin-active",
+      "narrative-active",
+      "victory-active",
     );
     void this.audio.dispose();
   }
@@ -1057,6 +1209,7 @@ export class AppShell {
     let reopenAfterResolution = false;
     this.combatAutocomplete.hide();
     this.busy = true;
+    this.syncAudioFocus();
     requiredElement(this.root, ".game-stage").classList.add("is-resolving");
     this.executeButton.disabled = true;
     this.sqlButton.disabled = true;
@@ -1095,6 +1248,7 @@ export class AppShell {
         this.onboarding.advance("query-accepted");
       }
       this.closeTerminal(true);
+      this.audio.setFocus("resolving");
       try {
         await this.getBattleScene()?.animateTurn(resolution);
       } catch (error) {
@@ -1128,6 +1282,7 @@ export class AppShell {
       this.executeButton.disabled = false;
       this.sqlButton.disabled = this.lastSnapshot?.mode !== "combat";
       if (reopenAfterResolution) this.openTerminal();
+      else this.syncAudioFocus();
     }
   }
 
@@ -1143,6 +1298,7 @@ export class AppShell {
 
     this.gateAutocomplete.hide();
     this.busy = true;
+    this.syncAudioFocus();
     this.gateExecuteButton.disabled = true;
     requiredElement(this.root, ".game-stage").classList.add("is-resolving");
     try {
@@ -1186,7 +1342,50 @@ export class AppShell {
       this.busy = false;
       this.gateExecuteButton.disabled = false;
       requiredElement(this.root, ".game-stage").classList.remove("is-resolving");
+      this.syncAudioFocus();
     }
+  }
+
+  private openNarrativeCodex(): void {
+    if (
+      this.busy ||
+      this.isGateTerminalOpen() ||
+      this.isTerminalOpen() ||
+      this.isReviewOpen() ||
+      this.isAdminMenuOpen() ||
+      this.isInventoryMenuOpen() ||
+      this.isLootMenuOpen()
+    ) {
+      this.showFeedbackNotice({
+        message: "先结束当前界面，再打开失名录。",
+        tone: "info",
+      });
+      return;
+    }
+    this.hideNarrativeBeatCard();
+    this.root.classList.add("narrative-active");
+    this.narrativeCodex.open();
+    this.syncAudioFocus();
+  }
+
+  private isNarrativeCodexOpen(): boolean {
+    return this.narrativeCodex?.isOpen() ?? false;
+  }
+
+  private syncAudioFocus(): void {
+    if (this.busy) {
+      this.audio.setFocus("resolving");
+      return;
+    }
+    this.audio.setFocus(
+      this.isTerminalOpen() ||
+      this.isGateTerminalOpen() ||
+      this.isReviewOpen() ||
+      this.isNarrativeCodexOpen() ||
+      this.isCampfireMenuOpen()
+        ? "thinking"
+        : "world",
+    );
   }
 
   private openReview(
@@ -1194,6 +1393,7 @@ export class AppShell {
     context: "manual" | "campfire" | "death" = "manual",
   ): void {
     if ((this.busy && context !== "death") || this.isGateTerminalOpen()) return;
+    if (this.isNarrativeCodexOpen()) this.narrativeCodex.close();
     if (this.isTerminalOpen()) this.closeTerminal(false);
     if (!this.isReviewOpen()) {
       this.focusBeforeTerminal = document.activeElement instanceof HTMLElement
@@ -1208,6 +1408,7 @@ export class AppShell {
     this.answerReview.closeButton.focus({
       preventScroll: true,
     });
+    this.syncAudioFocus();
   }
 
   private closeReview(): void {
@@ -1217,6 +1418,7 @@ export class AppShell {
     this.reviewScope = "all";
     this.answerReview.setOpen(false);
     this.root.classList.remove("review-active");
+    this.syncAudioFocus();
     const focusTarget = this.focusBeforeTerminal;
     this.focusBeforeTerminal = null;
     if (context === "death") {
@@ -1313,7 +1515,7 @@ export class AppShell {
     const living = snapshot.monsters.filter((monster) => monster.hp > 0);
     const bosses = living.filter((monster) => monster.isBoss);
     requiredElement(this.adminMenu, "#admin-summary").textContent =
-      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length} · 区域门 ${snapshot.biomePlan.portals.length}`;
+      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length} · 区域交通 ${snapshot.biomePlan.portals.length}`;
     const floors = requiredElement(this.adminMenu, "#admin-floor-list");
     floors.replaceChildren();
     for (let floor = 1; floor <= 8; floor += 1) {
@@ -1705,6 +1907,12 @@ export class AppShell {
     requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
     requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
       `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点。`;
+    const recap = buildScribeRecap(snapshot.floorReview);
+    const campfireBeat = narrativeFloorFor(snapshot.floor).beats.find(
+      (beat) => beat.kind === "campfire",
+    );
+    requiredElement(this.campfireMenu, "#scribe-recap").textContent =
+      `${campfireBeat?.lines[0] ?? "我会替你保存这一层的事实。"} ${recap.summary}`;
     if (entered && !this.isReviewOpen()) {
       requiredElement<HTMLButtonElement>(
         this.campfireMenu,
@@ -1715,6 +1923,63 @@ export class AppShell {
 
   private isCampfireMenuOpen(): boolean {
     return this.campfireMenu?.classList.contains("is-open") ?? false;
+  }
+
+  private renderNarrativeProgress(snapshot: GameSnapshot): void {
+    const progress = narrativeProgressForSnapshot(snapshot);
+    this.narrativeCodex.render({
+      floor: snapshot.floor,
+      seenBeatIds: progress.seenBeatIds,
+      discoveredEvidenceIds: progress.discoveredEvidenceIds,
+      completedAscentIds: progress.completedAscentIds,
+      completedMigrationStepIds: progress.completedMigrationStepIds,
+    });
+    requiredElement<HTMLButtonElement>(this.root, "#open-narrative").textContent =
+      `▧ 失名录 ${progress.seenBeatIds.length}/5`;
+
+    if (
+      progress.latestBeat &&
+      progress.latestBeat.id !== this.lastNarrativeBeatId
+    ) {
+      this.lastNarrativeBeatId = progress.latestBeat.id;
+      this.showNarrativeBeatCard(progress.latestBeat, snapshot.totalMoves);
+    } else if (
+      shouldDismissTransientCard(
+        this.narrativeBeatShownAtMove,
+        snapshot.totalMoves,
+      )
+    ) {
+      this.hideNarrativeBeatCard();
+    }
+  }
+
+  private showNarrativeBeatCard(beat: NarrativeBeat, totalMoves: number): void {
+    const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
+    const kindLabel: Readonly<Record<NarrativeBeat["kind"], string>> = {
+      "floor-entry": "LOST NAME / 入层",
+      "midpoint-evidence": "LOST NAME / 证据",
+      campfire: "SCRIBE / 篝火复盘",
+      boss: "ARCHIVE / 层主",
+      "floor-end": "ASCENT / 层末",
+    };
+    requiredElement(card, "#narrative-beat-kind").textContent = kindLabel[beat.kind];
+    requiredElement(card, "#narrative-beat-title").textContent = beat.title;
+    const lines = requiredElement(card, "#narrative-beat-lines");
+    lines.replaceChildren(...beat.lines.map((line) => {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = line;
+      return paragraph;
+    }));
+    this.narrativeBeatShownAtMove = totalMoves;
+    card.hidden = false;
+    card.classList.add("is-visible");
+  }
+
+  private hideNarrativeBeatCard(): void {
+    const card = this.root.querySelector<HTMLElement>("#narrative-beat-card");
+    card?.classList.remove("is-visible");
+    if (card) card.hidden = true;
+    this.narrativeBeatShownAtMove = null;
   }
 
   private openTerminal(): void {
@@ -1733,6 +1998,7 @@ export class AppShell {
         : null;
     }
     void this.audio.resume();
+    this.audio.setFocus("thinking");
     this.terminal.classList.add("is-open");
     this.root.classList.add("terminal-active");
     this.terminal.inert = false;
@@ -1755,6 +2021,7 @@ export class AppShell {
     if (!this.isGateTerminalOpen()) this.root.classList.remove("terminal-active");
     this.terminal.inert = true;
     this.terminal.setAttribute("aria-hidden", "true");
+    this.syncAudioFocus();
     if (returnFocus) {
       this.textarea.blur();
       const focusTarget = this.focusBeforeTerminal;
@@ -1788,6 +2055,7 @@ export class AppShell {
         : null;
     }
     void this.audio.resume();
+    this.audio.setFocus("thinking");
     this.gateTerminal.classList.add("is-open");
     this.root.classList.add("terminal-active", "gate-terminal-active");
     this.gateTerminal.inert = false;
@@ -1810,6 +2078,7 @@ export class AppShell {
     if (!this.isTerminalOpen()) this.root.classList.remove("terminal-active");
     this.gateTerminal.inert = true;
     this.gateTerminal.setAttribute("aria-hidden", "true");
+    this.syncAudioFocus();
     if (!returnFocus) return;
     this.gateTextarea.blur();
     const focusTarget = this.focusBeforeTerminal;
@@ -2029,6 +2298,8 @@ export class AppShell {
     this.closeTerminal(true);
     this.hidePickupCard();
     this.hideCombatSettlement();
+    this.hideNarrativeBeatCard();
+    this.lastNarrativeBeatId = null;
     if (this.defeatRespawnTimer !== null) {
       window.clearTimeout(this.defeatRespawnTimer);
       this.defeatRespawnTimer = null;
@@ -2042,7 +2313,12 @@ export class AppShell {
     this.queryStatus.textContent = message;
     this.queryStatus.dataset.kind = "success";
     this.showFeedbackNotice({ message, tone: "success" });
-    this.audio.setMode("explore");
+    const resetSnapshot = this.session.snapshot();
+    this.audio.setScene({
+      floor: resetSnapshot.floor,
+      region: 0,
+      mode: "explore",
+    });
   }
 
   private async toggleAudio(): Promise<void> {
@@ -2077,6 +2353,11 @@ export class AppShell {
         (region) => region.kind === snapshot.currentBiome,
       ),
     );
+    const routeTransit = floorTransitPresentation(
+      floorMapBlueprint(snapshot.floor).routeTransit,
+    );
+    requiredElement(this.root, "#map-region-transit").textContent =
+      `◉ ${routeTransit.label}`;
     const target = snapshot.focusMonsterId === null
       ? undefined
       : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId);
@@ -2169,6 +2450,7 @@ export class AppShell {
     this.renderCampfireMenu(snapshot, enteredCampfire);
     this.renderInventoryMenu(snapshot, enteredInventory);
     this.renderLootMenu(snapshot, enteredLoot);
+    this.renderNarrativeProgress(snapshot);
 
     this.renderTarget(target, snapshot);
     const locksSignature = snapshot.locks.join("\u0000");
@@ -2227,9 +2509,12 @@ export class AppShell {
     const musicMode = snapshot.mode === "combat"
       ? target?.isBoss ? "boss" : "combat"
       : "explore";
-    this.audio.setFloor(snapshot.floor);
-    this.audio.setRegion(biomeIndex);
-    this.audio.setMode(musicMode);
+    this.audio.setScene({
+      floor: snapshot.floor,
+      region: biomeIndex,
+      mode: musicMode,
+    });
+    this.syncAudioFocus();
     if (this.isAdminMenuOpen()) this.renderAdminMenu(snapshot);
     if (this.isReviewOpen()) this.answerReview.render(snapshot, this.reviewScope);
     if (enteredDeathReview || (snapshot.mode === "death-review" && !this.isReviewOpen())) {
@@ -2328,21 +2613,65 @@ export class AppShell {
 
   private renderFloorTransition(snapshot: GameSnapshot): void {
     const portal = requiredElement<HTMLElement>(this.root, "#floor-portal");
+    const victoryActions = requiredElement<HTMLElement>(
+      portal,
+      "#floor-victory-actions",
+    );
     const transitioning = snapshot.mode === "transition" && snapshot.floor < 8;
     const dungeonCleared = snapshot.mode === "victory";
+    const enteredVictory = dungeonCleared && this.lastMode !== "victory";
     portal.hidden = !transitioning && !dungeonCleared;
+    portal.inert = !transitioning && !dungeonCleared;
+    portal.setAttribute("aria-hidden", String(!transitioning && !dungeonCleared));
+    victoryActions.hidden = !dungeonCleared;
+    this.root.classList.toggle("victory-active", dungeonCleared);
     if (transitioning) {
+      portal.dataset.state = "transition";
+      portal.removeAttribute("role");
+      portal.removeAttribute("aria-modal");
+      portal.removeAttribute("aria-labelledby");
+      const ascent = narrativeFloorFor(snapshot.floor).ascent;
+      const blueprint = floorMapBlueprint(snapshot.floor);
+      const transit = floorTransitPresentation(blueprint.ascentTransit);
+      const arrival = ascent?.arrival ?? `第 ${snapshot.floor + 1} 层`;
+      portal.dataset.transit = blueprint.ascentTransit;
+      requiredElement(portal, "#floor-ascent-facility").textContent =
+        transit.label;
+      requiredElement(portal, "#floor-ascent-destination").textContent =
+        arrival;
       requiredElement(portal, "#floor-clear-title").textContent =
         `FLOOR ${String(snapshot.floor).padStart(2, "0")} CLEARED`;
       requiredElement(portal, "#floor-clear-copy").textContent =
-        `CONGRATULATIONS!! · 正在传送至第 ${snapshot.floor + 1} 层`;
+        `CONGRATULATIONS!! · ${transit.action}${transit.label} · 前往${arrival}`;
       this.hidePickupCard();
       this.hideCombatSettlement();
     } else if (dungeonCleared) {
+      portal.dataset.state = "victory";
+      portal.setAttribute("role", "dialog");
+      portal.setAttribute("aria-modal", "true");
+      portal.setAttribute("aria-labelledby", "floor-clear-title");
+      portal.dataset.transit = "migrate";
+      requiredElement(portal, "#floor-ascent-facility").textContent = "HISTORY";
+      requiredElement(portal, "#floor-ascent-destination").textContent = "IDENTITY";
       requiredElement(portal, "#floor-clear-title").textContent = "DUNGEON CLEARED";
-      requiredElement(portal, "#floor-clear-copy").textContent = "CONGRATULATIONS!!";
+      requiredElement(portal, "#floor-clear-copy").textContent =
+        "CONGRATULATIONS!! · MIGRATE 已完成";
       this.hidePickupCard();
       this.hideCombatSettlement();
+      if (enteredVictory) {
+        queueMicrotask(() => {
+          if (!this.isVictoryPortalOpen()) return;
+          requiredElement<HTMLButtonElement>(
+            portal,
+            "#open-ending-codex",
+          ).focus({ preventScroll: true });
+        });
+      }
+    } else {
+      delete portal.dataset.state;
+      portal.removeAttribute("role");
+      portal.removeAttribute("aria-modal");
+      portal.removeAttribute("aria-labelledby");
     }
     if (!transitioning) {
       if (this.floorTransitionTimer !== null) {
@@ -2363,9 +2692,21 @@ export class AppShell {
       const nextSnapshot = this.session.snapshot();
       this.sql.reset(nextSnapshot.monsters);
       this.clearQueryArtifacts();
-      this.audio.setFloor(nextSnapshot.floor);
-      this.audio.setMode("explore");
+      this.audio.setScene({
+        floor: nextSnapshot.floor,
+        region: 0,
+        mode: "explore",
+      });
     }, delay);
+  }
+
+  private isVictoryPortalOpen(): boolean {
+    const portal = this.root.querySelector<HTMLElement>("#floor-portal");
+    return Boolean(
+      portal &&
+      !portal.hidden &&
+      portal.dataset.state === "victory",
+    );
   }
 
   private renderRegionTransition(snapshot: GameSnapshot): void {
@@ -2373,8 +2714,15 @@ export class AppShell {
     if (!transfer || transfer.sequence <= this.lastRegionTransferSequence) return;
     this.lastRegionTransferSequence = transfer.sequence;
     const overlay = requiredElement<HTMLElement>(this.root, "#region-transition");
+    const blueprint = floorMapBlueprint(snapshot.floor);
+    const transit = floorTransitPresentation(blueprint.routeTransit);
+    overlay.dataset.transit = blueprint.routeTransit;
+    requiredElement(overlay, "#region-transition-kind").textContent =
+      `REGION TRANSIT / ${transit.label}`;
     requiredElement(overlay, "#region-transition-route").textContent =
       `${transfer.fromName} → ${transfer.toName}`;
+    requiredElement(overlay, "#region-transition-copy").textContent =
+      `${transit.action}${transit.label} · 生态音乐与地图色调正在切换…`;
     overlay.hidden = false;
     if (this.regionTransitionTimer !== null) {
       window.clearTimeout(this.regionTransitionTimer);
@@ -2646,7 +2994,10 @@ export class AppShell {
     svg.setAttribute("viewBox", `0 0 ${floor.width} ${floor.height}`);
     svg.setAttribute("role", "img");
     svg.setAttribute("focusable", "false");
-    svg.setAttribute("aria-label", `64 × 48 迷宫小地图，已探索 ${discovered.size} 格；未知区域隐藏。`);
+    svg.setAttribute(
+      "aria-label",
+      `${snapshot.mazeFloor.width} × ${snapshot.mazeFloor.height} 迷宫小地图，已探索 ${discovered.size} 格；未知区域隐藏。`,
+    );
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
     const title = document.createElementNS(SVG_NS, "title");

@@ -14,10 +14,12 @@ export type MonsterVisualArchetype =
   | "zombie"
   | "necromancer"
   | "elemental"
+  | "storm-beast"
   | "humanoid"
   | "dragon"
   | "frog"
   | "treant"
+  | "branch-imp"
   | "water-beast"
   | "jungle-king"
   | "index-guard"
@@ -27,6 +29,7 @@ export type MonsterVisualArchetype =
   | "index-eye"
   | "index-tree"
   | "demon"
+  | "demon-general"
   | "dark-knight"
   | "lich"
   | "obsidian-golem"
@@ -84,6 +87,9 @@ export function monsterVisualArchetype(
 ): MonsterVisualArchetype {
   if (monster.species.includes("frog")) return "frog";
   if (monster.species.includes("treant")) return "treant";
+  if (monster.species.includes("storm_beast")) return "storm-beast";
+  if (monster.species.includes("branch_imp")) return "branch-imp";
+  if (monster.species.includes("demon_general")) return "demon-general";
   if (
     monster.species.includes("lake") ||
     monster.species.includes("water_snake")

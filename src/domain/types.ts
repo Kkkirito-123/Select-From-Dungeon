@@ -560,7 +560,7 @@ export interface GameSnapshot {
 
 export interface SavedRun {
   version: 10;
-  generatorVersion: 4;
+  generatorVersion: 4 | 5;
   campaign: CampaignProgress;
   floor: FloorNumber;
   graph: RoomGraph;

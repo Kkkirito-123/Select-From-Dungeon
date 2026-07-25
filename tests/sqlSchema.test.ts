@@ -86,4 +86,30 @@ describe("complete SQL schema catalog", () => {
       expect(result.columns).toEqual(columns);
     });
   });
+
+  it("区域首领在真实 SQLite monsters 表中统一标记为 is_boss = 1", async () => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    const result = engine.executeSelect(
+      "SELECT id, is_boss FROM monsters " +
+      "WHERE id IN (21, 22, 33, 44, 55, 66, 77, 89) ORDER BY id",
+    );
+
+    expect(result).toMatchObject({
+      columns: ["id", "is_boss"],
+      rows: [
+        { id: 21, is_boss: 1 },
+        { id: 22, is_boss: 1 },
+        { id: 33, is_boss: 1 },
+        { id: 44, is_boss: 1 },
+        { id: 55, is_boss: 1 },
+        { id: 66, is_boss: 1 },
+        { id: 77, is_boss: 1 },
+        { id: 89, is_boss: 1 },
+      ],
+    });
+  });
 });

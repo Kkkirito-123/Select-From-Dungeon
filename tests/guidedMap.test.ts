@@ -3,6 +3,7 @@ import { generateCampfires } from "../src/domain/campfire";
 import {
   generateGuidedMapPlan,
   nearbyShortcut,
+  shortcutNameForFloor,
   shortcutDestination,
   validateGuidedMapPlan,
 } from "../src/domain/guidedMap";
@@ -10,6 +11,13 @@ import { generateMazeFloor } from "../src/domain/mazeGenerator";
 import { generateRoomGraph } from "../src/domain/runGraph";
 
 describe("guided map plan", () => {
+  it("八层捷径使用各自地图主题的直白名称", () => {
+    const names = ([1, 2, 3, 4, 5, 6, 7, 8] as const)
+      .map((floor) => shortcutNameForFloor(floor));
+    expect(new Set(names).size).toBe(8);
+    names.forEach((name) => expect(name.endsWith("捷径") || name.endsWith("梯") || name.endsWith("门")).toBe(true));
+  });
+
   it.each([1, 2] as const)("第 %i 层同 Seed 的路线、死路收益和捷径完全一致", (floorNumber) => {
     const graph = generateRoomGraph(`guided-repeatable:${floorNumber}`, floorNumber);
     const firstFloor = generateMazeFloor(graph);

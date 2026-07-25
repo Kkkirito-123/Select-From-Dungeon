@@ -33,9 +33,9 @@ export const SQL_TABLES: readonly SqlTableDefinition[] = [
   {
     name: "monsters",
     title: "怪物主表",
-    description: "查怪物名字、血量或状态时使用。锁定某只怪物统一写 monsters.id。",
+    description: "查怪物名字、血量或状态时使用。怪物主键统一写 monsters.id，MVP 2.0 从 1 连续编号。",
     columns: [
-      column("id", "INTEGER", "怪物唯一编号", { primaryKey: true }),
+      column("id", "INTEGER", "怪物主键；从 1 连续编号", { primaryKey: true }),
       column("room_id", "INTEGER", "怪物所在房间编号"),
       column("name", "TEXT", "游戏画面显示的怪物名称"),
       column("species", "TEXT", "怪物种族代号"),
@@ -43,7 +43,7 @@ export const SQL_TABLES: readonly SqlTableDefinition[] = [
       column("armor", "INTEGER", "怪物护甲值"),
       column("status", "TEXT", "怪物当前状态"),
       column("weakness", "TEXT", "怪物弱点；部分记录未知", { nullable: true }),
-      column("master_id", "INTEGER", "主人怪物编号；无主时为空", { nullable: true }),
+      column("master_id", "INTEGER", "主人怪物编号；关联 monsters.id，无主时为空", { nullable: true }),
       column("is_boss", "INTEGER", "是否为魔王：1 是，0 否"),
     ],
   },

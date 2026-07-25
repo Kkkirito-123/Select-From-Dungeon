@@ -30,6 +30,10 @@ import {
   weightedBiomeEncounterIds,
 } from "../content/biomeContent";
 import {
+  floorMapBlueprint,
+  floorTransitPresentation,
+} from "../content/floorMapBlueprints";
+import {
   cloneMazeFloor,
   generateMazeFloor,
   isMazeWalkable,
@@ -378,8 +382,12 @@ function initialActors(
       x: home.x,
       y: home.y,
       home: { ...home },
-      behavior: monster.isBoss ? "anchored" : monster.id === 800 ? "guard" : "wander",
-      roamRadius: monster.id === 101 ? 3 : 4,
+      behavior: monster.isBoss
+        ? "anchored"
+        : monster.lessonId === "group-by"
+          ? "guard"
+          : "wander",
+      roamRadius: monster.lessonId === "select" ? 3 : 4,
       moveTick: 0,
     };
     });
@@ -527,7 +535,10 @@ export class GameSession {
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
 
-    if (savedRun?.version === 10 && savedRun.generatorVersion === 4) {
+    if (
+      savedRun?.version === 10 &&
+      (savedRun.generatorVersion === 4 || savedRun.generatorVersion === 5)
+    ) {
       this.campaign = cloneCampaignProgress(savedRun.campaign);
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
@@ -771,7 +782,7 @@ export class GameSession {
   toSavedRun(): SavedRun {
     return {
       version: 10,
-      generatorVersion: 4,
+      generatorVersion: this.mazeFloor.generatorVersion,
       campaign: cloneCampaignProgress(this.campaign),
       floor: this.floorNumber,
       graph: cloneGraph(this.graph),
@@ -1003,6 +1014,9 @@ export class GameSession {
         (!actor || position.x !== actor.x || position.y !== actor.y) &&
         !this.campfires.some(
           (campfire) => campfire.x === position.x && campfire.y === position.y,
+        ) &&
+        !this.guidedMap.shortcuts.some(
+          (shortcut) => distance(shortcut.keyPosition, position) <= 1,
         ),
     ) ?? anchor;
     this.player.x = destination.x;
@@ -1092,26 +1106,6 @@ export class GameSession {
     if (this.mode === "challenge") {
       return this.interactionFailure("机关破解终端已经开启。提交查询或按 ESC 退出。");
     }
-    const campfire = nearbyCampfire(this.campfires, this.player);
-    if (campfire) {
-      this.activeCampfireId = campfire.id;
-      this.mode = "campfire";
-      this.banner = `${this.campfirePhaseName(campfire)}已点燃。可以在此休息，或复盘第 ${this.floorNumber} 层答案。`;
-      this.emit();
-      return { ok: true, kind: "campfire", message: this.banner };
-    }
-    const nearbyLootBundle = [...this.lootBundles].reverse().find(
-      (entry) => distance(entry, this.player) <= 1,
-    );
-    const nearbyGroundItem = this.groundItems.find(
-      (entry) => entry.collection === "interact" && distance(entry, this.player) <= 1,
-    );
-    if (nearbyLootBundle && distance(nearbyLootBundle, this.player) === 0) {
-      return this.openLootBundle(nearbyLootBundle);
-    }
-    if (nearbyGroundItem && distance(nearbyGroundItem, this.player) === 0) {
-      return this.collectGroundItem(nearbyGroundItem, true);
-    }
     const shortcutKey = this.guidedMap.shortcuts.find((shortcut) => (
       !this.keyItems.includes(shortcut.keyId) &&
       distance(shortcut.keyPosition, this.player) <= 1
@@ -1121,6 +1115,29 @@ export class GameSession {
       this.banner = `获得捷径钥匙：${shortcutKey.name}。回到任一捷径门旁按 E，即可永久开启本层往返通道。`;
       this.emit();
       return { ok: true, kind: "shortcut", message: this.banner };
+    }
+    const nearbyLootBundle = [...this.lootBundles].reverse().find(
+      (entry) => distance(entry, this.player) <= 1,
+    );
+    const nearbyGroundItem = this.groundItems.find(
+      (entry) => entry.collection === "interact" && distance(entry, this.player) <= 1,
+    );
+    const nearbyGroundRoom = nearbyGroundItem
+      ? this.graph.nodes.find((room) => room.id === nearbyGroundItem.sourceRoomId)
+      : null;
+    if (nearbyLootBundle && distance(nearbyLootBundle, this.player) === 0) {
+      return this.openLootBundle(nearbyLootBundle);
+    }
+    if (nearbyGroundItem && distance(nearbyGroundItem, this.player) === 0) {
+      return this.collectGroundItem(nearbyGroundItem, true);
+    }
+    const campfire = nearbyCampfire(this.campfires, this.player);
+    if (campfire) {
+      this.activeCampfireId = campfire.id;
+      this.mode = "campfire";
+      this.banner = `${this.campfirePhaseName(campfire)}已点燃。可以在此休息，或复盘第 ${this.floorNumber} 层答案。`;
+      this.emit();
+      return { ok: true, kind: "campfire", message: this.banner };
     }
     const deadEndCache = this.guidedMap.deadEndCaches.find((cache) => (
       !this.openedGateIds.has(cache.id) &&
@@ -1133,10 +1150,6 @@ export class GameSession {
       this.banner = `打开死路补给：${reward?.name ?? "补给"}。${reward?.description ?? "本层探索收益已结算。"}`;
       this.emit();
       return { ok: true, kind: "reward", message: this.banner };
-    }
-    const regionPortal = this.nearbyRegionPortal();
-    if (regionPortal) {
-      return this.travelThroughRegionPortal(regionPortal.portal, regionPortal.side);
     }
     const nearbyGuidedShortcut = nearbyShortcut(this.guidedMap, this.player);
     if (nearbyGuidedShortcut) {
@@ -1168,6 +1181,17 @@ export class GameSession {
       this.banner = `穿过${shortcut.name}，跳过 ${shortcut.detourDistance} 格已探索折返路。`;
       this.emit();
       return { ok: true, kind: "shortcut", message: this.banner };
+    }
+    if (
+      nearbyGroundItem &&
+      nearbyGroundRoom?.required === true &&
+      nearbyGroundItem.kind === "weapon"
+    ) {
+      return this.collectGroundItem(nearbyGroundItem, true);
+    }
+    const regionPortal = this.nearbyRegionPortal();
+    if (regionPortal) {
+      return this.travelThroughRegionPortal(regionPortal.portal, regionPortal.side);
     }
     if (nearbyLootBundle) return this.openLootBundle(nearbyLootBundle);
     if (nearbyGroundItem) return this.collectGroundItem(nearbyGroundItem, true);
@@ -2397,12 +2421,26 @@ export class GameSession {
       this.mode = "transition";
       return `第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，正在自动进入第 ${this.floorNumber + 1} 层。`;
     }
+    this.completeCampaignVictory();
+    return "获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。";
+  }
+
+  private completeCampaignVictory(): void {
+    const completion = advanceCampaignProgress(this.campaign);
+    if (
+      !completion.ok ||
+      !completion.completed ||
+      completion.from !== 8 ||
+      completion.to !== 8
+    ) {
+      throw new Error("第八层终局无法提交：Campaign 状态与当前楼层不一致。");
+    }
+    this.campaign = completion.progress;
     this.mode = "victory";
     this.profile.victories += 1;
     this.profile.bestRunQueries = this.profile.bestRunQueries === null
       ? this.queryCount
       : Math.min(this.profile.bestRunQueries, this.queryCount);
-    return "获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。";
   }
 
   private completeAmbush(
@@ -2453,14 +2491,14 @@ export class GameSession {
     );
     const accessMessage = targetRoom ? this.roomAccessMessage(targetRoom) : null;
     if (accessMessage) {
-      return `区域首领通道已供能，但主线门仍锁定：${accessMessage}完成后可在区域门旁按 E 进入。`;
+      return `区域交通已开放，但主线门仍锁定：${accessMessage}完成后可在交通设施旁按 E 进入。`;
     }
     const destination = this.safeRegionPortalDestination(
       portal.exit,
       targetRegion.id,
     );
     if (!destination) {
-      return "区域首领通道已供能，但出口暂被占用；离开再回来后可在区域门旁按 E 进入。";
+      return "区域交通已开放，但落点暂被占用；离开再回来后可在交通设施旁按 E 进入。";
     }
     this.player.x = destination.x;
     this.player.y = destination.y;
@@ -2535,7 +2573,7 @@ export class GameSession {
     return {
       ok: true,
       kind: "none",
-      message: "管理员视图已开启：全图、怪物与区域门均可见；预览操作不会写入正式存档。",
+      message: "管理员视图已开启：全图、怪物与区域交通均可见；预览操作不会写入正式存档。",
     };
   }
 
@@ -2714,9 +2752,9 @@ export class GameSession {
   ): LootSpawnResolution {
     const biome = biomeRegionAt(this.biomePlan, position).kind;
     const encounter = biomeEncounterFor(monster.id);
-    const role = monster.isBoss
-      ? "floor-boss" as const
-      : encounter?.role ?? "curriculum";
+    const role = encounter?.role ?? (
+      monster.isBoss ? "floor-boss" as const : "curriculum"
+    );
     const items = rollLootItems({
       seed: this.graph.seed,
       floor: this.floorNumber,
@@ -2787,11 +2825,7 @@ export class GameSession {
         this.mode = "transition";
         this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，1.5 秒后自动进入第 ${this.floorNumber + 1} 层。`;
       } else {
-        this.mode = "victory";
-        this.profile.victories += 1;
-        this.profile.bestRunQueries = this.profile.bestRunQueries === null
-          ? this.queryCount
-          : Math.min(this.profile.bestRunQueries, this.queryCount);
+        this.completeCampaignVictory();
         this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。`;
       }
     } else if (
@@ -2925,19 +2959,22 @@ export class GameSession {
     portal: BiomePortal,
     side: "entry" | "exit",
   ): InteractionResolution {
+    const transit = floorTransitPresentation(
+      floorMapBlueprint(this.floorNumber).routeTransit,
+    );
     const destination = side === "entry" ? portal.exit : portal.entry;
     const targetRegionId = side === "entry" ? portal.toRegionId : portal.fromRegionId;
     const fromRegionId = side === "entry" ? portal.fromRegionId : portal.toRegionId;
     const fromRegion = this.biomePlan.regions.find((region) => region.id === fromRegionId);
     const targetRegion = this.biomePlan.regions.find((region) => region.id === targetRegionId);
     if (!fromRegion || !targetRegion) {
-      return this.interactionFailure("区域传送门的生态记录已经失效。");
+      return this.interactionFailure(`${transit.label}的区域记录已经失效。`);
     }
     if (side === "entry" && portal.requiredBossId !== null) {
       const blocker = this.monsters.find((monster) => monster.id === portal.requiredBossId);
       if (blocker && blocker.hp > 0) {
         return this.interactionFailure(
-          `${portal.name} 尚未供能：先击败 ${blocker.name}（ID #${blocker.id}）。`,
+          `${transit.label}尚未开放：先击败 ${blocker.name}（ID #${blocker.id}）。`,
         );
       }
     }
@@ -2946,14 +2983,14 @@ export class GameSession {
     );
     const accessMessage = targetRoom ? this.roomAccessMessage(targetRoom) : null;
     if (accessMessage) {
-      return this.interactionFailure(`区域传送门拒绝越级：${accessMessage}`);
+      return this.interactionFailure(`${transit.label}拒绝越级：${accessMessage}`);
     }
     const safeDestination = this.safeRegionPortalDestination(
       destination,
       targetRegion.id,
     );
     if (!safeDestination) {
-      return this.interactionFailure("区域传送门出口暂被怪物或物品占用，请稍后再试。");
+      return this.interactionFailure(`${transit.label}的落点暂被怪物或物品占用，请稍后再试。`);
     }
     this.player.x = safeDestination.x;
     this.player.y = safeDestination.y;
@@ -2966,7 +3003,7 @@ export class GameSession {
       fromName: fromRegion.name,
       toName: targetRegion.name,
     };
-    this.banner = `区域传送完成：${fromRegion.name} → ${targetRegion.name}。接下来 5 步不会触发随机遭遇。`;
+    this.banner = `${transit.label}抵达：${fromRegion.name} → ${targetRegion.name}。接下来 5 步不会触发随机遭遇。`;
     this.emit();
     return { ok: true, kind: "region-portal", message: this.banner };
   }
@@ -3035,6 +3072,18 @@ export class GameSession {
     if (this.mode === "transition") return `传送门启动 · 自动进入第 ${this.floorNumber + 1} 层`;
     if (this.mode === "victory") return "八层已贯通 · 可开始新 Run";
     if (this.mode === "defeat") return "YOU DIED · 正在返回最近篝火";
+    const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
+    if (lootBundle && distance(lootBundle, this.player) === 0) {
+      return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
+    }
+    const interactItem = this.groundItems.find(
+      (item) => item.collection === "interact" && distance(item, this.player) <= 1,
+    );
+    if (interactItem && distance(interactItem, this.player) === 0) {
+      return interactItem.id.startsWith("lesson-drop:")
+        ? `E  打开战利品宝箱 · ${interactItem.name}`
+        : `E  调查 ${interactItem.name}`;
+    }
     const campfire = nearbyCampfire(this.campfires, this.player);
     if (campfire) {
       return this.respawnCampfireId === campfire.id
@@ -3061,6 +3110,9 @@ export class GameSession {
     }
     const regionPortal = this.nearbyRegionPortal();
     if (regionPortal) {
+      const transit = floorTransitPresentation(
+        floorMapBlueprint(this.floorNumber).routeTransit,
+      );
       const targetRegion = this.biomePlan.regions.find((region) => (
         region.id === (
           regionPortal.side === "entry"
@@ -3074,14 +3126,10 @@ export class GameSession {
             (monster) => monster.id === regionPortal.portal.requiredBossId && monster.hp > 0,
           );
       return boss && regionPortal.side === "entry"
-        ? `E  区域门未供能 · 先击败 ${boss.name}`
-        : `E  传送到 ${targetRegion?.name ?? "相邻区域"}`;
+        ? `E  ${transit.label}未开放 · 先击败 ${boss.name}`
+        : `E  ${transit.action}${transit.label} · 前往${targetRegion?.name ?? "相邻区域"}`;
     }
-    const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
     if (lootBundle) return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
-    const interactItem = this.groundItems.find(
-      (item) => item.collection === "interact" && distance(item, this.player) <= 1,
-    );
     if (interactItem) {
       return interactItem.id.startsWith("lesson-drop:")
         ? `E  打开战利品宝箱 · ${interactItem.name}`

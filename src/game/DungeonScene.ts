@@ -1,6 +1,11 @@
 import Phaser from "phaser";
 import { TILE_SIZE } from "../content/mvpLevel";
-import { monsterVisualArchetype } from "../content/monsterVisuals";
+import { playerActorProfile } from "../content/actorVisuals";
+import {
+  floorMapBlueprint,
+  floorTransitPresentation,
+  type FloorTransitKind,
+} from "../content/floorMapBlueprints";
 import {
   mazeZoneAt,
   type MazeDecorationKind,
@@ -21,6 +26,11 @@ import {
   isGameplayShortcutCaptured,
   parseExternalMoveDetail,
 } from "./gameInput";
+import {
+  createMonsterActorParts,
+  createPlayerActor,
+  createScribeActor,
+} from "./PixelActorFactory";
 import { newlyOpenedGate, pickedItemsBetween } from "./snapshotFeedback";
 
 interface MonsterView {
@@ -417,11 +427,15 @@ export class DungeonScene extends Phaser.Scene {
   };
 
   private canAcceptGameplayInput(event?: KeyboardEvent): boolean {
+    const narrativeOpen = document
+      .querySelector("#app")
+      ?.classList.contains("narrative-active") ?? false;
     if (
       !this.scene.isActive() ||
       this.snapshot.mode !== "explore" ||
       this.battleTransitioning ||
-      this.pagePaused
+      this.pagePaused ||
+      narrativeOpen
     ) return false;
     if (!event) return true;
     return !isGameplayShortcutCaptured(event.target);
@@ -468,7 +482,7 @@ export class DungeonScene extends Phaser.Scene {
     if (
       time < this.nextHeldMoveAt ||
       this.moveLocked ||
-      this.snapshot.mode !== "explore" ||
+      !this.canAcceptGameplayInput() ||
       this.pressedDirections.size === 0
     ) return;
     const direction = [...this.pressedDirections.values()].at(-1);
@@ -973,6 +987,12 @@ export class DungeonScene extends Phaser.Scene {
         backgroundColor: "#08090cdd",
         padding: { x: 4, y: 2 },
       }).setOrigin(0.5);
+      const scribe = createScribeActor(this, {
+        x: -25,
+        y: 3,
+        scale: 0.64,
+        depth: 24,
+      }).container;
       container.add([
         checkpointRing,
         stoneRing,
@@ -981,6 +1001,7 @@ export class DungeonScene extends Phaser.Scene {
         logRight,
         flameFrameOne,
         flameFrameTwo,
+        scribe,
         label,
       ]);
       this.entityLayer.add(container);
@@ -1031,15 +1052,11 @@ export class DungeonScene extends Phaser.Scene {
 
   private createPlayer(): void {
     const pixel = gridToPixels(this.snapshot.player);
-    this.playerView = this.add.container(pixel.x, pixel.y).setDepth(30);
-    this.playerView.add([
-      this.add.rectangle(-7, 4, 11, 22, 0x3d5078),
-      this.add.rectangle(6, 4, 12, 22, 0x6a7fac),
-      this.add.rectangle(0, -9, 20, 14, COLORS.paper),
-      this.add.rectangle(-6, -10, 4, 4, 0x14161d),
-      this.add.rectangle(6, -10, 4, 4, 0x14161d),
-      this.add.rectangle(13, 2, 3, 27, COLORS.gold).setAngle(22),
-    ]);
+    this.playerView = createPlayerActor(
+      this,
+      playerActorProfile(this.snapshot.floor, this.snapshot.player),
+      { x: pixel.x, y: pixel.y, depth: 30 },
+    ).container;
     this.entityLayer.add(this.playerView);
   }
 
@@ -1114,379 +1131,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private createMonsterBody(monster: Monster): Phaser.GameObjects.GameObject[] {
-    const visual = monsterVisualArchetype(monster);
-    if (visual === "slime") {
-      const bodyColor = monster.species.includes("poison")
-        ? 0x8b5aa3
-        : monster.species.includes("water")
-          ? 0x4d9db5
-          : monster.species.includes("iron")
-            ? 0x7d8589
-            : monster.species.includes("king") ? 0xb6974d : 0x4f9a8f;
-      const crown = monster.species.includes("king")
-        ? [this.add.triangle(0, -21, -13, 8, 0, -9, 13, 8, 0xe0bd59)]
-        : [];
-      return [
-        this.add.rectangle(0, 5, 34, 22, bodyColor),
-        this.add.rectangle(-9, -7, 18, 15, mixColor(bodyColor, 0xffffff, 0.18)),
-        this.add.rectangle(9, -8, 20, 16, mixColor(bodyColor, 0xffffff, 0.3)),
-        this.add.rectangle(-6, 1, 4, 4, 0x10141b),
-        this.add.rectangle(7, 0, 4, 4, 0x10141b),
-        ...crown,
-      ];
-    }
-    if (visual === "skeleton" || visual === "zombie") {
-      const bone = monster.kind === "skeleton" ? 0xd8cfb6 : 0x70805a;
-      return [
-        this.add.rectangle(0, 8, 25, 26, bone).setStrokeStyle(2, 0x403c35),
-        this.add.rectangle(0, -10, 25, 21, mixColor(bone, 0xffffff, 0.14)),
-        this.add.rectangle(-7, -12, 4, 5, 0x171414),
-        this.add.rectangle(7, -12, 4, 5, 0x171414),
-        this.add.rectangle(-11, 26, 6, 11, bone),
-        this.add.rectangle(11, 26, 6, 11, bone),
-      ];
-    }
-    if (visual === "ghost" || visual === "necromancer" || visual === "lich") {
-      const spirit = visual === "necromancer"
-        ? 0x68447d
-        : visual === "lich" ? 0x40376f : 0x74558f;
-      return [
-        this.add.rectangle(0, 3, visual === "necromancer" || visual === "lich" ? 38 : 30, 34, spirit, 0.92),
-        this.add.triangle(-10, 26, -7, 8, 0, -7, 7, 8, spirit, 0.92),
-        this.add.triangle(10, 26, -7, 8, 0, -7, 7, 8, spirit, 0.92),
-        this.add.rectangle(-7, -4, 4, 5, 0xcaf4e9),
-        this.add.rectangle(7, -4, 4, 5, 0xcaf4e9),
-        ...(visual === "necromancer" || visual === "lich"
-          ? [this.add.triangle(0, -27, -14, 9, 0, -9, 14, 9, 0xc2a45c)]
-          : []),
-      ];
-    }
-    if (visual === "elemental") {
-      const elementColor = monster.kind === "fire-spirit"
-        ? 0xe55b3f
-        : monster.kind === "ice-spirit"
-          ? 0x65bddd
-          : monster.kind === "thunder-spirit" ? 0x9b79dd : 0xd28a48;
-      const size = monster.kind === "elemental-king" ? 42 : 31;
-      return [
-        this.add.rectangle(0, 5, size, size, elementColor)
-          .setStrokeStyle(3, mixColor(elementColor, 0xffffff, 0.32)),
-        this.add.triangle(0, -18, -13, 10, 0, -12, 13, 10, elementColor, 0.94),
-        this.add.rectangle(-7, 1, 4, 5, 0xfaf5d8),
-        this.add.rectangle(7, 1, 4, 5, 0xfaf5d8),
-      ];
-    }
-    if (visual === "humanoid") {
-      const armored = monster.kind === "knight" || monster.kind === "castle-lord";
-      const large = monster.kind === "troll" || monster.kind === "castle-lord";
-      const body = armored
-        ? 0x66727a
-        : monster.kind === "orc" ? 0x667743 : monster.kind === "troll" ? 0x6f665d : 0x558054;
-      return [
-        this.add.rectangle(0, 5, large ? 43 : 32, large ? 40 : 31, body)
-          .setStrokeStyle(2, 0x292d2c),
-        this.add.rectangle(0, -15, large ? 34 : 27, large ? 22 : 19, mixColor(body, 0xffffff, 0.16)),
-        this.add.rectangle(-7, -16, 4, 5, 0xf0ce6a),
-        this.add.rectangle(7, -16, 4, 5, 0xf0ce6a),
-        ...(armored ? [this.add.rectangle(0, 4, large ? 36 : 27, 8, 0xa9b0b2, 0.72)] : []),
-        ...(monster.kind === "castle-lord"
-          ? [this.add.triangle(0, -33, -14, 9, 0, -9, 14, 9, 0xd5aa52)]
-          : []),
-      ];
-    }
-    if (visual === "dragon") {
-      const large = monster.kind === "dragon" || monster.kind === "dragon-king";
-      const body = monster.species.includes("crystal")
-        ? 0x558ca3
-        : monster.species.includes("thunder") ? 0x8063a6 : 0xa54b38;
-      return [
-        this.add.rectangle(0, 4, large ? 48 : 35, large ? 38 : 29, body)
-          .setStrokeStyle(2, 0x3f1d1a),
-        this.add.triangle(-30, 2, 0, 12, 21, 0, 21, 24, mixColor(body, 0xffffff, 0.18), 0.9),
-        this.add.triangle(30, 2, 0, 0, 21, 12, 0, 24, mixColor(body, 0xffffff, 0.18), 0.9),
-        this.add.rectangle(-7, -7, 4, 5, 0xffe28a),
-        this.add.rectangle(7, -7, 4, 5, 0xffe28a),
-        ...(monster.kind === "dragon-king"
-          ? [this.add.triangle(0, -29, -15, 9, 0, -10, 15, 9, 0xefbd55)]
-          : []),
-      ];
-    }
-    if (visual === "frog") {
-      const poison = monster.species.includes("poison") || monster.species.includes("boss");
-      const body = poison ? 0x778b3b : 0x62a95e;
-      return [
-        this.add.ellipse(0, 8, 38, 25, body).setStrokeStyle(2, 0x2d4d2b),
-        this.add.ellipse(-18, 16, 17, 8, mixColor(body, 0x172416, 0.22)).setAngle(-20),
-        this.add.ellipse(18, 16, 17, 8, mixColor(body, 0x172416, 0.22)).setAngle(20),
-        this.add.rectangle(-10, -7, 14, 13, mixColor(body, 0xffffff, 0.22))
-          .setStrokeStyle(2, 0x2d4d2b),
-        this.add.rectangle(10, -7, 14, 13, mixColor(body, 0xffffff, 0.22))
-          .setStrokeStyle(2, 0x2d4d2b),
-        this.add.rectangle(-10, -8, 4, 4, 0x10141b),
-        this.add.rectangle(10, -8, 4, 4, 0x10141b),
-        this.add.rectangle(0, 12, 14, 3, poison ? 0xd6ce63 : 0x244429),
-        ...(monster.species.includes("boss")
-          ? [this.add.triangle(0, -24, -12, 8, 0, -8, 12, 8, COLORS.gold)]
-          : []),
-      ];
-    }
-    if (visual === "treant") {
-      return [
-        this.add.rectangle(0, 4, 24, 35, 0x745037).setStrokeStyle(2, 0x35271e),
-        this.add.rectangle(-15, -8, 22, 22, 0x3d7849),
-        this.add.rectangle(14, -11, 24, 23, 0x4d8c57),
-        this.add.rectangle(-6, 1, 4, 4, 0xe2c76b),
-        this.add.rectangle(6, 1, 4, 4, 0xe2c76b),
-      ];
-    }
-    if (visual === "water-beast") {
-      return [
-        this.add.ellipse(0, 5, 39, 24, 0x397e9d).setStrokeStyle(2, 0x194c68),
-        this.add.triangle(-23, 6, 0, 10, 15, 0, 15, 20, 0x5fb2c7),
-        this.add.rectangle(-7, -3, 4, 4, 0xd9f7f2),
-        this.add.rectangle(7, -3, 4, 4, 0xd9f7f2),
-        this.add.rectangle(0, 13, 16, 3, 0x183a4b),
-      ];
-    }
-    if (visual === "jungle-king") {
-      return [
-        this.add.rectangle(0, 5, 49, 43, 0x69543a).setStrokeStyle(4, 0x2e261d),
-        this.add.rectangle(-18, -20, 19, 14, 0x3f7645),
-        this.add.rectangle(18, -20, 19, 14, 0x3f7645),
-        this.add.rectangle(-10, -4, 6, 6, 0xe4c15c),
-        this.add.rectangle(10, -4, 6, 6, 0xe4c15c),
-        this.add.triangle(0, -34, -17, 10, 0, -10, 17, 10, 0xd0a640),
-      ];
-    }
-    if (visual === "hound") {
-      return [
-        this.add.rectangle(-2, 3, 38, 20, 0x9b6747),
-        this.add.rectangle(16, -9, 18, 18, 0xc08b5f),
-        this.add.rectangle(21, -9, 4, 4, COLORS.ember),
-        this.add.rectangle(-13, 19, 5, 11, 0x6f4233),
-        this.add.rectangle(12, 19, 5, 11, 0x6f4233),
-      ];
-    }
-    if (visual === "drake") {
-      return [
-        this.add.rectangle(0, 3, 30, 22, 0x3f67a8).setStrokeStyle(3, 0x17275b),
-        this.add.triangle(-27, 3, 0, 11, 18, 0, 18, 22, 0x5ad9df),
-        this.add.triangle(27, 3, 0, 0, 18, 11, 0, 22, 0x5ad9df),
-        this.add.rectangle(-7, -2, 4, 4, 0xdffcff),
-        this.add.rectangle(7, -2, 4, 4, 0xdffcff),
-        this.add.rectangle(0, 17, 18, 4, 0xd483ff),
-      ];
-    }
-    if (visual === "mimic") {
-      return [
-        this.add.rectangle(-10, 2, 25, 29, 0x6e4aa0).setStrokeStyle(3, 0x28184c),
-        this.add.rectangle(10, -2, 25, 29, 0x465fc0).setStrokeStyle(3, 0x28184c),
-        this.add.rectangle(-13, -4, 4, 4, 0xa8f8ff),
-        this.add.rectangle(7, -8, 4, 4, 0xa8f8ff),
-        this.add.rectangle(0, 17, 24, 4, 0x251638),
-      ];
-    }
-    if (visual === "spider") {
-      return [
-        this.add.rectangle(0, 3, 31, 26, 0x68449a).setStrokeStyle(3, 0x211545),
-        this.add.rectangle(0, -13, 22, 15, 0x4c6cca),
-        ...[-1, 1].flatMap((side) => [
-          this.add.rectangle(side * 22, -6, 22, 4, 0x68e8ee).setAngle(side * 20),
-          this.add.rectangle(side * 24, 8, 23, 4, 0x68e8ee).setAngle(side * -18),
-          this.add.rectangle(side * 20, 20, 18, 4, 0x68e8ee).setAngle(side * -35),
-        ]),
-        this.add.rectangle(-6, -14, 4, 4, 0xffffff),
-        this.add.rectangle(6, -14, 4, 4, 0xffffff),
-      ];
-    }
-    if (visual === "wraith") {
-      return [
-        this.add.rectangle(-7, 2, 27, 34, 0x7547a7, 0.94),
-        this.add.rectangle(12, 6, 13, 27, 0x2b2d65, 0.7),
-        this.add.rectangle(-14, 21, 10, 9, 0x7547a7, 0.94),
-        this.add.rectangle(3, 21, 10, 9, 0x7547a7, 0.94),
-        this.add.rectangle(-11, -5, 4, 5, 0xe4fbff),
-        this.add.text(7, -10, "NULL", {
-          color: "#68e8ee",
-          fontFamily: "monospace",
-          fontSize: "6px",
-        }).setOrigin(0.5),
-      ];
-    }
-    if (visual === "titan") {
-      return [
-        this.add.rectangle(0, 3, 51, 46, 0x303e88).setStrokeStyle(4, 0x17163f),
-        this.add.rectangle(-20, -22, 20, 13, 0x8d51bf),
-        this.add.rectangle(20, -22, 20, 13, 0x8d51bf),
-        this.add.rectangle(-12, -5, 7, 7, 0x68e8ee),
-        this.add.rectangle(12, -5, 7, 7, 0xd483ff),
-        this.add.rectangle(0, 15, 29, 5, 0x151637),
-        this.add.rectangle(-34, 4, 15, 5, 0x68e8ee),
-        this.add.rectangle(34, 4, 15, 5, 0xd483ff),
-      ];
-    }
-    if (visual === "golem") {
-      return [
-        this.add.rectangle(0, 5, 38, 38, 0x786b57).setStrokeStyle(3, 0x342f29),
-        this.add.rectangle(-23, 0, 12, 25, 0x968168).setStrokeStyle(2, 0x342f29),
-        this.add.rectangle(23, 0, 12, 25, 0x968168).setStrokeStyle(2, 0x342f29),
-        this.add.rectangle(-8, -6, 5, 5, COLORS.query),
-        this.add.rectangle(8, -6, 5, 5, COLORS.query),
-        this.add.rectangle(0, 11, 18, 4, 0x342f29),
-        this.add.rectangle(0, 1, 5, 26, COLORS.gold, 0.62).setAngle(18),
-      ];
-    }
-    if (visual === "index-guard") {
-      return [
-        this.add.rectangle(0, 3, 28, 28, 0x315f57)
-          .setAngle(45)
-          .setStrokeStyle(3, 0x83d9c4),
-        this.add.triangle(-19, -11, 0, 13, 12, 0, 12, 20, 0x4e8876),
-        this.add.triangle(19, -11, 0, 0, 12, 13, 0, 20, 0x4e8876),
-        this.add.rectangle(-6, -2, 4, 5, 0xd8fff4),
-        this.add.rectangle(6, -2, 4, 5, 0xd8fff4),
-        this.add.text(0, 14, "B+", {
-          color: "#d8fff4",
-          fontFamily: "monospace",
-          fontSize: "6px",
-          fontStyle: "bold",
-        }).setOrigin(0.5),
-      ];
-    }
-    if (visual === "root-beast") {
-      return [
-        this.add.ellipse(0, 7, 43, 29, 0x5c7042).setStrokeStyle(3, 0x28351f),
-        this.add.rectangle(0, -10, 27, 18, 0x71834c).setStrokeStyle(2, 0x28351f),
-        this.add.rectangle(-18, -23, 4, 25, 0x8f7650).setAngle(-28),
-        this.add.rectangle(18, -23, 4, 25, 0x8f7650).setAngle(28),
-        this.add.rectangle(-7, -11, 5, 5, 0xe8d46e),
-        this.add.rectangle(7, -11, 5, 5, 0xe8d46e),
-        this.add.rectangle(-14, 23, 7, 12, 0x4a5a37),
-        this.add.rectangle(14, 23, 7, 12, 0x4a5a37),
-      ];
-    }
-    if (visual === "crystal-spirit") {
-      return [
-        this.add.triangle(0, 0, -22, 18, 0, -25, 22, 18, 0x53b6b7, 0.95)
-          .setStrokeStyle(3, 0xa9f4eb),
-        this.add.triangle(-19, 9, -10, 15, 0, -19, 10, 15, 0x7a74c1, 0.9),
-        this.add.triangle(19, 9, -10, 15, 0, -19, 10, 15, 0x6fd2cc, 0.9),
-        this.add.rectangle(-6, -2, 4, 5, 0xffffff),
-        this.add.rectangle(6, -2, 4, 5, 0xffffff),
-      ];
-    }
-    if (visual === "vine-witch") {
-      return [
-        this.add.triangle(0, 11, -23, 25, 0, -22, 23, 25, 0x47613d)
-          .setStrokeStyle(3, 0x23331f),
-        this.add.rectangle(0, -13, 18, 17, 0x789167),
-        this.add.triangle(0, -30, -24, 12, 0, -12, 24, 12, 0x2e5137),
-        this.add.rectangle(-5, -14, 4, 4, 0xf0d974),
-        this.add.rectangle(5, -14, 4, 4, 0xf0d974),
-        this.add.rectangle(23, 3, 4, 38, 0x8d704a).setAngle(8),
-        this.add.ellipse(24, -18, 14, 9, 0x67a35d).setAngle(-25),
-      ];
-    }
-    if (visual === "index-eye") {
-      return [
-        this.add.ellipse(0, 2, 50, 34, 0x315b59).setStrokeStyle(4, 0x91ddd3),
-        this.add.ellipse(0, 2, 27, 27, 0xd5f4e9).setStrokeStyle(2, 0x173331),
-        this.add.ellipse(0, 2, 12, 18, 0x7650a2),
-        this.add.rectangle(-28, -18, 12, 4, 0x77c6b8).setAngle(-32),
-        this.add.rectangle(28, -18, 12, 4, 0x77c6b8).setAngle(32),
-        this.add.rectangle(-28, 22, 12, 4, 0x77c6b8).setAngle(32),
-        this.add.rectangle(28, 22, 12, 4, 0x77c6b8).setAngle(-32),
-      ];
-    }
-    if (visual === "index-tree") {
-      return [
-        this.add.rectangle(0, 9, 18, 39, 0x6f5339).setStrokeStyle(3, 0x30251d),
-        this.add.triangle(-17, -4, -18, 18, 0, -21, 18, 18, 0x437b5d),
-        this.add.triangle(15, -12, -17, 17, 0, -22, 17, 17, 0x55956d),
-        this.add.rectangle(-6, 2, 4, 5, 0xf2d46e),
-        this.add.rectangle(6, 2, 4, 5, 0xf2d46e),
-        this.add.rectangle(0, 19, 18, 5, 0x30251d),
-        this.add.triangle(0, -31, -13, 9, 0, -9, 13, 9, COLORS.gold),
-      ];
-    }
-    if (visual === "demon") {
-      return [
-        this.add.rectangle(0, 7, 31, 31, 0x6f3140).setStrokeStyle(2, 0x28131a),
-        this.add.rectangle(0, -12, 25, 20, 0x8a3d4c),
-        this.add.triangle(-12, -27, -10, 13, 0, -12, 10, 13, 0x34202b),
-        this.add.triangle(12, -27, -10, 13, 0, -12, 10, 13, 0x34202b),
-        this.add.rectangle(-7, -13, 4, 5, 0xf1c55f),
-        this.add.rectangle(7, -13, 4, 5, 0xf1c55f),
-        this.add.rectangle(18, 7, 4, 32, 0xd4a74f).setAngle(18),
-      ];
-    }
-    if (visual === "dark-knight") {
-      return [
-        this.add.rectangle(0, 7, 35, 36, 0x333743).setStrokeStyle(3, 0x11131a),
-        this.add.rectangle(0, -14, 30, 20, 0x505461).setStrokeStyle(2, 0x151821),
-        this.add.rectangle(0, -14, 23, 4, 0xba5362),
-        this.add.rectangle(-22, 3, 10, 29, 0x5f4a63).setAngle(-8),
-        this.add.rectangle(22, 2, 4, 43, 0xc5a65b).setAngle(19),
-        this.add.triangle(0, -31, -13, 10, 0, -10, 13, 10, 0x282a34),
-      ];
-    }
-    if (visual === "obsidian-golem") {
-      return [
-        this.add.rectangle(0, 5, 43, 42, 0x292633).setStrokeStyle(4, 0x756c86),
-        this.add.rectangle(-27, 5, 12, 31, 0x3a3448).setStrokeStyle(2, 0x16131d),
-        this.add.rectangle(27, 5, 12, 31, 0x3a3448).setStrokeStyle(2, 0x16131d),
-        this.add.rectangle(-9, -8, 6, 6, 0xb46ed0),
-        this.add.rectangle(9, -8, 6, 6, 0xb46ed0),
-        this.add.rectangle(0, 10, 23, 5, 0x111018),
-        this.add.rectangle(0, 2, 5, 34, 0x9f6abb, 0.65).setAngle(-22),
-      ];
-    }
-    if (visual === "replica-twin") {
-      return [
-        this.add.rectangle(-13, 6, 23, 34, 0x4a4162).setStrokeStyle(2, 0xa47fc1),
-        this.add.rectangle(13, 6, 23, 34, 0x344f65).setStrokeStyle(2, 0x6db8c5),
-        this.add.rectangle(-13, -14, 18, 16, 0x68577c),
-        this.add.rectangle(13, -14, 18, 16, 0x496d82),
-        this.add.rectangle(-15, -15, 4, 5, 0xf0d77d),
-        this.add.rectangle(11, -15, 4, 5, 0xf0d77d),
-        this.add.rectangle(0, 8, 4, 42, 0xe3c866, 0.78),
-      ];
-    }
-    if (visual === "shard-beast") {
-      return [
-        this.add.ellipse(0, 7, 45, 29, 0x433552).setStrokeStyle(3, 0x9d72b4),
-        this.add.triangle(-15, -12, -15, 18, 0, -24, 15, 18, 0x76548b),
-        this.add.triangle(20, 0, -12, 13, 0, -18, 12, 13, 0x55718b),
-        this.add.rectangle(-8, -7, 5, 5, 0xf1d26d),
-        this.add.rectangle(8, -7, 5, 5, 0xf1d26d),
-        this.add.triangle(-29, 9, 0, 12, 17, 0, 17, 24, 0x5c466d),
-        this.add.rectangle(-14, 23, 7, 12, 0x31263d),
-        this.add.rectangle(14, 23, 7, 12, 0x31263d),
-      ];
-    }
-    if (visual === "demon-king") {
-      return [
-        this.add.rectangle(0, 6, 51, 45, 0x5c2535).setStrokeStyle(4, 0x241018),
-        this.add.triangle(-34, 1, 0, 15, 22, 0, 22, 30, 0x34203f),
-        this.add.triangle(34, 1, 0, 0, 22, 15, 0, 30, 0x34203f),
-        this.add.rectangle(0, -17, 33, 23, 0x813449),
-        this.add.triangle(-16, -34, -10, 14, 0, -14, 10, 14, 0x17131d),
-        this.add.triangle(16, -34, -10, 14, 0, -14, 10, 14, 0x17131d),
-        this.add.rectangle(-9, -18, 6, 6, 0xf0c75e),
-        this.add.rectangle(9, -18, 6, 6, 0xf0c75e),
-        this.add.triangle(0, -38, -16, 10, 0, -11, 16, 10, COLORS.gold),
-      ];
-    }
-    return [
-      this.add.rectangle(0, 0, 34, 34, 0xb13266).setAngle(45)
-        .setStrokeStyle(4, 0xff9cc5),
-      this.add.text(0, 0, "?", {
-        color: "#ffffff",
-        fontFamily: "monospace",
-        fontSize: "19px",
-        fontStyle: "bold",
-      }).setOrigin(0.5),
-    ];
+    return createMonsterActorParts(this, monster);
   }
 
   private syncViews(): void {
@@ -1566,14 +1211,16 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private syncItemViews(): void {
+    const routeTransit = floorMapBlueprint(this.snapshot.floor).routeTransit;
+    const transitPresentation = floorTransitPresentation(routeTransit);
     const portalItems: GroundItem[] = this.snapshot.biomePlan.portals.flatMap(
       (portal) => [
         {
           id: `${portal.id}:entry`,
           sourceRoomId: portal.fromRegionId,
           ...portal.entry,
-          name: "区域传送门",
-          description: portal.name,
+          name: transitPresentation.label,
+          description: `${transitPresentation.label} · ${portal.name}`,
           kind: "event" as const,
           collection: "interact" as const,
           rewardId: null,
@@ -1582,8 +1229,8 @@ export class DungeonScene extends Phaser.Scene {
           id: `${portal.id}:exit`,
           sourceRoomId: portal.toRegionId,
           ...portal.exit,
-          name: "区域传送门",
-          description: portal.name,
+          name: transitPresentation.label,
+          description: `${transitPresentation.label} · ${portal.name}`,
           kind: "event" as const,
           collection: "interact" as const,
           rewardId: null,
@@ -1645,13 +1292,7 @@ export class DungeonScene extends Phaser.Scene {
         const isPortal = item.id.startsWith("biome-portal:");
         const parts: Phaser.GameObjects.GameObject[] = [];
         if (isPortal) {
-          parts.push(
-            this.add.ellipse(0, 2, 27, 38, 0x17152e, 0.88)
-              .setStrokeStyle(3, COLORS.plum),
-            this.add.ellipse(0, 2, 17, 29, COLORS.query, 0.16)
-              .setStrokeStyle(2, COLORS.query),
-            this.add.rectangle(0, 2, 5, 24, COLORS.paper, 0.75),
-          );
+          parts.push(...this.createRouteTransitParts(routeTransit));
         } else if (isChest) {
           parts.push(
             this.add.rectangle(0, 3, 24, 14, 0x8f6338)
@@ -1679,7 +1320,11 @@ export class DungeonScene extends Phaser.Scene {
         const label = this.add.text(
           0,
           -24,
-          isPortal ? "E · 区域门" : isChest ? "E · 战利品宝箱" : item.name,
+          isPortal
+            ? `E · ${transitPresentation.label}`
+            : isChest
+              ? "E · 战利品宝箱"
+              : item.name,
           {
           color: "#f1d28b",
           fontFamily: "monospace",
@@ -1746,6 +1391,92 @@ export class DungeonScene extends Phaser.Scene {
       }
       view.container.setVisible(this.snapshot.discoveredCells.includes(positionKey(bundle)));
     });
+  }
+
+  private createRouteTransitParts(
+    kind: FloorTransitKind,
+  ): Phaser.GameObjects.GameObject[] {
+    if (kind === "floodgate") {
+      return [
+        this.add.rectangle(0, 1, 29, 34, 0x24313a, 0.96)
+          .setStrokeStyle(2, 0x78c9b8),
+        this.add.rectangle(-7, 1, 3, 29, 0xa7b5b8),
+        this.add.rectangle(0, 1, 3, 29, 0xa7b5b8),
+        this.add.rectangle(7, 1, 3, 29, 0xa7b5b8),
+        this.add.rectangle(0, 12, 25, 5, 0x3a91ad, 0.78),
+      ];
+    }
+    if (kind === "skiff") {
+      return [
+        this.add.polygon(0, 6, [-17, -4, 16, -4, 10, 8, -10, 8], 0x765035)
+          .setStrokeStyle(2, 0xd7ad55),
+        this.add.rectangle(-2, -6, 2, 23, 0xe8dfc7),
+        this.add.triangle(5, -11, -6, 8, -6, -9, 8, 8, 0x78c9b8, 0.9)
+          .setStrokeStyle(1, 0xd8fff8),
+        this.add.ellipse(0, 13, 34, 6, 0x397e9d, 0.55),
+      ];
+    }
+    if (kind === "tomb-gate") {
+      return [
+        this.add.rectangle(-10, 4, 7, 29, 0x696d75)
+          .setStrokeStyle(1, 0xbec9cf),
+        this.add.rectangle(10, 4, 7, 29, 0x696d75)
+          .setStrokeStyle(1, 0xbec9cf),
+        this.add.rectangle(0, -11, 27, 7, 0x838891)
+          .setStrokeStyle(1, 0xd7e5e9),
+        this.add.triangle(0, -17, -14, 7, 0, -6, 14, 7, 0xa9cbd7, 0.72),
+      ];
+    }
+    if (kind === "element-switch") {
+      return [
+        this.add.polygon(0, 1, [0, -17, 17, 0, 0, 17, -17, 0], 0x29243a)
+          .setStrokeStyle(3, 0x9d78dc),
+        this.add.triangle(-5, 1, -5, 8, 0, -10, 5, 8, 0x63bfe0, 0.94),
+        this.add.triangle(6, 1, -5, 8, 0, -10, 5, 8, 0xe36a48, 0.94),
+      ];
+    }
+    if (kind === "drawbridge") {
+      return [
+        this.add.rectangle(0, 3, 31, 19, 0x765035)
+          .setStrokeStyle(2, 0xd7ad55),
+        this.add.rectangle(-10, 3, 2, 18, 0xc49a61),
+        this.add.rectangle(0, 3, 2, 18, 0xc49a61),
+        this.add.rectangle(10, 3, 2, 18, 0xc49a61),
+        this.add.rectangle(-13, -10, 2, 15, 0x9ca4aa).setAngle(-24),
+        this.add.rectangle(13, -10, 2, 15, 0x9ca4aa).setAngle(24),
+      ];
+    }
+    if (kind === "minecart") {
+      return [
+        this.add.polygon(0, 2, [-16, -9, 16, -9, 11, 8, -11, 8], 0x59656b)
+          .setStrokeStyle(2, 0xd7ad55),
+        this.add.rectangle(0, -3, 23, 3, 0x89959b),
+        this.add.ellipse(-9, 12, 8, 8, 0x171b22)
+          .setStrokeStyle(2, 0xa7b0b4),
+        this.add.ellipse(9, 12, 8, 8, 0x171b22)
+          .setStrokeStyle(2, 0xa7b0b4),
+      ];
+    }
+    if (kind === "crystal-gate") {
+      return [
+        this.add.triangle(-10, 2, -6, 15, 0, -17, 6, 15, 0x55b9b0, 0.88)
+          .setStrokeStyle(2, 0xb7f4e6),
+        this.add.triangle(10, 2, -6, 15, 0, -17, 6, 15, 0x8568b0, 0.88)
+          .setStrokeStyle(2, 0xe1c8ff),
+        this.add.polygon(0, -13, [0, -7, 8, 0, 0, 7, -8, 0], 0xe0bf63, 0.92),
+      ];
+    }
+    return [
+      this.add.rectangle(0, 1, 28, 35, 0x332719, 0.97)
+        .setStrokeStyle(3, 0xd7ad55),
+      this.add.rectangle(-7, 1, 11, 29, 0x5d4323)
+        .setStrokeStyle(1, 0xe0bf63),
+      this.add.rectangle(7, 1, 11, 29, 0x5d4323)
+        .setStrokeStyle(1, 0xe0bf63),
+      this.add.rectangle(0, -11, 19, 3, 0xf0c75e, 0.86),
+      this.add.ellipse(-2, 2, 3, 3, 0xf4e5a1),
+      this.add.ellipse(2, 2, 3, 3, 0xf4e5a1),
+    ];
   }
 
   private drawFog(): void {

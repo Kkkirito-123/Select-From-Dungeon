@@ -31,15 +31,15 @@ describe("high-difficulty gate challenges", () => {
     `);
 
     expect(result.rows).toEqual([
-      { id: 800, name: "铁胶怪", echo_count: 3, total_charge: 24 },
-      { id: 900, name: "泥王", echo_count: 3, total_charge: 24 },
+      { id: 4, name: "铁胶怪", echo_count: 3, total_charge: 24 },
+      { id: 5, name: "泥王", echo_count: 3, total_charge: 24 },
     ]);
     expect(evaluateGateChallenge(1, result)).toMatchObject({ accepted: true });
 
     const shortcut = engine.executeSelect(`
       SELECT id, name, 3 AS echo_count, 24 AS total_charge
       FROM monsters
-      WHERE id IN (800, 900)
+      WHERE id IN (4, 5)
       ORDER BY id
     `);
     expect(evaluateGateChallenge(1, shortcut)).toMatchObject({
@@ -106,10 +106,10 @@ describe("high-difficulty gate challenges", () => {
   it("第五、六层越级门按不可变装备 power 排名，战斗 HP 回写不改变答案", async () => {
     const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
     engine.updateMonsterHp([
-      { id: 28, hp: 0 },
-      { id: 33, hp: 0 },
-      { id: 39, hp: 0 },
-      { id: 44, hp: 0 },
+      { id: 50, hp: 0 },
+      { id: 55, hp: 0 },
+      { id: 61, hp: 0 },
+      { id: 66, hp: 0 },
     ]);
 
     const iron = engine.executeSelect(`

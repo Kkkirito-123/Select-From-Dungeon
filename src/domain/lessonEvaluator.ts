@@ -326,14 +326,14 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         projectsOnlyColumn(normalizedSql, "name") &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 101) &&
+        columnEqualsNumber(whereClause, "id", 1) &&
         hasSingleValue(result, "name", "史莱姆")
       );
     case "select-weakness":
       return (
         projectsOnlyColumn(normalizedSql, "weakness") &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 101) &&
+        columnEqualsNumber(whereClause, "id", 1) &&
         hasSingleValue(result, "weakness", "slash")
       );
     case "where-target":
@@ -343,7 +343,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsString(whereClause, "status", "escaped") &&
         !filtersByDirectId(whereClause) &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [201])
+        sameIds(result.targetIds, [2])
       );
     case "where-weakness":
       return (
@@ -360,7 +360,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnIsNull(whereClause, "master_id") &&
         !filtersByDirectId(whereClause) &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [301])
+        sameIds(result.targetIds, [3])
       );
     case "null-name":
       return (
@@ -374,7 +374,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
         hasAggregateProjection(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 800) &&
+        columnEqualsNumber(whereClause, "monster_id", 4) &&
         new RegExp(qualifiedColumn("channel"), "i").test(groupClause) &&
         hasExactColumns(result.columns, ["channel", "total"]) &&
         hasExactAggregateRows(result.rows, [
@@ -386,7 +386,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
         hasAggregateProjection(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 900) &&
+        columnEqualsNumber(whereClause, "monster_id", 5) &&
         new RegExp(qualifiedColumn("channel"), "i").test(groupClause) &&
         /\b(?:count\s*\([^)]*\)|total)\s*(?:>=\s*2\b|>\s*1\b)/i.test(havingClause) &&
         hasExactColumns(result.columns, ["channel", "total"]) &&
@@ -399,7 +399,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
         hasAggregateProjection(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 900) &&
+        columnEqualsNumber(whereClause, "monster_id", 5) &&
         new RegExp(qualifiedColumn("channel"), "i").test(groupClause) &&
         /\b(?:count\s*\([^)]*\)|total)\s*(?:>=\s*3\b|>\s*2\b)/i.test(havingClause) &&
         hasExactColumns(result.columns, ["channel", "total"]) &&
@@ -409,7 +409,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         projectsOnlyColumn(normalizedSql, "name") &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 111) &&
+        columnEqualsNumber(whereClause, "id", 6) &&
         hasSingleValue(result, "name", "软泥怪")
       );
     case "practice-where":
@@ -419,7 +419,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsString(whereClause, "status", "wet") &&
         !filtersByDirectId(whereClause) &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [211])
+        sameIds(result.targetIds, [7])
       );
     case "practice-null":
       return (
@@ -433,7 +433,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
         hasAggregateProjection(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 810) &&
+        columnEqualsNumber(whereClause, "monster_id", 9) &&
         new RegExp(qualifiedColumn("channel"), "i").test(groupClause) &&
         hasExactColumns(result.columns, ["channel", "total"]) &&
         hasExactAggregateRows(result.rows, [
@@ -445,13 +445,13 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         projectsOnlyColumn(normalizedSql, "name") &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 810) &&
+        columnEqualsNumber(whereClause, "id", 9) &&
         hasSingleValue(result, "name", "铁胶怪")
       );
     case "order-peak":
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 1200) &&
+        columnEqualsNumber(whereClause, "monster_id", 10) &&
         /\border\s+by\s+(?:\w+\.)?charge\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
         hasSingleValue(result, "channel", "surge")
@@ -459,7 +459,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "order-top-two":
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 1200) &&
+        columnEqualsNumber(whereClause, "monster_id", 10) &&
         /\border\s+by\s+(?:\w+\.)?charge\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+2\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["channel", "charge"], [
@@ -471,14 +471,14 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         /^select\s+distinct\s+(?:\w+\.)?channel\b/i.test(normalizedSql) &&
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 1300) &&
+        columnEqualsNumber(whereClause, "monster_id", 11) &&
         /\border\s+by\s+(?:\w+\.)?channel(?:\s+asc)?\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["channel"], [["echo"], ["mirror"]])
       );
     case "inner-join-room":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "id", 1400) &&
+        columnEqualsNumber(whereClause, "id", 12) &&
         hasExactOrderedRows(result, ["name", "room_name"], [
           ["树妖", "古树桥"],
         ])
@@ -486,7 +486,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "inner-join-sector":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "id", 1400) &&
+        columnEqualsNumber(whereClause, "id", 12) &&
         hasExactOrderedRows(result, ["name", "sector"], [
           ["树妖", "forest-bridge"],
         ])
@@ -497,7 +497,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "room_id", 24) &&
         columnIsNull(whereClause, "monster_id") &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [1500])
+        sameIds(result.targetIds, [13])
       );
     case "join-boss-groups":
       return (
@@ -514,7 +514,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "join-boss-core":
       return (
         joinsTables(normalizedSql, "monsters", "monster_gear", "id", "monster_id") &&
-        columnEqualsNumber(whereClause, "id", 1900) &&
+        columnEqualsNumber(whereClause, "id", 14) &&
         /\border\s+by\s+(?:\w+\.)?power\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["name", "power"], [
@@ -524,7 +524,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-order":
       return (
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 1210) &&
+        columnEqualsNumber(whereClause, "monster_id", 15) &&
         /\border\s+by\s+(?:\w+\.)?charge\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
         hasSingleValue(result, "channel", "surge")
@@ -532,13 +532,13 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-distinct":
       return (
         /^select\s+distinct\s+(?:\w+\.)?channel\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "monster_id", 1310) &&
+        columnEqualsNumber(whereClause, "monster_id", 16) &&
         hasExactOrderedRows(result, ["channel"], [["echo"], ["mirror"]])
       );
     case "practice-inner-join":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "id", 1410) &&
+        columnEqualsNumber(whereClause, "id", 17) &&
         hasExactOrderedRows(result, ["name", "room_name"], [
           ["青蛙", "泥沼石径"],
         ])
@@ -549,19 +549,19 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "room_id", 34) &&
         columnIsNull(whereClause, "monster_id") &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [1510])
+        sameIds(result.targetIds, [18])
       );
     case "practice-left-core":
       return (
         projectsOnlyColumn(normalizedSql, "name") &&
-        columnEqualsNumber(whereClause, "id", 1510) &&
+        columnEqualsNumber(whereClause, "id", 18) &&
         columnEqualsString(whereClause, "status", "toxic") &&
         hasSingleValue(result, "name", "毒蛙")
       );
     case "practice-forest-order":
       return (
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 1610) &&
+        columnEqualsNumber(whereClause, "id", 19) &&
         /\border\s+by\s+(?:\w+\.)?hp\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["name", "hp"], [["猎犬", 13]])
@@ -569,13 +569,13 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-forest-join":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "id", 1710) &&
+        columnEqualsNumber(whereClause, "id", 20) &&
         hasExactOrderedRows(result, ["name", "room_name"], [["树妖", "树妖林地"]])
       );
     case "practice-forest-join-core":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "id", 1710) &&
+        columnEqualsNumber(whereClause, "id", 20) &&
         /\border\s+by\s+(?:\w+\.)?sector(?:\s+asc)?\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["name", "sector"], [["树妖", "forest-treant"]])
@@ -583,37 +583,37 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "lake-boss-scan":
       return (
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 1810) &&
+        columnEqualsNumber(whereClause, "id", 21) &&
         hasExactOrderedRows(result, ["name", "status"], [["湖怪", "submerged"]])
       );
     case "lake-boss-sort":
       return (
         /^select\s+distinct\s+(?:\w+\.)?status\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 1810) &&
+        columnEqualsNumber(whereClause, "id", 21) &&
         /\border\s+by\s+(?:\w+\.)?status(?:\s+asc)?\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["status"], [["submerged"]])
       );
     case "frog-boss-left":
       return (
         joinsTables(normalizedSql, "monsters", "monster_gear", "id", "monster_id", true) &&
-        columnEqualsNumber(whereClause, "id", 1911) &&
+        columnEqualsNumber(whereClause, "id", 22) &&
         columnIsNull(whereClause, "monster_id") &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [1911])
+        sameIds(result.targetIds, [22])
       );
     case "frog-boss-distinct":
       return (
         /^select\s+distinct\s+(?:\w+\.)?name\b/i.test(normalizedSql) &&
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "floor", 2) &&
-        columnEqualsNumber(whereClause, "id", 1911) &&
+        columnEqualsNumber(whereClause, "id", 22) &&
         /\border\s+by\s+(?:\w+\.)?name(?:\s+asc)?\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["name"], [["蛙王"]])
       );
     case "f3-inner-room":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "id", 1) &&
+        columnEqualsNumber(whereClause, "id", 23) &&
         hasExactOrderedRows(result, ["name", "room_name"], [["骷髅", "骨桥前庭"]])
       );
     case "f3-left-unarmed":
@@ -622,18 +622,18 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "room_id", 42) &&
         columnIsNull(whereClause, "monster_id") &&
         hasExactColumns(result.columns, ["id"]) &&
-        sameIds(result.targetIds, [2])
+        sameIds(result.targetIds, [24])
       );
     case "f3-self-master":
       return (
         result.features.includes("self-join") &&
-        columnEqualsNumber(whereClause, "id", 3) &&
+        columnEqualsNumber(whereClause, "id", 25) &&
         hasExactOrderedRows(result, ["child_name", "master_name"], [["幽灵", "死灵王"]])
       );
     case "f3-chain-gear":
       return (
         (normalizedSql.match(/\bjoin\b/gi)?.length ?? 0) >= 2 &&
-        columnEqualsNumber(whereClause, "id", 4) &&
+        columnEqualsNumber(whereClause, "id", 26) &&
         hasExactOrderedRows(
           result,
           ["room_name", "name", "power"],
@@ -642,8 +642,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "f3-union-patrol":
       return hasExactOrderedRows(result, ["id", "name"], [
-        [1, "骷髅"],
-        [3, "幽灵"],
+        [23, "骷髅"],
+        [25, "幽灵"],
       ]);
     case "f3-audit-groups":
       return (
@@ -661,35 +661,35 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "practice-bone":
       return (
-        columnEqualsNumber(whereClause, "id", 7) &&
+        columnEqualsNumber(whereClause, "id", 29) &&
         hasExactOrderedRows(result, ["name", "room_name"], [["碎骨", "遗骨荒地"]])
       );
     case "practice-zombie":
       return (
-        columnEqualsNumber(whereClause, "id", 8) &&
+        columnEqualsNumber(whereClause, "id", 30) &&
         columnIsNull(whereClause, "monster_id") &&
         hasSingleValue(result, "name", "腐尸")
       );
     case "practice-spirit":
       return (
-        columnEqualsNumber(whereClause, "id", 9) &&
+        columnEqualsNumber(whereClause, "id", 31) &&
         hasExactOrderedRows(result, ["name", "master_name"], [["鬼火", "墓主"]])
       );
     case "practice-spirit-core":
       return (
-        columnEqualsNumber(whereClause, "id", 9) &&
+        columnEqualsNumber(whereClause, "id", 31) &&
         columnEqualsString(whereClause, "status", "haunting") &&
         hasSingleValue(result, "name", "鬼火")
       );
     case "grave-boss-scan":
       return hasExactOrderedRows(result, ["id", "name"], [
-        [9, "鬼火"],
-        [10, "游魂"],
-        [11, "墓主"],
+        [31, "鬼火"],
+        [32, "游魂"],
+        [33, "墓主"],
       ]);
     case "grave-boss-core":
       return (
-        columnEqualsNumber(whereClause, "id", 11) &&
+        columnEqualsNumber(whereClause, "id", 33) &&
         hasExactOrderedRows(result, ["name", "master_name"], [["墓主", "死灵王"]])
       );
     case "f4-scalar-first":
@@ -697,14 +697,14 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "f4-in-frost":
       return hasExactOrderedRows(result, ["name"], [["冰灵"]]);
     case "f4-exists-gear":
-      return columnEqualsNumber(whereClause, "id", 14) &&
+      return columnEqualsNumber(whereClause, "id", 36) &&
         hasSingleValue(result, "name", "雷灵");
     case "f4-correlated-gear":
-      return columnEqualsNumber(whereClause, "id", 15) &&
+      return columnEqualsNumber(whereClause, "id", 37) &&
         /\bmax\s*\(/i.test(normalizedSql) &&
         hasSingleValue(result, "name", "石巨人");
     case "f4-cte-armor":
-      return columnEqualsNumber(whereClause, "id", 16) &&
+      return columnEqualsNumber(whereClause, "id", 38) &&
         hasSingleValue(result, "name", "炎王");
     case "f4-recursive-rooms":
       return hasExactOrderedRows(result, ["room_name"], [
@@ -723,25 +723,25 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-ice":
       return hasExactOrderedRows(result, ["name"], [["冰晶"]]);
     case "practice-storm":
-      return columnEqualsNumber(whereClause, "id", 20) &&
+      return columnEqualsNumber(whereClause, "id", 42) &&
         hasSingleValue(result, "name", "雷兽");
     case "practice-storm-core":
       return (
-        columnEqualsNumber(whereClause, "id", 20) &&
+        columnEqualsNumber(whereClause, "id", 42) &&
         columnEqualsString(whereClause, "status", "charged") &&
         hasSingleValue(result, "name", "雷兽")
       );
     case "practice-wraith":
-      return columnEqualsNumber(whereClause, "id", 10) &&
+      return columnEqualsNumber(whereClause, "id", 32) &&
         hasExactOrderedRows(result, ["name", "master_name"], [["游魂", "墓主"]]);
     case "practice-spark":
-      return columnEqualsNumber(whereClause, "id", 21) &&
+      return columnEqualsNumber(whereClause, "id", 43) &&
         hasSingleValue(result, "name", "电球");
     case "forge-boss-scan":
-      return columnEqualsNumber(whereClause, "id", 22) &&
+      return columnEqualsNumber(whereClause, "id", 44) &&
         hasSingleValue(result, "name", "炉主");
     case "forge-boss-core":
-      return columnEqualsNumber(whereClause, "id", 22) &&
+      return columnEqualsNumber(whereClause, "id", 44) &&
         hasSingleValue(result, "name", "炉主");
     case "f5-over-count":
       return hasExactOrderedRows(result, ["name", "guard_total"], [
@@ -983,7 +983,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
 }
 
 const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
-  "select-name": "结果没有精确读出史莱姆的 name。检查列名、来源表和 id = 101。",
+  "select-name": "结果没有精确读出史莱姆的 name。检查列名、来源表和 id = 1。",
   "select-weakness": "结果没有精确读出史莱姆的 weakness。检查完整 SELECT。",
   "where-target": "结果不是唯一的水胶怪。检查 room_id、status 和多余行。",
   "where-weakness": "没有按怪物名字与状态读出 weakness。不要只用 id 绕过过滤训练。",
@@ -992,7 +992,7 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "group-signals": "分组结果应为 echo = 3、noise = 1；检查执行官 ID、COUNT(*) 与 channel。",
   "having-shield": "护盾阶段应保留 echo = 3 与 ward = 2；HAVING 要过滤聚合后的组。",
   "having-core": "核心阶段只应保留 echo = 3；把 HAVING 阈值提高到 3。",
-  "practice-select": "结果没有精确读出软泥怪的 name。检查列名、表名与 id = 111。",
+  "practice-select": "结果没有精确读出软泥怪的 name。检查列名、表名与 id = 6。",
   "practice-where": "结果没有锁定水胶怪。需要同时过滤 room_id 与 status。",
   "practice-null": "结果没有读出无主毒胶怪。检查 IS NULL 与 toxic 状态。",
   "practice-group": "铁胶怪信号应得到 echo = 2、noise = 2；检查 COUNT(*) 与 GROUP BY。",
@@ -1002,7 +1002,7 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "distinct-status": "去重结果应只有 echo、mirror；检查 DISTINCT 与排序。",
   "inner-join-room": "没有把树妖与“古树桥”正确连接；检查 room_id = rooms.id 与别名。",
   "inner-join-sector": "连接结果应显示树妖位于 forest-bridge sector。",
-  "left-join-unarmed": "没有找到右表缺失的 #1500；检查 LEFT JOIN 与 g.monster_id IS NULL。",
+  "left-join-unarmed": "没有找到右表缺失的 #13；检查 LEFT JOIN 与 g.monster_id IS NULL。",
   "join-boss-groups": "综合结果应依次为 ambush = 4、storm = 2；检查 JOIN、分组、HAVING 与排序。",
   "join-boss-core": "没有定位丛林王 power = 21 的最强装备；检查 JOIN、DESC 与 LIMIT 1。",
   "practice-order": "没有取出水怪的最高 surge 信号；检查 DESC 与 LIMIT。",
