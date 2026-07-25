@@ -6,7 +6,6 @@ import { isSavedRun } from "../src/storage/localProgress";
 import type {
   GroundItem,
   LessonId,
-  LootItem,
   SavedRun,
   SqlQueryResult,
   TurnResolution,
@@ -127,31 +126,18 @@ function enterLesson(session: GameSession, lessonId: LessonId): void {
   expect(session.snapshot().lessonId).toBe(lessonId);
 }
 
-function collectLootItem(
+function collectLessonChest(
   session: GameSession,
-  itemId: string,
-  preferredAction: "store" | "equip" | "claim" = "equip",
-): LootItem {
+  lessonId: LessonId,
+): GroundItem {
   const snapshot = session.snapshot();
-  const bundle = snapshot.lootBundles.find((entry) => (
-    entry.items.some((item) => item.itemId === itemId)
+  const roomId = roomIdForLesson(session, lessonId);
+  const item = snapshot.groundItems.find((entry) => (
+    entry.sourceRoomId === roomId && entry.collection === "interact"
   ));
-  const item = bundle?.items.find((entry) => entry.itemId === itemId);
-  if (!bundle || !item) throw new Error(`缺少预期战利品：${itemId}`);
-  expect(session.setPlayerPosition(bundle.x, bundle.y)).toBe(true);
-  expect(session.interact()).toMatchObject({ ok: true, kind: "loot-bundle" });
-  if (item.rewardId === "floor-key") {
-    expect(session.takeAllLoot(bundle.id).ok).toBe(true);
-  } else {
-    const action = item.kind === "weapon" || item.kind === "armor"
-      ? preferredAction
-      : "claim";
-    expect(session.takeLootItem(bundle.id, item.dropId, action).ok).toBe(true);
-    if (session.snapshot().mode === "loot") {
-      session.takeAllLoot(bundle.id);
-      if (session.snapshot().mode === "loot") session.closeLootBundle();
-    }
-  }
+  if (!item) throw new Error(`缺少 ${lessonId} 课程宝箱`);
+  expect(session.setPlayerPosition(item.x, item.y)).toBe(true);
+  expect(session.interact()).toMatchObject({ ok: true });
   return item;
 }
 
@@ -181,10 +167,8 @@ function clearSelect(session: GameSession): TurnResolution {
     currentLevel: 1,
   });
   expect(session.snapshot().mode).toBe("explore");
-  expect(session.snapshot().lootBundles.some(
-    (bundle) => bundle.items.some((item) => item.itemId === "filter-bow"),
-  )).toBe(true);
-  collectLootItem(session, "filter-bow");
+  expect(session.snapshot().lootBundles).toEqual([]);
+  collectLessonChest(session, "select");
   expect(session.snapshot().player.weapon.id).toBe("filter-bow");
   return second;
 }
@@ -203,7 +187,7 @@ function clearBranch(
     expect(session.resolveQuery(NULL_TARGET).accepted).toBe(true);
     const completed = session.resolveQuery(NULL_NAME);
     expect(completed.lessonCompleted).toBe("is-null");
-    collectLootItem(session, "null-lantern");
+    collectLessonChest(session, "is-null");
     expect(session.snapshot().player.weapon.id).toBe("null-lantern");
     return completed;
   }
@@ -258,10 +242,31 @@ describe("GameSession SQL 魔王城 Run", () => {
 
   it("普通怪必须完成两条不同任务，不再被一次查询秒杀", () => {
     const session = new GameSession(null, null, "two-stage");
+    expect(session.snapshot().profile.discoveredMonsterIds).not.toContain(1);
     clearSelect(session);
     expect(session.snapshot().completedLessons).toContain("select");
     expect(session.snapshot().profile.masteredLessons).toContain("select");
+    expect(session.snapshot().profile.discoveredMonsterIds).toContain(1);
     expect(session.snapshot().monsters.find((monster) => monster.id === 1)?.hp).toBe(0);
+  });
+
+  it("身份只在致命一击结算，并能从 Run 中的已击败记录恢复", () => {
+    const session = new GameSession(null, null, "identity-recovery");
+    enterLesson(session, "select");
+    const first = session.resolveQuery(SELECT_NAME);
+    expect(first.events.some((event) => event.type === "identity-recovered")).toBe(false);
+    expect(session.snapshot().profile.discoveredMonsterIds).toEqual([]);
+
+    const second = session.resolveQuery(SELECT_WEAKNESS);
+    expect(second.events).toContainEqual(expect.objectContaining({
+      type: "identity-recovered",
+      targetId: 1,
+      itemName: "史莱姆",
+    }));
+    expect(session.snapshot().profile.discoveredMonsterIds).toEqual([1]);
+
+    const restored = new GameSession(session.toSavedRun()).snapshot();
+    expect(restored.profile.discoveredMonsterIds).toContain(1);
   });
 
   it("靠近怪物不会隔空开战，只有尝试进入怪物所在格才触发遭遇", () => {
@@ -530,16 +535,8 @@ describe("GameSession SQL 魔王城 Run", () => {
     enterLesson(session, "group-by");
     expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
     expect(session.snapshot().mode).toBe("explore");
-    const groupBundle = session.snapshot().lootBundles.find(
-      (bundle) => bundle.sourceMonsterId === 4,
-    );
-    const groupItem = groupBundle?.items[0];
-    if (!groupItem) throw new Error("GROUP BY 精英没有生成战利品包");
-    collectLootItem(
-      session,
-      groupItem.itemId,
-      groupItem.kind === "weapon" || groupItem.kind === "armor" ? "equip" : "claim",
-    );
+    expect(session.snapshot().lootBundles).toEqual([]);
+    collectLessonChest(session, "group-by");
 
     enterLesson(session, "having");
     expect(session.resolveQuery(HAVING_SHIELD).accepted).toBe(true);
@@ -547,7 +544,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().monsters.find((monster) => monster.id === 5)?.hp).toBe(12);
     expect(session.resolveQuery(HAVING_CORE).lessonCompleted).toBe("having");
     expect(session.snapshot().mode).toBe("explore");
-    collectLootItem(session, "floor-key", "claim");
+    collectLessonChest(session, "having");
     expect(session.snapshot()).toMatchObject({
       mode: "transition",
       floor: 1,
@@ -672,7 +669,7 @@ describe("GameSession SQL 魔王城 Run", () => {
       expect.objectContaining({
         id: 1,
         battleId: 1,
-        monsterName: "史莱姆",
+        monsterName: "ID #001",
         lessonId: "select",
         stageId: "select-name",
         sql: "SELECT name FROM monsters",
@@ -874,7 +871,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
     expect(restored.toSavedRun()).toMatchObject({
-      version: 10,
+      version: 11,
       generatorVersion: 5,
       floor: 1,
       campaign: { currentFloor: 1, status: "active" },
@@ -902,6 +899,28 @@ describe("GameSession SQL 魔王城 Run", () => {
       (entry) => entry.monsterId === actor.monsterId,
     );
     expect(restoredActor).toMatchObject(actor.home);
+  });
+
+  it("旧存档中已经巡逻走偏的首课史莱姆会回到 SELECT 石碑", () => {
+    const session = new GameSession(null, null, "tutorial-actor-recovery");
+    const saved = session.toSavedRun();
+    const tutorialRoom = saved.graph.nodes.find((room) => room.type === "tutorial");
+    const actor = saved.worldActors.find((entry) => entry.roomNodeId === tutorialRoom?.id);
+    if (!tutorialRoom || !actor) throw new Error("缺少首课房间或怪物 Actor");
+    actor.behavior = "wander";
+    actor.roamRadius = 3;
+    actor.x += 2;
+    actor.y += 1;
+
+    const restoredActor = new GameSession(saved).snapshot().worldActors.find(
+      (entry) => entry.monsterId === actor.monsterId,
+    );
+    expect(restoredActor).toMatchObject({
+      x: actor.home.x,
+      y: actor.home.y,
+      behavior: "anchored",
+      roamRadius: 0,
+    });
   });
 
   it("Boss 门可用高难 SQL 越级破解，但不会伪造课程、XP 或战利品", () => {

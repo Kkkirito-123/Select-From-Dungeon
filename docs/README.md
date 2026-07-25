@@ -14,19 +14,21 @@ README、代码和测试共同为准；历史正文中的旧尺寸、旧音乐�
 | [MVP 2.0 发布检查表](./RELEASE_CHECKLIST.md) | `PR_OPEN / VALIDATED` | 自动化、浏览器、兼容、版权与最终 PR 证据 |
 | [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | `CURRENT` | 当前 47 组课程顺序、题型与掌握标准 |
 | [MVP 2.0 设计与实施基线](./design/MVP_2_0_MASTER_PLAN.md) | `IMPLEMENTED / RELEASE_CANDIDATE` | 八层主线、48×36 地图、角色、叙事、音乐与交付边界 |
-| [音乐与地图上升设计圣经](./design/MUSIC_MAP_ASCENT_BIBLE.md) | `IMPLEMENTED / LISTENING_QA_PENDING` | 八层地理上升、原创程序化乐谱与抗疲劳边界；正文的候选试听 / 不接运行时段落是实现前记录 |
+| [音乐与地图上升设计圣经](./design/MUSIC_MAP_ASCENT_BIBLE.md) | `HISTORICAL DIRECTION / CURRENT SCORE UPDATED` | 八层地理上升与抗疲劳方向；运行时已改为公版古典主题的程序化电子合成 |
 | [叙事圣经](./design/NARRATIVE_BIBLE.md) | `CORE_IMPLEMENTED` | 世界真相、抄写员、《失名录》与唯一 `MIGRATE` 结局；正文的 `v1.1 CURRENT / 尚未实现` 标记是实现前快照 |
-| [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `CURRENT` | 三篝火、安全区、休息、死亡回归、复盘与捷径 |
+| [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `HISTORICAL / CURRENT OVERRIDE BELOW` | 原三篝火设计；当前为中后两处实体篝火 + 出生安全锚点 |
 
 当前关键事实：
 
 - 新 Run：`48×36 / generator v5`；八层各有手工宏观轮廓、三个区域与实体交通；
 - 兼容 Run：`64×48 / generator v4` 只用于读取旧存档，不代表当前新图；
 - 课程：保留现有八层 47 组顺序，不在 MVP 2.0 暗中重排；
-- 音乐：八层均为原创声明式音符 + Web Audio 连续合成，不再运行贝多芬或其他既有作品改编；
+- 音乐：八层采用标明出处的公版古典主题 + Web Audio 程序化电子合成，不打包外部录音；
 - 叙事：每层五拍、两条固定证据、抄写员、本地《失名录》和唯一 `MIGRATE` 结局已进入运行时；
+- 身份：必修怪物击败前只显示 ID，最后一击回收名字，永久怪物图鉴跨 Run 保存；
 - 角色：玩家四阶段显形、抄写员和怪物模型由地图 / 战斗同源程序化配方绘制；
-- 存档：继续使用 `run:v10`、`profile:v2`、`onboarding:v1`，叙事进度由已有 Run 事实派生。
+- 篝火：每层中段与后段各一处实体篝火，出生区作为前段安全与兜底复活锚点；
+- 存档：使用 `run:v11`、`profile:v3`、`onboarding:v1`；旧 v10/v2 记录在内存迁移。
 
 ## 历史设计与兼容参考
 

@@ -10,14 +10,16 @@ import {
 const MODES = ["explore", "combat", "boss"] as const satisfies readonly ArcadeMusicMode[];
 
 describe("musicScore", () => {
-  it("定义连续八层、独立标识与明确的原创配器参数", () => {
+  it("定义连续八层、独立标识与明确的公共领域电子改编来源", () => {
     expect(FLOOR_SCORE_PROFILES.map((profile) => profile.floor)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8,
     ]);
     expect(new Set(FLOOR_SCORE_PROFILES.map((profile) => profile.id)).size).toBe(8);
 
     FLOOR_SCORE_PROFILES.forEach((profile) => {
-      expect(profile.origin).toBe("original-procedural");
+      expect(profile.origin).toBe("public-domain-electronic-adaptation");
+      expect(profile.sourceWork.length).toBeGreaterThan(0);
+      expect(profile.composer.length).toBeGreaterThan(0);
       expect(profile.tonalCenter.length).toBeGreaterThan(0);
       expect(profile.scaleName.length).toBeGreaterThan(0);
       expect(profile.regionOffsets).toHaveLength(3);
@@ -36,7 +38,7 @@ describe("musicScore", () => {
     });
   });
 
-  it("探索乐谱用跨乐句底床，战斗限制高频、噪声密度和音高", () => {
+  it("探索乐谱移除持续低频底床，战斗限制高频、噪声密度和音高", () => {
     FLOOR_SCORE_PROFILES.forEach((profile) => {
       const floor = profile.floor as DungeonFloor;
       const explorePatterns = musicPatternsForScene({
@@ -47,10 +49,14 @@ describe("musicScore", () => {
       explorePatterns.forEach((pattern) => {
         expect(pattern.melody).toHaveLength(pattern.phraseSteps);
         expect(pattern.bass).toHaveLength(pattern.phraseSteps);
-        expect(pattern.bed.length).toBeGreaterThanOrEqual(2);
-        expect(pattern.bedDurationSeconds).toBeGreaterThan(
-          pattern.stepSeconds * pattern.phraseSteps,
+        expect(pattern.bed).toEqual([]);
+        expect(pattern.bedDurationSeconds).toBe(0);
+        expect(pattern.padLevel).toBe(0);
+        const bassNotes = pattern.bass.filter(
+          (note): note is number => note !== null,
         );
+        expect(Math.min(...bassNotes)).toBeGreaterThanOrEqual(45);
+        expect(pattern.bassLevel).toBeLessThan(pattern.melodyLevel);
       });
 
       (["combat", "boss"] as const).forEach((mode) => {

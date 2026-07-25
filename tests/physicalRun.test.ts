@@ -835,32 +835,15 @@ function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
   }
   expect(finalResolution?.lessonCompleted).toBe(lessonId);
   const snapshot = session.snapshot();
-  const monster = snapshot.monsters.find((entry) => entry.lessonId === lessonId);
-  const bundle = snapshot.lootBundles.find(
-    (entry) => entry.sourceMonsterId === monster?.id,
+  const lessonRoom = snapshot.roomGraph.nodes.find(
+    (entry) => entry.lessonId === lessonId,
   );
-  if (!bundle) throw new Error(`${lessonId} 应产生课程战利品包`);
-  walkTo(session, bundle);
-  expect(session.interact()).toMatchObject({ ok: true, kind: "loot-bundle" });
-  const protectedWeapon = bundle.items.find((item) => item.kind === "weapon" && item.protected);
-  if (protectedWeapon) {
-    let equipped = session.takeLootItem(bundle.id, protectedWeapon.dropId, "equip");
-    if (!equipped.ok) {
-      const replaceable = session.snapshot().equipmentInventory.find((item) => !item.protected);
-      if (!replaceable) throw new Error(`${lessonId} 背包已满且没有可替换装备`);
-      equipped = session.takeLootItem(
-        bundle.id,
-        protectedWeapon.dropId,
-        "equip",
-        replaceable.instanceId,
-      );
-    }
-    expect(equipped.ok, equipped.message).toBe(true);
-  }
-  if (session.snapshot().mode === "loot") {
-    expect(session.takeAllLoot(bundle.id).ok).toBe(true);
-  }
-  if (session.snapshot().mode === "loot") session.closeLootBundle();
+  const chest = snapshot.groundItems.find((entry) => (
+    entry.sourceRoomId === lessonRoom?.id &&
+    entry.collection === "interact"
+  ));
+  if (!chest) throw new Error(`${lessonId} 应在课程房留下固定宝箱`);
+  collectItemByWalking(session, chest);
 }
 
 function collectAggregateHammer(session: GameSession): void {

@@ -39,8 +39,9 @@ and turn the correct result into an animated attack.
   not clickable. Two physical region portals connect each floor's front,
   middle, and rear biomes without bypassing curriculum gates; defeating the
   middle area Boss automatically transfers the player into the rear main path.
-- The same seed deterministically rebuilds course-route beacons, distance-based
-  front/middle/rear campfires, dead-end caches, and one two-way shortcut.
+- The same seed deterministically rebuilds course-route beacons, two
+  middle/rear campfires, the entrance safe anchor, dead-end caches, and one
+  two-way shortcut.
   Visible route interests stay within 18 steps on the main course route. Every
   remaining corridor dead end contains a one-use cache. The shortcut key is
   guaranteed in a middle/rear area, consumes no inventory slot, and never
@@ -54,8 +55,9 @@ and turn the correct result into an animated attack.
   guarantee an encounter after 30 eligible quiet steps. The deterministic
   result cannot be rerolled by reloading.
   Ordinary monsters take one slow patrol step about every 1,100 ms; the Boss
-  remains anchored. The opponent's full name, ID, HP, and next counter are
-  visible before every query.
+  remains anchored. Before defeat, the opponent exposes only its stable ID, HP,
+  and next counter. The finishing blow shows `NAME RECOVERED / 获得名字` and
+  permanently records the direct name in the Monster Codex.
 - Ambushes draw only from the biome under the player. Floors one through eight
   use 5%, 7%, 9%, 11%, 13%, 15%, 17%, and 19% seeded mini-elite weights. Pools
   progress from slimes, wetland creatures, undead, and elementals to fortress
@@ -94,8 +96,8 @@ and turn the correct result into an animated attack.
   its reference answer, error category, hint level, and battle outcome for the
   latest battle or current floor. The local-only log keeps at most 200 SQL turns
   and never records movement or key presses or uploads the log.
-- Find three seeded physical campfires on every floor: one in the front, middle,
-  and rear learning phase. Their visibly bounded tiles and the floor entrance
+- Find two seeded physical campfires on every floor, in the middle and rear
+  learning phases; the entrance is the front safe/respawn anchor. Their visibly bounded tiles and the floor entrance
   are safe zones with no ambushes, enemy spawns, or patrol entry. Stand beside a
   fire and press `E` to choose `在此休息` or `答案复盘`. Resting restores maximum
   HP and makes that fire the checkpoint; review shows the current floor.
@@ -126,7 +128,8 @@ and turn the correct result into an animated attack.
   2% for normal/curriculum monsters, 5% for mini-elites, 10% for area Bosses,
   and 0% for floor Bosses. Most victories award XP only; random loot has no
   minimum count and never occupies the inventory.
-  Curriculum rewards remain guaranteed: Filter Bow after `SELECT`, Null Lantern
+  Curriculum rewards remain guaranteed in room chests unlocked by the
+  corresponding lesson: Filter Bow after `SELECT`, Null Lantern
   after `IS NULL`, Aggregate Hammer before `GROUP BY`, Sort Saber and Join
   Chain on floor two, Bone Blade on floor three, Rune Staff on floor four,
   Iron Axe on floor five, Dragon Spear on floor six, Crystal Blade on floor
@@ -136,13 +139,13 @@ and turn the correct result into an animated attack.
   before floor transition; protected base/course items and keys cannot be
   discarded. Acquisition and XP-settlement cards disappear after three later
   successful movement steps.
-- Hear one continuous, fully original procedural Web Audio score across all
-  eight floors. Each floor has its own tonal centre, region variation, and
-  exploration/combat/Boss movement; sustained low and pad voices bridge phrase
-  boundaries, while combat increases pace and low-mid rhythm without a sharp
-  noise wall. Region changes retarget the next phrase and floor/mode changes use
-  a short fade. No recording, MIDI, sample library, Beethoven transcription, or
-  other game's melody is bundled.
+- Hear one continuous procedural electronic Web Audio score across all eight
+  floors, built from identified public-domain classical themes. Each floor has
+  its own theme, region variation, and exploration/combat/Boss movement; short,
+  soft voices and phrase overlap replace the buzzing sustained bed, while
+  combat increases pace and low-mid rhythm without a sharp noise wall. Region
+  changes retarget the next phrase and floor/mode changes use a short fade. No
+  recording, MIDI, sample library, or other game's soundtrack is bundled.
   Steps, wall bumps,
   encounters, query casts, hits, damage, stage
   clears, drops, pickups, gate openings, victory, and defeat receive distinct
@@ -150,9 +153,10 @@ and turn the correct result into an animated attack.
 - Follow an optional step-by-step guide through movement, finding a monster,
   opening the terminal, casting the first query, and opening the first loot bundle.
   It can be skipped or replayed without changing SQL mastery.
-- Resume the maze, actors, ground items, fog, three campfires, checkpoint, and
-  combat state separately from permanent mastery, attempt counts, victories,
-  and best query count. Starting a new Run preserves the profile.
+- Resume the maze, actors, ground items, fog, two campfires, entrance anchor,
+  checkpoint, and combat state separately from permanent mastery, recovered
+  monster identities, attempt counts, victories, and best query count. Starting
+  a new Run preserves the profile.
 - Play with WASD/arrow keys on desktop or visible touch controls and a full-screen
   SQL terminal on narrow screens.
 - Retreat from any battle to the current checkpoint without healing or resetting
@@ -336,7 +340,7 @@ Generator v4 `64x48` maps remain loadable only for legacy Run compatibility.
 The generator isolates `topology` and `decor` random streams. `GuidedMap`
 then derives route beacons, dead-end caches, and the keyed shortcut from the
 fixed maze, curriculum graph, and campfires, so decoration density cannot move
-courses, keys, or shortcuts. Actors and fixed curriculum drops derive from
+courses, keys, or shortcuts. Actors and fixed curriculum room chests derive from
 course anchors, while biome loot uses independent stable hashes. The biome plan
 is rebuilt from maze, campfires, guided map, and seed instead of being stored.
 An independent content-version field is still outside this MVP.
@@ -352,26 +356,25 @@ behavior.
 
 Browser-local storage is split into:
 
-- `select-from-dungeon:run:v10`: disposable current Run, including the
+- `select-from-dungeon:run:v11`: disposable current Run, including the
   deterministic eight-floor campaign scaffold, current executable floor,
   generated maze, world actors, ground items, pending loot bundles,
   equipment inventory, armor/armor HP, consumables, unique-item history, key
-  items, discovered fog cells, three campfires, the active checkpoint, HP,
+  items, discovered fog cells, two campfires, the entrance anchor, active checkpoint, HP,
   level/XP, encounter meter, relics, combat progress, opened challenge gates,
   opened shortcut/cache state, the active gate challenge, and up to 200 local
   SQL answer records. The guided plan itself is rebuilt from the seed instead
   of storing a duplicate copy.
-- `select-from-dungeon:profile:v2`: 47 mastered lessons, attempts, victories, and
-  best run query count.
+- `select-from-dungeon:profile:v3`: 47 mastered lessons, recovered monster IDs,
+  attempts, victories, and best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
 
-A valid `run:v9` is migrated in memory into v10 without changing the current
-Run. Valid `run:v8` through `run:v4` saves continue through the existing
-migration chain before v10. Legacy keys are not deleted; earlier Run keys remain
-unread. A valid `profile:v1` migrates to v2,
-preserving first-floor mastery while adding second-floor counters. Older v2
-profiles are backfilled with missing lesson counters.
+A valid `run:v10` is migrated in memory into v11 without changing the current
+Run. Valid `run:v9` through `run:v4` saves continue through the existing
+migration chain before v11. Legacy keys are not deleted; earlier Run keys remain
+unread. Valid `profile:v1` and `profile:v2` records migrate to v3, preserving
+learning counters while initializing missing identity records as empty.
 `src/storage/progressPersistence.ts` coalesces non-critical movement and patrol
 snapshots, while query, loot, inventory, mode, and topology changes flush
 immediately.

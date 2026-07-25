@@ -67,9 +67,9 @@ describe("guided map plan", () => {
     expect(shortcutDestination(shortcut, "exit")).toEqual(shortcut.entry);
   });
 
-  it("两层各 200 个 Seed 均满足引导距离、死路收益和钥匙捷径约束", () => {
-    ([1, 2] as const).forEach((floorNumber) => {
-      for (let index = 0; index < 200; index += 1) {
+  it("八层各 64 个 Seed 均满足引导距离、死路收益和钥匙捷径约束", () => {
+    ([1, 2, 3, 4, 5, 6, 7, 8] as const).forEach((floorNumber) => {
+      for (let index = 0; index < 64; index += 1) {
         const seed = `guided-invariant:${floorNumber}:${index}`;
         const graph = generateRoomGraph(seed, floorNumber);
         const floor = generateMazeFloor(graph);

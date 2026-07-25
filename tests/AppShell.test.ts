@@ -249,7 +249,7 @@ describe("combatSettlementCopy", () => {
       xp: "+1 XP",
       progress: "LV.1 · 0 → 1 / 2 XP",
       levelUp: "距离下一等级又近了一步",
-      reward: "固定奖励包已出现在怪物位置 · 靠近后按 E 打开",
+      reward: "战利品包已留在战场 · 靠近后按 E 打开",
     });
   });
 
@@ -258,7 +258,7 @@ describe("combatSettlementCopy", () => {
       .toBe("树果（生命 1→2） 已自动使用 · 不占背包");
     expect(combatSettlementCopy(base, true, "树果（生命 1→2）").reward)
       .toBe(
-        "树果（生命 1→2） 已自动使用 · 不占背包；固定奖励包已出现在怪物位置",
+        "树果（生命 1→2） 已自动使用 · 不占背包；另有战利品包留在战场",
       );
   });
 

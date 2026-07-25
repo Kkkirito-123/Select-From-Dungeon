@@ -19,6 +19,8 @@ export interface FeedbackNotice {
   tone: "info" | "success" | "danger" | "reward";
 }
 
+export const PLAYER_STEP_MIN_INTERVAL_MS = 180;
+
 type FeedbackListener = (event: FeedbackEvent, notice: FeedbackNotice | null) => void;
 
 function cueFor(event: FeedbackEvent): ArcadeSfx {
@@ -74,6 +76,7 @@ function noticeFor(event: FeedbackEvent): FeedbackNotice | null {
 export class FeedbackDirector {
   private readonly listeners = new Set<FeedbackListener>();
   private lastBumpAt = -Infinity;
+  private lastStepAt = -Infinity;
 
   constructor(private readonly audio: Pick<ArcadeAudio, "playSfx">) {}
 
@@ -86,6 +89,10 @@ export class FeedbackDirector {
     if (event.type === "wall-bump") {
       if (now - this.lastBumpAt < 150) return;
       this.lastBumpAt = now;
+    }
+    if (event.type === "player-step") {
+      if (now - this.lastStepAt < PLAYER_STEP_MIN_INTERVAL_MS) return;
+      this.lastStepAt = now;
     }
     const notice = noticeFor(event);
     this.listeners.forEach((listener) => listener(event, notice));

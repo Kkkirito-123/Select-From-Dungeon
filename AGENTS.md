@@ -35,20 +35,23 @@ beginners and interview learners. The MVP 2.0 Run has eight deterministic
 room slots, 2–4 tile-wide roads, three regions, physical transit landmarks, and
 seeded non-critical variation. Generator-v4 `64x48` maps are a legacy save
 compatibility path, not the new-Run layout. Players reveal the
-non-interactive minimap by physically walking the maze. Moving into a named
+non-interactive minimap by physically walking the maze. Curriculum monsters
+show only a stable `ID #NNN` until defeated; the finishing blow recovers the
+plain display name into the permanent Monster Codex. Moving into a living
 curriculum monster or passing an encounter check starts a separate
 single-target battle where the player writes complete read-only SQL. The Run
 starts at two hearts, uses deterministic one-damage counters with armor-first
 absorption, awards rank-based XP with a visible post-battle settlement, and
-puts every curriculum reward in an
-`E`-opened loot bundle, explains acquired loot, automatically
+unlocks each deterministic curriculum reward in its room's
+`E`-opened chest, explains acquired loot, automatically
 opens a short non-interactive portal after each of the first seven floor Bosses,
 and ends at an eighth-floor five-stage database-incident Boss. Step-meter ambushes award XP and
 may produce only optional low-probability loot. Outside safe zones, each
 eligible successful step has a 2% base ambush chance and the meter guarantees an
 encounter after 30 eligible quiet steps; reloads do not reroll the result.
-Each floor also contains three seeded physical campfires across the front,
-middle, and rear learning phases. The same seed also derives main-course route
+Each floor contains two seeded physical campfires in the middle and rear
+learning phases; the entrance remains the front safe/respawn anchor. The same
+seed also derives main-course route
 beacons, one-use supplies in every remaining dead end, and one guaranteed-key
 two-way shortcut. Route points stay at most 18 walking steps apart; the key sits
 in the middle or rear phase, does not consume inventory capacity, and never
@@ -138,7 +141,7 @@ index.html -> src/main.ts
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> FloorMapBlueprints (eight authored macro layouts and transit identities)
   -> MazeGenerator/MazeValidation (deterministic 48x36 generator-v5 world)
-  -> CampfireDomain (three seeded checkpoints and shared safe-cell masks)
+  -> CampfireDomain (two seeded checkpoints, entrance anchor, safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
   -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
@@ -151,15 +154,15 @@ index.html -> src/main.ts
   -> DungeonScene (continuous map, fog, collision, patrol, Scribe, encounter)
   -> BattleScene (separate duel arena with shared actor animation)
   -> FeedbackDirector (semantic event -> one notice and one audio cue)
-  -> MusicScore/ArcadeAudio (continuous original eight-floor procedural score)
-  -> NarrativeCodexView (local Lost Name and migration-progress UI)
+  -> MusicScore/ArcadeAudio (public-domain classical themes, electronic synthesis)
+  -> NarrativeCodexView/MonsterCodexView (story and recovered identities)
   -> OnboardingController (move -> encounter -> terminal -> query -> pickup)
 
 player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
-  -> coalesced v10 Run save + permanent v2 profile save
+  -> coalesced v11 Run save + permanent v3 profile save
 ```
 
 `GameSession` owns physical movement, campfires/checkpoints, guided-map
@@ -188,7 +191,7 @@ locks pass. First-floor lessons are intentionally limited to one flat `SELECT`
 without `OR`, subqueries, or set operators so required predicates cannot be
 hidden in a dead branch. The same one-statement boundary applies to second-floor
 sorting and join lessons, whose relationship predicates are checked as part of
-the concept lock. Shared curriculum data and fixed drops live in
+the concept lock. Shared curriculum data and fixed room-chest rewards live in
 `src/content/mvpLevel.ts`, with later executable floors in
 `src/content/floor2Level.ts` through `floor8Level.ts`; room flavor and run rewards live in
 `src/content/runContent.ts`; optional Boss-gate questions and semantic result
@@ -198,7 +201,7 @@ contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls and
 same-battle deduplication. Runtime optional candidates are immediate recovery
-items only; explicit curriculum bundles still use the inventory flow.
+items only; unlocked curriculum room chests still use the inventory flow.
 `src/content/biomeContent.ts` owns the executable eight-floor biome encounter
 pools and optional multi-stage exercises. `src/domain/biome.ts` derives region
 ownership, static features, area-Boss positions, and two region portals from
@@ -217,7 +220,7 @@ evaluation.
 ## Repository Map
 
 ```text
-src/audio/          Original eight-floor procedural Web Audio score and event SFX
+src/audio/          Public-domain classical-theme electronic Web Audio score and SFX
 src/content/        Curriculum, SQL schema, map/actor/narrative truth, entities,
                     fixed weapons, rewards, and onboarding copy
 src/domain/         Pure state, combat rules, course graph, physical maze,
@@ -284,22 +287,25 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   signal. It is SQLite evidence, not a MySQL execution plan. MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
 - Save data is browser-local and split between
-  `select-from-dungeon:run:v10` (eight-floor campaign slots plus current floor,
+  `select-from-dungeon:run:v11` (eight-floor campaign slots plus current floor,
   maze, actors, ground items, loot
   bundles, inventory, armor, consumables, unique-item history, key items, fog,
-  three campfires, the active checkpoint, encounter meter, level/XP, opened
+  two campfires, the entrance anchor, active checkpoint, encounter meter,
+  level/XP, opened
   challenge gates/shortcuts/dead-end caches, active gate challenge, at most 200
   local answer records, and disposable current Run state),
-  `select-from-dungeon:profile:v2` (47 mastered lessons, attempts, victories, best
-  query count), and `select-from-dungeon:onboarding:v1` (finished/skipped guide
-  state). A valid `select-from-dungeon:run:v9` is migrated in memory into v10;
+  `select-from-dungeon:profile:v3` (47 mastered lessons, recovered monster IDs,
+  attempts, victories, and best query count), and
+  `select-from-dungeon:onboarding:v1` (finished/skipped guide state). A valid
+  `select-from-dungeon:run:v10` is migrated in memory into v11;
   valid `run:v8` is upgraded with deterministic eight-floor campaign slots, and `run:v7` is then
   migrated with empty inventory/loot state and acquired equipped gear
   registered; valid `run:v6`, `run:v5`, and `run:v4` data continue through the
-  existing migrations before v10. Legacy keys remain undeleted; older Run keys remain
+  existing migrations before v11. Legacy keys remain undeleted; older Run keys remain
   unread.
-  A valid `select-from-dungeon:profile:v1` is migrated into v2, and a pre-v0.8
-  v2 profile is backfilled with the new lesson counters. `progressPersistence`
+  Valid `select-from-dungeon:profile:v1` and `profile:v2` records migrate into
+  v3; missing identity records start empty while existing learning counters are
+  preserved. `progressPersistence`
   coalesces non-critical movement/patrol snapshots while flushing query, loot,
   inventory, mode, and topology changes immediately; changing a shape requires
   a version or recovery decision.
@@ -337,7 +343,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   and reject patrol entry. Ordinary world monsters patrol slowly; the Boss
   remains anchored.
 - `GuidedMap` is derived deterministically from the curriculum graph, saved
-  `MazeFloor`, and three campfires rather than duplicated in save data. Route
+  `MazeFloor`, and two campfires rather than duplicated in save data. Route
   beacons appear about every 14 steps with no gap above 18, and every remaining
   corridor dead end contains a one-use supply. Each floor currently has exactly
   one two-way shortcut and one guaranteed middle/rear key that consumes no
@@ -349,10 +355,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   movement or `E`; level, XP, equipment, inventory, consumables, key items,
   relics, and query count carry into a newly generated harder floor while
   per-floor maze and lesson state reset.
-- Every victory shows an explicit XP settlement. A non-empty result leaves one
-  `E`-opened loot bundle on the defeated monster's tile; curriculum bundles
-  include their deterministic reward, while ambush bundles contain only
-  optional seeded candidates and may be empty. Acquisition copy names every
+- Every victory shows an explicit XP settlement. Curriculum victories unlock
+  their deterministic room chest instead of manufacturing a guaranteed monster
+  drop. Ambush results contain only optional seeded immediate recovery and are
+  usually empty. Acquisition copy names every
   item and its exact effect. Settlement and acquisition cards dismiss after
   three later successful movement steps. Legacy loose drops remain
   touch-collectable, while altars, treasure rooms, and campfires also use `E`.
@@ -374,11 +380,11 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   the surviving enemy's current HP remain intact. The automatically opened
   review is scoped to the battle that caused death.
 - Web Audio music and event cues are authored in project code. All eight floors
-  use original declarative score profiles with region variations and separate
-  exploration, combat, and Boss movements. Sustained bass/pad voices bridge
-  phrase boundaries; region changes retarget the next phrase, while floor and
-  mode changes use a short fade. No recording, MIDI, sample library,
-  public-domain transcription, or copied game melody is bundled.
+  electronically re-synthesize identified public-domain classical themes with
+  region variations and separate exploration, combat, and Boss movements.
+  Short, soft voices and phrase overlap avoid the previous buzzing sustained
+  bed; floor and mode changes use a short fade. No recording, MIDI, sample
+  library, or copied game soundtrack is bundled.
   Movement, wall
   bumps, encounters, query casts, hits, damage, stage clears, drops, pickups,
   gates, victory, and defeat have distinct feedback; reduced-motion preferences

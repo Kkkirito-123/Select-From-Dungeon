@@ -6,6 +6,7 @@ import {
 } from "../content/biomeContent";
 import { playerActorProfile } from "../content/actorVisuals";
 import { GameSession } from "../domain/GameSession";
+import { monsterIdentityPresentation } from "../domain/monsterIdentity";
 import type { GameSnapshot, Monster, TurnResolution } from "../domain/types";
 import {
   createMonsterActor,
@@ -455,7 +456,13 @@ export class BattleScene extends Phaser.Scene {
       padding: { x: 6, y: 4 },
     }).setOrigin(1, 0);
 
-    this.add.text(352, 64, target ? `${target.name}  ·  ID #${target.id}` : "未知怪物", {
+    const identity = target
+      ? monsterIdentityPresentation(
+        target,
+        this.snapshot.profile.discoveredMonsterIds,
+      )
+      : null;
+    this.add.text(352, 64, identity?.worldLabel ?? "未知记录", {
       color: "#e8dfc7",
       fontFamily: "Georgia, serif",
       fontSize: target?.isBoss ? "18px" : "15px",

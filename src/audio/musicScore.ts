@@ -31,7 +31,9 @@ export interface FloorScoreProfile {
   readonly floor: DungeonFloor;
   readonly id: string;
   readonly title: string;
-  readonly origin: "original-procedural";
+  readonly origin: "public-domain-electronic-adaptation";
+  readonly sourceWork: string;
+  readonly composer: string;
   readonly tonalCenter: string;
   readonly scaleName: string;
   readonly tonicMidi: number;
@@ -101,8 +103,10 @@ function movement(
 const FLOOR_ONE: FloorScoreProfile = {
   floor: 1,
   id: "ember-archive",
-  title: "余烬档案库",
-  origin: "original-procedural",
+  title: "余烬中的星",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《小星星变奏曲》K.265",
+  composer: "Wolfgang Amadeus Mozart",
   tonalCenter: "A",
   scaleName: "A Dorian",
   tonicMidi: 57,
@@ -115,8 +119,8 @@ const FLOOR_ONE: FloorScoreProfile = {
       4,
       0.34,
       [
-        [0, null, 2, 3, 4, null, 3, 1, 0, null, 1, 3, 5, 4, 2, null],
-        [2, null, 4, 5, 6, null, 4, 3, 1, null, 3, 4, 2, 1, 0, null],
+        [0, 0, 4, 4, 5, 5, 4, null, 3, 3, 2, 2, 1, 1, 0, null],
+        [4, 4, 3, 3, 2, 2, 1, null, 4, 4, 3, 3, 2, 2, 1, null],
       ],
       [0, null, null, null, 3, null, null, null, 5, null, null, null, 3, null, null, null],
       [0, 4],
@@ -128,7 +132,7 @@ const FLOOR_ONE: FloorScoreProfile = {
       2_250,
       4,
       0.58,
-      [[0, 2, 3, 5, 4, 3, 1, 2, 0, 3, 5, 7, 6, 4, 3, 1]],
+      [[0, 0, 4, 4, 5, 5, 4, 3, 3, 2, 2, 1, 1, 0, 4, 0]],
       [0, null, 0, null, 3, null, 4, null, 0, null, 5, null, 3, null, 1, null],
       [0, 4],
       [0, 4, 8, 12],
@@ -140,7 +144,7 @@ const FLOOR_ONE: FloorScoreProfile = {
       2_450,
       5,
       0.68,
-      [[0, 1, 3, 6, 5, 3, 2, 4, 1, 3, 5, 8, 7, 5, 4, 2]],
+      [[0, 4, 5, 4, 3, 2, 1, 0, 4, 7, 8, 7, 5, 4, 2, 0]],
       [0, null, 3, null, 0, null, 4, null, 1, null, 5, null, 3, null, 2, null],
       [0, 3],
       [0, 3, 6, 8, 11, 14],
@@ -153,8 +157,10 @@ const FLOOR_ONE: FloorScoreProfile = {
 const FLOOR_TWO: FloorScoreProfile = {
   floor: 2,
   id: "tidal-archipelago",
-  title: "潮汐群岛",
-  origin: "original-procedural",
+  title: "潮汐水上曲",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《水上音乐》HWV 348–350",
+  composer: "George Frideric Handel",
   tonalCenter: "D",
   scaleName: "D Mixolydian",
   tonicMidi: 62,
@@ -205,8 +211,10 @@ const FLOOR_TWO: FloorScoreProfile = {
 const FLOOR_THREE: FloorScoreProfile = {
   floor: 3,
   id: "frost-gravefield",
-  title: "霜墓原",
-  origin: "original-procedural",
+  title: "冬夜墓原",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《四季·冬》第二乐章",
+  composer: "Antonio Vivaldi",
   tonalCenter: "E",
   scaleName: "E Aeolian",
   tonicMidi: 64,
@@ -257,8 +265,10 @@ const FLOOR_THREE: FloorScoreProfile = {
 const FLOOR_FOUR: FloorScoreProfile = {
   floor: 4,
   id: "elemental-forge",
-  title: "元素升炉",
-  origin: "original-procedural",
+  title: "升炉赋格",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《平均律键盘曲集》C 小调赋格 BWV 847",
+  composer: "Johann Sebastian Bach",
   tonalCenter: "B",
   scaleName: "B Phrygian",
   tonicMidi: 59,
@@ -308,8 +318,10 @@ const FLOOR_FOUR: FloorScoreProfile = {
 const FLOOR_FIVE: FloorScoreProfile = {
   floor: 5,
   id: "iron-outer-city",
-  title: "黑铁外城",
-  origin: "original-procedural",
+  title: "黑铁萨拉班德",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《D 小调萨拉班德》HWV 437",
+  composer: "George Frideric Handel",
   tonalCenter: "G",
   scaleName: "G Dorian",
   tonicMidi: 55,
@@ -359,8 +371,10 @@ const FLOOR_FIVE: FloorScoreProfile = {
 const FLOOR_SIX: FloorScoreProfile = {
   floor: 6,
   id: "dragon-ridge",
-  title: "龙脊上城",
-  origin: "original-procedural",
+  title: "新世界龙脊",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《第九交响曲“自新大陆”》第四乐章",
+  composer: "Antonín Dvořák",
   tonalCenter: "C",
   scaleName: "C Mixolydian",
   tonicMidi: 60,
@@ -411,8 +425,10 @@ const FLOOR_SIX: FloorScoreProfile = {
 const FLOOR_SEVEN: FloorScoreProfile = {
   floor: 7,
   id: "sunset-index-garden",
-  title: "残照索引庭",
-  origin: "original-procedural",
+  title: "残照天鹅庭",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《天鹅湖》主题",
+  composer: "Pyotr Ilyich Tchaikovsky",
   tonalCenter: "E",
   scaleName: "E Lydian",
   tonicMidi: 64,
@@ -462,8 +478,10 @@ const FLOOR_SEVEN: FloorScoreProfile = {
 const FLOOR_EIGHT: FloorScoreProfile = {
   floor: 8,
   id: "obsidian-high-hall",
-  title: "黑金高堂",
-  origin: "original-procedural",
+  title: "高堂终章",
+  origin: "public-domain-electronic-adaptation",
+  sourceWork: "《第七交响曲》第二乐章",
+  composer: "Ludwig van Beethoven",
   tonalCenter: "A",
   scaleName: "A Major with modal mixture",
   tonicMidi: 57,
@@ -592,27 +610,22 @@ export function musicPatternsForScene(scene: ScoreScene): readonly MusicPattern[
     melody: renderDegrees(motif, profile.tonicMidi, profile, transpose),
     bass: renderDegrees(
       movementProfile.bassDegrees,
-      profile.tonicMidi - 24,
+      Math.max(48, profile.tonicMidi - 12),
       profile,
       transpose,
     ),
-    bed: renderDegrees(
-      movementProfile.bedDegrees,
-      profile.tonicMidi - 12,
-      profile,
-      transpose,
-    ).filter((note): note is number => note !== null),
-    // The bed overlaps the next phrase by two steps, preventing the old
-    // start-stop sensation while a new melodic variation is selected.
-    bedDurationSeconds: stepSeconds * (motif.length + 2),
+    // 不叠加持续低频 Pad。旋律和短低音靠无缝调度保持连续，
+    // 避免长时间驻波形成玩家反馈的“嗡嗡声”。
+    bed: [],
+    bedDurationSeconds: 0,
     kicks: movementProfile.kicks,
     hats: movementProfile.hats,
     melodyWave: movementProfile.melodyWave,
     bassWave: movementProfile.bassWave,
     padWave: movementProfile.padWave,
     melodyLevel: 0.026 + movementProfile.energy * 0.026,
-    bassLevel: 0.038 + movementProfile.energy * 0.026,
-    padLevel: 0.018 + movementProfile.energy * 0.018,
+    bassLevel: 0.018 + movementProfile.energy * 0.012,
+    padLevel: 0,
     kickLevel: 0.055 + movementProfile.energy * 0.04,
     hatLevel: 0.006 + movementProfile.energy * 0.009,
     voiceLimit: movementProfile.voiceLimit,

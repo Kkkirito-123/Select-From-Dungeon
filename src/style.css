@@ -177,6 +177,7 @@ h1 span {
 }
 
 .audio-toggle,
+.monster-codex-toggle,
 .narrative-toggle,
 .review-toggle,
 .admin-toggle {
@@ -193,6 +194,7 @@ h1 span {
 }
 
 .audio-toggle:hover,
+.monster-codex-toggle:hover,
 .review-toggle:hover,
 .admin-toggle:hover {
   color: var(--gold-light);
@@ -594,6 +596,53 @@ h1 span {
   color: var(--gold-light);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 20px;
+}
+
+.combat-result-card__identity {
+  display: grid;
+  grid-template-columns: max-content 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  border: 1px solid #4b5261;
+  padding: 8px 10px;
+  background: #0d1118;
+}
+
+.combat-result-card__identity code {
+  color: #a7afbd;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.combat-result-card__identity i {
+  color: var(--query);
+  font-style: normal;
+  text-align: center;
+}
+
+.combat-result-card__identity b {
+  overflow: hidden;
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combat-result-card.is-new-identity {
+  border-color: #e4bb65;
+  border-top-color: #e4bb65;
+  box-shadow:
+    0 0 0 2px rgba(120, 201, 184, 0.22),
+    7px 7px 0 rgba(0, 0, 0, 0.62);
+}
+
+.combat-result-card.is-new-identity .combat-result-card__identity {
+  border-color: var(--gold);
+  background:
+    linear-gradient(90deg, rgba(215, 173, 85, 0.13), transparent 72%),
+    #0d1118;
 }
 
 .combat-result-card__xp {
@@ -1491,6 +1540,184 @@ h1 span {
   place-items: center;
   padding: clamp(9px, 2.5vw, 30px);
   background: rgba(4, 5, 9, 0.94);
+}
+
+.monster-codex {
+  position: fixed;
+  z-index: 116;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(9px, 2.5vw, 30px);
+  background: rgba(4, 5, 9, 0.95);
+}
+
+.monster-codex[hidden] {
+  display: none;
+}
+
+.monster-codex__dialog {
+  width: min(1120px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  border: 2px solid #52616d;
+  border-top: 5px solid var(--query);
+  padding: clamp(13px, 2vw, 22px);
+  background:
+    linear-gradient(90deg, rgba(120, 201, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(120, 201, 184, 0.035) 1px, transparent 1px),
+    #090c11;
+  background-size: 20px 20px;
+  box-shadow: 13px 13px 0 rgba(0, 0, 0, 0.74);
+}
+
+.monster-codex__header,
+.monster-codex__navigator {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.monster-codex__header {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 13px;
+}
+
+.monster-codex__eyebrow,
+.monster-codex__count,
+.monster-codex__floor-count {
+  margin: 0;
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+
+.monster-codex__heading {
+  margin: 5px 0 4px;
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(26px, 4vw, 42px);
+}
+
+.monster-codex__close,
+.monster-codex__floor {
+  border: 1px solid #626b79;
+  padding: 8px 10px;
+  background: #11151d;
+  color: var(--paper);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.monster-codex__close:hover,
+.monster-codex__close:focus-visible,
+.monster-codex__floor:hover,
+.monster-codex__floor:focus-visible,
+.monster-codex__floor.is-active {
+  border-color: var(--query);
+  color: #a9f1e1;
+  box-shadow: inset 0 -3px 0 var(--query);
+}
+
+.monster-codex__navigator {
+  align-items: center;
+  margin: 14px 0;
+}
+
+.monster-codex__floor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.monster-codex__entries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.monster-codex__entry {
+  display: grid;
+  min-height: 132px;
+  grid-template-columns: 104px minmax(0, 1fr);
+  border: 1px solid #39424f;
+  background: rgba(14, 18, 25, 0.96);
+}
+
+.monster-codex__entry.is-discovered {
+  border-color: #6a6352;
+  background:
+    linear-gradient(110deg, rgba(215, 173, 85, 0.08), transparent 52%),
+    rgba(14, 18, 25, 0.98);
+}
+
+.monster-codex__identity {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border-right: 1px solid #39424f;
+  background: rgba(3, 6, 10, 0.55);
+}
+
+.monster-codex__id {
+  color: #aab2bf;
+  font-size: 11px;
+}
+
+.monster-codex__sigil {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 2px solid #4a5564;
+  background: #111721;
+  color: #596575;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 24px;
+  box-shadow: 4px 4px 0 #05070a;
+}
+
+.monster-codex__entry.is-discovered .monster-codex__sigil {
+  border-color: var(--gold);
+  background: #18312e;
+  color: #9ae5d3;
+}
+
+.monster-codex__copy {
+  padding: 14px 15px;
+}
+
+.monster-codex__name {
+  margin: 0;
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+}
+
+.monster-codex__entry.is-unknown .monster-codex__name {
+  color: #858d9a;
+}
+
+.monster-codex__meta,
+.monster-codex__lore {
+  margin: 7px 0 0;
+  line-height: 1.55;
+}
+
+.monster-codex__meta {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.monster-codex__lore {
+  color: #c7cbd2;
+  font-size: 12px;
 }
 
 .narrative-codex[hidden] {
@@ -2684,6 +2911,37 @@ h1 span {
   line-height: 1.58;
 }
 
+.mission-card .story-thread {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 10px;
+  border: 1px solid #4b5260;
+  border-left: 3px solid var(--query);
+  padding: 8px 9px;
+  background:
+    linear-gradient(90deg, rgba(120, 201, 184, 0.08), transparent 68%),
+    #0d1117;
+}
+
+.mission-card .story-thread span {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.mission-card .story-thread strong {
+  color: var(--gold-light);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+}
+
+.mission-card .story-thread p {
+  color: #d0d3da;
+  font-size: 9px;
+}
+
 .mission-card .lesson-intro {
   margin-top: 9px;
   border-top: 1px dashed #484d5a;
@@ -3356,6 +3614,25 @@ h1 span {
     grid-template-columns: 1fr;
   }
 
+  .monster-codex {
+    padding: 7px;
+  }
+
+  .monster-codex__dialog {
+    max-height: calc(100dvh - 14px);
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .monster-codex__header,
+  .monster-codex__navigator {
+    align-items: stretch;
+  }
+
+  .monster-codex__entries {
+    grid-template-columns: 1fr;
+  }
+
   .admin-floor-list {
     grid-template-columns: repeat(4, minmax(54px, 1fr));
   }
@@ -3632,6 +3909,7 @@ h1 span {
   .title-sub { display: none; }
   .run-console { grid-template-columns: 54px minmax(0, 1fr) auto auto auto; }
   .audio-toggle,
+  .monster-codex-toggle,
   .narrative-toggle,
   .review-toggle,
   .admin-toggle { padding-inline: 5px !important; }

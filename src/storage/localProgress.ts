@@ -41,6 +41,7 @@ import {
   currentMonsterIdForLegacy,
   detectMonsterIdScheme,
 } from "../content/monsterIds";
+import { LESSONS } from "../content/mvpLevel";
 import { rewardDetails } from "../content/runContent";
 import {
   lessonsForFloor,
@@ -75,14 +76,16 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v10";
-export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
-const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v9";
-const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
-const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
-const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
-const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
-const PRIMITIVE_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v11";
+export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v3";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v10";
+const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v9";
+const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
+const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
+const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
+const PRIMITIVE_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+const ORIGINAL_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+const LEGACY_PROFILE_V2_SAVE_KEY = "select-from-dungeon:profile:v2";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
 // v9 through v4 are read as compatible baselines and upgraded in memory.
 // Legacy keys are never deleted, so v10 recovery cannot mutate a previous Run.
@@ -296,7 +299,7 @@ const BATTLE_OUTCOMES = ["hit", "countered", "victory", "defeat"] as const;
 
 export function createEmptyProfile(): ProfileProgress {
   return {
-    version: 2,
+    version: 3,
     masteredLessons: [],
     attempts: {
       select: 0,
@@ -347,9 +350,21 @@ export function createEmptyProfile(): ProfileProgress {
       "f8-sharding": 0,
       "f8-security": 0,
     },
+    discoveredMonsterIds: [],
     victories: 0,
     bestRunQueries: null,
   };
+}
+
+function discoveredMonsterIdsForLessons(
+  masteredLessons: readonly LessonId[],
+): number[] {
+  const mastered = new Set(masteredLessons);
+  return LESSONS
+    .filter((lesson) => mastered.has(lesson.id))
+    .map((lesson) => lesson.primaryMonsterId)
+    .filter((id, index, values) => values.indexOf(id) === index)
+    .sort((left, right) => left - right);
 }
 
 function parseJson(raw: string | null): unknown {
@@ -1136,8 +1151,13 @@ function validatedCampfires(
   value: unknown,
   graph: RoomGraph,
   floor: MazeFloor,
+  legacy = false,
 ): Campfire[] | null {
-  if (!Array.isArray(value) || value.length !== 3 || !value.every((entry) => isCampfire(entry, floor))) {
+  if (
+    !Array.isArray(value) ||
+    (legacy ? value.length !== 2 && value.length !== 3 : value.length !== 2) ||
+    !value.every((entry) => isCampfire(entry, floor))
+  ) {
     return null;
   }
   const campfires = value as Campfire[];
@@ -1147,6 +1167,7 @@ function validatedCampfires(
     !hasUniqueValues(campfires.map((campfire) => campfire.roomNodeId)) ||
     !hasUniqueValues(campfires.map(positionKey))
   ) return null;
+  if (legacy) return campfires;
   let expected: Campfire[];
   try {
     expected = generateCampfires(graph, floor);
@@ -1158,7 +1179,7 @@ function validatedCampfires(
 
 function isSavedRunVersion(
   value: unknown,
-  version: 4 | 5 | 6 | 7 | 8 | 9 | 10,
+  version: 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11,
 ): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
@@ -1200,7 +1221,7 @@ function isSavedRunVersion(
   const battleSequence = version >= 6 ? run.battleSequence : 0;
   const reviewBattleId = version >= 6 ? run.reviewBattleId : null;
   const campfires = version >= 7
-    ? validatedCampfires(run.campfires, graph, mazeFloor)
+    ? validatedCampfires(run.campfires, graph, mazeFloor, version <= 10)
     : [];
   const guidedMap = version >= 7 && campfires
     ? generateGuidedMapPlan(graph, mazeFloor, campfires)
@@ -1471,9 +1492,13 @@ function isSavedRunVersion(
       run.availableLoot.weapon.id !== looseWeapon?.weapon?.id
     ))
   ) return false;
-  const interactiveReward = run.groundItems.find((item) => (
-    item.sourceRoomId === run.currentRoomId && item.collection === "interact"
-  ));
+  const interactiveReward = run.groundItems.find((item) => {
+    if (item.sourceRoomId !== run.currentRoomId || item.collection !== "interact") {
+      return false;
+    }
+    const room = graph.nodes.find((node) => node.id === item.sourceRoomId);
+    return !room?.lessonId || run.completedLessons?.includes(room.lessonId);
+  });
   if (
     version >= 7 &&
     (
@@ -1488,12 +1513,16 @@ function isSavedRunVersion(
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 10);
+  return isSavedRunVersion(value, 11);
 }
 
 type LegacyPlayerState = Omit<PlayerState, "armor" | "armorHp">;
 
-type SavedRunV9 = Omit<SavedRun, "version"> & {
+type SavedRunV10 = Omit<SavedRun, "version"> & {
+  version: 10;
+};
+
+type SavedRunV9 = Omit<SavedRunV10, "version"> & {
   version: 9;
 };
 
@@ -1526,15 +1555,60 @@ type SavedRunV5 = Omit<
   "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
 > & { version: 5 };
 
+function migrateV10Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 10)) return null;
+  const legacy = value as SavedRunV10;
+  const campfires = generateCampfires(legacy.graph, legacy.mazeFloor);
+  const oldCampfireFor = (id: string | null): Campfire | null => (
+    id ? legacy.campfires.find((campfire) => campfire.id === id) ?? null : null
+  );
+  const nearestCampfire = (oldCampfire: Campfire | null): Campfire | null => {
+    if (!oldCampfire) return null;
+    return [...campfires].sort((left, right) => (
+      Math.abs(left.x - oldCampfire.x) + Math.abs(left.y - oldCampfire.y) -
+      (Math.abs(right.x - oldCampfire.x) + Math.abs(right.y - oldCampfire.y))
+    ))[0] ?? null;
+  };
+  const activeCampfire = nearestCampfire(oldCampfireFor(legacy.activeCampfireId));
+  const respawnCampfire = nearestCampfire(oldCampfireFor(legacy.respawnCampfireId));
+  const overlappingCampfire = campfires.find((campfire) => (
+    campfire.x === legacy.player.x && campfire.y === legacy.player.y
+  ));
+  const movedCampfire = activeCampfire ?? overlappingCampfire ?? null;
+  const player = movedCampfire
+    ? { ...legacy.player, ...movedCampfire.restPosition }
+    : legacy.player;
+  const currentRoomId = movedCampfire?.roomNodeId ?? legacy.currentRoomId;
+  const migrated: SavedRun = {
+    ...legacy,
+    version: 11,
+    campfires,
+    activeCampfireId: activeCampfire?.id ?? null,
+    respawnCampfireId: respawnCampfire?.id ?? null,
+    player,
+    currentRoomId,
+    visitedRoomIds: [...new Set([
+      ...legacy.visitedRoomIds,
+      ...(movedCampfire ? [movedCampfire.roomNodeId] : []),
+    ])],
+    discoveredCells: [...new Set([
+      ...legacy.discoveredCells,
+      positionKey(player),
+    ])],
+    banner: `${legacy.banner} 篝火路线已收束为中、后两个检查点。`,
+  };
+  return isSavedRun(migrated) ? migrated : null;
+}
+
 function migrateV9Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 9)) return null;
   const legacy = value as SavedRunV9;
-  const migrated: SavedRun = {
+  const migrated: SavedRunV10 = {
     ...legacy,
     version: 10,
     banner: `${legacy.banner} 第七、八层课程已开放，当前进度完整保留。`,
   };
-  return isSavedRun(migrated) ? migrated : null;
+  return isSavedRunVersion(migrated, 10) ? migrateV10Run(migrated) : null;
 }
 
 function migrateV8Run(value: unknown): SavedRun | null {
@@ -1625,11 +1699,15 @@ function migrateV6Run(value: unknown): SavedRun | null {
         weapon: { ...looseWeapon.weapon },
       }
     : null;
-  const interactiveReward = groundItems.find((item) => (
-    item.sourceRoomId === currentRoomId &&
-    item.collection === "interact" &&
-    item.rewardId !== null
-  ));
+  const interactiveReward = groundItems.find((item) => {
+    if (
+      item.sourceRoomId !== currentRoomId ||
+      item.collection !== "interact" ||
+      item.rewardId === null
+    ) return false;
+    const room = legacy.graph.nodes.find((node) => node.id === item.sourceRoomId);
+    return !room?.lessonId || legacy.completedLessons.includes(room.lessonId);
+  });
   const claimableReward = interactiveReward?.rewardId
     ? rewardDetails(interactiveReward.rewardId)
     : null;
@@ -1709,11 +1787,14 @@ export function isProfileProgress(value: unknown): value is ProfileProgress {
   if (!isRecord(value)) return false;
   const profile = value as Partial<ProfileProgress>;
   return (
-    profile.version === 2 &&
+    profile.version === 3 &&
     Array.isArray(profile.masteredLessons) &&
     profile.masteredLessons.every(isLessonId) &&
     Boolean(profile.attempts) &&
     LESSON_IDS.every((id) => isNonNegativeInteger(profile.attempts?.[id])) &&
+    Array.isArray(profile.discoveredMonsterIds) &&
+    profile.discoveredMonsterIds.every(isNonNegativeInteger) &&
+    new Set(profile.discoveredMonsterIds).size === profile.discoveredMonsterIds.length &&
     isNonNegativeInteger(profile.victories) &&
     (profile.bestRunQueries === null || isNonNegativeInteger(profile.bestRunQueries))
   );
@@ -1744,10 +1825,13 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
   });
   migrated.victories = value.victories;
   migrated.bestRunQueries = value.bestRunQueries;
+  migrated.discoveredMonsterIds = discoveredMonsterIdsForLessons(
+    migrated.masteredLessons,
+  );
   return migrated;
 }
 
-function migratePreV08Profile(value: unknown): ProfileProgress | null {
+function migrateV2Profile(value: unknown): ProfileProgress | null {
   if (!isRecord(value)) return null;
   const attempts = isRecord(value.attempts) ? value.attempts : null;
   if (
@@ -1768,6 +1852,9 @@ function migratePreV08Profile(value: unknown): ProfileProgress | null {
   });
   migrated.victories = value.victories;
   migrated.bestRunQueries = value.bestRunQueries;
+  migrated.discoveredMonsterIds = discoveredMonsterIdsForLessons(
+    migrated.masteredLessons,
+  );
   return migrated;
 }
 
@@ -1779,19 +1866,24 @@ export function loadRun(storage: StorageLike): SavedRun | null {
   );
   const value = readRun(RUN_SAVE_KEY);
   if (isSavedRun(value)) return value;
-  return migrateV9Run(readRun(LEGACY_RUN_SAVE_KEY))
-    ?? migrateV8Run(readRun(OLDER_RUN_SAVE_KEY))
-    ?? migrateV7Run(readRun(OLDEST_RUN_SAVE_KEY))
-    ?? migrateV6Run(readRun(ANCIENT_RUN_SAVE_KEY))
-    ?? migrateV5Run(readRun(ARCHAIC_RUN_SAVE_KEY))
-    ?? migrateV4Run(readRun(PRIMITIVE_RUN_SAVE_KEY));
+  return migrateV10Run(readRun(LEGACY_RUN_SAVE_KEY))
+    ?? migrateV9Run(readRun(OLDER_RUN_SAVE_KEY))
+    ?? migrateV8Run(readRun(OLDEST_RUN_SAVE_KEY))
+    ?? migrateV7Run(readRun(ANCIENT_RUN_SAVE_KEY))
+    ?? migrateV6Run(readRun(ARCHAIC_RUN_SAVE_KEY))
+    ?? migrateV5Run(readRun(PRIMITIVE_RUN_SAVE_KEY))
+    ?? migrateV4Run(readRun(ORIGINAL_RUN_SAVE_KEY));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {
   const value = parseJson(safeGetItem(storage, PROFILE_SAVE_KEY));
   if (isProfileProgress(value)) return value;
-  const migratedCurrent = migratePreV08Profile(value);
+  const migratedCurrent = migrateV2Profile(value);
   if (migratedCurrent) return migratedCurrent;
+  const migratedV2 = migrateV2Profile(
+    parseJson(safeGetItem(storage, LEGACY_PROFILE_V2_SAVE_KEY)),
+  );
+  if (migratedV2) return migratedV2;
   return migrateLegacyProfile(parseJson(safeGetItem(storage, LEGACY_PROFILE_SAVE_KEY)))
     ?? createEmptyProfile();
 }

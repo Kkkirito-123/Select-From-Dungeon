@@ -25,13 +25,18 @@ export type FloorTransitKind =
 export interface FloorTransitPresentation {
   label: string;
   action: string;
+  regionLabel?: string;
 }
 
 export const FLOOR_TRANSIT_PRESENTATIONS: Readonly<Record<
   FloorTransitKind,
   FloorTransitPresentation
 >> = {
-  floodgate: { label: "排水水闸", action: "穿过" },
+  floodgate: {
+    label: "排水水闸",
+    regionLabel: "排水渡点",
+    action: "穿过",
+  },
   "freight-lift": { label: "档案升降机", action: "乘坐" },
   skiff: { label: "月潮渡船", action: "乘坐" },
   "north-ferry": { label: "北岸渡船", action: "乘坐" },

@@ -47,14 +47,15 @@ export interface ArcadeAudioOptions {
 type AudioContextConstructor = new () => AudioContext;
 
 const SILENCE = 0.0001;
-const MUSIC_GAIN_LEVEL = 0.36;
+const MUSIC_GAIN_LEVEL = 0.3;
 const SCHEDULE_AHEAD_SECONDS = 0.24;
 const SCHEDULER_INTERVAL_MS = 80;
 const MODE_FADE_SECONDS = 0.05;
 const MODE_FADE_MS = MODE_FADE_SECONDS * 1_000;
 
 export const ARCADE_MUSIC_CREDITS = [
-  "MVP 2.0 八层原创程序化配乐（项目内音级与节奏数据；不使用外部旋律或录音）",
+  "MVP 2.0 八层公共领域古典主题电子改编（项目内重新配器与合成；不使用外部录音）",
+  "Mozart / Handel / Vivaldi / Bach / Dvořák / Tchaikovsky / Beethoven 的公共领域作品主题",
 ] as const;
 
 export function chooseNextTrackIndex(
@@ -652,7 +653,7 @@ export class ArcadeAudio {
         this.musicSources,
         startAt,
         midiToFrequency(bassNote),
-        pattern.stepSeconds * 1.7,
+        pattern.stepSeconds * 0.72,
         pattern.bassWave,
         pattern.bassLevel,
       );
@@ -725,8 +726,7 @@ export class ArcadeAudio {
 
     switch (effect) {
       case "step":
-        this.scheduleTone(output, sources, startAt, 155, 0.045, "square", 0.035, 104);
-        this.scheduleNoise(output, sources, startAt, 0.024, 0.018);
+        this.scheduleTone(output, sources, startAt, 168, 0.028, "sine", 0.012, 132);
         break;
       case "bump":
         this.scheduleTone(output, sources, startAt, 92, 0.075, "triangle", 0.075, 52);

@@ -31,6 +31,14 @@ describe("FLOOR_MAP_BLUEPRINTS", () => {
     });
   });
 
+  it("第一层区域交通与唯一实体水闸使用不同名称", () => {
+    const transit = floorTransitPresentation(
+      FLOOR_MAP_BLUEPRINTS[1].routeTransit,
+    );
+    expect(transit.label).toBe("排水水闸");
+    expect(transit.regionLabel).toBe("排水渡点");
+  });
+
   it("每个蓝图槽位与本层 RoomGraph 一一对应、位于地图内且互不重叠", () => {
     FLOORS.forEach((floorNumber) => {
       const blueprint = FLOOR_MAP_BLUEPRINTS[floorNumber];

@@ -10,7 +10,11 @@ import {
   floorTransitPresentation,
 } from "../content/floorMapBlueprints";
 import type { OnboardingMilestone } from "../content/onboarding";
-import { LESSONS, practiceStagesFor } from "../content/mvpLevel";
+import {
+  INITIAL_MONSTERS,
+  LESSONS,
+  practiceStagesFor,
+} from "../content/mvpLevel";
 import {
   COMPLETE_RELATION_LINES,
   COMPLETE_SCHEMA_LINES,
@@ -24,6 +28,10 @@ import {
   buildScribeRecap,
   narrativeFloorFor,
 } from "../domain/narrative";
+import {
+  monsterIdLabel,
+  monsterIdentityPresentation,
+} from "../domain/monsterIdentity";
 import type { FloorNumber } from "../domain/runGraph";
 import type {
   ExperienceSettlement,
@@ -46,6 +54,7 @@ import {
   type AnswerReviewScope,
 } from "./AnswerReviewView";
 import { NarrativeCodexView } from "./NarrativeCodexView";
+import { MonsterCodexView } from "./MonsterCodexView";
 import {
   parseSchemaLines,
   SqlAutocompleteController,
@@ -277,10 +286,10 @@ export function combatSettlementCopy(
     levelUp,
     reward: recoveryName
       ? `${recoveryName} 已自动使用 · 不占背包${
-        lootDropped ? "；固定奖励包已出现在怪物位置" : ""
+        lootDropped ? "；另有战利品包留在战场" : ""
       }`
       : lootDropped
-        ? "固定奖励包已出现在怪物位置 · 靠近后按 E 打开"
+        ? "战利品包已留在战场 · 靠近后按 E 打开"
         : "本次没有物品掉落 · 经验已正常结算",
   };
 }
@@ -301,6 +310,7 @@ export class AppShell {
   private adminMenu!: HTMLElement;
   private answerReview!: AnswerReviewView;
   private narrativeCodex!: NarrativeCodexView;
+  private monsterCodex!: MonsterCodexView;
   private executeButton!: HTMLButtonElement;
   private gateExecuteButton!: HTMLButtonElement;
   private sqlButton!: HTMLButtonElement;
@@ -341,6 +351,11 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly keydownHandler = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.isMonsterCodexOpen()) {
+      event.preventDefault();
+      this.monsterCodex.close();
+      return;
+    }
     if (event.key === "Escape" && this.isNarrativeCodexOpen()) {
       event.preventDefault();
       this.narrativeCodex.close();
@@ -385,6 +400,7 @@ export class AppShell {
       event.key === "Tab" &&
       (
         this.isReviewOpen() ||
+        this.isMonsterCodexOpen() ||
         this.isNarrativeCodexOpen() ||
         this.isAdminMenuOpen() ||
         this.isLootMenuOpen() ||
@@ -397,7 +413,9 @@ export class AppShell {
     ) {
       this.trapDialogFocus(
         event,
-        this.isNarrativeCodexOpen()
+        this.isMonsterCodexOpen()
+          ? this.monsterCodex.element
+          : this.isNarrativeCodexOpen()
           ? this.narrativeCodex.element
           : this.isReviewOpen()
           ? this.answerReview.element
@@ -525,7 +543,8 @@ export class AppShell {
             <div><span>FLOOR</span><strong id="floor-value">01 / 08</strong></div>
             <div><span>SEED</span><strong id="seed-value">—</strong></div>
             <button id="open-admin" type="button" class="admin-toggle">⌘ 管理员</button>
-            <button id="open-narrative" type="button" class="narrative-toggle">▧ 失名录 1/5</button>
+            <button id="open-monster-codex" type="button" class="monster-codex-toggle">◆ 怪物图鉴 0/0</button>
+            <button id="open-narrative" type="button" class="narrative-toggle">▧ 剧情档案 1/5</button>
             <button id="open-review" type="button" class="review-toggle">▤ 答题复盘</button>
             <button id="audio-toggle" type="button" class="audio-toggle" aria-pressed="false">♪ 声音开启</button>
             <label class="volume-control"><span>音量</span><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.55"></label>
@@ -583,7 +602,12 @@ export class AppShell {
               </aside>
 
               <aside id="combat-result-card" class="combat-result-card" role="status" aria-live="assertive" aria-atomic="true" hidden>
-                <span>VICTORY / 战斗结算</span>
+                <span id="combat-result-kicker">VICTORY / 战斗结算</span>
+                <div class="combat-result-card__identity">
+                  <code id="combat-result-id">ID #---</code>
+                  <i aria-hidden="true">→</i>
+                  <b id="combat-result-name">名字未确认</b>
+                </div>
                 <strong id="combat-result-title">击败怪物</strong>
                 <div class="combat-result-card__xp">
                   <b id="combat-result-xp">+0 XP</b>
@@ -805,6 +829,11 @@ export class AppShell {
             <section class="mission-card">
               <div class="mission-kicker" id="lesson-concept">当前房间</div>
               <h2 id="mission-title">载入魔王城…</h2>
+              <div class="story-thread" aria-label="当前剧情线索">
+                <span>STORY / 当前线索</span>
+                <strong id="story-thread-title">没有名字的人</strong>
+                <p id="story-thread-line">先活下来，再从查询结果里找回自己。</p>
+              </div>
               <p id="mission-body"></p>
               <p id="lesson-intro" class="lesson-intro"></p>
               <p id="banner" class="banner"></p>
@@ -897,8 +926,8 @@ export class AppShell {
         <footer class="page-footer">
           <span>真实执行：SQLite WASM</span>
           <span>地图：48×36 八层手工轮廓 + Seeded 支路</span>
-          <span>音乐：八层原创程序化配乐 · 连续场景混音</span>
-          <span>关键装备：固定掉落</span>
+          <span>音乐：公共领域古典主题电子改编 · 无外部录音</span>
+          <span>奖励：课程宝箱固定 · 随机恢复品低概率</span>
         </footer>
 
         <div id="feedback-toast" class="feedback-toast" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -922,6 +951,12 @@ export class AppShell {
     this.narrativeCodex = new NarrativeCodexView(this.root, {
       onClose: () => {
         this.root.classList.remove("narrative-active");
+        this.syncAudioFocus();
+      },
+    });
+    this.monsterCodex = new MonsterCodexView(this.root, {
+      onClose: () => {
+        this.root.classList.remove("monster-codex-active");
         this.syncAudioFocus();
       },
     });
@@ -971,6 +1006,11 @@ export class AppShell {
     requiredElement(this.root, "#open-narrative").addEventListener(
       "click",
       () => this.openNarrativeCodex(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#open-monster-codex").addEventListener(
+      "click",
+      () => this.openMonsterCodex(),
       listenerOptions,
     );
     requiredElement(this.root, "#open-ending-codex").addEventListener(
@@ -1160,6 +1200,7 @@ export class AppShell {
     this.releaseAudioGesture = null;
     this.listenerController.abort();
     this.narrativeCodex.destroy();
+    this.monsterCodex.destroy();
     if (this.toastTimer !== null) window.clearTimeout(this.toastTimer);
     this.toastTimer = null;
     this.activeNotice = null;
@@ -1185,6 +1226,7 @@ export class AppShell {
       "review-active",
       "admin-active",
       "narrative-active",
+      "monster-codex-active",
       "victory-active",
     );
     void this.audio.dispose();
@@ -1352,6 +1394,7 @@ export class AppShell {
       this.isGateTerminalOpen() ||
       this.isTerminalOpen() ||
       this.isReviewOpen() ||
+      this.isMonsterCodexOpen() ||
       this.isAdminMenuOpen() ||
       this.isInventoryMenuOpen() ||
       this.isLootMenuOpen()
@@ -1372,6 +1415,33 @@ export class AppShell {
     return this.narrativeCodex?.isOpen() ?? false;
   }
 
+  private openMonsterCodex(): void {
+    if (
+      this.busy ||
+      this.isGateTerminalOpen() ||
+      this.isTerminalOpen() ||
+      this.isReviewOpen() ||
+      this.isNarrativeCodexOpen() ||
+      this.isAdminMenuOpen() ||
+      this.isInventoryMenuOpen() ||
+      this.isLootMenuOpen()
+    ) {
+      this.showFeedbackNotice({
+        message: "先结束当前界面，再打开怪物图鉴。",
+        tone: "info",
+      });
+      return;
+    }
+    this.hideNarrativeBeatCard();
+    this.root.classList.add("monster-codex-active");
+    this.monsterCodex.open();
+    this.syncAudioFocus();
+  }
+
+  private isMonsterCodexOpen(): boolean {
+    return this.monsterCodex?.isOpen() ?? false;
+  }
+
   private syncAudioFocus(): void {
     if (this.busy) {
       this.audio.setFocus("resolving");
@@ -1381,6 +1451,7 @@ export class AppShell {
       this.isTerminalOpen() ||
       this.isGateTerminalOpen() ||
       this.isReviewOpen() ||
+      this.isMonsterCodexOpen() ||
       this.isNarrativeCodexOpen() ||
       this.isCampfireMenuOpen()
         ? "thinking"
@@ -1394,6 +1465,7 @@ export class AppShell {
   ): void {
     if ((this.busy && context !== "death") || this.isGateTerminalOpen()) return;
     if (this.isNarrativeCodexOpen()) this.narrativeCodex.close();
+    if (this.isMonsterCodexOpen()) this.monsterCodex.close();
     if (this.isTerminalOpen()) this.closeTerminal(false);
     if (!this.isReviewOpen()) {
       this.focusBeforeTerminal = document.activeElement instanceof HTMLElement
@@ -1935,7 +2007,12 @@ export class AppShell {
       completedMigrationStepIds: progress.completedMigrationStepIds,
     });
     requiredElement<HTMLButtonElement>(this.root, "#open-narrative").textContent =
-      `▧ 失名录 ${progress.seenBeatIds.length}/5`;
+      `▧ 剧情档案 ${progress.seenBeatIds.length}/5`;
+    const latestBeat = progress.latestBeat ?? narrativeFloorFor(snapshot.floor).beats[0];
+    requiredElement(this.root, "#story-thread-title").textContent =
+      latestBeat?.title ?? "记录尚未恢复";
+    requiredElement(this.root, "#story-thread-line").textContent =
+      latestBeat?.lines[0] ?? "继续探索，寻找这一层留下的记录。";
 
     if (
       progress.latestBeat &&
@@ -2206,11 +2283,22 @@ export class AppShell {
   private showCombatSettlement(resolution: TurnResolution): void {
     if (!resolution.experience) return;
     const card = requiredElement<HTMLElement>(this.root, "#combat-result-card");
+    const recoveredIdentity = resolution.events.some(
+      (event) => event.type === "identity-recovered",
+    );
     const copy = combatSettlementCopy(
       resolution.experience,
       resolution.events.some((event) => event.type === "loot-drop"),
       resolution.events.find((event) => event.type === "auto-heal")?.itemName,
     );
+    card.classList.toggle("is-new-identity", recoveredIdentity);
+    requiredElement(card, "#combat-result-kicker").textContent = recoveredIdentity
+      ? "NAME RECOVERED / 获得名字"
+      : "IDENTITY CONFIRMED / 已识别记录";
+    requiredElement(card, "#combat-result-id").textContent =
+      monsterIdLabel(resolution.experience.monsterId);
+    requiredElement(card, "#combat-result-name").textContent =
+      resolution.experience.monsterName;
     requiredElement(card, "#combat-result-title").textContent = copy.title;
     requiredElement(card, "#combat-result-xp").textContent = copy.xp;
     requiredElement(card, "#combat-result-progress").textContent = copy.progress;
@@ -2357,7 +2445,7 @@ export class AppShell {
       floorMapBlueprint(snapshot.floor).routeTransit,
     );
     requiredElement(this.root, "#map-region-transit").textContent =
-      `◉ ${routeTransit.label}`;
+      `◉ ${routeTransit.regionLabel ?? routeTransit.label}`;
     const target = snapshot.focusMonsterId === null
       ? undefined
       : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId);
@@ -2451,6 +2539,7 @@ export class AppShell {
     this.renderInventoryMenu(snapshot, enteredInventory);
     this.renderLootMenu(snapshot, enteredLoot);
     this.renderNarrativeProgress(snapshot);
+    this.renderMonsterCodex(snapshot);
 
     this.renderTarget(target, snapshot);
     const locksSignature = snapshot.locks.join("\u0000");
@@ -2770,11 +2859,18 @@ export class AppShell {
   }
 
   private renderTarget(target: Monster | undefined, snapshot: GameSnapshot): void {
-    requiredElement(this.root, "#target-name").textContent = target?.name ?? "当前房间没有怪物";
-    requiredElement(this.root, "#target-id").textContent = target ? `ID #${target.id}` : "ID —";
-    requiredElement(this.root, "#target-species").textContent = target
-      ? `species = '${target.species}'`
-      : snapshot.currentRoomTitle;
+    const identity = target
+      ? monsterIdentityPresentation(
+        target,
+        snapshot.profile.discoveredMonsterIds,
+      )
+      : null;
+    requiredElement(this.root, "#target-name").textContent =
+      identity?.nameLabel ?? "当前房间没有怪物";
+    requiredElement(this.root, "#target-id").textContent =
+      identity?.idLabel ?? "ID —";
+    requiredElement(this.root, "#target-species").textContent =
+      identity?.speciesLabel ?? snapshot.currentRoomTitle;
     this.renderProgress(
       "#target-hp-progress",
       "#target-hp-bar",
@@ -2792,6 +2888,19 @@ export class AppShell {
         : target
           ? `${target.attackName} · 最高 ${target.damage} 伤害`
           : snapshot.claimableReward?.name ?? "探索 / 领取";
+  }
+
+  private renderMonsterCodex(snapshot: GameSnapshot): void {
+    this.monsterCodex.render({
+      floor: snapshot.floor,
+      discoveredMonsterIds: snapshot.profile.discoveredMonsterIds,
+    });
+    const total = new Set(INITIAL_MONSTERS.map((monster) => monster.id)).size;
+    requiredElement<HTMLButtonElement>(
+      this.root,
+      "#open-monster-codex",
+    ).textContent =
+      `◆ 怪物图鉴 ${snapshot.profile.discoveredMonsterIds.length}/${total}`;
   }
 
   private renderLocks(snapshot: GameSnapshot): void {

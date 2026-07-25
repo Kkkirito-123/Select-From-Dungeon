@@ -218,9 +218,10 @@ describe("ArcadeAudio", () => {
     await expect(audio.setPageHidden(true)).resolves.toBeUndefined();
   });
 
-  it("探索乐句换奏时不会连续重复，运行时只声明项目原创来源", () => {
+  it("探索乐句换奏时不会连续重复，运行时声明公共领域改编且不使用外部录音", () => {
     expect(ARCADE_MUSIC_CREDITS).toEqual([
-      "MVP 2.0 八层原创程序化配乐（项目内音级与节奏数据；不使用外部旋律或录音）",
+      "MVP 2.0 八层公共领域古典主题电子改编（项目内重新配器与合成；不使用外部录音）",
+      "Mozart / Handel / Vivaldi / Bach / Dvořák / Tchaikovsky / Beethoven 的公共领域作品主题",
     ]);
     for (let current = 0; current < 4; current += 1) {
       for (const random of [0, 0.25, 0.5, 0.999]) {

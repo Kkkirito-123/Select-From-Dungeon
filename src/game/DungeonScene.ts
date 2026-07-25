@@ -31,29 +31,47 @@ import {
   createPlayerActor,
   createScribeActor,
 } from "./PixelActorFactory";
+import { monsterIdentityPresentation } from "../domain/monsterIdentity";
 import { newlyOpenedGate, pickedItemsBetween } from "./snapshotFeedback";
+import {
+  INTERACTION_LABEL_DISTANCE,
+  MONSTER_LABEL_DISTANCE,
+  OBJECTIVE_HIDE_DISTANCE,
+  isNearPlayer,
+  tutorialObjective,
+} from "./worldOverlay";
 
 interface MonsterView {
   container: Phaser.GameObjects.Container;
+  hpBack: Phaser.GameObjects.Rectangle;
   hpFill: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
 }
 
 interface ItemView {
   container: Phaser.GameObjects.Container;
+  label: Phaser.GameObjects.Text;
+  position: Position;
   tween?: Phaser.Tweens.Tween;
 }
 
 interface GateView {
   block: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
+  parts?: Phaser.GameObjects.Rectangle[];
 }
 
 interface CampfireView {
   container: Phaser.GameObjects.Container;
   checkpointRing: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
+  scribeLabel: Phaser.GameObjects.Text;
   frameTimer?: Phaser.Time.TimerEvent;
+}
+
+interface ZoneLabelView {
+  label: Phaser.GameObjects.Text;
+  roomNodeId: string;
 }
 
 const COLORS = {
@@ -360,6 +378,7 @@ export class DungeonScene extends Phaser.Scene {
   private readonly gateViews = new Map<string, GateView>();
   private readonly shortcutViews = new Map<string, GateView[]>();
   private readonly campfireViews = new Map<string, CampfireView>();
+  private readonly zoneLabelViews: ZoneLabelView[] = [];
   private readonly pressedDirections = new Map<string, Position>();
   private renderedTopology = -1;
   private moveLocked = false;
@@ -523,7 +542,14 @@ export class DungeonScene extends Phaser.Scene {
     if (previous.mode !== "combat" && snapshot.mode === "combat") {
       const monster = snapshot.monsters.find((entry) => entry.id === snapshot.combat?.targetId);
       if (monster) {
-        this.feedback.dispatch({ type: "encounter-start", monsterName: monster.name });
+        const identity = monsterIdentityPresentation(
+          monster,
+          snapshot.profile.discoveredMonsterIds,
+        );
+        this.feedback.dispatch({
+          type: "encounter-start",
+          monsterName: identity.nameLabel,
+        });
         emitMilestone("encounter-start");
       }
       this.beginBattle();
@@ -606,6 +632,7 @@ export class DungeonScene extends Phaser.Scene {
     this.itemViews.clear();
     this.gateViews.clear();
     this.shortcutViews.clear();
+    this.zoneLabelViews.length = 0;
 
     const floor = this.snapshot.mazeFloor;
     const worldWidth = floor.width * TILE_SIZE;
@@ -620,11 +647,7 @@ export class DungeonScene extends Phaser.Scene {
     this.createPlayer();
     this.createMonsterViews();
     this.createObjectiveBeacon();
-    this.syncItemViews();
-    this.syncGateViews();
-    this.syncShortcutViews();
-    this.syncCampfireViews();
-    this.drawFog();
+    this.syncViews();
     this.cameras.main.startFollow(this.playerView, true, 0.18, 0.18);
     this.cameras.main.centerOn(this.playerView.x, this.playerView.y);
   }
@@ -874,33 +897,24 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private drawZoneLabels(): void {
-    this.snapshot.biomePlan.regions.forEach((region) => {
-      const pixel = gridToPixels(region.anchor);
-      const boss = region.areaBossId === null ? "" : " · 可选首领";
-      const label = this.add.text(pixel.x, pixel.y + 28, `${region.name}${boss}`, {
-        color: "#d9f0cf",
-        fontFamily: "monospace",
-        fontSize: "8px",
-        fontStyle: "bold",
-        backgroundColor: "#07100bdd",
-        padding: { x: 4, y: 2 },
-      }).setOrigin(0.5).setDepth(14);
-      label.setData("cell", positionKey(region.anchor));
-      this.entityLayer.add(label);
-    });
     this.snapshot.mazeFloor.zones.forEach((zone) => {
       const room = this.snapshot.roomGraph.nodes.find((node) => node.id === zone.roomNodeId);
-      const pixel = gridToPixels({ x: zone.center.x, y: zone.y + 1 });
+      const pixel = gridToPixels({ x: zone.x + 0.35, y: zone.y + 0.35 });
       const label = this.add.text(pixel.x, pixel.y, room?.title ?? "未知区域", {
         color: zone.type === "boss" ? "#ff978e" : "#e8dfc7",
         fontFamily: "monospace",
-        fontSize: "9px",
-        fontStyle: "bold",
-        backgroundColor: "#08090ccc",
-        padding: { x: 4, y: 2 },
-      }).setOrigin(0.5).setDepth(15);
-      label.setData("cell", `${zone.center.x}:${zone.center.y}`);
+        fontSize: "7px",
+        backgroundColor: "#08090ca8",
+        padding: { x: 3, y: 2 },
+      }).setOrigin(0, 0).setDepth(15).setVisible(false);
       this.entityLayer.add(label);
+      this.zoneLabelViews.push({ label, roomNodeId: zone.roomNodeId });
+    });
+  }
+
+  private syncZoneLabels(): void {
+    this.zoneLabelViews.forEach((view) => {
+      view.label.setVisible(view.roomNodeId === this.snapshot.currentRoomId);
     });
   }
 
@@ -925,25 +939,59 @@ export class DungeonScene extends Phaser.Scene {
   private createShortcutViews(): void {
     const colors = colorsForFloor(this.snapshot.floor);
     this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
-      const views = [shortcut.entry, shortcut.exit].map((position) => {
+      const views = [shortcut.entry, shortcut.exit].map((position, index) => {
         const pixel = gridToPixels(position);
+        const isPrimaryFloodgate = this.snapshot.floor === 1 && index === 0;
         const block = this.add.rectangle(
           pixel.x,
           pixel.y,
-          TILE_SIZE - 6,
-          TILE_SIZE - 6,
-          colors.plum,
-          0.76,
-        ).setStrokeStyle(2, colors.gold, 0.9).setDepth(18);
-        const label = this.add.text(pixel.x, pixel.y - 22, "E · LOCKED", {
+          isPrimaryFloodgate ? TILE_SIZE - 4 : TILE_SIZE - 12,
+          isPrimaryFloodgate ? TILE_SIZE + 2 : 10,
+          isPrimaryFloodgate ? 0x24313a : colors.plum,
+          isPrimaryFloodgate ? 0.96 : 0.62,
+        ).setStrokeStyle(
+          2,
+          isPrimaryFloodgate ? colors.query : colors.gold,
+          0.9,
+        ).setDepth(18);
+        const parts: Phaser.GameObjects.Rectangle[] = [];
+        if (isPrimaryFloodgate) {
+          [-7, 0, 7].forEach((offset) => {
+            parts.push(
+              this.add.rectangle(
+                pixel.x + offset,
+                pixel.y,
+                3,
+                TILE_SIZE - 5,
+                0xa7b5b8,
+              ).setDepth(19),
+            );
+          });
+          parts.push(
+            this.add.rectangle(
+              pixel.x,
+              pixel.y + 12,
+              TILE_SIZE - 7,
+              5,
+              0x3a91ad,
+              0.78,
+            ).setDepth(19),
+          );
+        }
+        const label = this.add.text(
+          pixel.x,
+          pixel.y - 22,
+          isPrimaryFloodgate ? "E · 排水水闸" : "E · 捷径落点",
+          {
           color: "#f1d28b",
           fontFamily: "monospace",
           fontSize: "7px",
           backgroundColor: "#08090cdd",
           padding: { x: 3, y: 2 },
-        }).setOrigin(0.5).setDepth(19);
-        this.entityLayer.add([block, label]);
-        return { block, label };
+          },
+        ).setOrigin(0.5).setDepth(20);
+        this.entityLayer.add([block, ...parts, label]);
+        return { block, label, parts };
       });
       this.shortcutViews.set(shortcut.id, views);
     });
@@ -987,12 +1035,25 @@ export class DungeonScene extends Phaser.Scene {
         backgroundColor: "#08090cdd",
         padding: { x: 4, y: 2 },
       }).setOrigin(0.5);
+      const restDx = campfire.restPosition.x - campfire.x;
+      const scribeX = restDx === 0 ? -24 : -restDx * 25;
       const scribe = createScribeActor(this, {
-        x: -25,
-        y: 3,
-        scale: 0.64,
+        // Keep the Scribe opposite the horizontal rest slot. Vertical rest
+        // slots use the left display rail so the actor never occupies the
+        // player's interaction tile or the label above the fire.
+        x: scribeX,
+        y: 4,
+        scale: 0.7,
         depth: 24,
       }).container;
+      const scribeLabel = this.add.text(scribeX, -22, "抄写员", {
+        color: "#f0ddbd",
+        fontFamily: "monospace",
+        fontSize: "7px",
+        fontStyle: "bold",
+        backgroundColor: "#08090cdd",
+        padding: { x: 3, y: 2 },
+      }).setOrigin(0.5);
       container.add([
         checkpointRing,
         stoneRing,
@@ -1002,6 +1063,7 @@ export class DungeonScene extends Phaser.Scene {
         flameFrameOne,
         flameFrameTwo,
         scribe,
+        scribeLabel,
         label,
       ]);
       this.entityLayer.add(container);
@@ -1023,6 +1085,7 @@ export class DungeonScene extends Phaser.Scene {
         container,
         checkpointRing,
         label,
+        scribeLabel,
         frameTimer,
       });
     });
@@ -1035,10 +1098,15 @@ export class DungeonScene extends Phaser.Scene {
       const view = this.campfireViews.get(campfire.id);
       if (!view) return;
       const checkpoint = this.snapshot.respawnCampfireId === campfire.id;
-      view.container.setVisible(discovered.has(positionKey(campfire)));
+      const visible = discovered.has(positionKey(campfire));
+      view.container.setVisible(visible);
       view.checkpointRing.setVisible(checkpoint);
       view.label.setText(checkpoint ? "复活点 · 篝火" : "E · 篝火");
       view.label.setColor(checkpoint ? "#8ff5e1" : "#f1d28b");
+      view.label.setVisible(
+        visible &&
+        isNearPlayer(this.snapshot.player, campfire, INTERACTION_LABEL_DISTANCE),
+      );
     });
   }
 
@@ -1067,67 +1135,105 @@ export class DungeonScene extends Phaser.Scene {
       const pixel = gridToPixels(actor);
       const container = this.add.container(pixel.x, pixel.y).setDepth(25);
       const body = this.createMonsterBody(monster);
-      const hpBack = this.add.rectangle(0, -28, 42, 5, 0x090a0e).setOrigin(0.5)
+      const bodyScale = monster.rank === "boss"
+        ? 0.88
+        : monster.rank === "elite"
+          ? 0.76
+          : 0.68;
+      const bodyContainer = this.add.container(0, 0, body).setScale(bodyScale);
+      const infoRailY = monster.rank === "boss"
+        ? -38
+        : monster.rank === "elite"
+          ? -32
+          : -28;
+      const hpBack = this.add.rectangle(0, infoRailY, 42, 5, 0x090a0e).setOrigin(0.5)
         .setStrokeStyle(1, 0x676d7c);
-      const hpFill = this.add.rectangle(-20, -28, 40, 3, COLORS.ember).setOrigin(0, 0.5);
-      const label = this.add.text(0, -42, `${monster.name}  #${monster.id}`, {
+      const hpFill = this.add.rectangle(-20, infoRailY, 40, 3, COLORS.ember).setOrigin(0, 0.5);
+      const identity = monsterIdentityPresentation(
+        monster,
+        this.snapshot.profile.discoveredMonsterIds,
+      );
+      const label = this.add.text(0, infoRailY - 14, identity.worldLabel, {
         color: "#f1d28b",
         fontFamily: "monospace",
         fontSize: "7px",
         backgroundColor: "#08090cdd",
         padding: { x: 3, y: 2 },
       }).setOrigin(0.5);
-      container.add([...body, hpBack, hpFill, label]);
+      container.add([bodyContainer, hpBack, hpFill, label]);
       this.entityLayer.add(container);
-      this.monsterViews.set(monster.id, { container, hpFill, label });
+      this.monsterViews.set(monster.id, { container, hpBack, hpFill, label });
     });
   }
 
   private createObjectiveBeacon(): void {
-    const firstLesson = this.snapshot.roomGraph.nodes.find((node) => node.type === "tutorial");
-    const firstMonster = this.snapshot.monsters.find(
-      (monster) => monster.lessonId === firstLesson?.lessonId && monster.encounterType === "curriculum",
-    );
-    const actor = this.snapshot.worldActors.find((entry) => entry.monsterId === firstMonster?.id);
-    if (!actor) {
+    const objective = tutorialObjective(this.snapshot);
+    if (!objective) {
       this.objectiveBeacon = null;
       return;
     }
-    const pixel = gridToPixels(actor);
-    const beacon = this.add.container(pixel.x, pixel.y - 58).setDepth(45);
-    const diamond = this.add.rectangle(0, 0, 12, 12, COLORS.query, 0.9)
-      .setAngle(45)
-      .setStrokeStyle(2, COLORS.paper, 0.9);
+    const pixel = gridToPixels(objective.position);
+    const beacon = this.add.container(pixel.x, pixel.y - 47).setDepth(45);
+    const arrow = this.add.triangle(
+      0,
+      0,
+      -7,
+      -6,
+      7,
+      -6,
+      0,
+      6,
+      COLORS.query,
+      0.94,
+    ).setStrokeStyle(2, COLORS.paper, 0.9);
     const beaconLabels: Record<GameSnapshot["floor"], string> = {
-      1: "SELECT 信标",
-      2: "ORDER BY 信标",
-      3: "INNER JOIN 信标",
-      4: "SUBQUERY 信标",
-      5: "OVER 信标",
-      6: "INSERT 信标",
-      7: "INDEX 信标",
-      8: "MVCC 信标",
+      1: "SELECT → ID #001",
+      2: "ORDER BY → 目标",
+      3: "INNER JOIN → 目标",
+      4: "SUBQUERY → 目标",
+      5: "OVER → 目标",
+      6: "INSERT → 目标",
+      7: "INDEX → 目标",
+      8: "MVCC → 目标",
     };
-    const label = this.add.text(0, -18, beaconLabels[this.snapshot.floor], {
+    const label = this.add.text(0, -16, beaconLabels[this.snapshot.floor], {
       color: this.snapshot.floor === 1 ? "#91e3d1" : "#9eeeff",
       fontFamily: "monospace",
-      fontSize: "8px",
+      fontSize: "7px",
       fontStyle: "bold",
       backgroundColor: "#08090cee",
       padding: { x: 4, y: 2 },
     }).setOrigin(0.5);
-    beacon.add([diamond, label]);
+    beacon.add([arrow, label]);
     if (!this.reducedMotion) {
       this.tweens.add({
         targets: beacon,
-        y: pixel.y - 66,
+        alpha: 0.68,
         yoyo: true,
         repeat: -1,
-        duration: 520,
+        duration: 620,
         ease: "Sine.inOut",
       });
     }
     this.objectiveBeacon = beacon;
+    this.syncObjectiveBeacon();
+  }
+
+  private syncObjectiveBeacon(): void {
+    const objective = tutorialObjective(this.snapshot);
+    if (!this.objectiveBeacon || !objective) {
+      this.objectiveBeacon?.setVisible(false);
+      return;
+    }
+    const pixel = gridToPixels(objective.position);
+    this.objectiveBeacon.setPosition(pixel.x, pixel.y - 47);
+    this.objectiveBeacon.setVisible(
+      !isNearPlayer(
+        this.snapshot.player,
+        objective.position,
+        OBJECTIVE_HIDE_DISTANCE,
+      ),
+    );
   }
 
   private createMonsterBody(monster: Monster): Phaser.GameObjects.GameObject[] {
@@ -1141,10 +1247,7 @@ export class DungeonScene extends Phaser.Scene {
       this.playerView.setPosition(pixel.x, pixel.y);
     }
     const discovered = new Set(this.snapshot.discoveredCells);
-    const firstLesson = this.snapshot.roomGraph.nodes.find((node) => node.type === "tutorial")?.lessonId;
-    this.objectiveBeacon?.setVisible(
-      firstLesson !== undefined && !this.snapshot.completedLessons.includes(firstLesson),
-    );
+    this.syncObjectiveBeacon();
     this.monsterViews.forEach((view, monsterId) => {
       const actor = this.snapshot.worldActors.find((entry) => entry.monsterId === monsterId);
       const monster = this.snapshot.monsters.find((entry) => entry.id === monsterId);
@@ -1152,13 +1255,27 @@ export class DungeonScene extends Phaser.Scene {
       const pixel = gridToPixels(actor);
       if (!this.tweens.isTweening(view.container)) view.container.setPosition(pixel.x, pixel.y);
       view.hpFill.setScale(monster.hp / monster.maxHp, 1);
-      view.label.setText(`${monster.name}  #${monster.id}`);
-      view.container.setVisible(monster.hp > 0 && discovered.has(positionKey(actor)));
+      const identity = monsterIdentityPresentation(
+        monster,
+        this.snapshot.profile.discoveredMonsterIds,
+      );
+      view.label.setText(identity.worldLabel);
+      const visible = monster.hp > 0 && discovered.has(positionKey(actor));
+      const showDetails = visible && isNearPlayer(
+        this.snapshot.player,
+        actor,
+        MONSTER_LABEL_DISTANCE,
+      );
+      view.container.setVisible(visible);
+      view.hpBack.setVisible(showDetails);
+      view.hpFill.setVisible(showDetails);
+      view.label.setVisible(visible);
     });
     this.syncItemViews();
     this.syncGateViews();
     this.syncShortcutViews();
     this.syncCampfireViews();
+    this.syncZoneLabels();
     this.drawFog();
   }
 
@@ -1185,7 +1302,11 @@ export class DungeonScene extends Phaser.Scene {
           ? missing.map((lesson) => lesson.toUpperCase()).join(" + ")
           : "需要聚合战锤");
       view.block.setVisible(this.snapshot.discoveredCells.includes(positionKey(gate)));
-      view.label.setVisible(view.block.visible && !open);
+      view.label.setVisible(
+        view.block.visible &&
+        !open &&
+        isNearPlayer(this.snapshot.player, gate, INTERACTION_LABEL_DISTANCE),
+      );
     });
   }
 
@@ -1200,12 +1321,36 @@ export class DungeonScene extends Phaser.Scene {
       [shortcut.entry, shortcut.exit].forEach((position, index) => {
         const view = views[index];
         if (!view) return;
-        view.block.setFillStyle(open ? colors.query : colors.plum, open ? 0.28 : 0.76);
+        const isPrimaryFloodgate = this.snapshot.floor === 1 && index === 0;
+        view.block.setFillStyle(
+          open ? colors.query : isPrimaryFloodgate ? 0x24313a : colors.plum,
+          open ? 0.28 : isPrimaryFloodgate ? 0.96 : 0.62,
+        );
         view.block.setStrokeStyle(2, open ? colors.query : colors.gold, 0.9);
-        view.label.setText(open ? "E · SHORTCUT" : hasKey ? "E · UNLOCK" : "E · LOCKED");
+        view.label.setText(
+          isPrimaryFloodgate
+            ? open
+              ? "E · 已开启捷径"
+              : hasKey
+                ? "E · 打开排水水闸"
+                : "E · 需要捷径钥匙"
+            : open
+              ? "E · 穿行捷径"
+              : "捷径落点",
+        );
         const visible = discovered.has(positionKey(position));
         view.block.setVisible(visible);
-        view.label.setVisible(visible);
+        view.parts?.forEach((part) => {
+          part.setVisible(visible && !open);
+        });
+        view.label.setVisible(
+          visible &&
+          isNearPlayer(
+            this.snapshot.player,
+            position,
+            INTERACTION_LABEL_DISTANCE,
+          ),
+        );
       });
     });
   }
@@ -1213,14 +1358,16 @@ export class DungeonScene extends Phaser.Scene {
   private syncItemViews(): void {
     const routeTransit = floorMapBlueprint(this.snapshot.floor).routeTransit;
     const transitPresentation = floorTransitPresentation(routeTransit);
+    const regionTransitLabel =
+      transitPresentation.regionLabel ?? transitPresentation.label;
     const portalItems: GroundItem[] = this.snapshot.biomePlan.portals.flatMap(
       (portal) => [
         {
           id: `${portal.id}:entry`,
           sourceRoomId: portal.fromRegionId,
           ...portal.entry,
-          name: transitPresentation.label,
-          description: `${transitPresentation.label} · ${portal.name}`,
+          name: regionTransitLabel,
+          description: `${regionTransitLabel} · ${portal.name}`,
           kind: "event" as const,
           collection: "interact" as const,
           rewardId: null,
@@ -1229,8 +1376,8 @@ export class DungeonScene extends Phaser.Scene {
           id: `${portal.id}:exit`,
           sourceRoomId: portal.toRegionId,
           ...portal.exit,
-          name: transitPresentation.label,
-          description: `${transitPresentation.label} · ${portal.name}`,
+          name: regionTransitLabel,
+          description: `${regionTransitLabel} · ${portal.name}`,
           kind: "event" as const,
           collection: "interact" as const,
           rewardId: null,
@@ -1286,13 +1433,14 @@ export class DungeonScene extends Phaser.Scene {
         );
         const isChest = item.collection === "interact" && (
           item.id.startsWith("lesson-drop:") ||
+          (item.id.startsWith("room-reward:") && Boolean(sourceRoom?.lessonId)) ||
           item.id.startsWith("guided-cache:") ||
           sourceRoom?.type === "treasure"
         );
         const isPortal = item.id.startsWith("biome-portal:");
         const parts: Phaser.GameObjects.GameObject[] = [];
         if (isPortal) {
-          parts.push(...this.createRouteTransitParts(routeTransit));
+          parts.push(...this.createRouteTransitParts(routeTransit, true));
         } else if (isChest) {
           parts.push(
             this.add.rectangle(0, 3, 24, 14, 0x8f6338)
@@ -1321,16 +1469,18 @@ export class DungeonScene extends Phaser.Scene {
           0,
           -24,
           isPortal
-            ? `E · ${transitPresentation.label}`
+            ? `E · ${regionTransitLabel}`
             : isChest
               ? "E · 战利品宝箱"
               : item.name,
           {
-          color: "#f1d28b",
-          fontFamily: "monospace",
-          fontSize: "7px",
-          backgroundColor: "#08090cdd",
-          padding: { x: 3, y: 2 },
+            color: "#f1d28b",
+            fontFamily: "monospace",
+            fontSize: "7px",
+            backgroundColor: "#08090cdd",
+            padding: { x: 3, y: 2 },
+            wordWrap: { width: 82, useAdvancedWrap: true },
+            align: "center",
           },
         ).setOrigin(0.5);
         parts.push(label);
@@ -1346,10 +1496,24 @@ export class DungeonScene extends Phaser.Scene {
               duration: 620,
               ease: "Sine.inOut",
             });
-        view = { container, tween };
+        view = {
+          container,
+          label,
+          position: { x: item.x, y: item.y },
+          tween,
+        };
         this.itemViews.set(item.id, view);
       }
-      view.container.setVisible(this.snapshot.discoveredCells.includes(positionKey(item)));
+      const visible = this.snapshot.discoveredCells.includes(positionKey(item));
+      view.container.setVisible(visible);
+      view.label.setVisible(
+        visible &&
+        isNearPlayer(
+          this.snapshot.player,
+          view.position,
+          INTERACTION_LABEL_DISTANCE,
+        ),
+      );
     });
     this.snapshot.lootBundles.forEach((bundle) => {
       const viewId = `loot-bundle:${bundle.id}`;
@@ -1358,6 +1522,14 @@ export class DungeonScene extends Phaser.Scene {
         const pixel = gridToPixels(bundle);
         const container = this.add.container(pixel.x, pixel.y).setDepth(24);
         const colors = colorsForFloor(this.snapshot.floor);
+        const label = this.add.text(0, -27, `E · 战利品 ×${bundle.items.length}`, {
+          color: "#ffe09a",
+          fontFamily: "monospace",
+          fontSize: "7px",
+          fontStyle: "bold",
+          backgroundColor: "#08090cdd",
+          padding: { x: 4, y: 2 },
+        }).setOrigin(0.5);
         const parts: Phaser.GameObjects.GameObject[] = [
           this.add.rectangle(0, 3, 28, 16, 0x8f6338)
             .setStrokeStyle(2, colors.gold),
@@ -1365,14 +1537,7 @@ export class DungeonScene extends Phaser.Scene {
             .setStrokeStyle(2, colors.paper),
           this.add.rectangle(0, 1, 6, 8, colors.gold)
             .setStrokeStyle(1, colors.paper),
-          this.add.text(0, -27, `E · 战利品 ×${bundle.items.length}`, {
-            color: "#ffe09a",
-            fontFamily: "monospace",
-            fontSize: "7px",
-            fontStyle: "bold",
-            backgroundColor: "#08090cdd",
-            padding: { x: 4, y: 2 },
-          }).setOrigin(0.5),
+          label,
         ];
         container.add(parts);
         this.entityLayer.add(container);
@@ -1386,16 +1551,41 @@ export class DungeonScene extends Phaser.Scene {
               duration: 720,
               ease: "Sine.inOut",
             });
-        view = { container, tween };
+        view = {
+          container,
+          label,
+          position: { x: bundle.x, y: bundle.y },
+          tween,
+        };
         this.itemViews.set(viewId, view);
       }
-      view.container.setVisible(this.snapshot.discoveredCells.includes(positionKey(bundle)));
+      const visible = this.snapshot.discoveredCells.includes(positionKey(bundle));
+      view.container.setVisible(visible);
+      view.label.setVisible(
+        visible &&
+        isNearPlayer(
+          this.snapshot.player,
+          view.position,
+          INTERACTION_LABEL_DISTANCE,
+        ),
+      );
     });
   }
 
   private createRouteTransitParts(
     kind: FloorTransitKind,
+    regionPortal = false,
   ): Phaser.GameObjects.GameObject[] {
+    if (kind === "floodgate" && regionPortal) {
+      return [
+        this.add.ellipse(0, 7, 30, 12, 0x2a6574, 0.58)
+          .setStrokeStyle(2, 0x78c9b8),
+        this.add.rectangle(0, 2, 23, 5, 0x446b75, 0.82),
+        this.add.rectangle(0, -4, 9, 9, 0x78c9b8, 0.82)
+          .setAngle(45)
+          .setStrokeStyle(1, 0xd8fff8),
+      ];
+    }
     if (kind === "floodgate") {
       return [
         this.add.rectangle(0, 1, 29, 34, 0x24313a, 0.96)
@@ -1606,6 +1796,7 @@ export class DungeonScene extends Phaser.Scene {
         });
       }
     });
+    this.syncObjectiveBeacon();
     if (result.moves.length > 0) {
       window.dispatchEvent(new CustomEvent("dungeon:patrol", {
         detail: { moves: result.moves },
