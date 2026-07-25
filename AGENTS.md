@@ -30,9 +30,11 @@ working here, then read the closest nested `AGENTS.md` if one is added later.
 ## Product and Users
 
 `SQL 魔王城 / SELECT * FROM DUNGEON` is a Chinese browser roguelite for SQL
-beginners and interview learners. The v1.0 MVP is an eight-floor Run; each floor
-is a deterministic 64x48 continuous seeded maze, divided into 16x16 technical
-partitions and braided with extra loops to reduce dead-end backtracking. Players reveal the
+beginners and interview learners. The MVP 2.0 Run has eight deterministic
+`48x36` generator-v5 maps. Each floor uses an authored macro silhouette, stable
+room slots, 2–4 tile-wide roads, three regions, physical transit landmarks, and
+seeded non-critical variation. Generator-v4 `64x48` maps are a legacy save
+compatibility path, not the new-Run layout. Players reveal the
 non-interactive minimap by physically walking the maze. Moving into a named
 curriculum monster or passing an encounter check starts a separate
 single-target battle where the player writes complete read-only SQL. The Run
@@ -70,6 +72,12 @@ minimum count; course rewards, explicit chests, and keys stay deterministic.
 Full bags require explicit replacement, ordinary discards remain
 recoverable on the current floor, and protected base/course/key items cannot be
 discarded.
+Every campfire also renders the Scribe. Her recap is built only from local
+floor-answer evidence. Five short narrative beats and two fixed Lost Name
+evidence entries per floor unlock from existing Run progress; the local
+`失名录` distinguishes unknown, confirmed `NULL`, and actual values. The eighth
+floor resolves the sole MVP 2.0 ending, `MIGRATE`; no Agent, account, backend,
+or network log is used.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
 exploration is active. Each floor's locked Boss gate also exposes one optional
 high-difficulty SQL breach: a correct composite query opens only that physical
@@ -90,11 +98,11 @@ including their ordered lesson prerequisites, three exercise tiers, five
 encounter roles, theme/topology, monster/equipment/loot pools, deterministic
 completion rewards, and runtime evidence boundary. The executable content covers
 47 required lesson groups across all eight floors and a five-stage final Boss.
-The runtime derives three deterministic biome regions per executable floor
-from the saved maze instead of persisting duplicate geometry. The eight themes
-progress from drainage/slime/embers and wetland forest through grave city,
-elemental forge, iron fortress, dragon nest, crystal index forest, and the
-obsidian data throne. Ambushes draw only from the current biome pool, with
+The runtime derives three deterministic regions per executable floor from the
+saved map instead of persisting duplicate geometry. The eight authored macro
+themes progress from the Ember Archive through the Tidal Archipelago, Frost
+Gravefield, Elemental Furnace, Black-Iron Outer City, Dragon Ridge, Sunset
+Index Garden, and Black-Gold High Hall. Ambushes draw only from the current biome pool, with
 seeded 5%, 7%, 9%, 11%, 13%, 15%, 17%, and 19% mini-elite weights by floor.
 Authored optional area Bosses use multi-stage floor-appropriate exercises, award
 3 XP, but do not guarantee random items. Two physical region portals connect
@@ -128,7 +136,8 @@ index.html -> src/main.ts
   -> GameSession (authoritative maze, combat, loot, answer log, profile)
   -> CampaignDomain (ordered eight-floor slots and transition invariants)
   -> RunGraph (curriculum dependency and point-of-interest graph)
-  -> MazeGenerator/MazeValidation (deterministic 64x48 physical world)
+  -> FloorMapBlueprints (eight authored macro layouts and transit identities)
+  -> MazeGenerator/MazeValidation (deterministic 48x36 generator-v5 world)
   -> CampfireDomain (three seeded checkpoints and shared safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
   -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
@@ -137,11 +146,13 @@ index.html -> src/main.ts
   -> LootDirector (seeded independent candidates and same-battle deduplication)
   -> SqlEngine (in-memory SQLite WASM, seed data, SELECT/WITH execution, HP sync)
   -> lessonEvaluator (query features, lesson locks, result semantics)
-  -> DungeonScene (continuous maze, fog, collision, patrol, same-tile encounter)
-  -> BattleScene (separate duel arena, HP bars, intent, combat animation)
+  -> NarrativeContent/NarrativeDomain (beats, evidence, ascents, MIGRATE)
+  -> ActorVisuals/PixelActorFactory (shared world/battle actor recipes)
+  -> DungeonScene (continuous map, fog, collision, patrol, Scribe, encounter)
+  -> BattleScene (separate duel arena with shared actor animation)
   -> FeedbackDirector (semantic event -> one notice and one audio cue)
-  -> ArcadeAudio (randomized electronic-classical exploration loops, original
-                  high-energy battle music, and event SFX)
+  -> MusicScore/ArcadeAudio (continuous original eight-floor procedural score)
+  -> NarrativeCodexView (local Lost Name and migration-progress UI)
   -> OnboardingController (move -> encounter -> terminal -> query -> pickup)
 
 player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
@@ -206,9 +217,9 @@ evaluation.
 ## Repository Map
 
 ```text
-src/audio/          Original procedural Web Audio music loops and event SFX
-src/content/        Curriculum, canonical SQL schema, entities, fixed weapons,
-                    rewards, and onboarding copy
+src/audio/          Original eight-floor procedural Web Audio score and event SFX
+src/content/        Curriculum, SQL schema, map/actor/narrative truth, entities,
+                    fixed weapons, rewards, and onboarding copy
 src/domain/         Pure state, combat rules, course graph, physical maze,
                     validation, roaming, semantic evaluation, and query policy
 src/feedback/       Semantic gameplay-event routing to notices and audio cues
@@ -216,7 +227,7 @@ src/game/           Continuous-maze exploration, battle scene, and bootstrap
 src/runtime/        Page lifecycle coordination for rendering, audio, and saves
 src/sql/            SQLite WASM initialization, schema, execution, HP sync
 src/storage/        Versioned Run/profile validation, recovery, and write coalescing
-src/ui/             DOM shell, onboarding state, and SQL/game orchestration
+src/ui/             DOM shell, Lost Name codex, onboarding, and game orchestration
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
                     onboarding, and query policy
 docs/               Current bilingual blueprints, one active roadmap, future
@@ -313,8 +324,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   result semantics are validated. Success opens only that physical gate and
   grants no mastery, attempts, XP, or loot. Wrong results and syntax errors deal
   one armor-first damage; empty input and `Escape` consume nothing.
-- The 64x48 `MazeFloor` records 16x16 technical partitions and adds deterministic
-  loops after carving to reduce dead ends. Players must walk through the
+- New Runs use generator-v5 `48x36` `MazeFloor` records built from eight
+  authored macro blueprints; generator-v4 `64x48` records remain loadable for
+  legacy Run compatibility. Broad routes, stable room slots, and deterministic
+  local variation replace the old technical-partition maze. Players must walk through the
   continuous world; the discovery minimap is not a navigation control. Moving
   into the same tile as a living curriculum monster or triggering the
   successful-step encounter meter starts the separate battle scene. After its
@@ -360,11 +373,12 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   entrance with full HP, while mastery, XP, gear, doors, defeated enemies, and
   the surviving enemy's current HP remain intact. The automatically opened
   review is scoped to the battle that caused death.
-- Web Audio music and event cues are authored in project code. First-floor
-  exploration rotates four lyrical electronic-classical patterns; second-floor
-  exploration rotates three in-code chiptune arrangements of public-domain
-  Beethoven compositions. Combat switches to original high-energy retro sci-fi
-  patterns and never uses a copied game recording or melody.
+- Web Audio music and event cues are authored in project code. All eight floors
+  use original declarative score profiles with region variations and separate
+  exploration, combat, and Boss movements. Sustained bass/pad voices bridge
+  phrase boundaries; region changes retarget the next phrase, while floor and
+  mode changes use a short fade. No recording, MIDI, sample library,
+  public-domain transcription, or copied game melody is bundled.
   Movement, wall
   bumps, encounters, query casts, hits, damage, stage clears, drops, pickups,
   gates, victory, and defeat have distinct feedback; reduced-motion preferences

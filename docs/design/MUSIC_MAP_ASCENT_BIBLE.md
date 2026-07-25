@@ -1,12 +1,17 @@
 # SQL 魔王城音乐与地图上升设计圣经
 
-> 状态：`APPROVED_DIRECTION / IN_IMPLEMENTATION`
+> 状态：`IMPLEMENTED / LISTENING_QA_PENDING`
 > 日期：2026-07-24
 > 类型：MVP 2.0 音乐与地图目标方向；实现与验收以
 > [MVP 2.0 设计与实施基线](./MVP_2_0_MASTER_PLAN.md) 为准
 > 关联：[叙事圣经](./NARRATIVE_BIBLE.md) /
 > [探索改造计划](./NARRATIVE_EXPLORATION_REDESIGN_PLAN.md) /
 > [八层课程](../CURRICULUM.zh-CN.md)
+>
+> 运行时事实：八层原创乐谱已进入
+> [`musicScore.ts`](../../src/audio/musicScore.ts) 与
+> [`ArcadeAudio.ts`](../../src/audio/ArcadeAudio.ts)。下文保留的试听、脚本和“本次不做”
+> 是实施授权前的方案快照；实际调式、速度与验收以主基线第 9、13、16 节和运行代码为准。
 
 ## 1. 本次目标
 
