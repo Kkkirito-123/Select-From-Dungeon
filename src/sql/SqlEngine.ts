@@ -11,6 +11,110 @@ import type { FloorNumber } from "../domain/runGraph";
 
 const MAX_RESULT_ROWS = 50;
 
+interface MonsterSignalFixture {
+  id: number;
+  monsterId: number;
+  channel: string;
+  charge: number;
+}
+
+interface MonsterGearFixture {
+  id: number;
+  monsterId: number;
+  gearName: string;
+  power: number;
+}
+
+const MONSTER_SIGNAL_FIXTURES: readonly MonsterSignalFixture[] = [
+  { id: 1, monsterId: 4, channel: "echo", charge: 7 },
+  { id: 2, monsterId: 4, channel: "echo", charge: 8 },
+  { id: 3, monsterId: 4, channel: "echo", charge: 9 },
+  { id: 4, monsterId: 4, channel: "noise", charge: 1 },
+  { id: 5, monsterId: 5, channel: "echo", charge: 7 },
+  { id: 6, monsterId: 5, channel: "echo", charge: 8 },
+  { id: 7, monsterId: 5, channel: "echo", charge: 9 },
+  { id: 8, monsterId: 5, channel: "ward", charge: 4 },
+  { id: 9, monsterId: 5, channel: "ward", charge: 5 },
+  { id: 10, monsterId: 5, channel: "noise", charge: 1 },
+  { id: 11, monsterId: 9, channel: "echo", charge: 6 },
+  { id: 12, monsterId: 9, channel: "echo", charge: 7 },
+  { id: 13, monsterId: 9, channel: "noise", charge: 2 },
+  { id: 14, monsterId: 9, channel: "noise", charge: 3 },
+  { id: 15, monsterId: 10, channel: "pulse", charge: 9 },
+  { id: 16, monsterId: 10, channel: "surge", charge: 13 },
+  { id: 17, monsterId: 10, channel: "arc", charge: 11 },
+  { id: 18, monsterId: 15, channel: "arc", charge: 7 },
+  { id: 19, monsterId: 15, channel: "surge", charge: 10 },
+  { id: 20, monsterId: 11, channel: "echo", charge: 5 },
+  { id: 21, monsterId: 11, channel: "echo", charge: 6 },
+  { id: 22, monsterId: 11, channel: "mirror", charge: 8 },
+  { id: 23, monsterId: 11, channel: "mirror", charge: 9 },
+  { id: 24, monsterId: 16, channel: "echo", charge: 4 },
+  { id: 25, monsterId: 16, channel: "echo", charge: 5 },
+  { id: 26, monsterId: 16, channel: "mirror", charge: 7 },
+] as const;
+
+const MONSTER_GEAR_FIXTURES: readonly MonsterGearFixture[] = [
+  { id: 1, monsterId: 10, gearName: "雷序军刀", power: 13 },
+  { id: 2, monsterId: 11, gearName: "镜像甲片", power: 8 },
+  { id: 3, monsterId: 12, gearName: "古树链刃", power: 15 },
+  { id: 4, monsterId: 14, gearName: "丛林王冠", power: 21 },
+  { id: 5, monsterId: 14, gearName: "备用节拍器", power: 17 },
+  { id: 6, monsterId: 15, gearName: "湖鳞", power: 7 },
+  { id: 7, monsterId: 16, gearName: "蛇蜕", power: 6 },
+  { id: 8, monsterId: 17, gearName: "青蛙叶", power: 9 },
+  { id: 9, monsterId: 23, gearName: "骨短刀", power: 15 },
+  { id: 10, monsterId: 25, gearName: "魂灯", power: 16 },
+  { id: 11, monsterId: 26, gearName: "墓卫剑", power: 18 },
+  { id: 12, monsterId: 27, gearName: "骨枪", power: 20 },
+  { id: 13, monsterId: 28, gearName: "死灵冠", power: 24 },
+  { id: 14, monsterId: 31, gearName: "鬼火瓶", power: 17 },
+  { id: 15, monsterId: 33, gearName: "墓主印", power: 22 },
+  { id: 16, monsterId: 36, gearName: "雷晶", power: 17 },
+  { id: 17, monsterId: 37, gearName: "炉心", power: 18 },
+  { id: 18, monsterId: 38, gearName: "炎冠", power: 20 },
+  { id: 19, monsterId: 39, gearName: "元素核", power: 26 },
+  { id: 20, monsterId: 42, gearName: "雷兽爪", power: 19 },
+  { id: 21, monsterId: 44, gearName: "炉主锤", power: 22 },
+  { id: 22, monsterId: 43, gearName: "电容核", power: 16 },
+  { id: 23, monsterId: 45, gearName: "短矛", power: 18 },
+  { id: 24, monsterId: 47, gearName: "黑铁盾", power: 20 },
+  { id: 25, monsterId: 48, gearName: "骑枪", power: 22 },
+  { id: 26, monsterId: 49, gearName: "城墙锤", power: 24 },
+  { id: 27, monsterId: 50, gearName: "城主冠", power: 28 },
+  { id: 28, monsterId: 53, gearName: "卫队盾", power: 24 },
+  { id: 29, monsterId: 55, gearName: "堡垒弩", power: 26 },
+  { id: 30, monsterId: 56, gearName: "幼龙爪", power: 20 },
+  { id: 31, monsterId: 58, gearName: "雷龙角", power: 24 },
+  { id: 32, monsterId: 59, gearName: "龙晶甲", power: 25 },
+  { id: 33, monsterId: 60, gearName: "古龙鳞", power: 28 },
+  { id: 34, monsterId: 61, gearName: "龙王冠", power: 32 },
+  { id: 35, monsterId: 64, gearName: "雷核", power: 29 },
+  { id: 36, monsterId: 66, gearName: "古龙骨", power: 30 },
+  { id: 49, monsterId: 46, gearName: "战斧", power: 20 },
+  { id: 50, monsterId: 51, gearName: "侦察短刀", power: 18 },
+  { id: 51, monsterId: 52, gearName: "兽骨肩甲", power: 20 },
+  { id: 52, monsterId: 54, gearName: "投石索", power: 22 },
+  { id: 53, monsterId: 57, gearName: "翼爪", power: 22 },
+  { id: 54, monsterId: 62, gearName: "火壳", power: 21 },
+  { id: 55, monsterId: 63, gearName: "翼刃", power: 23 },
+  { id: 56, monsterId: 65, gearName: "晶爪", power: 27 },
+  { id: 57, monsterId: 67, gearName: "枝剑", power: 31 },
+  { id: 58, monsterId: 69, gearName: "镜盾", power: 33 },
+  { id: 59, monsterId: 71, gearName: "晶眼", power: 35 },
+  { id: 60, monsterId: 72, gearName: "树心", power: 38 },
+  { id: 61, monsterId: 75, gearName: "晶核", power: 34 },
+  { id: 62, monsterId: 77, gearName: "林王冠", power: 37 },
+  { id: 63, monsterId: 78, gearName: "旧版灯", power: 39 },
+  { id: 64, monsterId: 79, gearName: "锁骑链", power: 41 },
+  { id: 65, monsterId: 81, gearName: "黑曜拳", power: 43 },
+  { id: 66, monsterId: 82, gearName: "双塔印", power: 45 },
+  { id: 67, monsterId: 83, gearName: "分片角", power: 46 },
+  { id: 68, monsterId: 84, gearName: "魔王冠", power: 50 },
+  { id: 69, monsterId: 87, gearName: "魔将刃", power: 44 },
+  { id: 70, monsterId: 89, gearName: "王兽牙", power: 48 },
+] as const;
+
 function estimateHeat(plan: string[]): number {
   if (plan.length === 0) return 4;
   return Math.max(
@@ -241,34 +345,6 @@ export class SqlEngine {
       CREATE INDEX idx_index_records_code
         ON index_records(code);
 
-      INSERT INTO monster_signals(id, monster_id, channel, charge) VALUES
-        (1, 800, 'echo', 7),
-        (2, 800, 'echo', 8),
-        (3, 800, 'echo', 9),
-        (4, 800, 'noise', 1),
-        (5, 900, 'echo', 7),
-        (6, 900, 'echo', 8),
-        (7, 900, 'echo', 9),
-        (8, 900, 'ward', 4),
-        (9, 900, 'ward', 5),
-        (10, 900, 'noise', 1),
-        (11, 810, 'echo', 6),
-        (12, 810, 'echo', 7),
-        (13, 810, 'noise', 2),
-        (14, 810, 'noise', 3),
-        (15, 1200, 'pulse', 9),
-        (16, 1200, 'surge', 13),
-        (17, 1200, 'arc', 11),
-        (18, 1210, 'arc', 7),
-        (19, 1210, 'surge', 10),
-        (20, 1300, 'echo', 5),
-        (21, 1300, 'echo', 6),
-        (22, 1300, 'mirror', 8),
-        (23, 1300, 'mirror', 9),
-        (24, 1310, 'echo', 4),
-        (25, 1310, 'echo', 5),
-        (26, 1310, 'mirror', 7);
-
       INSERT INTO rooms(id, name, sector, floor) VALUES
         (1, '青石排水室', 'drainage', 1),
         (2, '软泥水池', 'slime', 1),
@@ -349,66 +425,6 @@ export class SqlEngine {
         (99, '黑骑王庭', 'void-court', 8),
         (100, '黑曜阶梯', 'data-throne', 8),
         (101, '王兽台', 'data-throne', 8);
-
-      INSERT INTO monster_gear(id, monster_id, gear_name, power) VALUES
-        (1, 1200, '雷序军刀', 13),
-        (2, 1300, '镜像甲片', 8),
-        (3, 1400, '古树链刃', 15),
-        (4, 1900, '丛林王冠', 21),
-        (5, 1900, '备用节拍器', 17),
-        (6, 1210, '湖鳞', 7),
-        (7, 1310, '蛇蜕', 6),
-        (8, 1410, '青蛙叶', 9),
-        (9, 1, '骨短刀', 15),
-        (10, 3, '魂灯', 16),
-        (11, 4, '墓卫剑', 18),
-        (12, 5, '骨枪', 20),
-        (13, 6, '死灵冠', 24),
-        (14, 9, '鬼火瓶', 17),
-        (15, 11, '墓主印', 22),
-        (16, 14, '雷晶', 17),
-        (17, 15, '炉心', 18),
-        (18, 16, '炎冠', 20),
-        (19, 17, '元素核', 26),
-        (20, 20, '雷兽爪', 19),
-        (21, 22, '炉主锤', 22),
-        (22, 21, '电容核', 16),
-        (23, 23, '短矛', 18),
-        (24, 25, '黑铁盾', 20),
-        (25, 26, '骑枪', 22),
-        (26, 27, '城墙锤', 24),
-        (27, 28, '城主冠', 28),
-        (28, 31, '卫队盾', 24),
-        (29, 33, '堡垒弩', 26),
-        (30, 34, '幼龙爪', 20),
-        (31, 36, '雷龙角', 24),
-        (32, 37, '龙晶甲', 25),
-        (33, 38, '古龙鳞', 28),
-        (34, 39, '龙王冠', 32),
-        (35, 42, '雷核', 29),
-        (36, 44, '古龙骨', 30),
-        (49, 24, '战斧', 20),
-        (50, 29, '侦察短刀', 18),
-        (51, 30, '兽骨肩甲', 20),
-        (52, 32, '投石索', 22),
-        (53, 35, '翼爪', 22),
-        (54, 40, '火壳', 21),
-        (55, 41, '翼刃', 23),
-        (56, 43, '晶爪', 27),
-        (57, 45, '枝剑', 31),
-        (58, 47, '镜盾', 33),
-        (59, 49, '晶眼', 35),
-        (60, 50, '树心', 38),
-        (61, 53, '晶核', 34),
-        (62, 55, '林王冠', 37),
-        (63, 56, '旧版灯', 39),
-        (64, 57, '锁骑链', 41),
-        (65, 59, '黑曜拳', 43),
-        (66, 60, '双塔印', 45),
-        (67, 61, '分片角', 46),
-        (68, 62, '魔王冠', 50),
-        (69, 65, '魔将刃', 44),
-        (70, 67, '王兽牙', 48);
 
       INSERT INTO repair_queue(id, item, quantity, status) VALUES
         (1, 'ore', 2, 'ready'),
@@ -502,6 +518,48 @@ export class SqlEngine {
       });
     } finally {
       insertMonster.free();
+    }
+
+    this.seedMonsterRelations(new Set(monsters.map((monster) => monster.id)));
+  }
+
+  private seedMonsterRelations(monsterIds: ReadonlySet<number>): void {
+    const insertSignal = this.database.prepare(`
+      INSERT INTO monster_signals(id, monster_id, channel, charge)
+      VALUES ($id, $monsterId, $channel, $charge)
+    `);
+    try {
+      MONSTER_SIGNAL_FIXTURES
+        .filter((fixture) => monsterIds.has(fixture.monsterId))
+        .forEach((fixture) => {
+          insertSignal.run({
+            $id: fixture.id,
+            $monsterId: fixture.monsterId,
+            $channel: fixture.channel,
+            $charge: fixture.charge,
+          });
+        });
+    } finally {
+      insertSignal.free();
+    }
+
+    const insertGear = this.database.prepare(`
+      INSERT INTO monster_gear(id, monster_id, gear_name, power)
+      VALUES ($id, $monsterId, $gearName, $power)
+    `);
+    try {
+      MONSTER_GEAR_FIXTURES
+        .filter((fixture) => monsterIds.has(fixture.monsterId))
+        .forEach((fixture) => {
+          insertGear.run({
+            $id: fixture.id,
+            $monsterId: fixture.monsterId,
+            $gearName: fixture.gearName,
+            $power: fixture.power,
+          });
+        });
+    } finally {
+      insertGear.free();
     }
   }
 }

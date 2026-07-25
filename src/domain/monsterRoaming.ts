@@ -1,3 +1,4 @@
+import { legacyMonsterIdForCurrent } from "../content/monsterIds";
 import type { LessonId, Position } from "./types";
 import { createSeededRandom } from "./runGraph";
 import { isMazeWalkable, type MazeFloor } from "./mazeGenerator";
@@ -81,7 +82,9 @@ export function advanceMonsterPatrol(
     return { actor: { ...actor, home: { ...actor.home }, moveTick: nextTick }, moved: false, encounter: false };
   }
   const random = createSeededRandom(
-    `select-from-dungeon:patrol:v1:${context.floor.seed}:${actor.monsterId}:${nextTick}`,
+    `select-from-dungeon:patrol:v1:${context.floor.seed}:${
+      legacyMonsterIdForCurrent(actor.monsterId)
+    }:${nextTick}`,
   );
   // An explicit idle choice keeps patrols readable and avoids relentless pursuit.
   const directions = shuffled(DIRECTIONS, random);

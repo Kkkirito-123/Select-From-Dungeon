@@ -1,3 +1,11 @@
+import {
+  MVP2_MAZE_CHUNK_SIZE,
+  MVP2_MAZE_HEIGHT,
+  MVP2_MAZE_WIDTH,
+  floorMapBlueprint,
+  type FloorMapBlueprint,
+  type FloorMapSlot,
+} from "../content/floorMapBlueprints";
 import type { LessonId, Position } from "./types";
 import {
   createSeededRandom,
@@ -8,10 +16,14 @@ import {
   type RunLessonId,
 } from "./runGraph";
 
-export const MAZE_GENERATOR_VERSION = 4 as const;
-export const MAZE_WIDTH = 64;
-export const MAZE_HEIGHT = 48;
-export const MAZE_CHUNK_SIZE = 16;
+export const LEGACY_MAZE_GENERATOR_VERSION = 4 as const;
+export const MAZE_GENERATOR_VERSION = 5 as const;
+export const LEGACY_MAZE_WIDTH = 64;
+export const LEGACY_MAZE_HEIGHT = 48;
+export const LEGACY_MAZE_CHUNK_SIZE = 16;
+export const MAZE_WIDTH = MVP2_MAZE_WIDTH;
+export const MAZE_HEIGHT = MVP2_MAZE_HEIGHT;
+export const MAZE_CHUNK_SIZE = MVP2_MAZE_CHUNK_SIZE;
 
 export type MazeTile = "#" | ".";
 export type MazeDecorationKind = "torch" | "rubble" | "rune";
@@ -40,9 +52,14 @@ export interface MazeDecoration extends Position {
   kind: MazeDecorationKind;
 }
 
+/**
+ * `version` remains 4 because the serialized shape is unchanged. The nested
+ * generator version distinguishes legacy 64×48 mazes from authored 48×36
+ * macro layouts.
+ */
 export interface MazeFloor {
   version: 4;
-  generatorVersion: 4;
+  generatorVersion: 4 | 5;
   seed: string;
   width: number;
   height: number;
@@ -61,13 +78,6 @@ export interface MazeGenerationOptions {
   braidRatio?: number;
 }
 
-interface Slot {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 interface Direction {
   x: number;
   y: number;
@@ -80,37 +90,6 @@ const DIRECTIONS: readonly Direction[] = [
   { x: 0, y: 1, name: "south" },
   { x: 0, y: -1, name: "north" },
 ];
-
-// Twelve 16×16 macro chunks are the technical partition; authored POIs occupy
-// ten separated slots while their exact position and the connecting maze vary.
-const ZONE_SLOTS: readonly Slot[] = [
-  { x: 3, y: 38, width: 7, height: 7 },
-  { x: 15, y: 36, width: 7, height: 7 },
-  { x: 3, y: 22, width: 7, height: 7 },
-  { x: 27, y: 36, width: 7, height: 7 },
-  { x: 15, y: 21, width: 7, height: 7 },
-  { x: 43, y: 36, width: 7, height: 7 },
-  { x: 3, y: 5, width: 7, height: 7 },
-  { x: 35, y: 21, width: 7, height: 7 },
-  { x: 40, y: 6, width: 7, height: 7 },
-  { x: 54, y: 4, width: 8, height: 9 },
-] as const;
-
-// Floor two crosses the map diagonally and clusters its final relation rooms
-// around the upper-right conductor core, so it reads as a new place even
-// though both floors retain the same iframe-friendly 64×48 footprint.
-const FLOOR_TWO_ZONE_SLOTS: readonly Slot[] = [
-  { x: 4, y: 5, width: 7, height: 7 },
-  { x: 16, y: 8, width: 7, height: 7 },
-  { x: 4, y: 22, width: 7, height: 7 },
-  { x: 29, y: 4, width: 7, height: 7 },
-  { x: 17, y: 24, width: 7, height: 7 },
-  { x: 4, y: 37, width: 7, height: 7 },
-  { x: 31, y: 21, width: 7, height: 7 },
-  { x: 44, y: 34, width: 7, height: 7 },
-  { x: 45, y: 18, width: 7, height: 7 },
-  { x: 54, y: 4, width: 8, height: 9 },
-] as const;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -133,57 +112,14 @@ function shuffle<T>(values: readonly T[], random: () => number): T[] {
   return result;
 }
 
-function createWallGrid(): MazeTile[][] {
-  return Array.from({ length: MAZE_HEIGHT }, () =>
-    Array.from({ length: MAZE_WIDTH }, () => "#" as MazeTile),
+function createWallGrid(width: number, height: number): MazeTile[][] {
+  return Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => "#" as MazeTile),
   );
 }
 
-function inBounds(x: number, y: number): boolean {
-  return x > 0 && y > 0 && x < MAZE_WIDTH - 1 && y < MAZE_HEIGHT - 1;
-}
-
-function carveBaseMaze(grid: MazeTile[][], random: () => number): void {
-  const start = { x: 1, y: 1 };
-  const stack: Position[] = [start];
-  grid[start.y][start.x] = ".";
-
-  while (stack.length > 0) {
-    const current = stack[stack.length - 1];
-    const choices = shuffle(DIRECTIONS, random).filter((direction) => {
-      const nextX = current.x + direction.x * 2;
-      const nextY = current.y + direction.y * 2;
-      return inBounds(nextX, nextY) && grid[nextY][nextX] === "#";
-    });
-    const direction = choices[0];
-    if (!direction) {
-      stack.pop();
-      continue;
-    }
-    const between = {
-      x: current.x + direction.x,
-      y: current.y + direction.y,
-    };
-    const next = {
-      x: current.x + direction.x * 2,
-      y: current.y + direction.y * 2,
-    };
-    grid[between.y][between.x] = ".";
-    grid[next.y][next.x] = ".";
-    stack.push(next);
-  }
-}
-
-function jitteredSlot(slot: Slot, random: () => number, isBoss: boolean): Slot {
-  const jitterX = Math.floor(random() * 3) - 1;
-  const jitterY = Math.floor(random() * 3) - 1;
-  const width = isBoss ? slot.width : slot.width + (random() < 0.28 ? 2 : 0);
-  return {
-    x: clamp(slot.x + jitterX, 2, MAZE_WIDTH - width - 2),
-    y: clamp(slot.y + jitterY, 2, MAZE_HEIGHT - slot.height - 2),
-    width,
-    height: slot.height,
-  };
+function inBounds(x: number, y: number, width: number, height: number): boolean {
+  return x > 0 && y > 0 && x < width - 1 && y < height - 1;
 }
 
 function zoneContains(zone: MazeZone, position: Position, includeBoundary = true): boolean {
@@ -209,7 +145,132 @@ function carveZone(grid: MazeTile[][], zone: MazeZone): void {
   }
 }
 
-function gateCandidate(zone: MazeZone, direction: Direction): { gate: Position; outside: Position } {
+function assertSlotInsideMap(slot: FloorMapSlot, blueprint: FloorMapBlueprint): void {
+  const fits =
+    slot.x > 0 &&
+    slot.y > 0 &&
+    slot.width >= 5 &&
+    slot.height >= 5 &&
+    slot.x + slot.width < MAZE_WIDTH &&
+    slot.y + slot.height < MAZE_HEIGHT;
+  if (!fits) {
+    throw new Error(
+      `第 ${blueprint.floor} 层蓝图槽位 ${slot.roomNodeId} 超出 ${MAZE_WIDTH}×${MAZE_HEIGHT} 地图。`,
+    );
+  }
+}
+
+function slotsOverlap(first: FloorMapSlot, second: FloorMapSlot): boolean {
+  return !(
+    first.x + first.width <= second.x ||
+    second.x + second.width <= first.x ||
+    first.y + first.height <= second.y ||
+    second.y + second.height <= first.y
+  );
+}
+
+function assertBlueprint(
+  blueprint: FloorMapBlueprint,
+  graph: RoomGraph,
+): void {
+  if (blueprint.slots.length !== graph.nodes.length) {
+    throw new Error(
+      `第 ${graph.floor} 层蓝图有 ${blueprint.slots.length} 个槽位，但课程图有 ${graph.nodes.length} 个节点。`,
+    );
+  }
+  const graphNodeIds = new Set(graph.nodes.map((node) => node.id));
+  const slotNodeIds = blueprint.slots.map((slot) => slot.roomNodeId);
+  if (
+    new Set(slotNodeIds).size !== slotNodeIds.length ||
+    slotNodeIds.some((roomNodeId) => !graphNodeIds.has(roomNodeId))
+  ) {
+    throw new Error(
+      `第 ${graph.floor} 层蓝图槽位必须与 RoomGraph 节点一一显式对应。`,
+    );
+  }
+  blueprint.slots.forEach((slot, index) => {
+    assertSlotInsideMap(slot, blueprint);
+    for (let otherIndex = index + 1; otherIndex < blueprint.slots.length; otherIndex += 1) {
+      if (slotsOverlap(slot, blueprint.slots[otherIndex])) {
+        throw new Error(
+          `第 ${graph.floor} 层蓝图槽位 ${slot.roomNodeId} 与 ${blueprint.slots[otherIndex].roomNodeId} 重叠。`,
+        );
+      }
+    }
+  });
+}
+
+function placeZones(
+  grid: MazeTile[][],
+  graph: RoomGraph,
+  blueprint: FloorMapBlueprint,
+): MazeZone[] {
+  assertBlueprint(blueprint, graph);
+  const slotsByRoomNodeId = new Map(
+    blueprint.slots.map((slot) => [slot.roomNodeId, slot]),
+  );
+  return graph.nodes.map((node) => {
+    const slot = slotsByRoomNodeId.get(node.id);
+    if (!slot) {
+      throw new Error(
+        `第 ${graph.floor} 层蓝图缺少 RoomGraph 节点 ${node.id} 的槽位。`,
+      );
+    }
+    const zone: MazeZone = {
+      id: `zone:${node.id}`,
+      roomNodeId: node.id,
+      type: node.type,
+      lessonId: node.lessonId,
+      x: slot.x,
+      y: slot.y,
+      width: slot.width,
+      height: slot.height,
+      center: {
+        x: slot.x + Math.floor(slot.width / 2),
+        y: slot.y + Math.floor(slot.height / 2),
+      },
+    };
+    carveZone(grid, zone);
+    return zone;
+  });
+}
+
+function graphNeighbors(graph: RoomGraph, roomNodeId: string): string[] {
+  const neighbors = new Set<string>();
+  graph.nodes.forEach((node) => {
+    if (node.id === roomNodeId) node.next.forEach((nextId) => neighbors.add(nextId));
+    if (node.next.includes(roomNodeId)) neighbors.add(node.id);
+  });
+  return [...neighbors];
+}
+
+function directionTowardNeighbors(
+  graph: RoomGraph,
+  zone: MazeZone,
+  zonesByNodeId: ReadonlyMap<string, MazeZone>,
+  random: () => number,
+): Direction {
+  const neighbors = graphNeighbors(graph, zone.roomNodeId)
+    .map((nodeId) => zonesByNodeId.get(nodeId))
+    .filter((entry): entry is MazeZone => Boolean(entry));
+  if (neighbors.length === 0) return DIRECTIONS[0];
+  const target = {
+    x: neighbors.reduce((total, entry) => total + entry.center.x, 0) / neighbors.length,
+    y: neighbors.reduce((total, entry) => total + entry.center.y, 0) / neighbors.length,
+  };
+  const deltaX = target.x - zone.center.x;
+  const deltaY = target.y - zone.center.y;
+  const preferred = Math.abs(deltaX) >= Math.abs(deltaY)
+    ? (deltaX >= 0 ? "east" : "west")
+    : (deltaY >= 0 ? "south" : "north");
+  const ordered = shuffle(DIRECTIONS, random);
+  return ordered.find((direction) => direction.name === preferred) ?? ordered[0];
+}
+
+function gateCandidate(
+  zone: MazeZone,
+  direction: Direction,
+): { gate: Position; outside: Position } {
   if (direction.name === "north") {
     const x = zone.center.x;
     return { gate: { x, y: zone.y }, outside: { x, y: zone.y - 1 } };
@@ -228,110 +289,13 @@ function gateCandidate(zone: MazeZone, direction: Direction): { gate: Position; 
   return { gate: { x, y }, outside: { x: x + 1, y } };
 }
 
-function belongsToAnyZone(position: Position, zones: readonly MazeZone[]): boolean {
-  return zones.some((zone) => zoneContains(zone, position));
-}
-
-function createZoneMask(zones: readonly MazeZone[]): Uint8Array {
-  const mask = new Uint8Array(MAZE_WIDTH * MAZE_HEIGHT);
-  zones.forEach((zone) => {
-    for (let y = zone.y; y < zone.y + zone.height; y += 1) {
-      for (let x = zone.x; x < zone.x + zone.width; x += 1) {
-        mask[y * MAZE_WIDTH + x] = 1;
-      }
-    }
-  });
-  return mask;
-}
-
-function zoneMaskContains(mask: Uint8Array, x: number, y: number): boolean {
-  return mask[y * MAZE_WIDTH + x] === 1;
-}
-
-function pathToNearestFloor(
-  start: Position,
-  grid: readonly MazeTile[][],
-  zones: readonly MazeZone[],
-  targetKeys?: ReadonlySet<string>,
-): Position[] {
-  const pending: Position[] = [start];
-  const previous = new Map<string, Position | null>([[key(start), null]]);
-  let target: Position | null = null;
-
-  while (pending.length > 0) {
-    const current = pending.shift();
-    if (!current) break;
-    const isRequestedTarget = targetKeys?.has(key(current)) ?? false;
-    const isAnyFloor = grid[current.y]?.[current.x] === "." && !samePosition(current, start);
-    if (isRequestedTarget || (!targetKeys && isAnyFloor)) {
-      target = current;
-      break;
-    }
-    for (const direction of DIRECTIONS) {
-      const next = { x: current.x + direction.x, y: current.y + direction.y };
-      const nextKey = key(next);
-      if (!inBounds(next.x, next.y) || previous.has(nextKey)) continue;
-      if (belongsToAnyZone(next, zones)) continue;
-      previous.set(nextKey, current);
-      pending.push(next);
-    }
-  }
-
-  if (!target) return [start];
-  const path: Position[] = [];
-  let cursor: Position | null = target;
-  while (cursor) {
-    path.unshift(cursor);
-    cursor = previous.get(key(cursor)) ?? null;
-  }
-  return path;
-}
-
-function reachableFloor(grid: readonly MazeTile[][], start: Position): Set<string> {
-  if (grid[start.y]?.[start.x] !== ".") return new Set();
-  const visited = new Set<string>([key(start)]);
-  const pending: Position[] = [start];
-  while (pending.length > 0) {
-    const current = pending.shift();
-    if (!current) break;
-    DIRECTIONS.forEach((direction) => {
-      const next = { x: current.x + direction.x, y: current.y + direction.y };
-      const nextKey = key(next);
-      if (
-        !visited.has(nextKey) &&
-        grid[next.y]?.[next.x] === "."
-      ) {
-        visited.add(nextKey);
-        pending.push(next);
-      }
-    });
-  }
-  return visited;
-}
-
-function placeZones(
-  grid: MazeTile[][],
-  graph: RoomGraph,
-  random: () => number,
-): MazeZone[] {
-  const slots = graph.floor === 1 ? ZONE_SLOTS : FLOOR_TWO_ZONE_SLOTS;
-  return graph.nodes.map((node, index) => {
-    const base = slots[index] ?? slots[slots.length - 1];
-    const slot = jitteredSlot(base, random, node.type === "boss");
-    const zone: MazeZone = {
-      id: `zone:${node.id}`,
-      roomNodeId: node.id,
-      type: node.type,
-      lessonId: node.lessonId,
-      ...slot,
-      center: {
-        x: slot.x + Math.floor(slot.width / 2),
-        y: slot.y + Math.floor(slot.height / 2),
-      },
-    };
-    carveZone(grid, zone);
-    return zone;
-  });
+function directionTowardPosition(zone: MazeZone, target: Position): Direction {
+  const deltaX = target.x - zone.center.x;
+  const deltaY = target.y - zone.center.y;
+  const name: Direction["name"] = Math.abs(deltaX) >= Math.abs(deltaY)
+    ? (deltaX >= 0 ? "east" : "west")
+    : (deltaY >= 0 ? "south" : "north");
+  return DIRECTIONS.find((direction) => direction.name === name) ?? DIRECTIONS[0];
 }
 
 function placeGates(
@@ -340,121 +304,255 @@ function placeGates(
   zones: readonly MazeZone[],
   random: () => number,
 ): MazeGate[] {
+  const zonesByNodeId = new Map(zones.map((zone) => [zone.roomNodeId, zone]));
   return zones.map((zone) => {
     const node = graph.nodes.find((entry) => entry.id === zone.roomNodeId) as RoomNode;
-    const options = shuffle(DIRECTIONS, random).map((direction) => {
-      const candidate = gateCandidate(zone, direction);
-      const path = pathToNearestFloor(candidate.outside, grid, zones);
-      return { ...candidate, path };
-    }).sort((a, b) => a.path.length - b.path.length);
-    const chosen = options[0];
-    grid[chosen.gate.y][chosen.gate.x] = ".";
-    chosen.path.forEach((position) => {
-      grid[position.y][position.x] = ".";
-    });
+    const direction = directionTowardNeighbors(graph, zone, zonesByNodeId, random);
+    const candidate = gateCandidate(zone, direction);
+    grid[candidate.gate.y][candidate.gate.x] = ".";
+    grid[candidate.outside.y][candidate.outside.x] = ".";
     return {
       id: `gate:${zone.roomNodeId}`,
       roomNodeId: zone.roomNodeId,
       requires: [...node.prerequisiteLessons],
-      ...chosen.gate,
-      outside: { ...chosen.outside },
+      ...candidate.gate,
+      outside: { ...candidate.outside },
     };
   });
 }
 
-function connectAllZones(
-  grid: MazeTile[][],
+function createZoneMask(
   zones: readonly MazeZone[],
-  gates: readonly MazeGate[],
-  spawn: Position,
-): void {
-  const entryZone = zones.find((zone) => zoneContains(zone, spawn));
-  const entryGate = gates.find((gate) => gate.roomNodeId === entryZone?.roomNodeId);
-  if (entryGate) {
-    const entryOutside = new Set([key(entryGate.outside)]);
-    gates.forEach((gate) => {
-      if (gate.id === entryGate.id) return;
-      const path = pathToNearestFloor(gate.outside, grid, zones, entryOutside);
-      path.forEach((position) => {
-        grid[position.y][position.x] = ".";
-      });
-    });
-  }
-
-  // The explicit gate backbone above is the deterministic repair pass. Keep a
-  // bounded second pass for malformed future templates, never an open-ended
-  // retry loop.
-  for (let attempt = 0; attempt < zones.length; attempt += 1) {
-    const reachable = reachableFloor(grid, spawn);
-    const missing = zones.find((zone) => !reachable.has(key(zone.center)));
-    if (!missing) break;
-    const gate = gates.find((entry) => entry.roomNodeId === missing.roomNodeId);
-    if (!gate) break;
-    const path = pathToNearestFloor(gate.outside, grid, zones, reachable);
-    path.forEach((position) => {
-      grid[position.y][position.x] = ".";
-    });
-  }
-
-  const reachable = reachableFloor(grid, spawn);
-  for (let y = 1; y < MAZE_HEIGHT - 1; y += 1) {
-    for (let x = 1; x < MAZE_WIDTH - 1; x += 1) {
-      if (grid[y][x] === "." && !reachable.has(key({ x, y }))) {
-        grid[y][x] = "#";
+  width: number,
+  height: number,
+): Uint8Array {
+  const mask = new Uint8Array(width * height);
+  zones.forEach((zone) => {
+    for (let y = zone.y; y < zone.y + zone.height; y += 1) {
+      for (let x = zone.x; x < zone.x + zone.width; x += 1) {
+        mask[y * width + x] = 1;
       }
     }
-  }
+  });
+  return mask;
 }
 
-function floorNeighborCount(grid: readonly MazeTile[][], position: Position): number {
-  return DIRECTIONS.filter((direction) => (
-    grid[position.y + direction.y]?.[position.x + direction.x] === "."
-  )).length;
+function zoneMaskContains(mask: Uint8Array, width: number, x: number, y: number): boolean {
+  return mask[y * width + x] === 1;
+}
+
+function routeBetween(
+  start: Position,
+  target: Position,
+  zoneMask: Uint8Array,
+  width: number,
+  height: number,
+  random: () => number,
+  forbidden: ReadonlySet<string> = new Set<string>(),
+): Position[] {
+  const pending: Position[] = [{ ...start }];
+  const previous = new Map<string, Position | null>([[key(start), null]]);
+  const directions = shuffle(DIRECTIONS, random);
+
+  while (pending.length > 0) {
+    const current = pending.shift();
+    if (!current) break;
+    if (samePosition(current, target)) {
+      const route: Position[] = [];
+      let cursor: Position | null = current;
+      while (cursor) {
+        route.unshift(cursor);
+        cursor = previous.get(key(cursor)) ?? null;
+      }
+      return route;
+    }
+    directions.forEach((direction) => {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const nextKey = key(next);
+      if (
+        previous.has(nextKey) ||
+        forbidden.has(nextKey) ||
+        !inBounds(next.x, next.y, width, height) ||
+        zoneMaskContains(zoneMask, width, next.x, next.y)
+      ) return;
+      previous.set(nextKey, current);
+      pending.push(next);
+    });
+  }
+
+  return [];
+}
+
+function carveWideRoute(
+  grid: MazeTile[][],
+  route: readonly Position[],
+  roadWidth: 2 | 3 | 4,
+  zoneMask: Uint8Array,
+): void {
+  const width = grid[0].length;
+  const height = grid.length;
+  const minOffset = roadWidth === 2 ? 0 : -1;
+  const maxOffset = roadWidth === 4 ? 2 : 1;
+  route.forEach((position) => {
+    for (let offsetY = minOffset; offsetY <= maxOffset; offsetY += 1) {
+      for (let offsetX = minOffset; offsetX <= maxOffset; offsetX += 1) {
+        const x = position.x + offsetX;
+        const y = position.y + offsetY;
+        if (
+          !inBounds(x, y, width, height) ||
+          zoneMaskContains(zoneMask, width, x, y)
+        ) continue;
+        grid[y][x] = ".";
+      }
+    }
+  });
 }
 
 /**
- * Opens deterministic corridor cross-links without touching authored room
- * boundaries. The original depth-first maze remains recognizable, while most
- * backtracking-only branches become loops that return players to useful paths.
+ * Curriculum actors occupy room centers. A single anchored area Boss or
+ * patrol actor must not be able to seal the only doorway. Every curriculum
+ * transition therefore receives a second physical route between the same two
+ * RoomGraph nodes. Both apertures still resolve through each room's one
+ * serialized MazeGate and prerequisite list.
  */
-function braidCorridors(
+function ensureCurriculumAccessRedundancy(
   grid: MazeTile[][],
-  zoneMask: Uint8Array,
+  graph: RoomGraph,
+  zones: readonly MazeZone[],
+  gates: readonly MazeGate[],
   random: () => number,
-  ratio: number,
 ): void {
-  if (ratio <= 0) return;
-  const candidates: Position[] = [];
-  for (let y = 1; y < MAZE_HEIGHT - 1; y += 1) {
-    for (let x = 1; x < MAZE_WIDTH - 1; x += 1) {
-      if (
-        grid[y][x] === "." &&
-        !zoneMaskContains(zoneMask, x, y) &&
-        floorNeighborCount(grid, { x, y }) === 1
-      ) {
-        candidates.push({ x, y });
-      }
+  const width = grid[0].length;
+  const height = grid.length;
+  const zoneMask = createZoneMask(zones, width, height);
+  const gateByNodeId = new Map(gates.map((gate) => [gate.roomNodeId, gate]));
+  const zoneByNodeId = new Map(zones.map((zone) => [zone.roomNodeId, zone]));
+  graph.nodes.filter((node) => node.lessonId).forEach((node) => {
+    const predecessor = graph.nodes
+      .filter((entry) => entry.next.includes(node.id) && entry.depth < node.depth)
+      .sort((left, right) => right.depth - left.depth)[0];
+    const zone = zoneByNodeId.get(node.id);
+    const predecessorZone = predecessor ? zoneByNodeId.get(predecessor.id) : undefined;
+    const gate = gateByNodeId.get(node.id);
+    const predecessorGate = predecessor ? gateByNodeId.get(predecessor.id) : undefined;
+    if (!zone || !predecessor || !predecessorZone || !gate || !predecessorGate) {
+      throw new Error(`课程房 ${node.id} 缺少前置房、物理区域或门。`);
     }
-  }
-  const deadEnds = shuffle(candidates, random);
-
-  deadEnds.forEach((position) => {
-    if (random() > ratio || floorNeighborCount(grid, position) > 1) return;
-    const links = shuffle(DIRECTIONS, random).filter((direction) => {
-      const wall = { x: position.x + direction.x, y: position.y + direction.y };
-      const beyond = { x: position.x + direction.x * 2, y: position.y + direction.y * 2 };
-      return (
-        inBounds(beyond.x, beyond.y) &&
-        grid[wall.y]?.[wall.x] === "#" &&
-        grid[beyond.y]?.[beyond.x] === "." &&
-        !zoneMaskContains(zoneMask, wall.x, wall.y) &&
-        !zoneMaskContains(zoneMask, beyond.x, beyond.y)
-      );
-    });
-    const chosen = links[0];
-    if (!chosen) return;
-    grid[position.y + chosen.y][position.x + chosen.x] = ".";
+    const primaryFromDirection = directionTowardPosition(predecessorZone, zone.center);
+    const primaryToDirection = directionTowardPosition(zone, predecessorZone.center);
+    const primaryFrom = gateCandidate(predecessorZone, primaryFromDirection);
+    const primaryTo = gateCandidate(zone, primaryToDirection);
+    const forbidden = new Set<string>([
+      key(primaryFrom.outside),
+      key(primaryTo.outside),
+      ...DIRECTIONS.flatMap((direction) => [
+        key({
+          x: primaryFrom.outside.x + direction.x,
+          y: primaryFrom.outside.y + direction.y,
+        }),
+        key({
+          x: primaryTo.outside.x + direction.x,
+          y: primaryTo.outside.y + direction.y,
+        }),
+      ]),
+    ]);
+    const fromCandidates = shuffle(
+      DIRECTIONS.filter((direction) => direction.name !== primaryFromDirection.name),
+      random,
+    ).map((direction) => gateCandidate(predecessorZone, direction))
+      .filter((door) => (
+        inBounds(door.outside.x, door.outside.y, width, height) &&
+        !zoneMaskContains(zoneMask, width, door.outside.x, door.outside.y) &&
+        !forbidden.has(key(door.outside))
+      ));
+    const toCandidates = shuffle(
+      DIRECTIONS.filter((direction) => direction.name !== primaryToDirection.name),
+      random,
+    ).map((direction) => gateCandidate(zone, direction))
+      .filter((door) => (
+        inBounds(door.outside.x, door.outside.y, width, height) &&
+        !zoneMaskContains(zoneMask, width, door.outside.x, door.outside.y) &&
+        !forbidden.has(key(door.outside))
+      ));
+    const candidates = fromCandidates.flatMap((fromDoor) => (
+      toCandidates.map((toDoor) => ({
+        fromDoor,
+        toDoor,
+        route: routeBetween(
+          fromDoor.outside,
+          toDoor.outside,
+          zoneMask,
+          width,
+          height,
+          random,
+          forbidden,
+        ),
+      }))
+    )).filter(({ route }) => route.length > 0)
+      .sort((left, right) => left.route.length - right.route.length);
+    const selected = candidates[0];
+    if (!selected) {
+      throw new Error(`课程房 ${node.id} 无法建立第二条独立入口。`);
+    }
+    grid[selected.fromDoor.gate.y][selected.fromDoor.gate.x] = ".";
+    grid[selected.fromDoor.outside.y][selected.fromDoor.outside.x] = ".";
+    grid[selected.toDoor.gate.y][selected.toDoor.gate.x] = ".";
+    grid[selected.toDoor.outside.y][selected.toDoor.outside.x] = ".";
+    carveWideRoute(grid, selected.route, 2, zoneMask);
   });
+}
+
+function connectRoomGraph(
+  grid: MazeTile[][],
+  graph: RoomGraph,
+  gates: readonly MazeGate[],
+  zones: readonly MazeZone[],
+  blueprint: FloorMapBlueprint,
+  random: () => number,
+): void {
+  const zoneMask = createZoneMask(zones, grid[0].length, grid.length);
+  const gateByNodeId = new Map(gates.map((gate) => [gate.roomNodeId, gate]));
+  const zoneByNodeId = new Map(zones.map((zone) => [zone.roomNodeId, zone]));
+  graph.nodes.forEach((node) => {
+    const from = gateByNodeId.get(node.id);
+    const fromZone = zoneByNodeId.get(node.id);
+    if (!from || !fromZone) throw new Error(`缺少房间 ${node.id} 的物理门。`);
+    node.next.forEach((nextId) => {
+      const to = gateByNodeId.get(nextId);
+      const toZone = zoneByNodeId.get(nextId);
+      if (!to || !toZone) throw new Error(`缺少房间 ${nextId} 的物理门。`);
+      // One canonical gate remains serialized per room. Additional graph-edge
+      // apertures are derived from the saved zones and tiles, so the shape does
+      // not grow while branching rooms can face each connected objective.
+      const fromDoor = gateCandidate(
+        fromZone,
+        directionTowardPosition(fromZone, toZone.center),
+      );
+      const toDoor = gateCandidate(
+        toZone,
+        directionTowardPosition(toZone, fromZone.center),
+      );
+      grid[fromDoor.gate.y][fromDoor.gate.x] = ".";
+      grid[fromDoor.outside.y][fromDoor.outside.x] = ".";
+      grid[toDoor.gate.y][toDoor.gate.x] = ".";
+      grid[toDoor.outside.y][toDoor.outside.x] = ".";
+      const route = routeBetween(
+        fromDoor.outside,
+        toDoor.outside,
+        zoneMask,
+        grid[0].length,
+        grid.length,
+        random,
+      );
+      if (route.length === 0) {
+        throw new Error(
+          `无法连接宏观路线 ${key(fromDoor.outside)} → ${key(toDoor.outside)}。`,
+        );
+      }
+      carveWideRoute(grid, route, blueprint.mainRoadWidth, zoneMask);
+    });
+  });
+  ensureCurriculumAccessRedundancy(grid, graph, zones, gates, random);
 }
 
 function createDecorations(
@@ -464,10 +562,12 @@ function createDecorations(
   density: number,
 ): MazeDecoration[] {
   const decorations: MazeDecoration[] = [];
+  const width = grid[0].length;
+  const height = grid.length;
   const kinds: readonly MazeDecorationKind[] = ["torch", "rubble", "rune"];
-  for (let y = 2; y < MAZE_HEIGHT - 2; y += 1) {
-    for (let x = 2; x < MAZE_WIDTH - 2; x += 1) {
-      if (grid[y][x] !== "." || zoneMaskContains(zoneMask, x, y)) continue;
+  for (let y = 2; y < height - 2; y += 1) {
+    for (let x = 2; x < width - 2; x += 1) {
+      if (grid[y][x] !== "." || zoneMaskContains(zoneMask, width, x, y)) continue;
       if (random() >= density) continue;
       decorations.push({
         id: `decor:${x}:${y}`,
@@ -480,9 +580,15 @@ function createDecorations(
   return decorations;
 }
 
-function topologyHash(tiles: readonly string[], gates: readonly MazeGate[]): number {
+function topologyHash(
+  tiles: readonly string[],
+  gates: readonly MazeGate[],
+  blueprint: FloorMapBlueprint,
+): number {
   return stableStringHash(
-    `${tiles.join("|")}|${gates.map((gate) => `${gate.roomNodeId}:${gate.x}:${gate.y}`).join("|")}`,
+    `${blueprint.layoutName}|${tiles.join("|")}|${gates
+      .map((gate) => `${gate.roomNodeId}:${gate.x}:${gate.y}`)
+      .join("|")}`,
   );
 }
 
@@ -490,33 +596,27 @@ export function generateMazeFloor(
   graph: RoomGraph,
   options: MazeGenerationOptions = {},
 ): MazeFloor {
+  const blueprint = floorMapBlueprint(graph.floor);
   const topologyRandom = createSeededRandom(
-    `select-from-dungeon:maze:v3:floor-${graph.floor}:${graph.seed}:phase:topology`,
+    `select-from-dungeon:maze:v5:floor-${graph.floor}:${graph.seed}:phase:topology`,
   );
   const decorRandom = createSeededRandom(
-    `select-from-dungeon:maze:v3:floor-${graph.floor}:${graph.seed}:phase:decor`,
+    `select-from-dungeon:maze:v5:floor-${graph.floor}:${graph.seed}:phase:decor`,
   );
-  const grid = createWallGrid();
-  carveBaseMaze(grid, topologyRandom);
-  const zones = placeZones(grid, graph, topologyRandom);
+  const grid = createWallGrid(MAZE_WIDTH, MAZE_HEIGHT);
+  const zones = placeZones(grid, graph, blueprint);
   const gates = placeGates(grid, graph, zones, topologyRandom);
+  connectRoomGraph(grid, graph, gates, zones, blueprint, topologyRandom);
   const entryZone = zones.find((zone) => zone.roomNodeId === graph.entryId) ?? zones[0];
   const spawn = { ...entryZone.center };
-  connectAllZones(grid, zones, gates, spawn);
-  const zoneMask = createZoneMask(zones);
-  braidCorridors(
-    grid,
-    zoneMask,
-    topologyRandom,
-    clamp(options.braidRatio ?? 1, 0, 1),
-  );
   const tiles = grid.map((row) => row.join(""));
   const anchors = Object.fromEntries(
     zones.map((zone) => [zone.roomNodeId, { ...zone.center }]),
   );
+  const zoneMask = createZoneMask(zones, MAZE_WIDTH, MAZE_HEIGHT);
   const density = clamp(options.decorDensity ?? 0.045, 0, 0.2);
   return {
-    version: MAZE_GENERATOR_VERSION,
+    version: 4,
     generatorVersion: MAZE_GENERATOR_VERSION,
     seed: graph.seed,
     width: MAZE_WIDTH,
@@ -528,7 +628,7 @@ export function generateMazeFloor(
     gates,
     anchors,
     decorations: createDecorations(grid, zoneMask, decorRandom, density),
-    topologyHash: topologyHash(tiles, gates),
+    topologyHash: topologyHash(tiles, gates, blueprint),
   };
 }
 
@@ -556,7 +656,19 @@ export function mazeZoneAt(floor: MazeFloor, position: Position): MazeZone | nul
 }
 
 export function mazeGateAt(floor: MazeFloor, position: Position): MazeGate | null {
-  return floor.gates.find((gate) => samePosition(gate, position)) ?? null;
+  const exact = floor.gates.find((gate) => samePosition(gate, position));
+  if (exact) return exact;
+  const boundaryZone = floor.zones.find((zone) => (
+    zoneContains(zone, position) &&
+    (
+      position.x === zone.x ||
+      position.x === zone.x + zone.width - 1 ||
+      position.y === zone.y ||
+      position.y === zone.y + zone.height - 1
+    )
+  ));
+  if (!boundaryZone || mazeTileAt(floor, position.x, position.y) !== ".") return null;
+  return floor.gates.find((gate) => gate.roomNodeId === boundaryZone.roomNodeId) ?? null;
 }
 
 export function isMazeWalkable(

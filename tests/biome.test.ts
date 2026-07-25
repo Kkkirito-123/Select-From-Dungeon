@@ -4,6 +4,7 @@ import {
   weightedBiomeEncounterIds,
   type BiomeKind,
 } from "../src/content/biomeContent";
+import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
 import {
   biomeRegionAt,
   generateBiomePlan,
@@ -28,8 +29,8 @@ function fixture(seed: string, floorNumber: FloorNumber) {
 }
 
 describe("seeded biome plan", () => {
-  it("前六层生态方案可复现、每区 14 个地标且不侵入安全区", () => {
-    for (const floorNumber of [1, 2, 3, 4, 5, 6] as const) {
+  it("八层生态方案可复现、每区 14 个地标且不侵入安全区", () => {
+    for (const floorNumber of [1, 2, 3, 4, 5, 6, 7, 8] as const) {
       for (let index = 0; index < 30; index += 1) {
         const seed = `biome-contract-${floorNumber}-${index}`;
         const first = fixture(seed, floorNumber);
@@ -70,7 +71,7 @@ describe("seeded biome plan", () => {
     for (let index = 0; index < 60; index += 1) {
       const current = fixture(`biome-boss-${index}`, 2);
       const bosses = current.biome.regions.filter((region) => region.areaBossId !== null);
-      expect(bosses.map((region) => region.areaBossId).sort()).toEqual([1810, 1911]);
+      expect(bosses.map((region) => region.areaBossId).sort()).toEqual([21, 22]);
       bosses.forEach((region) => {
         expect(region.areaBossPosition).not.toBeNull();
         if (!region.areaBossPosition) return;
@@ -83,6 +84,31 @@ describe("seeded biome plan", () => {
       });
     }
   }, 20_000);
+
+  it("区域首领统一使用 Boss 标记，但保留精英等级的 3 XP 语义", () => {
+    const areaBosses = BIOME_ENCOUNTERS.filter((encounter) => (
+      encounter.role === "area-boss"
+    ));
+
+    expect(areaBosses.map((encounter) => encounter.monsterId)).toEqual([
+      21,
+      22,
+      33,
+      44,
+      55,
+      66,
+      77,
+      89,
+    ]);
+    areaBosses.forEach((encounter) => {
+      expect(
+        INITIAL_MONSTERS.find((monster) => monster.id === encounter.monsterId),
+      ).toMatchObject({
+        isBoss: true,
+        rank: "elite",
+      });
+    });
+  });
 });
 
 describe("biome encounter pools", () => {
@@ -100,8 +126,8 @@ describe("biome encounter pools", () => {
           ))
           .map((entry) => entry.monsterId),
       ));
-      expect(ids).not.toContain(1810);
-      expect(ids).not.toContain(1911);
+      expect(ids).not.toContain(21);
+      expect(ids).not.toContain(22);
     }
   });
 
@@ -126,13 +152,13 @@ describe("biome encounter pools", () => {
       "storm-core",
       new Set(lessonsForFloor(4)),
     );
-    expect(floorOne.filter((id) => id === 810).length / floorOne.length)
+    expect(floorOne.filter((id) => id === 9).length / floorOne.length)
       .toBeCloseTo(0.05, 2);
-    expect(floorTwo.filter((id) => id === 1510).length / floorTwo.length)
+    expect(floorTwo.filter((id) => id === 18).length / floorTwo.length)
       .toBeCloseTo(0.07, 2);
-    expect(floorThree.filter((id) => id === 9).length / floorThree.length)
+    expect(floorThree.filter((id) => id === 31).length / floorThree.length)
       .toBeCloseTo(0.09, 2);
-    expect(floorFour.filter((id) => id === 20).length / floorFour.length)
+    expect(floorFour.filter((id) => id === 42).length / floorFour.length)
       .toBeCloseTo(0.11, 2);
   });
 });

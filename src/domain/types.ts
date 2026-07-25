@@ -445,9 +445,10 @@ export interface GroundItem extends Position {
 }
 
 export interface ProfileProgress {
-  version: 2;
+  version: 3;
   masteredLessons: LessonId[];
   attempts: Record<LessonId, number>;
+  discoveredMonsterIds: number[];
   victories: number;
   bestRunQueries: number | null;
 }
@@ -559,8 +560,8 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 10;
-  generatorVersion: 4;
+  version: 11;
+  generatorVersion: 4 | 5;
   campaign: CampaignProgress;
   floor: FloorNumber;
   graph: RoomGraph;
@@ -678,6 +679,7 @@ export interface CombatEvent {
     | "player-hit"
     | "enemy-hit"
     | "death"
+    | "identity-recovered"
     | "loot-drop"
     | "auto-heal";
   sourceId?: number;

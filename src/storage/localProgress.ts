@@ -1,4 +1,7 @@
 import {
+  LEGACY_MAZE_CHUNK_SIZE,
+  LEGACY_MAZE_HEIGHT,
+  LEGACY_MAZE_WIDTH,
   MAZE_CHUNK_SIZE,
   MAZE_HEIGHT,
   MAZE_WIDTH,
@@ -23,6 +26,7 @@ import {
   type BiomePlan,
 } from "../domain/biome";
 import {
+  advanceCampaignProgress,
   createCampaignProgress,
   isCampaignProgress,
 } from "../domain/campaign";
@@ -30,10 +34,20 @@ import type { WorldActor } from "../domain/monsterRoaming";
 import {
   gateChallengeIdForFloor,
 } from "../content/gateChallenges";
+import { floorMapBlueprint } from "../content/floorMapBlueprints";
+import {
+  CURRENT_MONSTER_IDS_BY_FLOOR,
+  currentMasterIdForLegacyMonster,
+  currentMonsterIdForLegacy,
+  detectMonsterIdScheme,
+} from "../content/monsterIds";
+import { LESSONS } from "../content/mvpLevel";
+import { rewardDetails } from "../content/runContent";
 import {
   lessonsForFloor,
   stableStringHash,
   validateRoomGraph,
+  type FloorNumber,
   type RoomGraph,
   type RoomReward,
   type RoomType,
@@ -62,14 +76,16 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v10";
-export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v2";
-const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v9";
-const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
-const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
-const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
-const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
-const PRIMITIVE_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v11";
+export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v3";
+const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v10";
+const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v9";
+const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
+const ANCIENT_RUN_SAVE_KEY = "select-from-dungeon:run:v7";
+const ARCHAIC_RUN_SAVE_KEY = "select-from-dungeon:run:v6";
+const PRIMITIVE_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
+const ORIGINAL_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
+const LEGACY_PROFILE_V2_SAVE_KEY = "select-from-dungeon:profile:v2";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
 // v9 through v4 are read as compatible baselines and upgraded in memory.
 // Legacy keys are never deleted, so v10 recovery cannot mutate a previous Run.
@@ -283,7 +299,7 @@ const BATTLE_OUTCOMES = ["hit", "countered", "victory", "defeat"] as const;
 
 export function createEmptyProfile(): ProfileProgress {
   return {
-    version: 2,
+    version: 3,
     masteredLessons: [],
     attempts: {
       select: 0,
@@ -334,9 +350,21 @@ export function createEmptyProfile(): ProfileProgress {
       "f8-sharding": 0,
       "f8-security": 0,
     },
+    discoveredMonsterIds: [],
     victories: 0,
     bestRunQueries: null,
   };
+}
+
+function discoveredMonsterIdsForLessons(
+  masteredLessons: readonly LessonId[],
+): number[] {
+  const mastered = new Set(masteredLessons);
+  return LESSONS
+    .filter((lesson) => mastered.has(lesson.id))
+    .map((lesson) => lesson.primaryMonsterId)
+    .filter((id, index, values) => values.indexOf(id) === index)
+    .sort((left, right) => left - right);
 }
 
 function parseJson(raw: string | null): unknown {
@@ -362,6 +390,116 @@ function isLessonId(value: unknown): value is LessonId {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFloorNumber(value: unknown): value is FloorNumber {
+  return value === 1 ||
+    value === 2 ||
+    value === 3 ||
+    value === 4 ||
+    value === 5 ||
+    value === 6 ||
+    value === 7 ||
+    value === 8;
+}
+
+function migratedMonsterReference(
+  value: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
+  const id = value[key];
+  return typeof id === "number" && Number.isInteger(id)
+    ? { ...value, [key]: currentMonsterIdForLegacy(id) }
+    : { ...value };
+}
+
+/**
+ * MVP 2.0 numbers the canonical monsters 1..89 in floor/content order.
+ * Existing v4-v10 Runs used a sparse first-two-floor scheme followed by 1..67.
+ * A floor's old and current ID sets are disjoint, so migration is deterministic
+ * and idempotent without changing the storage key or save schema.
+ */
+function migrateLegacyMonsterIds(value: unknown): unknown {
+  if (
+    !isRecord(value) ||
+    !isFloorNumber(value.floor) ||
+    !Array.isArray(value.monsters)
+  ) {
+    return value;
+  }
+  const ids = value.monsters.map((monster) => (
+    isRecord(monster) && typeof monster.id === "number"
+      ? monster.id
+      : Number.NaN
+  ));
+  if (detectMonsterIdScheme(value.floor, ids) !== "legacy") return value;
+
+  const monsters = value.monsters.map((monster) => {
+    if (!isRecord(monster)) return monster;
+    const migrated = migratedMonsterReference(monster, "id");
+    const id = migrated.id;
+    const masterId = monster.masterId;
+    return typeof id === "number" && Number.isInteger(id) && (
+      masterId === null ||
+      (typeof masterId === "number" && Number.isInteger(masterId))
+    )
+      ? {
+          ...migrated,
+          masterId: currentMasterIdForLegacyMonster(id, masterId),
+        }
+      : migrated;
+  });
+  const worldActors = Array.isArray(value.worldActors)
+    ? value.worldActors.map((actor) => (
+        isRecord(actor) ? migratedMonsterReference(actor, "monsterId") : actor
+      ))
+    : value.worldActors;
+  const combat = isRecord(value.combat)
+    ? migratedMonsterReference(value.combat, "targetId")
+    : value.combat;
+  const answerHistory = Array.isArray(value.answerHistory)
+    ? value.answerHistory.map((record) => (
+        isRecord(record) ? migratedMonsterReference(record, "monsterId") : record
+      ))
+    : value.answerHistory;
+  const lootBundles = Array.isArray(value.lootBundles)
+    ? value.lootBundles.map((bundle) => (
+        isRecord(bundle) && bundle.sourceMonsterId !== null
+          ? migratedMonsterReference(bundle, "sourceMonsterId")
+          : bundle
+      ))
+    : value.lootBundles;
+
+  return {
+    ...value,
+    monsters,
+    worldActors,
+    combat,
+    answerHistory,
+    lootBundles,
+  };
+}
+
+/**
+ * Early v10 builds entered victory before committing the eighth campaign slot.
+ * Repair only that one internally valid historical shape; every other mismatch
+ * is left untouched for the strict save validator to reject.
+ */
+function migrateLegacyVictoryCampaign(value: unknown): unknown {
+  if (
+    !isRecord(value) ||
+    value.version !== 10 ||
+    value.mode !== "victory" ||
+    !isCampaignProgress(value.campaign) ||
+    value.campaign.currentFloor !== 8 ||
+    value.campaign.status !== "active"
+  ) {
+    return value;
+  }
+  const completion = advanceCampaignProgress(value.campaign);
+  return completion.ok && completion.completed
+    ? { ...value, campaign: completion.progress }
+    : value;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -468,7 +606,9 @@ function isPlayer(value: unknown, requireArmor: boolean): value is PlayerState {
   if (
     !isNonNegativeInteger(value.armorHp) ||
     !(value.armor === null || isArmor(value.armor))
-  ) return false;
+  ) {
+    return false;
+  }
   return value.armor === null
     ? value.armorHp === 0
     : value.armorHp <= value.armor.maxArmor;
@@ -487,7 +627,7 @@ function isMonster(value: unknown): value is Monster {
       value.floor === 7 ||
       value.floor === 8
     ) &&
-    isNonNegativeInteger(value.id) &&
+    isPositiveInteger(value.id) &&
     isLessonId(value.lessonId) &&
     isNonNegativeInteger(value.roomId) &&
     typeof value.name === "string" &&
@@ -517,7 +657,7 @@ function isCombat(value: unknown): value is CombatState | null {
   if (value === null) return true;
   return (
     isRecord(value) &&
-    isNonNegativeInteger(value.targetId) &&
+    isPositiveInteger(value.targetId) &&
     typeof value.kind === "string" &&
     COMBAT_KINDS.includes(value.kind as CombatState["kind"]) &&
     isNonNegativeInteger(value.round) &&
@@ -646,7 +786,7 @@ function isLootBundle(
     isRecord(value) &&
     typeof value.id === "string" &&
     value.id.length > 0 &&
-    (value.sourceMonsterId === null || isNonNegativeInteger(value.sourceMonsterId)) &&
+    (value.sourceMonsterId === null || isPositiveInteger(value.sourceMonsterId)) &&
     typeof value.sourceRoomId === "string" &&
     graph.nodes.some((node) => node.id === value.sourceRoomId) &&
     value.floor === graph.floor &&
@@ -709,19 +849,31 @@ function isValidGraph(value: unknown): value is RoomGraph {
 }
 
 function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
+  const generatorVersion = isRecord(value) ? value.generatorVersion : null;
+  const expectedDimensions = generatorVersion === 4
+    ? {
+        width: LEGACY_MAZE_WIDTH,
+        height: LEGACY_MAZE_HEIGHT,
+        chunkSize: LEGACY_MAZE_CHUNK_SIZE,
+      }
+    : {
+        width: MAZE_WIDTH,
+        height: MAZE_HEIGHT,
+        chunkSize: MAZE_CHUNK_SIZE,
+      };
   if (
     !isRecord(value) ||
     value.version !== 4 ||
-    value.generatorVersion !== 4 ||
+    (value.generatorVersion !== 4 && value.generatorVersion !== 5) ||
     value.seed !== graph.seed ||
-    value.width !== MAZE_WIDTH ||
-    value.height !== MAZE_HEIGHT ||
-    value.chunkSize !== MAZE_CHUNK_SIZE ||
+    value.width !== expectedDimensions.width ||
+    value.height !== expectedDimensions.height ||
+    value.chunkSize !== expectedDimensions.chunkSize ||
     !Array.isArray(value.tiles) ||
-    value.tiles.length !== MAZE_HEIGHT ||
+    value.tiles.length !== expectedDimensions.height ||
     !value.tiles.every((row) => (
       typeof row === "string" &&
-      row.length === MAZE_WIDTH &&
+      row.length === expectedDimensions.width &&
       !/[^#.]/.test(row)
     )) ||
     !isPosition(value.spawn) ||
@@ -730,7 +882,9 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
     !isRecord(value.anchors) ||
     !Array.isArray(value.decorations) ||
     !isNonNegativeInteger(value.topologyHash)
-  ) return false;
+  ) {
+    return false;
+  }
 
   const floor = value as unknown as MazeFloor;
   const graphNodes = new Map(graph.nodes.map((node) => [node.id, node]));
@@ -762,7 +916,9 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
     }) ||
     !hasUniqueValues(floor.zones.map((zone) => zone.id)) ||
     !hasUniqueValues(floor.zones.map((zone) => zone.roomNodeId))
-  ) return false;
+  ) {
+    return false;
+  }
 
   if (
     floor.gates.length !== graph.nodes.length ||
@@ -794,7 +950,9 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
     }) ||
     !hasUniqueValues(floor.gates.map((gate) => gate.id)) ||
     !hasUniqueValues(floor.gates.map((gate) => gate.roomNodeId))
-  ) return false;
+  ) {
+    return false;
+  }
 
   const anchorEntries = Object.entries(floor.anchors);
   if (
@@ -806,13 +964,17 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
         anchor.x === zone?.center.x &&
         anchor.y === zone?.center.y;
     })
-  ) return false;
+  ) {
+    return false;
+  }
   const entryAnchor = floor.anchors[graph.entryId];
   if (
     !entryAnchor ||
     floor.spawn.x !== entryAnchor.x ||
     floor.spawn.y !== entryAnchor.y
-  ) return false;
+  ) {
+    return false;
+  }
 
   if (
     !floor.decorations.every((decoration) => (
@@ -824,18 +986,27 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
       isFloorCell(decoration, floor)
     )) ||
     !hasUniqueValues(floor.decorations.map((decoration) => decoration.id))
-  ) return false;
+  ) {
+    return false;
+  }
 
+  const layoutPrefix = floor.generatorVersion === 5
+    ? `${floorMapBlueprint(graph.floor).layoutName}|`
+    : "";
   const expectedTopologyHash = stableStringHash(
-    `${floor.tiles.join("|")}|${floor.gates
+    `${layoutPrefix}${floor.tiles.join("|")}|${floor.gates
       .map((gate) => `${gate.roomNodeId}:${gate.x}:${gate.y}`)
       .join("|")}`,
   );
-  if (floor.topologyHash !== expectedTopologyHash) return false;
+  if (floor.topologyHash !== expectedTopologyHash) {
+    return false;
+  }
 
   try {
     const validation = validateMazeFloor(floor, graph);
-    if (!validation.valid) return false;
+    if (!validation.valid) {
+      return false;
+    }
     const floorTileCount = floor.tiles.reduce(
       (total, row) => total + [...row].filter((tile) => tile === ".").length,
       0,
@@ -856,7 +1027,7 @@ function isWorldActor(
 ): value is WorldActor {
   if (
     !isRecord(value) ||
-    !isNonNegativeInteger(value.monsterId) ||
+    !isPositiveInteger(value.monsterId) ||
     typeof value.roomNodeId !== "string" ||
     !isFloorCell(value, floor) ||
     !isFloorCell(value.home, floor) ||
@@ -942,7 +1113,7 @@ function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
       value.floor === 7 ||
       value.floor === 8
     ) &&
-    isNonNegativeInteger(value.monsterId) &&
+    isPositiveInteger(value.monsterId) &&
     typeof value.monsterName === "string" &&
     value.monsterName.length > 0 &&
     isLessonId(value.lessonId) &&
@@ -980,8 +1151,13 @@ function validatedCampfires(
   value: unknown,
   graph: RoomGraph,
   floor: MazeFloor,
+  legacy = false,
 ): Campfire[] | null {
-  if (!Array.isArray(value) || value.length !== 3 || !value.every((entry) => isCampfire(entry, floor))) {
+  if (
+    !Array.isArray(value) ||
+    (legacy ? value.length !== 2 && value.length !== 3 : value.length !== 2) ||
+    !value.every((entry) => isCampfire(entry, floor))
+  ) {
     return null;
   }
   const campfires = value as Campfire[];
@@ -991,6 +1167,7 @@ function validatedCampfires(
     !hasUniqueValues(campfires.map((campfire) => campfire.roomNodeId)) ||
     !hasUniqueValues(campfires.map(positionKey))
   ) return null;
+  if (legacy) return campfires;
   let expected: Campfire[];
   try {
     expected = generateCampfires(graph, floor);
@@ -1002,14 +1179,17 @@ function validatedCampfires(
 
 function isSavedRunVersion(
   value: unknown,
-  version: 4 | 5 | 6 | 7 | 8 | 9 | 10,
+  version: 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11,
 ): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
   const candidateVersion: unknown = run.version;
   if (
     candidateVersion !== version ||
-    run.generatorVersion !== 4 ||
+    (
+      run.generatorVersion !== 4 &&
+      run.generatorVersion !== 5
+    ) ||
     (
       run.floor !== 1 &&
       run.floor !== 2 &&
@@ -1027,7 +1207,8 @@ function isSavedRunVersion(
     version >= 9 &&
     (
       !isCampaignProgress(run.campaign) ||
-      run.campaign.currentFloor !== run.floor
+      run.campaign.currentFloor !== run.floor ||
+      ((run.mode === "victory") !== (run.campaign.status === "completed"))
     )
   ) return false;
   if (!isMazeFloor(run.mazeFloor, graph)) return false;
@@ -1040,7 +1221,7 @@ function isSavedRunVersion(
   const battleSequence = version >= 6 ? run.battleSequence : 0;
   const reviewBattleId = version >= 6 ? run.reviewBattleId : null;
   const campfires = version >= 7
-    ? validatedCampfires(run.campfires, graph, mazeFloor)
+    ? validatedCampfires(run.campfires, graph, mazeFloor, version <= 10)
     : [];
   const guidedMap = version >= 7 && campfires
     ? generateGuidedMapPlan(graph, mazeFloor, campfires)
@@ -1091,6 +1272,9 @@ function isSavedRunVersion(
     !run.monsters.every(isMonster) ||
     !hasUniqueValues(run.monsters.map((monster) => monster.id)) ||
     !run.monsters.every((monster) => monster.floor === run.floor) ||
+    !run.monsters.every((monster) => (
+      CURRENT_MONSTER_IDS_BY_FLOOR[run.floor as FloorNumber].includes(monster.id)
+    )) ||
     !run.monsters.every((monster) => isPositionInFloor(monster, mazeFloor)) ||
     !isCombat(run.combat) ||
     ((run.mode === "combat") !== (run.combat !== null)) ||
@@ -1308,23 +1492,37 @@ function isSavedRunVersion(
       run.availableLoot.weapon.id !== looseWeapon?.weapon?.id
     ))
   ) return false;
-  const interactiveReward = run.groundItems.find((item) => (
-    item.sourceRoomId === run.currentRoomId && item.collection === "interact"
-  ));
+  const interactiveReward = run.groundItems.find((item) => {
+    if (item.sourceRoomId !== run.currentRoomId || item.collection !== "interact") {
+      return false;
+    }
+    const room = graph.nodes.find((node) => node.id === item.sourceRoomId);
+    return !room?.lessonId || run.completedLessons?.includes(room.lessonId);
+  });
   if (
-    (run.claimableReward === null) !== (interactiveReward?.rewardId == null) ||
-    (run.claimableReward !== null && run.claimableReward.id !== interactiveReward?.rewardId)
+    version >= 7 &&
+    (
+      (run.claimableReward === null) !== (interactiveReward?.rewardId == null) ||
+      (
+        run.claimableReward !== null &&
+        run.claimableReward.id !== interactiveReward?.rewardId
+      )
+    )
   ) return false;
   return true;
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 10);
+  return isSavedRunVersion(value, 11);
 }
 
 type LegacyPlayerState = Omit<PlayerState, "armor" | "armorHp">;
 
-type SavedRunV9 = Omit<SavedRun, "version"> & {
+type SavedRunV10 = Omit<SavedRun, "version"> & {
+  version: 10;
+};
+
+type SavedRunV9 = Omit<SavedRunV10, "version"> & {
   version: 9;
 };
 
@@ -1357,15 +1555,60 @@ type SavedRunV5 = Omit<
   "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
 > & { version: 5 };
 
+function migrateV10Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 10)) return null;
+  const legacy = value as SavedRunV10;
+  const campfires = generateCampfires(legacy.graph, legacy.mazeFloor);
+  const oldCampfireFor = (id: string | null): Campfire | null => (
+    id ? legacy.campfires.find((campfire) => campfire.id === id) ?? null : null
+  );
+  const nearestCampfire = (oldCampfire: Campfire | null): Campfire | null => {
+    if (!oldCampfire) return null;
+    return [...campfires].sort((left, right) => (
+      Math.abs(left.x - oldCampfire.x) + Math.abs(left.y - oldCampfire.y) -
+      (Math.abs(right.x - oldCampfire.x) + Math.abs(right.y - oldCampfire.y))
+    ))[0] ?? null;
+  };
+  const activeCampfire = nearestCampfire(oldCampfireFor(legacy.activeCampfireId));
+  const respawnCampfire = nearestCampfire(oldCampfireFor(legacy.respawnCampfireId));
+  const overlappingCampfire = campfires.find((campfire) => (
+    campfire.x === legacy.player.x && campfire.y === legacy.player.y
+  ));
+  const movedCampfire = activeCampfire ?? overlappingCampfire ?? null;
+  const player = movedCampfire
+    ? { ...legacy.player, ...movedCampfire.restPosition }
+    : legacy.player;
+  const currentRoomId = movedCampfire?.roomNodeId ?? legacy.currentRoomId;
+  const migrated: SavedRun = {
+    ...legacy,
+    version: 11,
+    campfires,
+    activeCampfireId: activeCampfire?.id ?? null,
+    respawnCampfireId: respawnCampfire?.id ?? null,
+    player,
+    currentRoomId,
+    visitedRoomIds: [...new Set([
+      ...legacy.visitedRoomIds,
+      ...(movedCampfire ? [movedCampfire.roomNodeId] : []),
+    ])],
+    discoveredCells: [...new Set([
+      ...legacy.discoveredCells,
+      positionKey(player),
+    ])],
+    banner: `${legacy.banner} 篝火路线已收束为中、后两个检查点。`,
+  };
+  return isSavedRun(migrated) ? migrated : null;
+}
+
 function migrateV9Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 9)) return null;
   const legacy = value as SavedRunV9;
-  const migrated: SavedRun = {
+  const migrated: SavedRunV10 = {
     ...legacy,
     version: 10,
     banner: `${legacy.banner} 第七、八层课程已开放，当前进度完整保留。`,
   };
-  return isSavedRun(migrated) ? migrated : null;
+  return isSavedRunVersion(migrated, 10) ? migrateV10Run(migrated) : null;
 }
 
 function migrateV8Run(value: unknown): SavedRun | null {
@@ -1456,13 +1699,17 @@ function migrateV6Run(value: unknown): SavedRun | null {
         weapon: { ...looseWeapon.weapon },
       }
     : null;
-  const interactiveReward = groundItems.find((item) => (
-    item.sourceRoomId === currentRoomId &&
-    item.collection === "interact" &&
-    item.rewardId !== null
-  ));
-  const claimableReward = interactiveReward?.rewardId === legacy.claimableReward?.id
-    ? legacy.claimableReward
+  const interactiveReward = groundItems.find((item) => {
+    if (
+      item.sourceRoomId !== currentRoomId ||
+      item.collection !== "interact" ||
+      item.rewardId === null
+    ) return false;
+    const room = legacy.graph.nodes.find((node) => node.id === item.sourceRoomId);
+    return !room?.lessonId || legacy.completedLessons.includes(room.lessonId);
+  });
+  const claimableReward = interactiveReward?.rewardId
+    ? rewardDetails(interactiveReward.rewardId)
     : null;
   const migrated: SavedRunV7 = {
     ...legacy,
@@ -1540,11 +1787,14 @@ export function isProfileProgress(value: unknown): value is ProfileProgress {
   if (!isRecord(value)) return false;
   const profile = value as Partial<ProfileProgress>;
   return (
-    profile.version === 2 &&
+    profile.version === 3 &&
     Array.isArray(profile.masteredLessons) &&
     profile.masteredLessons.every(isLessonId) &&
     Boolean(profile.attempts) &&
     LESSON_IDS.every((id) => isNonNegativeInteger(profile.attempts?.[id])) &&
+    Array.isArray(profile.discoveredMonsterIds) &&
+    profile.discoveredMonsterIds.every(isNonNegativeInteger) &&
+    new Set(profile.discoveredMonsterIds).size === profile.discoveredMonsterIds.length &&
     isNonNegativeInteger(profile.victories) &&
     (profile.bestRunQueries === null || isNonNegativeInteger(profile.bestRunQueries))
   );
@@ -1575,10 +1825,13 @@ function migrateLegacyProfile(value: unknown): ProfileProgress | null {
   });
   migrated.victories = value.victories;
   migrated.bestRunQueries = value.bestRunQueries;
+  migrated.discoveredMonsterIds = discoveredMonsterIdsForLessons(
+    migrated.masteredLessons,
+  );
   return migrated;
 }
 
-function migratePreV08Profile(value: unknown): ProfileProgress | null {
+function migrateV2Profile(value: unknown): ProfileProgress | null {
   if (!isRecord(value)) return null;
   const attempts = isRecord(value.attempts) ? value.attempts : null;
   if (
@@ -1599,25 +1852,38 @@ function migratePreV08Profile(value: unknown): ProfileProgress | null {
   });
   migrated.victories = value.victories;
   migrated.bestRunQueries = value.bestRunQueries;
+  migrated.discoveredMonsterIds = discoveredMonsterIdsForLessons(
+    migrated.masteredLessons,
+  );
   return migrated;
 }
 
 export function loadRun(storage: StorageLike): SavedRun | null {
-  const value = parseJson(safeGetItem(storage, RUN_SAVE_KEY));
+  const readRun = (key: string): unknown => (
+    migrateLegacyVictoryCampaign(
+      migrateLegacyMonsterIds(parseJson(safeGetItem(storage, key))),
+    )
+  );
+  const value = readRun(RUN_SAVE_KEY);
   if (isSavedRun(value)) return value;
-  return migrateV9Run(parseJson(safeGetItem(storage, LEGACY_RUN_SAVE_KEY)))
-    ?? migrateV8Run(parseJson(safeGetItem(storage, OLDER_RUN_SAVE_KEY)))
-    ?? migrateV7Run(parseJson(safeGetItem(storage, OLDEST_RUN_SAVE_KEY)))
-    ?? migrateV6Run(parseJson(safeGetItem(storage, ANCIENT_RUN_SAVE_KEY)))
-    ?? migrateV5Run(parseJson(safeGetItem(storage, ARCHAIC_RUN_SAVE_KEY)))
-    ?? migrateV4Run(parseJson(safeGetItem(storage, PRIMITIVE_RUN_SAVE_KEY)));
+  return migrateV10Run(readRun(LEGACY_RUN_SAVE_KEY))
+    ?? migrateV9Run(readRun(OLDER_RUN_SAVE_KEY))
+    ?? migrateV8Run(readRun(OLDEST_RUN_SAVE_KEY))
+    ?? migrateV7Run(readRun(ANCIENT_RUN_SAVE_KEY))
+    ?? migrateV6Run(readRun(ARCHAIC_RUN_SAVE_KEY))
+    ?? migrateV5Run(readRun(PRIMITIVE_RUN_SAVE_KEY))
+    ?? migrateV4Run(readRun(ORIGINAL_RUN_SAVE_KEY));
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {
   const value = parseJson(safeGetItem(storage, PROFILE_SAVE_KEY));
   if (isProfileProgress(value)) return value;
-  const migratedCurrent = migratePreV08Profile(value);
+  const migratedCurrent = migrateV2Profile(value);
   if (migratedCurrent) return migratedCurrent;
+  const migratedV2 = migrateV2Profile(
+    parseJson(safeGetItem(storage, LEGACY_PROFILE_V2_SAVE_KEY)),
+  );
+  if (migratedV2) return migratedV2;
   return migrateLegacyProfile(parseJson(safeGetItem(storage, LEGACY_PROFILE_SAVE_KEY)))
     ?? createEmptyProfile();
 }

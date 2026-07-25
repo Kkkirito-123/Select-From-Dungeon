@@ -13,7 +13,7 @@ import type { LootItem, Monster } from "../src/domain/types";
 function monster(rank: Monster["rank"]): Monster {
   return {
     floor: 1,
-    id: rank === "normal" ? 111 : rank === "elite" ? 810 : 900,
+    id: rank === "normal" ? 6 : rank === "elite" ? 9 : 5,
     lessonId: "select",
     roomId: 1,
     name: "史莱姆",
@@ -117,7 +117,7 @@ describe("rollLootItems", () => {
     const items = rollLootItems({
       seed: "area-boss-minimum",
       floor: 2,
-      monster: { ...monster("elite"), floor: 2, id: 1810 },
+      monster: { ...monster("elite"), floor: 2, id: 21 },
       candidates: [gelCandidate, armorCandidate, weaponCandidate],
       fixedItems: [],
       acquiredUniqueItemIds: new Set(),
@@ -165,7 +165,7 @@ describe("rollLootItems", () => {
 
   it("楼层钥匙不占三件上限且相同输入不会重抽", () => {
     const key: LootItem = {
-      dropId: "900:floor-key",
+      dropId: "5:floor-key",
       itemId: "floor-key",
       kind: "reward",
       name: "楼层钥匙",

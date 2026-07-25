@@ -1,5 +1,11 @@
 import type { LessonId, Position } from "./types";
 import {
+  LEGACY_MAZE_CHUNK_SIZE,
+  LEGACY_MAZE_HEIGHT,
+  LEGACY_MAZE_WIDTH,
+  MAZE_CHUNK_SIZE,
+  MAZE_HEIGHT,
+  MAZE_WIDTH,
   isMazeWalkable,
   mazeTileAt,
   type MazeFloor,
@@ -72,11 +78,34 @@ function computeCycleRank(floor: MazeFloor): number {
 
 export function validateMazeFloor(floor: MazeFloor, graph: RoomGraph): MazeValidationResult {
   const errors: string[] = [];
-  if (floor.version !== 4 || floor.generatorVersion !== 4) {
-    errors.push("迷宫版本不是 v4。");
+  if (
+    floor.version !== 4 ||
+    (floor.generatorVersion !== 4 && floor.generatorVersion !== 5)
+  ) {
+    errors.push("迷宫结构版本必须是 v4，生成器版本必须是 v4 或 v5。");
   }
-  if (floor.width !== 64 || floor.height !== 48 || floor.tiles.length !== floor.height) {
-    errors.push("迷宫尺寸必须是 64×48。");
+  const expectedDimensions = floor.generatorVersion === 4
+    ? {
+        width: LEGACY_MAZE_WIDTH,
+        height: LEGACY_MAZE_HEIGHT,
+        chunkSize: LEGACY_MAZE_CHUNK_SIZE,
+      }
+    : {
+        width: MAZE_WIDTH,
+        height: MAZE_HEIGHT,
+        chunkSize: MAZE_CHUNK_SIZE,
+      };
+  if (
+    floor.width !== expectedDimensions.width ||
+    floor.height !== expectedDimensions.height ||
+    floor.chunkSize !== expectedDimensions.chunkSize ||
+    floor.tiles.length !== floor.height
+  ) {
+    errors.push(
+      `生成器 v${floor.generatorVersion} 迷宫尺寸必须是 ` +
+      `${expectedDimensions.width}×${expectedDimensions.height}，分块必须是 ` +
+      `${expectedDimensions.chunkSize}。`,
+    );
   }
   if (floor.tiles.some((row) => row.length !== floor.width || /[^#.]/.test(row))) {
     errors.push("迷宫地砖形状或字符无效。");

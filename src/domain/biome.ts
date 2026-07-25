@@ -2,6 +2,7 @@ import {
   BIOME_ENCOUNTERS,
   type BiomeKind,
 } from "../content/biomeContent";
+import { floorMapBlueprint } from "../content/floorMapBlueprints";
 import type { Campfire, Position } from "./types";
 import type { GuidedMapPlan } from "./guidedMap";
 import {
@@ -80,57 +81,56 @@ export interface BiomePlan {
 
 interface RegionTemplate {
   kind: BiomeKind;
-  name: string;
   lessonId: RunLessonId;
   feature: BiomeFeatureKind;
 }
 
 const FLOOR_ONE_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "drainage", name: "青石排水渠", lessonId: "select", feature: "drain" },
-  { kind: "slime-pool", name: "软泥水池", lessonId: "where", feature: "slime" },
-  { kind: "ember-cellar", name: "余烬仓窖", lessonId: "having", feature: "ember" },
+  { kind: "drainage", lessonId: "select", feature: "drain" },
+  { kind: "slime-pool", lessonId: "where", feature: "slime" },
+  { kind: "ember-cellar", lessonId: "having", feature: "ember" },
 ];
 
 const FLOOR_TWO_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "lake", name: "月影湖泊", lessonId: "distinct", feature: "water" },
-  { kind: "swamp", name: "毒雾泥沼", lessonId: "left-join", feature: "reeds" },
-  { kind: "forest", name: "古树森林", lessonId: "join-boss", feature: "tree" },
+  { kind: "lake", lessonId: "distinct", feature: "water" },
+  { kind: "swamp", lessonId: "left-join", feature: "reeds" },
+  { kind: "forest", lessonId: "join-boss", feature: "tree" },
 ];
 
 const FLOOR_THREE_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "bone-yard", name: "遗骨荒地", lessonId: "f3-inner", feature: "bones" },
-  { kind: "grave-mire", name: "腐土墓园", lessonId: "f3-chain", feature: "grave" },
-  { kind: "spirit-crypt", name: "幽火地宫", lessonId: "f3-union", feature: "ghost-flame" },
+  { kind: "bone-yard", lessonId: "f3-inner", feature: "bones" },
+  { kind: "grave-mire", lessonId: "f3-chain", feature: "grave" },
+  { kind: "spirit-crypt", lessonId: "f3-union", feature: "ghost-flame" },
 ];
 
 const FLOOR_FOUR_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "fire-forge", name: "烈焰熔炉", lessonId: "f4-cte", feature: "lava" },
-  { kind: "frost-vault", name: "寒霜冰库", lessonId: "f4-in", feature: "ice" },
-  { kind: "storm-core", name: "雷晶核心", lessonId: "f4-exists", feature: "crystal" },
+  { kind: "fire-forge", lessonId: "f4-cte", feature: "lava" },
+  { kind: "frost-vault", lessonId: "f4-in", feature: "ice" },
+  { kind: "storm-core", lessonId: "f4-exists", feature: "crystal" },
 ];
 
 const FLOOR_FIVE_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "iron-yard", name: "黑铁外城", lessonId: "f5-over", feature: "iron" },
-  { kind: "barracks", name: "兽人兵营", lessonId: "f5-lag-lead", feature: "banner" },
-  { kind: "black-citadel", name: "要塞内城", lessonId: "f5-top-n", feature: "battlement" },
+  { kind: "iron-yard", lessonId: "f5-over", feature: "iron" },
+  { kind: "barracks", lessonId: "f5-lag-lead", feature: "banner" },
+  { kind: "black-citadel", lessonId: "f5-top-n", feature: "battlement" },
 ];
 
 const FLOOR_SIX_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "magma-nest", name: "岩浆孵化场", lessonId: "f6-insert", feature: "egg" },
-  { kind: "crystal-cavern", name: "龙晶洞窟", lessonId: "f6-constraint", feature: "magma" },
-  { kind: "dragon-throne", name: "古龙王巢", lessonId: "f6-savepoint", feature: "dragon-bone" },
+  { kind: "magma-nest", lessonId: "f6-insert", feature: "egg" },
+  { kind: "crystal-cavern", lessonId: "f6-constraint", feature: "magma" },
+  { kind: "dragon-throne", lessonId: "f6-savepoint", feature: "dragon-bone" },
 ];
 
 const FLOOR_SEVEN_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "crystal-grove", name: "水晶林地", lessonId: "f7-btree", feature: "crystal-tree" },
-  { kind: "root-maze", name: "盘根迷宫", lessonId: "f7-composite", feature: "root" },
-  { kind: "index-heart", name: "索引树心", lessonId: "f7-optimize", feature: "index-rune" },
+  { kind: "crystal-grove", lessonId: "f7-btree", feature: "crystal-tree" },
+  { kind: "root-maze", lessonId: "f7-composite", feature: "root" },
+  { kind: "index-heart", lessonId: "f7-optimize", feature: "index-rune" },
 ];
 
 const FLOOR_EIGHT_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "obsidian-hall", name: "黑曜长厅", lessonId: "f8-mvcc", feature: "obsidian" },
-  { kind: "void-court", name: "虚空王庭", lessonId: "f8-lock", feature: "void-flame" },
-  { kind: "data-throne", name: "数据王座", lessonId: "f8-security", feature: "gold-throne" },
+  { kind: "obsidian-hall", lessonId: "f8-mvcc", feature: "obsidian" },
+  { kind: "void-court", lessonId: "f8-lock", feature: "void-flame" },
+  { kind: "data-throne", lessonId: "f8-security", feature: "gold-throne" },
 ];
 
 const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTemplate[]>> = {
@@ -415,6 +415,7 @@ export function generateBiomePlan(
   guidedMap: GuidedMapPlan,
 ): BiomePlan {
   const templates = TEMPLATES_BY_FLOOR[graph.floor];
+  const regionNames = floorMapBlueprint(graph.floor).regionNames;
   const seed = `select-from-dungeon:biome:v1:floor-${graph.floor}:${graph.seed}`;
   const regions: BiomeRegion[] = templates.map((template, index) => {
     const node = graph.nodes.find((entry) => entry.lessonId === template.lessonId);
@@ -430,7 +431,7 @@ export function generateBiomePlan(
     return {
       id: `biome:${graph.floor}:${template.kind}`,
       kind: template.kind,
-      name: template.name,
+      name: regionNames[index],
       anchor: { ...anchor },
       sourceRoomNodeId: node.id,
       areaBossId: areaBoss?.monsterId ?? null,

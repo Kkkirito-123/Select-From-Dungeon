@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "design_status": "candidate-v3",
+  "deterministic": true,
+  "runtime_asset": false,
+  "supersedes": [
+    "docs/design/assets/region-01/scribe-ember-archive-preview-v1.wav",
+    "docs/design/assets/region-01/floor1-wetwall-circuit-preview-v1.wav",
+    "docs/design/assets/music-ascent-v1/floor1-underground-hearth-exploration-preview-v2.wav",
+    "docs/design/assets/music-ascent-v1/floor1-underground-hearth-battle-preview-v2.wav",
+    "docs/design/assets/music-ascent-v1/floor8-sunset-high-hall-preview-v1.wav"
+  ],
+  "tracks": [
+    {
+      "id": "floor1-underground-hearth-exploration-preview-v3",
+      "title_zh": "地下余烬",
+      "title_en": "Underground Hearth",
+      "role": "floor-1-exploration",
+      "filename": "floor1-underground-hearth-exploration-preview-v3.wav",
+      "bpm": 68,
+      "time_signature": "3/4",
+      "bars": 12,
+      "mode": "A Dorian / A minor",
+      "duration_seconds": 31.764706,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "bit_depth": 16,
+      "lowpass_hz": 3200,
+      "room_taps_ms": [
+        92,
+        181,
+        287
+      ],
+      "compressor": null,
+      "target_peak_dbfs": -8,
+      "sha256": "6cf262a7452aacb2f559fda454c331cfa1ae7c9f092fafcba14b0d010ef50c02",
+      "source": "scripts/generate-music-ascent-previews.mjs",
+      "theme": "A-C-E-B becomes A-C#-E-B at the high hall.",
+      "license_note": "Project-original procedural audio; no samples, MIDI imports, or third-party recordings."
+    },
+    {
+      "id": "floor1-underground-hearth-battle-preview-v3",
+      "title_zh": "余烬疾行",
+      "title_en": "Ember Pursuit",
+      "role": "floor-1-battle",
+      "filename": "floor1-underground-hearth-battle-preview-v3.wav",
+      "bpm": 118,
+      "time_signature": "4/4",
+      "bars": 16,
+      "mode": "A Dorian / A minor",
+      "duration_seconds": 32.542373,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "bit_depth": 16,
+      "lowpass_hz": 3000,
+      "room_taps_ms": [
+        68,
+        137
+      ],
+      "compressor": {
+        "threshold": 0.16,
+        "ratio": 3
+      },
+      "target_peak_dbfs": -6,
+      "sha256": "641069c593dceccb1add12ea06763d75cf548b398f2289718b982b8d307ee010",
+      "source": "scripts/generate-music-ascent-previews.mjs",
+      "theme": "A-C-E-B becomes A-C#-E-B at the high hall.",
+      "license_note": "Project-original procedural audio; no samples, MIDI imports, or third-party recordings."
+    },
+    {
+      "id": "floor8-sunset-high-hall-preview-v2",
+      "title_zh": "残照高堂",
+      "title_en": "High Hall at Sunset",
+      "role": "floor-8-exploration",
+      "filename": "floor8-sunset-high-hall-preview-v2.wav",
+      "bpm": 72,
+      "time_signature": "3/4",
+      "bars": 12,
+      "mode": "A major with borrowed minor iv and flat VI",
+      "duration_seconds": 30,
+      "sample_rate_hz": 22050,
+      "channels": 1,
+      "bit_depth": 16,
+      "lowpass_hz": 3400,
+      "room_taps_ms": [
+        118,
+        237,
+        409
+      ],
+      "compressor": null,
+      "target_peak_dbfs": -7,
+      "sha256": "5db257596e4f42b7101e925203184302bcc011aa78ef3e75d3a0fe140c51fb55",
+      "source": "scripts/generate-music-ascent-previews.mjs",
+      "theme": "A-C-E-B becomes A-C#-E-B at the high hall.",
+      "license_note": "Project-original procedural audio; no samples, MIDI imports, or third-party recordings."
+    }
+  ]
+}

@@ -228,6 +228,12 @@ const REWARD_CATALOG: Partial<Record<RoomReward, ClaimableReward>> = {
     description: "WHERE 条件命中时造成 7 点伤害，并减少 1 点查询热量。",
     kind: "weapon",
   },
+  "null-lantern": {
+    id: "null-lantern",
+    name: "空值提灯",
+    description: "IS NULL 条件命中时造成 8 点伤害，并减少 1 点查询热量。",
+    kind: "weapon",
+  },
   "aggregate-hammer": {
     id: "aggregate-hammer",
     name: "聚合战锤",

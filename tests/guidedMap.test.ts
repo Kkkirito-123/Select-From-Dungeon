@@ -3,6 +3,7 @@ import { generateCampfires } from "../src/domain/campfire";
 import {
   generateGuidedMapPlan,
   nearbyShortcut,
+  shortcutNameForFloor,
   shortcutDestination,
   validateGuidedMapPlan,
 } from "../src/domain/guidedMap";
@@ -10,6 +11,13 @@ import { generateMazeFloor } from "../src/domain/mazeGenerator";
 import { generateRoomGraph } from "../src/domain/runGraph";
 
 describe("guided map plan", () => {
+  it("八层捷径使用各自地图主题的直白名称", () => {
+    const names = ([1, 2, 3, 4, 5, 6, 7, 8] as const)
+      .map((floor) => shortcutNameForFloor(floor));
+    expect(new Set(names).size).toBe(8);
+    names.forEach((name) => expect(name.endsWith("捷径") || name.endsWith("梯") || name.endsWith("门")).toBe(true));
+  });
+
   it.each([1, 2] as const)("第 %i 层同 Seed 的路线、死路收益和捷径完全一致", (floorNumber) => {
     const graph = generateRoomGraph(`guided-repeatable:${floorNumber}`, floorNumber);
     const firstFloor = generateMazeFloor(graph);
@@ -59,9 +67,9 @@ describe("guided map plan", () => {
     expect(shortcutDestination(shortcut, "exit")).toEqual(shortcut.entry);
   });
 
-  it("两层各 200 个 Seed 均满足引导距离、死路收益和钥匙捷径约束", () => {
-    ([1, 2] as const).forEach((floorNumber) => {
-      for (let index = 0; index < 200; index += 1) {
+  it("八层各 64 个 Seed 均满足引导距离、死路收益和钥匙捷径约束", () => {
+    ([1, 2, 3, 4, 5, 6, 7, 8] as const).forEach((floorNumber) => {
+      for (let index = 0; index < 64; index += 1) {
         const seed = `guided-invariant:${floorNumber}:${index}`;
         const graph = generateRoomGraph(seed, floorNumber);
         const floor = generateMazeFloor(graph);

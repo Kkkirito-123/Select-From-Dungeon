@@ -166,37 +166,46 @@ SOFTWARE.
 
 ## Original procedural audio / 原创程序化音频
 
-The four first-floor exploration patterns (`C Major Circuit`, `Moonlight Data
-Lake`, `Nocturne Cache`, and `Adagio Terminal`) use original note, rhythm,
-synthesis, and sequencing data authored in `src/audio/ArcadeAudio.ts`; their
-labels and broad harmonic vocabulary acknowledge public-domain classical
-traditions without transcribing a named work.
+The concept packs under `docs/design/assets/region-01/` and
+`docs/design/assets/music-ascent-v1/` contain project-original procedural WAV
+previews generated from declared note data by
+`scripts/generate-concept-audio.mjs` and
+`scripts/generate-music-ascent-previews.mjs`. They use no sample, SoundFont,
+external recording, imported MIDI, or third-party melody. The WAV files are
+review material and are not loaded by the runtime bundle. The first pair under
+`region-01/` is retained as a rejected sharpness reference; the ascent pack is
+retained as a pre-implementation direction record, while
+`src/audio/musicScore.ts` is the current runtime score.
 
-The second-floor exploration playlist contains new in-code chiptune
-arrangements of Beethoven's Symphony No. 5 first movement, *Für Elise*, and the
-Moonlight Sonata first movement. Their underlying compositions were published
-well before 1931 and are public domain in the United States. Every oscillator,
-rhythm, sequence, and runtime performance in this project is newly authored;
-no third-party recording or sample is bundled. The U.S. Copyright Office
-separately distinguishes a musical composition from a sound recording:
-[What is Copyright?](https://copyright.gov/what-is-copyright/) and
-[Musical Compositions and Sound Recordings](https://www.copyright.gov/register/pa-sr.html).
+The concept PNG files under `region-01/` and `mvp2/` were generated from
+original project prompts and direction, then reviewed as visual references.
+The MVP 2.0 character sheet used the repository's own scribe concept as its
+only image reference. No third-party image was provided as an input or copied.
+They are not production sprites, tiles, or runtime assets.
 
-All battle patterns, including the second-floor `Relation Storm Pursuit` and
-`Conductor Singularity`, are original retro science-fiction arcade designs and
-do not reproduce music from Seer or another game.
+`docs/design/assets/region-01/` 与 `docs/design/assets/music-ascent-v1/` 下的 WAV
+试听由 `scripts/generate-concept-audio.mjs` 和
+`scripts/generate-music-ascent-previews.mjs` 根据项目原创的声明式音符数据生成，不使用
+采样、SoundFont、外部录音、导入 MIDI 或第三方旋律；它们只用于评审，不进入运行时 Bundle。
+其中 `region-01/` 的首轮两首保留为尖锐感淘汰对照，音乐上升包保留为实施前方向记录；
+当前运行乐谱以 `src/audio/musicScore.ts` 为准。
 
-第一层四首探索曲式（`C 大调回路`、`月光数据湖`、`夜曲缓存`、`柔板终端`）的音符、节奏、合成
-与编排数据均原创于 `src/audio/ArcadeAudio.ts`；曲名和宽泛和声语言向公版古典传统致意，不转录
-具体作品。
+`region-01/` 与 `mvp2/` 下的概念 PNG 来自项目原创提示词与方向，并经过人工用途审查；
+MVP 2.0 角色阵容只使用仓库自有的抄写员概念图作为图片参考。生成过程没有输入或复制第三方
+图片。它们不是正式 Sprite、Tile 或运行时素材。
 
-第二层探索歌单由代码重新编排贝多芬第五交响曲第一乐章、《致爱丽丝》和《月光奏鸣曲》第一乐章
-的芯片版本；这些底层作品早于 1931 年发表，在美国已进入公版。项目中的振荡器、节奏、序列和
-运行时演奏均为新创作，没有打包第三方录音或采样。美国版权局分别说明了乐曲作品与录音作品的
-区别，来源见上方链接。
+The MVP 2.0 runtime score is defined in `src/audio/musicScore.ts`. Its eight
+floor profiles, exploration/combat/boss motifs, rhythms, orchestration
+parameters, synthesis, and sequencing are project-original. The score uses
+only generated sine/triangle voices and sparse generated noise; it does not
+transcribe, arrange, sample, or load a named classical work, Seer track, or
+other third-party game music. Earlier experimental classical-reference
+playlists were removed from the runtime before the MVP 2.0 release.
 
-包括第二层 `关系风暴追击` 与 `指挥家奇点` 在内的全部战斗曲均为原创复古科幻街机设计，没有
-复制《赛尔号》或其他游戏音乐。
+MVP 2.0 的运行时乐谱统一定义于 `src/audio/musicScore.ts`。八层的探索 / 战斗 / Boss 动机、
+节奏、配器参数、合成与编排均为项目原创，只使用实时生成的正弦波、三角波与稀疏噪声；不会转录、
+改编、采样或加载具名古典作品、《赛尔号》或其他第三方游戏音乐。早期用于方向讨论的古典参考歌单
+已在 MVP 2.0 发布前从运行时移除。
 
 ## Learning-game and combat-design references / 教学游戏与战斗设计参考
 
@@ -247,8 +256,9 @@ do not reproduce music from Seer or another game.
 - Use: evidence for expressing a dungeon as generated room connectivity rather
   than one fixed painted maze.
 - Status: reference only. This repository uses its own deterministic hash,
-  curriculum graph, 64x48 maze generator, physical-world validation, and
-  prerequisite rules; no tutorial code, map, text, or asset is copied.
+  curriculum graph, current 48x36 generator-v5 blueprints, legacy 64x48
+  generator-v4 compatibility, physical-world validation, and prerequisite
+  rules; no tutorial code, map, text, or asset is copied.
 
 ## Procedural-generation references / 程序生成参考
 

@@ -57,6 +57,21 @@ export interface GuidedMapValidation {
   emptyDeadEnds: number;
 }
 
+const SHORTCUT_NAMES: Readonly<Record<RoomGraph["floor"], string>> = {
+  1: "排水回廊捷径",
+  2: "月潮船闸捷径",
+  3: "王陵侧门捷径",
+  4: "升炉检修梯",
+  5: "城墙吊桥捷径",
+  6: "龙脊矿道捷径",
+  7: "根系晶门捷径",
+  8: "王座侍从门",
+};
+
+export function shortcutNameForFloor(floor: RoomGraph["floor"]): string {
+  return SHORTCUT_NAMES[floor];
+}
+
 const DIRECTIONS: readonly Position[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
@@ -191,28 +206,87 @@ function createShortcut(
   keyRoomNodeId: string,
   keyPosition: Position,
 ): GuidedShortcut | null {
-  const route = pathBetween(floor, floor.spawn, keyPosition);
+  // 捷径必须服务主课程路线；钥匙所在的可选房间可能离出生点很近，
+  // 不能再拿“出生点 → 钥匙”这段短路来决定水闸是否存在。
+  const route = stitchedCourseRoute(graph, floor);
   if (route.length < 24) return null;
-  const entry = nearestEligiblePathCell(
+  const preferredEntryIndex = graph.floor === 1
+    ? Math.min(route.length - 3, 6)
+    : Math.max(3, Math.floor(route.length * 0.16));
+  const preferredExitIndex = Math.min(
+    route.length - 3,
+    Math.floor(route.length * 0.84),
+  );
+  const preferredEntry = nearestEligiblePathCell(
     route,
-    Math.max(3, Math.floor(route.length * 0.16)),
+    preferredEntryIndex,
     floor,
     campfires,
   );
-  const exit = nearestEligiblePathCell(
+  const preferredExit = nearestEligiblePathCell(
     route,
-    Math.min(route.length - 3, Math.floor(route.length * 0.84)),
+    preferredExitIndex,
     floor,
     campfires,
   );
-  if (!entry || !exit || positionKey(entry) === positionKey(exit)) return null;
-  const detour = pathBetween(floor, entry, exit);
-  if (detour.length < 18) return null;
+  let entry = preferredEntry;
+  let exit = preferredExit;
+  let detour = entry && exit && positionKey(entry) !== positionKey(exit)
+    ? pathBetween(floor, entry, exit)
+    : [];
+
+  // 某些复合楼层会让 16% / 84% 两点在空间上意外靠近。此时在课程
+  // 前、后段中寻找真正能缩短折返的端点，而不是让整个 Seed 丢掉捷径。
+  if (detour.length < 18) {
+    const candidates = route
+      .map((position, index) => ({ position, index }))
+      .filter(({ position }) => (
+        isShortcutEndpointCandidate(floor, campfires, position)
+      ));
+    const early = candidates.filter(({ index }) => (
+      index <= Math.max(preferredEntryIndex + 10, Math.floor(route.length * 0.4))
+    ));
+    const late = candidates.filter(({ index }) => (
+      index >= Math.min(preferredExitIndex - 10, Math.ceil(route.length * 0.6))
+    ));
+    let best: {
+      entry: Position;
+      exit: Position;
+      detour: Position[];
+      score: number;
+    } | null = null;
+    for (const left of early) {
+      for (const right of late) {
+        if (
+          left.index >= right.index ||
+          positionKey(left.position) === positionKey(right.position)
+        ) continue;
+        const candidateDetour = pathBetween(floor, left.position, right.position);
+        if (candidateDetour.length < 18) continue;
+        const score =
+          candidateDetour.length * 100 -
+          Math.abs(left.index - preferredEntryIndex) * 3 -
+          Math.abs(right.index - preferredExitIndex);
+        if (!best || score > best.score) {
+          best = {
+            entry: { ...left.position },
+            exit: { ...right.position },
+            detour: candidateDetour,
+            score,
+          };
+        }
+      }
+    }
+    entry = best?.entry ?? null;
+    exit = best?.exit ?? null;
+    detour = best?.detour ?? [];
+  }
+  if (!entry || !exit || detour.length < 18) return null;
   const keyRoom = graph.nodes.find((node) => node.id === keyRoomNodeId);
   return {
     id: `shortcut:${graph.floor}:return`,
     keyId: `shortcut-key:${graph.floor}`,
-    name: graph.floor === 1 ? "排水回廊捷径" : "雷轨回路捷径",
+    name: shortcutNameForFloor(graph.floor),
     entry,
     exit,
     keyPosition: { ...keyPosition },

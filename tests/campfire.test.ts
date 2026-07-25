@@ -12,26 +12,28 @@ import { generateMazeFloor, mazeTileAt } from "../src/domain/mazeGenerator";
 import { findGridPath } from "../src/domain/pathfinding";
 import { generateRoomGraph, type FloorNumber } from "../src/domain/runGraph";
 
+const GENERATED_SEED_SAMPLES = 8;
+
 describe("campfire generation", () => {
-  it.each([1, 2] as const)("第 %i 层固定生成前、中、后三个互异篝火", (floorNumber) => {
-    for (let index = 0; index < 20; index += 1) {
+  it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
+    "第 %i 层固定生成中、后两个互异篝火，出生点单独承担前段安全锚点",
+    (floorNumber) => {
+    for (let index = 0; index < GENERATED_SEED_SAMPLES; index += 1) {
       const seed = `campfire-contract:${floorNumber}:${index}`;
       const graph = generateRoomGraph(seed, floorNumber);
       const floor = generateMazeFloor(graph);
       const campfires = generateCampfires(graph, floor);
 
-      expect(campfires).toHaveLength(3);
+      expect(campfires).toHaveLength(2);
       expect(campfires.map((campfire) => campfire.phase)).toEqual([
-        "front",
         "middle",
         "rear",
       ]);
       expect(campfires.map((campfire) => campfire.id)).toEqual([
-        `campfire:${floorNumber}:front`,
         `campfire:${floorNumber}:middle`,
         `campfire:${floorNumber}:rear`,
       ]);
-      expect(new Set(campfires.map((campfire) => campfire.roomNodeId)).size).toBe(3);
+      expect(new Set(campfires.map((campfire) => campfire.roomNodeId)).size).toBe(2);
       const distances = campfires.map((campfire) => (
         findGridPath(
           floor.spawn,
@@ -55,7 +57,32 @@ describe("campfire generation", () => {
         ).toBe(1);
       });
     }
-  }, 15_000);
+  }, 30_000);
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
+    "第 %i 层篝火安全圈不会覆盖课程怪物出生点",
+    (floorNumber) => {
+      for (let index = 0; index < GENERATED_SEED_SAMPLES; index += 1) {
+        const seed = `campfire-lesson-clearance:${floorNumber}:${index}`;
+        const graph = generateRoomGraph(seed, floorNumber);
+        const floor = generateMazeFloor(graph);
+        const campfires = generateCampfires(graph, floor);
+        const safeCells = campfireSafeCellKeys(floor, campfires);
+        const lessonAnchors = graph.nodes
+          .filter((room) => room.lessonId)
+          .map((room) => floor.anchors[room.id])
+          .filter((position) => position !== undefined);
+
+        lessonAnchors.forEach((position) => {
+          expect(
+            safeCells.has(`${position.x}:${position.y}`),
+            `seed=${seed} 的课程锚点 ${position.x}:${position.y} 被篝火安全圈覆盖`,
+          ).toBe(false);
+        });
+      }
+    },
+    30_000,
+  );
 
   it.each([1, 2] as const)("第 %i 层同一 seed 的篝火位置和休息点可重入", (floorNumber) => {
     const graph = generateRoomGraph(`campfire-stable:${floorNumber}`, floorNumber);

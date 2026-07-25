@@ -5,7 +5,7 @@ import type { Campfire, CampfirePhase, Position } from "./types";
 
 export const CAMPFIRE_SAFE_RADIUS = 2;
 
-const PHASES: readonly CampfirePhase[] = ["front", "middle", "rear"];
+const PHASES: readonly CampfirePhase[] = ["middle", "rear"];
 
 function positionKey(position: Position): string {
   return `${position.x}:${position.y}`;
@@ -49,10 +49,10 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
 }
 
 /**
- * The current two-floor graph always has at least three non-combat side rooms.
- * Hosts are selected by their real walking distance from spawn so the three
- * checkpoints form front, middle, and rear route segments instead of merely
- * following authored room types. Exact corners remain seeded.
+ * Every floor keeps two physical checkpoints: one around the middle of the
+ * route and one before the rear/Boss segment. The entry zone is already a
+ * safe recovery anchor, so an additional front fire only adds visual clutter.
+ * Exact corners remain seeded.
  */
 export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[] {
   const candidates = floor.zones
@@ -60,6 +60,7 @@ export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[
       const room = graph.nodes.find((node) => node.id === zone.roomNodeId);
       return Boolean(
         room &&
+        !room.required &&
         room.type !== "entry" &&
         room.type !== "boss" &&
         !room.lessonId,
@@ -80,20 +81,16 @@ export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[
       left.zone.roomNodeId.localeCompare(right.zone.roomNodeId)
     ));
 
-  if (candidates.length < 3) {
-    throw new Error(`第 ${graph.floor} 层缺少前、中、后三个篝火候选区域。`);
+  if (candidates.length < 2) {
+    throw new Error(`第 ${graph.floor} 层缺少中、后两个篝火候选区域。`);
   }
-  const front = candidates[0];
   const rear = candidates.at(-1);
-  if (!front || !rear || front.zone.roomNodeId === rear.zone.roomNodeId) {
+  if (!rear) {
     throw new Error(`第 ${graph.floor} 层缺少后段篝火候选区域。`);
   }
-  const midpoint = front.distance + (rear.distance - front.distance) / 2;
+  const midpoint = rear.distance * 0.5;
   const middlePool = candidates
-    .filter(({ zone }) => (
-      zone.roomNodeId !== front.zone.roomNodeId &&
-      zone.roomNodeId !== rear.zone.roomNodeId
-    ))
+    .filter(({ zone }) => zone.roomNodeId !== rear.zone.roomNodeId)
     .sort((left, right) => (
       Math.abs(left.distance - midpoint) - Math.abs(right.distance - midpoint) ||
       stableStringHash(`${floor.seed}:campfire:middle:${left.zone.roomNodeId}`) -
@@ -103,7 +100,7 @@ export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[
   if (!middle) {
     throw new Error(`第 ${graph.floor} 层缺少中段篝火候选区域。`);
   }
-  const selected = [front, middle, rear];
+  const selected = [middle, rear];
   return selected.map(({ zone, position }, index) => {
     return {
       id: `campfire:${graph.floor}:${PHASES[index]}`,
