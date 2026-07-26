@@ -57,14 +57,14 @@ function sandboxResult(
 const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   select: [
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 1",
-      ["name"],
-      [{ name: "史莱姆" }],
-    ),
-    teachingResult(
       "SELECT weakness FROM monsters WHERE id = 1",
       ["weakness"],
       [{ weakness: "slash" }],
+    ),
+    teachingResult(
+      "SELECT name FROM monsters WHERE id = 1",
+      ["name"],
+      [{ name: "史莱姆" }],
     ),
   ],
   where: [
@@ -75,7 +75,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       [2],
     ),
     teachingResult(
-      "SELECT weakness FROM monsters WHERE name = '水胶怪' AND status = 'escaped'",
+      "SELECT weakness FROM monsters WHERE id = 2 AND status = 'escaped'",
       ["weakness"],
       [{ weakness: "focus" }],
     ),
@@ -90,7 +90,7 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
     teachingResult(
       "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
       ["name"],
-      [{ name: "毒胶怪" }],
+      [{ name: "毒史莱姆" }],
     ),
   ],
   "group-by": [
@@ -142,14 +142,14 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   ],
   "inner-join": [
     teachingResult(
-      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 12",
-      ["name", "room_name"],
-      [{ name: "树妖", room_name: "古树桥" }],
+      "SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
+      ["id", "sector"],
+      [{ id: 12, sector: "forest" }],
     ),
     teachingResult(
-      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 12",
-      ["name", "sector"],
-      [{ name: "树妖", sector: "forest-bridge" }],
+      "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
+      ["name", "room_name"],
+      [{ name: "树妖", room_name: "古树桥" }],
     ),
   ],
   "left-join": [
@@ -162,17 +162,18 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   ],
   "join-boss": [
     teachingResult(
-      "SELECT r.sector, COUNT(*) AS total FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 2 ORDER BY total DESC",
+      "SELECT r.sector, COUNT(*) AS total FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 3 ORDER BY total DESC, r.sector ASC",
       ["sector", "total"],
       [
-        { sector: "ambush", total: 4 },
-        { sector: "storm", total: 2 },
+        { sector: "lake", total: 4 },
+        { sector: "swamp", total: 4 },
+        { sector: "forest", total: 3 },
       ],
     ),
     teachingResult(
       "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1",
       ["name", "power"],
-      [{ name: "丛林王", power: 21 }],
+      [{ name: "灯塔守卫", power: 21 }],
     ),
   ],
   "f3-inner": [teachingResult(
@@ -487,7 +488,7 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
   6: [teachingResult(
     "SELECT name FROM monsters WHERE id = 6",
     ["name"],
-    [{ name: "软泥怪" }],
+    [{ name: "小水怪" }],
   )],
   7: [teachingResult(
     "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
@@ -498,7 +499,7 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
   8: [teachingResult(
     "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
     ["name"],
-    [{ name: "毒胶怪" }],
+    [{ name: "灰史莱姆" }],
   )],
   9: [
     teachingResult(
@@ -512,7 +513,7 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     teachingResult(
       "SELECT name FROM monsters WHERE id = 9",
       ["name"],
-      [{ name: "铁胶怪" }],
+      [{ name: "铁泥怪" }],
     ),
   ],
   15: [teachingResult(
@@ -550,14 +551,14 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
   )],
   20: [
     teachingResult(
-      "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20",
-      ["name", "room_name"],
-      [{ name: "树妖", room_name: "树妖林地" }],
+      "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20",
+      ["id", "room_name"],
+      [{ id: 20, room_name: "盘根林地" }],
     ),
     teachingResult(
-      "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1",
-      ["name", "sector"],
-      [{ name: "树妖", sector: "forest-treant" }],
+      "SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1",
+      ["name", "room_sector"],
+      [{ name: "树妖", room_sector: "forest" }],
     ),
   ],
   29: [teachingResult(

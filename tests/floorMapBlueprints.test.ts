@@ -4,6 +4,7 @@ import {
   FLOOR_TRANSIT_PRESENTATIONS,
   MVP2_MAZE_HEIGHT,
   MVP2_MAZE_WIDTH,
+  compatibleFloorLayoutNames,
   floorTransitPresentation,
 } from "../src/content/floorMapBlueprints";
 import {
@@ -37,6 +38,18 @@ describe("FLOOR_MAP_BLUEPRINTS", () => {
     );
     expect(transit.label).toBe("排水水闸");
     expect(transit.regionLabel).toBe("排水渡点");
+  });
+
+  it("第一、二层保留已发布 v11 布局名作为只读存档兼容身份", () => {
+    expect(compatibleFloorLayoutNames(1)).toEqual([
+      "地下余烬档案回环",
+      "回燃档案环廊",
+    ]);
+    expect(compatibleFloorLayoutNames(2)).toEqual([
+      "月潮群岛船闸环线",
+      "月潮群岛航线",
+    ]);
+    expect(compatibleFloorLayoutNames(3)).toEqual(["白霜墓原回环"]);
   });
 
   it("每个蓝图槽位与本层 RoomGraph 一一对应、位于地图内且互不重叠", () => {

@@ -31,6 +31,7 @@ import {
   floorMapBlueprint,
   floorTransitPresentation,
 } from "../content/floorMapBlueprints";
+import { floorExperience } from "../content/floorExperience";
 import {
   cloneMazeFloor,
   generateMazeFloor,
@@ -67,8 +68,13 @@ import {
   nearbyCampfire,
   safeZoneCellKeys,
 } from "./campfire";
-import { evaluateStage } from "./lessonEvaluator";
 import {
+  evaluateStage,
+  evaluateUnrevealedIdentityQuery,
+  unrevealedIdentityQueryMessage,
+} from "./lessonEvaluator";
+import {
+  monsterIntentName,
   monsterNameForProfile,
   recoverMonsterIdentity,
 } from "./monsterIdentity";
@@ -504,6 +510,7 @@ export class GameSession {
   private banner = "迷宫已经生成。沿青色箭头找到 ID #001，触碰它进入 SELECT 战斗。";
   private adminMode = false;
   private adminPanelOpen = false;
+  private adminIdentityMonsterIds = new Set<number>();
   private regionTransferSequence = 0;
   private regionTransfer: GameSnapshot["regionTransfer"] = null;
   private profile: ProfileProgress;
@@ -717,6 +724,13 @@ export class GameSession {
               : room.lessonId && roomTarget && roomTarget.hp > 0
               ? stage.objective
               : roomFlavor(room.type, this.floorNumber);
+    const visibleProfile = cloneProfile(this.profile);
+    if (this.adminMode && this.adminIdentityMonsterIds.size > 0) {
+      visibleProfile.discoveredMonsterIds = [...new Set([
+        ...visibleProfile.discoveredMonsterIds,
+        ...this.adminIdentityMonsterIds,
+      ])].sort((left, right) => left - right);
+    }
 
     return {
       mode: this.mode,
@@ -769,7 +783,7 @@ export class GameSession {
       openedGateIds: [...this.openedGateIds],
       activeGateChallenge,
       relics: this.relics.map((relic) => ({ ...relic })),
-      profile: cloneProfile(this.profile),
+      profile: visibleProfile,
       availableLoot: looseWeapon,
       claimableReward: roomReward,
       runSeed: this.graph.seed,
@@ -1134,32 +1148,45 @@ export class GameSession {
       !this.keyItems.includes(shortcut.keyId) &&
       distance(shortcut.keyPosition, this.player) <= 1
     ));
+    const nearbyLootBundle = [...this.lootBundles].reverse().find(
+      (entry) => distance(entry, this.player) <= 1,
+    );
+    const nearbyGroundItem = this.groundItems
+      .filter((entry) => {
+        if (entry.collection !== "interact" || distance(entry, this.player) > 1) {
+          return false;
+        }
+        const sourceRoom = this.graph.nodes.find(
+          (room) => room.id === entry.sourceRoomId,
+        );
+        return !sourceRoom?.lessonId || this.completedLessons.has(sourceRoom.lessonId);
+      })
+      .sort((left, right) => {
+        const distanceDelta = distance(left, this.player) - distance(right, this.player);
+        if (distanceDelta !== 0) return distanceDelta;
+
+        const leftIsCurrentRoom = left.sourceRoomId === this.currentRoomId ? 0 : 1;
+        const rightIsCurrentRoom = right.sourceRoomId === this.currentRoomId ? 0 : 1;
+        if (leftIsCurrentRoom !== rightIsCurrentRoom) {
+          return leftIsCurrentRoom - rightIsCurrentRoom;
+        }
+
+        return left.id.localeCompare(right.id);
+      })[0];
+    const nearbyGroundRoom = nearbyGroundItem
+      ? this.graph.nodes.find((room) => room.id === nearbyGroundItem.sourceRoomId)
+      : null;
+    if (nearbyGroundItem && distance(nearbyGroundItem, this.player) === 0) {
+      return this.collectGroundItem(nearbyGroundItem, true);
+    }
+    if (nearbyLootBundle && distance(nearbyLootBundle, this.player) === 0) {
+      return this.openLootBundle(nearbyLootBundle);
+    }
     if (shortcutKey) {
       this.keyItems.push(shortcutKey.keyId);
       this.banner = `获得捷径钥匙：${shortcutKey.name}。回到任一捷径门旁按 E，即可永久开启本层往返通道。`;
       this.emit();
       return { ok: true, kind: "shortcut", message: this.banner };
-    }
-    const nearbyLootBundle = [...this.lootBundles].reverse().find(
-      (entry) => distance(entry, this.player) <= 1,
-    );
-    const nearbyGroundItem = this.groundItems.find((entry) => {
-      if (entry.collection !== "interact" || distance(entry, this.player) > 1) {
-        return false;
-      }
-      const sourceRoom = this.graph.nodes.find(
-        (room) => room.id === entry.sourceRoomId,
-      );
-      return !sourceRoom?.lessonId || this.completedLessons.has(sourceRoom.lessonId);
-    });
-    const nearbyGroundRoom = nearbyGroundItem
-      ? this.graph.nodes.find((room) => room.id === nearbyGroundItem.sourceRoomId)
-      : null;
-    if (nearbyLootBundle && distance(nearbyLootBundle, this.player) === 0) {
-      return this.openLootBundle(nearbyLootBundle);
-    }
-    if (nearbyGroundItem && distance(nearbyGroundItem, this.player) === 0) {
-      return this.collectGroundItem(nearbyGroundItem, true);
     }
     const campfire = nearbyCampfire(this.campfires, this.player);
     if (campfire) {
@@ -1555,6 +1582,7 @@ export class GameSession {
     if (this.mode !== "challenge" || !this.activeGateChallengeId) {
       return {
         accepted: false,
+        resultDisclosure: "shape-only",
         opened: false,
         gateId,
         message: "当前没有正在破解的机关门。",
@@ -1573,6 +1601,7 @@ export class GameSession {
       this.emit();
       return {
         accepted: true,
+        resultDisclosure: "safe-values",
         opened: true,
         gateId,
         message: this.banner,
@@ -1588,6 +1617,7 @@ export class GameSession {
     if (this.mode !== "challenge" || !this.activeGateChallengeId) {
       return {
         accepted: false,
+        resultDisclosure: "shape-only",
         opened: false,
         gateId: this.challengeGateId(),
         message,
@@ -1674,6 +1704,31 @@ export class GameSession {
     return message;
   }
 
+  validateCombatQuery(sql: string): { ok: true } | { ok: false; message: string } {
+    if (this.mode !== "combat" || !this.combat) return { ok: true };
+    const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
+    const evaluation = evaluateUnrevealedIdentityQuery(
+      this.floorNumber,
+      this.currentStage(),
+      sql,
+      target ? this.profile.discoveredMonsterIds.includes(target.id) : false,
+    );
+    return evaluation
+      ? { ok: false, message: evaluation.message }
+      : { ok: true };
+  }
+
+  validateGateChallengeQuery(sql: string): { ok: true } | { ok: false; message: string } {
+    if (this.mode !== "challenge" || !this.activeGateChallengeId) return { ok: true };
+    const message = unrevealedIdentityQueryMessage(
+      this.floorNumber,
+      "SELECT id FROM monsters",
+      sql,
+      false,
+    );
+    return message ? { ok: false, message } : { ok: true };
+  }
+
   resolveQuery(result: SqlQueryResult): TurnResolution {
     if (this.mode !== "combat" || !this.combat) {
       return this.emptyTurn("先触碰当前区域的怪物进入遭遇。", result.targetIds);
@@ -1690,7 +1745,15 @@ export class GameSession {
     const relicCooling = this.relics.reduce((total, relic) => total + relic.heatReduction, 0);
     const heatAdded = Math.max(1, result.baseHeat - this.player.weapon.heatReduction - relicCooling);
     this.player.heat = Math.min(99, this.player.heat + heatAdded);
-    const evaluation = evaluateStage(stage, result);
+    const identityEvaluation = evaluateUnrevealedIdentityQuery(
+      this.floorNumber,
+      stage,
+      result.sql,
+      reviewTarget
+        ? this.profile.discoveredMonsterIds.includes(reviewTarget.id)
+        : false,
+    );
+    const evaluation = identityEvaluation ?? evaluateStage(stage, result);
     const events: CombatEvent[] = [{ type: "query-cast", targetId: this.combat.targetId }];
     const hpUpdates: Array<{ id: number; hp: number }> = [];
     const killedIds: number[] = [];
@@ -1753,7 +1816,11 @@ export class GameSession {
         : `生命损失 ${playerDamage} 点`;
       this.banner = `${evaluation.message} ${
         target ? monsterNameForProfile(target, this.profile) : "未知记录"
-      } 使用${target?.attackName ?? "反击"}，${damageMessage}。`;
+      }：${
+        target
+          ? monsterIntentName(target, this.profile.discoveredMonsterIds)
+          : "反击"
+      }，${damageMessage}。`;
       if (this.player.hp === 0) {
         playerDefeated = true;
         this.enterDefeat("combat");
@@ -1785,8 +1852,13 @@ export class GameSession {
     this.emit();
     return {
       accepted: evaluation.accepted,
+      resultDisclosure: evaluation.accepted
+        ? experience
+          ? "full-values"
+          : "safe-values"
+        : "shape-only",
       message: this.banner,
-      queryTargetIds: result.targetIds,
+      queryTargetIds: identityEvaluation ? [] : result.targetIds,
       attackTargetIds: evaluation.attackTargetIds,
       hpUpdates,
       killedIds,
@@ -1856,6 +1928,7 @@ export class GameSession {
     this.emit();
     return {
       accepted: false,
+      resultDisclosure: "shape-only",
       message: this.banner,
       queryTargetIds: [],
       attackTargetIds: [],
@@ -1931,6 +2004,7 @@ export class GameSession {
     this.completedRoomIds = new Set([this.currentRoomId]);
     this.completedLessons = new Set();
     this.openedGateIds = new Set();
+    this.adminIdentityMonsterIds = new Set();
     this.activeGateChallengeId = null;
     this.selectedMonsterId = null;
     this.encounterMeter = {
@@ -1942,7 +2016,7 @@ export class GameSession {
     this.regionTransfer = null;
     const floorNames: Record<FloorNumber, string> = {
       1: "余烬地窖",
-      2: "湖沼森林",
+      2: "潮汐群岛",
       3: "亡者墓城",
       4: "元素熔炉",
       5: "黑铁要塞",
@@ -2656,6 +2730,7 @@ export class GameSession {
     this.completedRoomIds = new Set([this.currentRoomId]);
     this.completedLessons = new Set();
     this.openedGateIds = new Set();
+    this.adminIdentityMonsterIds = new Set();
     this.activeGateChallengeId = null;
     this.selectedMonsterId = null;
     this.encounterMeter = {
@@ -2667,6 +2742,105 @@ export class GameSession {
     this.regionTransfer = null;
     this.revealAt(this.player);
     this.banner = `管理员预览：第 ${floor} 层全图已载入。刷新页面可回到最后一次正式存档。`;
+    this.emit();
+    return { ok: true, kind: "none", message: this.banner };
+  }
+
+  adminApplyPreset(presetId: string): InteractionResolution {
+    if (!this.adminMode || this.mode !== "explore") {
+      return this.interactionFailure("管理员状态预设当前不可用。");
+    }
+    if (this.floorNumber !== 1 && this.floorNumber !== 2) {
+      return this.interactionFailure("状态预设目前只覆盖精修后的第一、二层。");
+    }
+    const experience = floorExperience(this.floorNumber);
+    const preset = experience.adminPresets.find((entry) => entry.id === presetId);
+    if (!preset) return this.interactionFailure("未知管理员状态预设。");
+
+    const completedLessons = new Set<LessonId>(preset.completedLessonIds);
+    const defeatedMonsterIds = new Set(preset.defeatedMonsterIds);
+    const focusLandmark = experience.landmarks.find(
+      (landmark) => landmark.id === preset.focusLandmarkId,
+    );
+    if (!focusLandmark) {
+      return this.interactionFailure("管理员预设缺少有效地标落点。");
+    }
+    const focusZone = this.mazeFloor.zones.find(
+      (zone) => zone.roomNodeId === focusLandmark.anchor.roomNodeId,
+    );
+    if (!focusZone) {
+      return this.interactionFailure("管理员预设地标没有对应的物理房间。");
+    }
+
+    this.completedLessons = completedLessons;
+    this.openedGateIds = new Set(preset.openedGateIds);
+    this.keyItems = [...preset.collectedKeyItems];
+    this.adminIdentityMonsterIds = defeatedMonsterIds;
+    this.monsters = this.monsters.map((monster) => ({
+      ...monster,
+      hp: defeatedMonsterIds.has(monster.id) ? 0 : monster.maxHp,
+    }));
+    this.combat = null;
+    this.selectedMonsterId = null;
+    this.activeGateChallengeId = null;
+    this.activeCampfireId = null;
+    this.activeLootBundleId = null;
+    this.regionTransfer = null;
+    this.hintLevel = 0;
+
+    const progressedRoomIds = new Set<string>([
+      this.graph.entryId,
+      focusLandmark.anchor.roomNodeId,
+      ...this.graph.nodes
+        .filter((room) => room.lessonId && completedLessons.has(room.lessonId))
+        .map((room) => room.id),
+    ]);
+    this.visitedRoomIds = new Set(progressedRoomIds);
+    this.completedRoomIds = new Set(progressedRoomIds);
+    this.groundItems = initialGroundItems(this.graph, this.mazeFloor).filter(
+      (item) => !progressedRoomIds.has(item.sourceRoomId),
+    );
+    this.lootBundles = [];
+
+    const target = {
+      x: Math.round(
+        focusZone.x + focusLandmark.anchor.position.x * Math.max(1, focusZone.width - 1),
+      ),
+      y: Math.round(
+        focusZone.y + focusLandmark.anchor.position.y * Math.max(1, focusZone.height - 1),
+      ),
+    };
+    const candidates: Position[] = [];
+    for (let radius = 0; radius <= Math.max(focusZone.width, focusZone.height); radius += 1) {
+      for (let y = target.y - radius; y <= target.y + radius; y += 1) {
+        for (let x = target.x - radius; x <= target.x + radius; x += 1) {
+          if (Math.abs(x - target.x) + Math.abs(y - target.y) !== radius) continue;
+          candidates.push({ x, y });
+        }
+      }
+    }
+    const destination = candidates.find((position) => (
+      position.x >= focusZone.x &&
+      position.x < focusZone.x + focusZone.width &&
+      position.y >= focusZone.y &&
+      position.y < focusZone.y + focusZone.height &&
+      isMazeWalkable(
+        this.mazeFloor,
+        position.x,
+        position.y,
+        this.completedLessons,
+        this.openedGateIds,
+      ) &&
+      !this.livingActorAt(position)
+    )) ?? this.mazeFloor.anchors[focusZone.roomNodeId] ?? this.mazeFloor.spawn;
+
+    this.player.x = destination.x;
+    this.player.y = destination.y;
+    this.player.hp = this.player.maxHp;
+    this.player.heat = 0;
+    this.currentRoomId = focusZone.roomNodeId;
+    this.revealAt(destination);
+    this.banner = `管理员预设：${preset.label} · 已定位 ${focusLandmark.name}。预览不会写入正式进度。`;
     this.emit();
     return { ok: true, kind: "none", message: this.banner };
   }
@@ -3049,10 +3223,6 @@ export class GameSession {
     if (this.mode === "transition") return `传送门启动 · 自动进入第 ${this.floorNumber + 1} 层`;
     if (this.mode === "victory") return "八层已贯通 · 可开始新 Run";
     if (this.mode === "defeat") return "YOU DIED · 正在返回最近篝火";
-    const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
-    if (lootBundle && distance(lootBundle, this.player) === 0) {
-      return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
-    }
     const interactItem = this.groundItems.find(
       (item) => item.collection === "interact" && distance(item, this.player) <= 1,
     );
@@ -3061,6 +3231,10 @@ export class GameSession {
         interactItem.id.startsWith("room-reward:")
         ? `E  打开战利品宝箱 · ${interactItem.name}`
         : `E  调查 ${interactItem.name}`;
+    }
+    const lootBundle = this.lootBundles.find((entry) => distance(entry, this.player) <= 1);
+    if (lootBundle && distance(lootBundle, this.player) === 0) {
+      return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
     }
     const campfire = nearbyCampfire(this.campfires, this.player);
     if (campfire) {
@@ -3156,6 +3330,7 @@ export class GameSession {
     this.emit();
     return {
       accepted: false,
+      resultDisclosure: "shape-only",
       opened: false,
       gateId,
       message: this.banner,
@@ -3213,6 +3388,7 @@ export class GameSession {
   private emptyTurn(message: string, queryTargetIds: number[]): TurnResolution {
     return {
       accepted: false,
+      resultDisclosure: "shape-only",
       message,
       queryTargetIds,
       attackTargetIds: [],

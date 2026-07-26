@@ -3,6 +3,7 @@ import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
 import {
   monsterIdLabel,
   monsterIdentityPresentation,
+  monsterIntentName,
   recoverMonsterIdentity,
 } from "../src/domain/monsterIdentity";
 import { createEmptyProfile } from "../src/storage/localProgress";
@@ -19,14 +20,16 @@ describe("monster identity archive", () => {
       idLabel: "ID #001",
       nameLabel: "ID #001",
       worldLabel: "ID #001",
-      speciesLabel: "species = 未识别",
+      speciesLabel: "类型 = 未识别",
     });
+    expect(monsterIntentName(monster, [])).toBe("攻击正在蓄力");
     expect(monsterIdentityPresentation(monster, [1])).toMatchObject({
       discovered: true,
       nameLabel: "史莱姆",
       worldLabel: "史莱姆 · ID #001",
-      speciesLabel: "species = 'projection_slime'",
+      speciesLabel: "类型 = 软体记录",
     });
+    expect(monsterIntentName(monster, [1])).toBe(monster.attackName);
   });
 
   it("身份写入去重并保持稳定排序", () => {
@@ -49,7 +52,10 @@ describe("monster identity archive", () => {
       discovered: true,
       idLabel: "ID #001",
       name: "史莱姆",
+      species: "软体记录",
       concept: "SELECT / FROM",
+      habitat: "青石排水渠",
+      worldEffect: "铜轮连续转动，宿舍栈桥放下",
     });
     expect(unknown).toMatchObject({
       discovered: false,
@@ -58,9 +64,12 @@ describe("monster identity archive", () => {
       species: null,
       rank: null,
       concept: null,
+      habitat: null,
+      worldEffect: null,
     });
+    expect(known?.species).not.toContain("projection_slime");
     expect(unknown?.lore).not.toContain(INITIAL_MONSTERS.find(
       (entry) => entry.id === 2,
-    )?.name ?? "水胶怪");
+    )?.name ?? "水史莱姆");
   });
 });

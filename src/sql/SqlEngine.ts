@@ -8,6 +8,10 @@ import {
   validateSandboxScript,
 } from "../domain/queryPolicy";
 import type { FloorNumber } from "../domain/runGraph";
+import {
+  WORLD_STORY_SCHEMA_DDL,
+  worldStorySeedDml,
+} from "./worldStorySchema";
 
 const MAX_RESULT_ROWS = 50;
 
@@ -52,17 +56,22 @@ const MONSTER_SIGNAL_FIXTURES: readonly MonsterSignalFixture[] = [
   { id: 24, monsterId: 16, channel: "echo", charge: 4 },
   { id: 25, monsterId: 16, channel: "echo", charge: 5 },
   { id: 26, monsterId: 16, channel: "mirror", charge: 7 },
+  { id: 27, monsterId: 21, channel: "deep", charge: 7 },
+  { id: 28, monsterId: 21, channel: "wake", charge: 11 },
+  { id: 29, monsterId: 21, channel: "wake", charge: 9 },
+  { id: 30, monsterId: 21, channel: "surge", charge: 14 },
+  { id: 31, monsterId: 21, channel: "surge", charge: 13 },
 ] as const;
 
 const MONSTER_GEAR_FIXTURES: readonly MonsterGearFixture[] = [
   { id: 1, monsterId: 10, gearName: "雷序军刀", power: 13 },
   { id: 2, monsterId: 11, gearName: "镜像甲片", power: 8 },
   { id: 3, monsterId: 12, gearName: "古树链刃", power: 15 },
-  { id: 4, monsterId: 14, gearName: "丛林王冠", power: 21 },
-  { id: 5, monsterId: 14, gearName: "备用节拍器", power: 17 },
+  { id: 4, monsterId: 14, gearName: "主透镜", power: 21 },
+  { id: 5, monsterId: 14, gearName: "备用透镜", power: 17 },
   { id: 6, monsterId: 15, gearName: "湖鳞", power: 7 },
   { id: 7, monsterId: 16, gearName: "蛇蜕", power: 6 },
-  { id: 8, monsterId: 17, gearName: "青蛙叶", power: 9 },
+  { id: 8, monsterId: 17, gearName: "沼叶", power: 9 },
   { id: 9, monsterId: 23, gearName: "骨短刀", power: 15 },
   { id: 10, monsterId: 25, gearName: "魂灯", power: 16 },
   { id: 11, monsterId: 26, gearName: "墓卫剑", power: 18 },
@@ -257,6 +266,8 @@ export class SqlEngine {
     this.database.run(`
       ${SQL_SCHEMA_DDL}
 
+      ${WORLD_STORY_SCHEMA_DDL}
+
       CREATE TABLE repair_queue (
         id INTEGER PRIMARY KEY,
         item TEXT NOT NULL,
@@ -346,24 +357,24 @@ export class SqlEngine {
         ON index_records(code);
 
       INSERT INTO rooms(id, name, sector, floor) VALUES
-        (1, '青石排水室', 'drainage', 1),
-        (2, '软泥水池', 'slime', 1),
-        (3, '毒泥仓窖', 'slime', 1),
-        (4, '铁泥巢', 'ember', 1),
-        (5, '泥王巢', 'core', 1),
-        (21, '森林入口', 'storm', 2),
-        (22, '湖心石台', 'storm', 2),
-        (23, '古树桥', 'forest-bridge', 2),
-        (24, '毒雾泥沼', 'swamp', 2),
-        (25, '丛林王庭', 'core', 2),
-        (31, '浅水湖岸', 'ambush', 2),
-        (32, '水蛇湾', 'ambush', 2),
-        (33, '泥沼石径', 'ambush', 2),
-        (34, '毒蛙洼地', 'ambush', 2),
-        (35, '猎犬林道', 'forest-hound', 2),
-        (36, '树妖林地', 'forest-treant', 2),
-        (37, '湖怪深潭', 'lake-boss', 2),
-        (38, '蛙王泥宫', 'swamp-boss', 2),
+        (1, '水轮大厅', 'drainage', 1),
+        (2, '青石排水渠', 'drainage', 1),
+        (3, '无名宿舍', 'dormitory', 1),
+        (4, '聚合档案室', 'ember', 1),
+        (5, '登记大厅', 'core', 1),
+        (21, '白沙浅滩', 'coast', 2),
+        (22, '月影湖', 'lake', 2),
+        (23, '古树桥', 'forest', 2),
+        (24, '芦苇沼泽', 'swamp', 2),
+        (25, '灯塔岛', 'lighthouse', 2),
+        (31, '湖泊', 'lake', 2),
+        (32, '镜潮湾', 'lake', 2),
+        (33, '泥沼石径', 'swamp', 2),
+        (34, '毒雾洼地', 'swamp', 2),
+        (35, '北林巡道', 'forest', 2),
+        (36, '盘根林地', 'forest', 2),
+        (37, '深水影潭', 'lake', 2),
+        (38, '泥冠宫', 'swamp', 2),
         (41, '骨桥前庭', 'grave', 3),
         (42, '空甲墓道', 'grave', 3),
         (43, '回声灵堂', 'crypt', 3),
@@ -490,6 +501,8 @@ export class SqlEngine {
         (2, 'prepared-select', 1, 1, 1),
         (3, 'admin-script', 1, 0, 0),
         (4, 'sanitized-text', 0, 1, 0);
+
+      ${worldStorySeedDml()}
     `);
 
     const insertMonster = this.database.prepare(`

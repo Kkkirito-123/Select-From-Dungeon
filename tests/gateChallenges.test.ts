@@ -19,25 +19,24 @@ describe("high-difficulty gate challenges", () => {
     const result = engine.executeSelect(`
       SELECT
         m.id,
-        m.name,
         COUNT(s.id) AS echo_count,
         SUM(s.charge) AS total_charge
       FROM monsters AS m
       JOIN monster_signals AS s ON s.monster_id = m.id
       WHERE s.channel = 'echo'
-      GROUP BY m.id, m.name
+      GROUP BY m.id
       HAVING COUNT(s.id) >= 3 AND SUM(s.charge) >= 24
       ORDER BY total_charge DESC, m.id ASC
     `);
 
     expect(result.rows).toEqual([
-      { id: 4, name: "铁胶怪", echo_count: 3, total_charge: 24 },
-      { id: 5, name: "泥王", echo_count: 3, total_charge: 24 },
+      { id: 4, echo_count: 3, total_charge: 24 },
+      { id: 5, echo_count: 3, total_charge: 24 },
     ]);
     expect(evaluateGateChallenge(1, result)).toMatchObject({ accepted: true });
 
     const shortcut = engine.executeSelect(`
-      SELECT id, name, 3 AS echo_count, 24 AS total_charge
+      SELECT id, 3 AS echo_count, 24 AS total_charge
       FROM monsters
       WHERE id IN (4, 5)
       ORDER BY id
@@ -67,7 +66,7 @@ describe("high-difficulty gate challenges", () => {
     `);
 
     expect(result.rows).toEqual([
-      { id: 25, room_name: "丛林王庭", monster_count: 1, total_power: 38 },
+      { id: 25, room_name: "灯塔岛", monster_count: 1, total_power: 38 },
       { id: 23, room_name: "古树桥", monster_count: 1, total_power: 15 },
     ]);
     expect(evaluateGateChallenge(2, result)).toMatchObject({ accepted: true });

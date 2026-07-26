@@ -65,6 +65,12 @@ export interface FloorMapSlot {
 export interface FloorMapBlueprint {
   floor: FloorNumber;
   layoutName: string;
+  /**
+   * Previously shipped v11 topology identities. These names are validation-only:
+   * new maps always hash `layoutName`, while local save recovery may accept one
+   * of these exact historical names without rewriting the saved maze.
+   */
+  legacyLayoutNames?: readonly string[];
   regionNames: readonly [string, string, string];
   routeTransit: FloorTransitKind;
   ascentTransit: FloorTransitKind;
@@ -91,42 +97,44 @@ function slot(
 export const FLOOR_MAP_BLUEPRINTS = {
   1: {
     floor: 1,
-    layoutName: "回燃档案环廊",
-    regionNames: ["青石排水渠", "软泥水池", "余烬仓窖"],
+    layoutName: "地下余烬档案回环",
+    legacyLayoutNames: ["回燃档案环廊"],
+    regionNames: ["青石排水渠", "无名宿舍", "回燃登记厅"],
     routeTransit: "floodgate",
     ascentTransit: "freight-lift",
     mainRoadWidth: 2,
     slots: [
-      slot("floor-1-entry", 2, 27),
-      slot("floor-1-tutorial", 10, 26),
-      slot("floor-1-where", 18, 28),
-      slot("floor-1-is-null", 18, 20),
-      slot("floor-1-rest", 10, 18),
-      slot("floor-1-treasure", 2, 18),
-      slot("floor-1-event", 10, 10),
-      slot("floor-1-group-by", 26, 25),
-      slot("floor-1-having-elite", 33, 17),
-      slot("floor-1-boss", 39, 7, 7, 7),
+      slot("floor-1-entry", 2, 27, 6, 6),
+      slot("floor-1-tutorial", 10, 26, 7, 7),
+      slot("floor-1-where", 19, 27, 7, 6),
+      slot("floor-1-is-null", 10, 18, 7, 6),
+      slot("floor-1-rest", 2, 18, 6, 6),
+      slot("floor-1-treasure", 2, 10, 6, 6),
+      slot("floor-1-event", 10, 9, 7, 6),
+      slot("floor-1-group-by", 19, 18, 7, 6),
+      slot("floor-1-having-elite", 28, 13, 7, 7),
+      slot("floor-1-boss", 38, 6, 9, 8),
     ],
   },
   2: {
     floor: 2,
-    layoutName: "月潮群岛航线",
-    regionNames: ["月影湖泊", "毒雾泥沼", "古树森林"],
+    layoutName: "月潮群岛船闸环线",
+    legacyLayoutNames: ["月潮群岛航线"],
+    regionNames: ["潮汐浅滩", "月影湖与沉水村落", "古树沼泽与灯塔岛"],
     routeTransit: "skiff",
     ascentTransit: "north-ferry",
     mainRoadWidth: 3,
     slots: [
-      slot("floor-2-entry", 2, 3),
-      slot("floor-2-order", 10, 5),
-      slot("floor-2-distinct", 18, 3),
-      slot("floor-2-rest", 10, 14),
-      slot("floor-2-treasure", 2, 14),
-      slot("floor-2-event", 18, 12),
-      slot("floor-2-inner-join", 26, 8),
-      slot("floor-2-left-join", 31, 17),
-      slot("floor-2-join-elite", 34, 23),
-      slot("floor-2-boss", 40, 27, 7, 7),
+      slot("floor-2-entry", 2, 3, 7, 6),
+      slot("floor-2-order", 11, 3, 7, 6),
+      slot("floor-2-distinct", 20, 3, 8, 7),
+      slot("floor-2-rest", 11, 12, 7, 6),
+      slot("floor-2-treasure", 2, 12, 7, 7),
+      slot("floor-2-event", 20, 12, 8, 7),
+      slot("floor-2-inner-join", 29, 4, 7, 7),
+      slot("floor-2-left-join", 29, 14, 7, 7),
+      slot("floor-2-join-elite", 29, 23, 7, 7),
+      slot("floor-2-boss", 39, 24, 8, 8),
     ],
   },
   3: {
@@ -254,6 +262,11 @@ export const FLOOR_MAP_BLUEPRINTS = {
 
 export function floorMapBlueprint(floor: FloorNumber): FloorMapBlueprint {
   return FLOOR_MAP_BLUEPRINTS[floor];
+}
+
+export function compatibleFloorLayoutNames(floor: FloorNumber): readonly string[] {
+  const blueprint = floorMapBlueprint(floor);
+  return [blueprint.layoutName, ...(blueprint.legacyLayoutNames ?? [])];
 }
 
 export function floorTransitPresentation(

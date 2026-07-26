@@ -10,11 +10,16 @@ import {
   narrativeFloorFor,
   type LostNameEvidenceState,
 } from "../domain/narrative";
+import {
+  floorStoryMoments,
+  type FloorStoryMomentKind,
+} from "../domain/floorStory";
 import type { FloorNumber } from "../domain/runGraph";
 
 export interface NarrativeCodexRenderState {
   floor: FloorNumber;
   seenBeatIds?: readonly string[];
+  seenMomentIds?: readonly string[];
   discoveredEvidenceIds?: readonly string[];
   completedAscentIds?: readonly string[];
   completedMigrationStepIds?: readonly NarrativeEndingStep["id"][];
@@ -36,6 +41,22 @@ export interface NarrativeCodexEvidenceModel {
   state: LostNameEvidenceState;
   displayValue: string;
   finding: string | null;
+}
+
+export interface NarrativeCodexMomentModel {
+  id: string;
+  kind: FloorStoryMomentKind;
+  kicker: string;
+  title: string;
+  lines: readonly string[];
+  archiveLine: string | null;
+  complete: boolean;
+  query: {
+    title: string;
+    sql: string;
+    purpose: string;
+    resultShape: string;
+  } | null;
 }
 
 export type NarrativeCodexAscentState = "complete" | "available" | "locked";
@@ -65,6 +86,7 @@ export interface NarrativeCodexModel {
     totalBeats: number;
   };
   beats: readonly NarrativeCodexBeatModel[];
+  moments: readonly NarrativeCodexMomentModel[];
   evidence: readonly NarrativeCodexEvidenceModel[];
   ascents: readonly NarrativeCodexAscentModel[];
   migration: {
@@ -106,6 +128,7 @@ export function buildNarrativeCodexModel(
 ): NarrativeCodexModel {
   const floor = narrativeFloorFor(state.floor);
   const seenBeatIds = setFrom(state.seenBeatIds);
+  const seenMomentIds = setFrom(state.seenMomentIds);
   const completedAscentIds = setFrom(state.completedAscentIds);
   const completedMigrationStepIds = setFrom(state.completedMigrationStepIds);
 
@@ -118,6 +141,31 @@ export function buildNarrativeCodexModel(
       title: complete ? entry.title : "尚未抵达",
       lines: complete ? entry.lines : [],
       complete,
+    };
+  });
+  const moments = floorStoryMoments(state.floor).map((entry) => {
+    const complete = seenMomentIds.has(entry.id);
+    const query = complete && entry.query
+      ? {
+          title: entry.query.title,
+          sql: entry.query.sql,
+          purpose: entry.query.purpose,
+          resultShape: entry.query.expectedRowCount === 0
+            ? "真实结果：0 行"
+            : `真实结果：${entry.query.expectedRowCount} 行 · 字段 ${
+                entry.query.expectedColumns.join(", ")
+              }`,
+        }
+      : null;
+    return {
+      id: entry.id,
+      kind: entry.kind,
+      kicker: complete ? entry.kicker : "现场记录",
+      title: complete ? entry.title : "尚未抵达",
+      lines: complete ? entry.lines : [],
+      archiveLine: complete ? entry.archiveLine : null,
+      complete,
+      query,
     };
   });
   const evidence = lostNameEvidenceForFloor(
@@ -171,6 +219,7 @@ export function buildNarrativeCodexModel(
       totalBeats: NARRATIVE_BEAT_KINDS.length,
     },
     beats,
+    moments,
     evidence,
     ascents,
     migration: {
@@ -215,6 +264,9 @@ export class NarrativeCodexView {
   private readonly chapterTitle: HTMLElement;
   private readonly chapterProgress: HTMLElement;
   private readonly beatList: HTMLOListElement;
+  private readonly momentSection: HTMLElement;
+  private readonly momentProgress: HTMLElement;
+  private readonly momentList: HTMLOListElement;
   private readonly evidenceList: HTMLElement;
   private readonly ascentList: HTMLOListElement;
   private readonly migrationTitle: HTMLElement;
@@ -315,6 +367,36 @@ export class NarrativeCodexView {
     );
     chapter.append(this.chapterTitle, this.chapterProgress, this.beatList);
 
+    this.momentSection = createElement(
+      this.documentRoot,
+      "section",
+      "narrative-codex__moment-section",
+    );
+    const momentHeading = createElement(
+      this.documentRoot,
+      "div",
+      "narrative-codex__moment-heading",
+    );
+    momentHeading.append(createElement(
+      this.documentRoot,
+      "h3",
+      "narrative-codex__section-title",
+      "现场记录 · 查询改变世界",
+    ));
+    this.momentProgress = createElement(
+      this.documentRoot,
+      "p",
+      "narrative-codex__moment-progress",
+      "0 / 0 已记录",
+    );
+    momentHeading.append(this.momentProgress);
+    this.momentList = createElement(
+      this.documentRoot,
+      "ol",
+      "narrative-codex__moment-list",
+    );
+    this.momentSection.append(momentHeading, this.momentList);
+
     const evidenceSection = createElement(
       this.documentRoot,
       "section",
@@ -396,7 +478,13 @@ export class NarrativeCodexView {
       "div",
       "narrative-codex__body",
     );
-    body.append(chapter, evidenceSection, ascentSection, migrationSection);
+    body.append(
+      chapter,
+      this.momentSection,
+      evidenceSection,
+      ascentSection,
+      migrationSection,
+    );
     dialog.append(header, body);
     this.element.append(dialog);
     root.append(this.element);
@@ -473,6 +561,89 @@ export class NarrativeCodexView {
           line,
         ));
       });
+      return item;
+    }));
+
+    this.momentSection.hidden = model.moments.length === 0;
+    this.momentProgress.textContent =
+      `${model.moments.filter((entry) => entry.complete).length} / ${
+        model.moments.length
+      } 已记录`;
+    this.momentList.replaceChildren(...model.moments.map((entry) => {
+      const item = createElement(
+        this.documentRoot,
+        "li",
+        `narrative-codex__moment ${
+          entry.complete ? "is-complete" : "is-locked"
+        }`,
+      );
+      item.dataset.momentId = entry.id;
+      item.dataset.kind = entry.kind;
+      item.dataset.state = entry.complete ? "complete" : "locked";
+      item.append(
+        createElement(
+          this.documentRoot,
+          "span",
+          "narrative-codex__moment-kicker",
+          entry.kicker,
+        ),
+        createElement(
+          this.documentRoot,
+          "strong",
+          "narrative-codex__moment-title",
+          entry.title,
+        ),
+      );
+      entry.lines.forEach((line) => {
+        item.append(createElement(
+          this.documentRoot,
+          "p",
+          "narrative-codex__moment-line",
+          line,
+        ));
+      });
+      if (entry.archiveLine) {
+        item.append(createElement(
+          this.documentRoot,
+          "p",
+          "narrative-codex__moment-finding",
+          `本页结论：${entry.archiveLine}`,
+        ));
+      }
+      if (entry.query) {
+        const query = createElement(
+          this.documentRoot,
+          "article",
+          "narrative-codex__story-query",
+        );
+        query.append(
+          createElement(
+            this.documentRoot,
+            "span",
+            "narrative-codex__story-query-title",
+            `调查查询 / ${entry.query.title}`,
+          ),
+          createElement(
+            this.documentRoot,
+            "code",
+            "narrative-codex__story-query-sql",
+            entry.query.sql,
+          ),
+          createElement(
+            this.documentRoot,
+            "small",
+            "narrative-codex__story-query-shape",
+            entry.query.resultShape,
+          ),
+          createElement(
+            this.documentRoot,
+            "p",
+            "narrative-codex__story-query-purpose",
+            `结果含义：${entry.query.purpose}`,
+          ),
+        );
+        item.append(query);
+      }
       return item;
     }));
 

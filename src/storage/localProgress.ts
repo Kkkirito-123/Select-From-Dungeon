@@ -34,7 +34,7 @@ import type { WorldActor } from "../domain/monsterRoaming";
 import {
   gateChallengeIdForFloor,
 } from "../content/gateChallenges";
-import { floorMapBlueprint } from "../content/floorMapBlueprints";
+import { compatibleFloorLayoutNames } from "../content/floorMapBlueprints";
 import {
   CURRENT_MONSTER_IDS_BY_FLOOR,
   currentMasterIdForLegacyMonster,
@@ -990,15 +990,18 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
     return false;
   }
 
-  const layoutPrefix = floor.generatorVersion === 5
-    ? `${floorMapBlueprint(graph.floor).layoutName}|`
-    : "";
-  const expectedTopologyHash = stableStringHash(
-    `${layoutPrefix}${floor.tiles.join("|")}|${floor.gates
-      .map((gate) => `${gate.roomNodeId}:${gate.x}:${gate.y}`)
-      .join("|")}`,
-  );
-  if (floor.topologyHash !== expectedTopologyHash) {
+  const topologyBody = `${floor.tiles.join("|")}|${floor.gates
+    .map((gate) => `${gate.roomNodeId}:${gate.x}:${gate.y}`)
+    .join("|")}`;
+  const compatibleLayoutNames = floor.generatorVersion === 5
+    ? compatibleFloorLayoutNames(graph.floor)
+    : [""];
+  const hasCompatibleTopologyHash = compatibleLayoutNames.some((layoutName) => (
+    floor.topologyHash === stableStringHash(
+      `${layoutName ? `${layoutName}|` : ""}${topologyBody}`,
+    )
+  ));
+  if (!hasCompatibleTopologyHash) {
     return false;
   }
 

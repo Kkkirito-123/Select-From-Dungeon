@@ -115,6 +115,12 @@ class FakeAudioContext {
   }
 }
 
+class FakeRecordedAudioContext extends FakeAudioContext {
+  async decodeAudioData(): Promise<AudioBuffer> {
+    return { duration: 60 } as AudioBuffer;
+  }
+}
+
 describe("ArcadeAudio", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -151,7 +157,7 @@ describe("ArcadeAudio", () => {
     expect(audio.toggleMuted()).toBe(false);
   });
 
-  it("八层均切换到各自的原创程序化乐谱", () => {
+  it("八层均切换到各自的楼层乐谱", () => {
     const audio = new ArcadeAudio({ mode: "explore" });
     const trackIds = Array.from({ length: 8 }, (_, index) => {
       audio.setFloor((index + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
@@ -178,7 +184,7 @@ describe("ArcadeAudio", () => {
     expect(audio.trackId).toMatch(/^f7-sunset-index-garden-boss-r1/);
   });
 
-  it("重复场景不改曲目，同层区域切换只重定向到新的区域乐句", () => {
+  it("重复场景不改曲目，离线长循环在同层区域切换时保持连续", () => {
     const audio = new ArcadeAudio({ mode: "explore" });
     audio.setScene({ floor: 2, region: 0, mode: "explore" });
     const firstTrack = audio.trackId;
@@ -187,7 +193,8 @@ describe("ArcadeAudio", () => {
     expect(audio.trackId).toBe(firstTrack);
 
     audio.setScene({ floor: 2, region: 1, mode: "explore" });
-    expect(audio.trackId).toMatch(/^f2-tidal-archipelago-explore-r1/);
+    expect(audio.trackId).toBe(firstTrack);
+    expect(audio.trackTitle).toBe("潮汐水上曲");
   });
 
   it("所有新反馈与旧别名在静音状态都可无设备调用", async () => {
@@ -216,6 +223,34 @@ describe("ArcadeAudio", () => {
     await audio.dispose();
     expect(audio.ready).toBe(false);
     await expect(audio.setPageHidden(true)).resolves.toBeUndefined();
+  });
+
+  it("前两层优先加载长循环录音并在战斗模式切换对应文件", async () => {
+    const fetchAudio = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => new ArrayBuffer(8),
+    }));
+    vi.stubGlobal("window", { AudioContext: FakeRecordedAudioContext });
+    vi.stubGlobal("fetch", fetchAudio);
+    const audio = new ArcadeAudio();
+
+    expect(await audio.initialize()).toBe(true);
+    await vi.waitFor(() => {
+      expect(fetchAudio).toHaveBeenCalledWith(
+        "/assets/audio/f01/explore.ogg",
+        expect.objectContaining({ cache: "force-cache" }),
+      );
+    });
+
+    audio.setMode("combat");
+    await vi.waitFor(() => {
+      expect(fetchAudio).toHaveBeenCalledWith(
+        "/assets/audio/f01/combat.ogg",
+        expect.objectContaining({ cache: "force-cache" }),
+      );
+    });
+    await audio.dispose();
   });
 
   it("探索乐句换奏时不会连续重复，运行时声明公共领域改编且不使用外部录音", () => {

@@ -9,6 +9,8 @@ import {
   type ScoreFocus,
   type ScoreScene,
 } from "./musicScore";
+import { RecordedScorePlayer } from "./RecordedScorePlayer";
+import { runtimeScoreForScene } from "./runtimeScoreCatalog";
 
 export type {
   ArcadeMusicMode,
@@ -47,7 +49,7 @@ export interface ArcadeAudioOptions {
 type AudioContextConstructor = new () => AudioContext;
 
 const SILENCE = 0.0001;
-const MUSIC_GAIN_LEVEL = 0.3;
+const MUSIC_GAIN_LEVEL = 0.58;
 const SCHEDULE_AHEAD_SECONDS = 0.24;
 const SCHEDULER_INTERVAL_MS = 80;
 const MODE_FADE_SECONDS = 0.05;
@@ -99,6 +101,7 @@ export class ArcadeAudio {
   private musicGain: GainNode | null = null;
   private musicFilter: BiquadFilterNode | null = null;
   private sfxGain: GainNode | null = null;
+  private recordedScorePlayer: RecordedScorePlayer | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private schedulerTimer: ReturnType<typeof setTimeout> | null = null;
   private modeTransitionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -123,10 +126,11 @@ export class ArcadeAudio {
 
   private readonly contextStateHandler = (): void => {
     if (this.context?.state === "running" && !this.pageHiddenValue) {
-      this.startMusicScheduler();
+      this.startPreferredMusic();
     } else {
       this.clearModeTransition(true);
       this.stopMusicScheduler(true);
+      this.recordedScorePlayer?.stop();
     }
   };
 
@@ -172,11 +176,13 @@ export class ArcadeAudio {
   }
 
   get trackId(): string {
-    return this.currentMusicPattern().id;
+    return runtimeScoreForScene(this.renderedSceneValue)?.id
+      ?? this.currentMusicPattern().id;
   }
 
   get trackTitle(): string {
-    return this.currentMusicPattern().title;
+    return runtimeScoreForScene(this.renderedSceneValue)?.title
+      ?? this.currentMusicPattern().title;
   }
 
   /**
@@ -249,7 +255,7 @@ export class ArcadeAudio {
     }
 
     const running = !this.disposed && this.context.state === "running";
-    if (running) this.startMusicScheduler();
+    if (running) this.startPreferredMusic();
     return running;
   }
 
@@ -264,6 +270,12 @@ export class ArcadeAudio {
     if (transition === "none") return;
 
     this.sceneValue = normalized;
+    if (runtimeScoreForScene(normalized)) {
+      this.pendingSceneValue = null;
+      this.applyRenderedScene(normalized);
+      this.restartMusicPlaylist();
+      return;
+    }
     if (
       transition === "retarget" &&
       this.context?.state === "running" &&
@@ -316,6 +328,35 @@ export class ArcadeAudio {
     if (!context || context.state !== "running" || !musicGain || this.mutedValue) {
       this.clearModeTransition();
       this.stopMusicScheduler(true);
+      this.recordedScorePlayer?.stop();
+      return;
+    }
+
+    if (runtimeScoreForScene(this.renderedSceneValue) && this.recordedScorePlayer) {
+      this.clearModeTransition();
+      this.stopMusicScheduler(true);
+      void this.recordedScorePlayer.play(this.renderedSceneValue).then((played) => {
+        if (
+          !played &&
+          !this.disposed &&
+          !this.mutedValue &&
+          !this.pageHiddenValue &&
+          this.context?.state === "running"
+        ) {
+          this.startMusicScheduler();
+        }
+      });
+      return;
+    }
+    const wasPlayingRecordedScore =
+      this.recordedScorePlayer?.playingAssetId !== null &&
+      this.recordedScorePlayer?.playingAssetId !== undefined;
+    this.recordedScorePlayer?.stop(0.8);
+    if (wasPlayingRecordedScore) {
+      this.clearModeTransition();
+      this.stopMusicScheduler(true);
+      this.nextMusicStepAt = context.currentTime + 0.035;
+      this.startMusicScheduler();
       return;
     }
 
@@ -359,6 +400,7 @@ export class ArcadeAudio {
     if (muted) {
       this.clearModeTransition(true);
       this.stopMusicScheduler(true);
+      this.recordedScorePlayer?.stop();
       this.stopSources(this.sfxSources);
     } else {
       void this.resume();
@@ -384,6 +426,7 @@ export class ArcadeAudio {
     if (hidden) {
       this.clearModeTransition(true);
       this.stopMusicScheduler(true);
+      this.recordedScorePlayer?.stop();
       this.stopSources(this.sfxSources);
       if (context?.state === "running") {
         try {
@@ -416,6 +459,8 @@ export class ArcadeAudio {
     this.gestureCleanup = null;
     this.clearModeTransition();
     this.stopMusicScheduler(true);
+    this.recordedScorePlayer?.dispose();
+    this.recordedScorePlayer = null;
     this.stopSources(this.sfxSources);
 
     const context = this.context;
@@ -489,6 +534,9 @@ export class ArcadeAudio {
     this.musicFilter = musicFilter;
     this.sfxGain = sfxGain;
     this.noiseBuffer = noiseBuffer;
+    this.recordedScorePlayer = RecordedScorePlayer.canUse(context)
+      ? new RecordedScorePlayer(context, musicGain)
+      : null;
     context.addEventListener("statechange", this.contextStateHandler);
     this.applyMasterVolume();
     this.applyMusicCharacter(true);
@@ -502,7 +550,7 @@ export class ArcadeAudio {
     }
 
     if (this.disposed || context.state !== "running") return false;
-    this.startMusicScheduler();
+    this.startPreferredMusic();
     return true;
   }
 
@@ -524,9 +572,11 @@ export class ArcadeAudio {
 
   private musicLowPassTarget(): number {
     const profile = floorScoreProfile(this.renderedSceneValue.floor);
-    const base = profile.movements[this.renderedSceneValue.mode].lowPassHz;
-    if (this.focusValue === "thinking") return base * 0.68;
-    if (this.focusValue === "resolving") return base * 0.84;
+    const base = runtimeScoreForScene(this.renderedSceneValue)
+      ? this.renderedSceneValue.floor === 1 ? 5_200 : 5_600
+      : profile.movements[this.renderedSceneValue.mode].lowPassHz;
+    if (this.focusValue === "thinking") return base * 0.78;
+    if (this.focusValue === "resolving") return base * 0.91;
     return base;
   }
 
@@ -566,6 +616,32 @@ export class ArcadeAudio {
       this.nextMusicStepAt = this.context.currentTime + 0.035;
     }
     this.scheduleMusicWindow();
+  }
+
+  private startPreferredMusic(): void {
+    if (
+      this.disposed ||
+      this.pageHiddenValue ||
+      this.mutedValue ||
+      this.context?.state !== "running"
+    ) return;
+    if (runtimeScoreForScene(this.renderedSceneValue) && this.recordedScorePlayer) {
+      this.stopMusicScheduler(true);
+      void this.recordedScorePlayer.play(this.renderedSceneValue).then((played) => {
+        if (
+          !played &&
+          !this.disposed &&
+          !this.pageHiddenValue &&
+          !this.mutedValue &&
+          this.context?.state === "running"
+        ) {
+          this.startMusicScheduler();
+        }
+      });
+      return;
+    }
+    this.recordedScorePlayer?.stop(0.8);
+    this.startMusicScheduler();
   }
 
   private scheduleMusicWindow(): void {

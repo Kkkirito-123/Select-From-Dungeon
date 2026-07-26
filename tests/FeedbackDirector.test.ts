@@ -40,6 +40,25 @@ describe("FeedbackDirector", () => {
     ]);
   });
 
+  it("身份恢复同时给出名字、永久图鉴与经验反馈", () => {
+    const playSfx = vi.fn(async (_effect: ArcadeSfx) => true);
+    const director = new FeedbackDirector({ playSfx });
+    const notices: string[] = [];
+    director.subscribe((_event, notice) => {
+      if (notice) notices.push(notice.message);
+    });
+
+    director.dispatch({
+      type: "identity-recovered",
+      monsterName: "史莱姆",
+      monsterId: 1,
+      xp: 1,
+    }, 1_000);
+
+    expect(playSfx).toHaveBeenCalledExactlyOnceWith("stage-clear");
+    expect(notices).toEqual(["名字恢复：史莱姆 · 图鉴 +1 · +1 XP"]);
+  });
+
   it("按住方向键的 125ms 移动节奏每秒最多播放四次脚步音", () => {
     const playSfx = vi.fn(async (_effect: ArcadeSfx) => true);
     const director = new FeedbackDirector({ playSfx });

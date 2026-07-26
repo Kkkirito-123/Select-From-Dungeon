@@ -1,9 +1,28 @@
 # 文档索引
 
-文档按“当前事实、MVP 2.0 真源、历史设计与报告”分层。当前运行事实以 `AGENTS.md`、
-README、代码和测试共同为准；历史正文中的旧尺寸、旧音乐或原型状态不再覆盖 MVP 2.0。
+文档按“当前两层垂直切片、八层兼容基线、历史设计与报告”分层。当前运行事实以 `AGENTS.md`、
+README、代码和测试共同为准；`docs/product/` 是第一、二层内容与制作契约的第一真源。历史正文
+中的“八层已完整精修”、旧尺寸、旧音乐或原型状态不再覆盖两层垂直切片。
 
-## 当前事实与发布
+## 两层垂直切片产品真源
+
+本轮目标不是在旧八层原型上继续换色，而是先把第一、二层做到正式垂直切片质量：细腻剧情、
+地点化地图、真实世界状态、正式像素素材、连续音频和可验证教学。
+
+| 文档 | 状态 | 用途 |
+|---|---|---|
+| [产品文档总索引](./product/README.md) | `IMPLEMENTED RC` | 大厂规格文档集入口、真源、角色和变更控制 |
+| [两层产品规格](./product/PRODUCT_SPEC_TWO_FLOOR_VERTICAL_SLICE.md) | `IMPLEMENTED RC` | 产品愿景、核心循环、系统边界、八层宏观框架与总验收 |
+| [第一层关卡圣经](./product/floors/FLOOR_01_EMBER_ARCHIVE.md) | `VERTICAL SLICE CURRENT` | 地下余烬档案的地图、故事、SQL、怪物、Boss 与状态 |
+| [第二层关卡圣经](./product/floors/FLOOR_02_TIDAL_ARCHIPELAGO.md) | `VERTICAL SLICE CURRENT` | 潮汐群岛的航线、故事、JOIN、生态、Boss 与状态 |
+| [旧设计迁移矩阵](./product/LEGACY_DESIGN_MIGRATION_MATRIX.md) | `CURRENT DECISIONS` | 旧稿逐项保留、改造、替代、后置或废弃 |
+| [素材来源与生产清单](./product/ASSET_SOURCE_AND_PRODUCTION_MANIFEST.md) | `SOURCE VERIFIED` | 每个来源独立目录、许可证、哈希、派生与运行时预算 |
+
+系统、叙事、视听、技术、QA 专项文档全部由[产品文档总索引](./product/README.md)导航。文档中
+`CURRENT` 仅表示第一、二层垂直切片已经进入运行时；第三至八层仍沿用兼容内容，不因此获得同等
+精修状态。详细对白、美术帧和真人完整游玩仍可在不改变系统契约的前提下继续打磨。
+
+## 当前运行基线
 
 | 文档 | 状态 | 用途 |
 |---|---|---|
@@ -11,24 +30,40 @@ README、代码和测试共同为准；历史正文中的旧尺寸、旧音乐�
 | [English README](../README.md) / [中文](../README.zh-CN.md) | `2.0.0 RC` | 当前用户可见功能、架构与存档 |
 | [产品契约](../PRODUCT.md) | `2.0.0 RC` | 用户、定位、设计原则、运行规则与性能边界 |
 | [版本记录](../CHANGELOG.md) | `2.0.0 RC` | 各版本用户可见结果与 PR 归档 |
-| [MVP 2.0 发布检查表](./RELEASE_CHECKLIST.md) | `PR_OPEN / VALIDATED` | 自动化、浏览器、兼容、版权与最终 PR 证据 |
+| [MVP 2.1 发布检查表](./RELEASE_CHECKLIST.md) | `LOCAL_VALIDATED / PR_PENDING` | 自动化、浏览器、兼容、版权与最终 PR 证据 |
 | [八层课程蓝图](./CURRICULUM.zh-CN.md) / [English](./CURRICULUM.md) | `CURRENT` | 当前 47 组课程顺序、题型与掌握标准 |
-| [MVP 2.0 设计与实施基线](./design/MVP_2_0_MASTER_PLAN.md) | `IMPLEMENTED / RELEASE_CANDIDATE` | 八层主线、48×36 地图、角色、叙事、音乐与交付边界 |
-| [音乐与地图上升设计圣经](./design/MUSIC_MAP_ASCENT_BIBLE.md) | `HISTORICAL DIRECTION / CURRENT SCORE UPDATED` | 八层地理上升与抗疲劳方向；运行时已改为公版古典主题的程序化电子合成 |
+| [MVP 2.0 设计与实施基线](./design/MVP_2_0_MASTER_PLAN.md) | `LEGACY CURRENT CLAIM / SUPERSEDED FOR TARGET` | 八层旧运行基线；第一、二层目标已由 `docs/product/` 替代 |
+| [音乐与地图上升设计圣经](./design/MUSIC_MAP_ASCENT_BIBLE.md) | `HISTORICAL DIRECTION / CURRENT SCORE UPDATED` | 八层地理上升与抗疲劳方向；F1/F2 已改为项目基于公版主题生成并导出的连续曲目 |
 | [叙事圣经](./design/NARRATIVE_BIBLE.md) | `CORE_IMPLEMENTED` | 世界真相、抄写员、《失名录》与唯一 `MIGRATE` 结局；正文的 `v1.1 CURRENT / 尚未实现` 标记是实现前快照 |
 | [篝火、复活点与安全区](./design/CAMPFIRE_CHECKPOINT_DESIGN.md) | `HISTORICAL / CURRENT OVERRIDE BELOW` | 原三篝火设计；当前为中后两处实体篝火 + 出生安全锚点 |
 
-当前关键事实：
+当前代码关键事实：
 
-- 新 Run：`48×36 / generator v5`；八层各有手工宏观轮廓、三个区域与实体交通；
+- 新 Run：`48×36 / generator v5`；第一、二层拥有独立 CC0 地形资源、地点化布景、可见环境
+  状态、现场剧情节点和管理员状态预设；第三至八层继续使用既有蓝图与通用区域内容；
 - 兼容 Run：`64×48 / generator v4` 只用于读取旧存档，不代表当前新图；
 - 课程：保留现有八层 47 组顺序，不在 MVP 2.0 暗中重排；
-- 音乐：八层采用标明出处的公版古典主题 + Web Audio 程序化电子合成，不打包外部录音；
-- 叙事：每层五拍、两条固定证据、抄写员、本地《失名录》和唯一 `MIGRATE` 结局已进入运行时；
+- 音乐：第一、二层使用项目自行生成并导出的连续 OGG/MP3 曲目，主题取自公版作品，探索 / 战斗 /
+  Boss 以短交叉淡化切换；第三至八层保留 Web Audio 兼容配方，事件 SFX 仍为轻量实时生成；
+- 叙事：第一层有 8 个、第二层有 9 个现场剧情节点，课程、真实 SQLite 证据、抄写员、《失名录》
+  与环境状态共同推进；
 - 身份：必修怪物击败前只显示 ID，最后一击回收名字，永久怪物图鉴跨 Run 保存；
-- 角色：玩家四阶段显形、抄写员和怪物模型由地图 / 战斗同源程序化配方绘制；
+- 角色：玩家、怪物和唯一抄写员保持低开销像素 Actor；前两层地形与关键机关使用审计过的 CC0
+  Tile / Prop 叠加项目自制动态布景；
 - 篝火：每层中段与后段各一处实体篝火，出生区作为前段安全与兜底复活锚点；
 - 存档：使用 `run:v11`、`profile:v3`、`onboarding:v1`；旧 v10/v2 记录在内存迁移。
+
+## 后续体验质量迭代
+
+以下文档记录用户实测 MVP 2.0 后提出的体验改造方向，不是当前运行事实，也不授权直接修改代码、
+课程、存档、依赖或第三方素材：
+
+| 文档 | 状态 | 用途 |
+|---|---|---|
+| [八层差异化体验迭代](./design/EIGHT_FLOOR_EXPERIENCE_VARIETY_PLAN.md) | `APPROVED_FOR_DESIGN / NOT_IMPLEMENTED` | 定义八层独有动词、SQL 世界行为、非战斗玩法、回访、Boss、抄写员人物弧与疲劳预算 |
+
+该迭代保留当前八层 47 组课程、`48×36 / generator-v5`、Phaser、离线 SQLite、确定 Seed 和
+唯一 `MIGRATE` 结局。运行时实施必须从第一、二层垂直切片建立新的批准范围和验收证据。
 
 ## 历史设计与兼容参考
 
@@ -57,8 +92,10 @@ README、代码和测试共同为准；历史正文中的旧尺寸、旧音乐�
 
 ## 作者回归与发布归档
 
-- 功能已由 261 项自动化测试、生产构建、八层管理员视图、终局、320 px、触屏、
-  Reduced Motion 和 iframe 浏览器矩阵覆盖；
+- 功能已由 330 项自动化测试、生产构建、素材哈希校验、第一/二层管理员状态预设、桌面视觉、
+  精确 320 px 回流、声音开关和浏览器 0 警告 / 0 错误覆盖；
+- 本轮尚未重复执行触屏、Reduced Motion、受限 iframe 与跨浏览器完整矩阵；这些路径保留旧基线
+  与单元测试证据，但不能冒充本轮人工浏览器证据；
 - 真实耳机 / 扬声器上的主观连续性、疲劳与音量检查；
 - 真人从新 Run 到 `MIGRATE` 的完整游玩记录；
 - 统一 PR 创建与 PR CI 归档。

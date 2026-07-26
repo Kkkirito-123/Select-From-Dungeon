@@ -121,7 +121,7 @@ export const ROOM_TEMPLATES: Record<RoomType, RoomTemplate> = {
     accentColor: 0x9a74a5,
   },
   elite: {
-    label: "聚合钟楼",
+    label: "聚合档案厅",
     rows: THRONE_ROWS,
     floorColor: 0x29241e,
     accentColor: 0xd7ad55,
@@ -237,7 +237,7 @@ const REWARD_CATALOG: Partial<Record<RoomReward, ClaimableReward>> = {
   "aggregate-hammer": {
     id: "aggregate-hammer",
     name: "聚合战锤",
-    description: "领取必修武器，开启 GROUP BY 钟楼。",
+    description: "领取必修武器，开启 GROUP BY 回执归档间。",
     kind: "weapon",
   },
   "sort-saber": {
@@ -383,26 +383,26 @@ export function roomFlavor(type: RoomType, floor = 1): string {
   }
   if (floor === 2) {
     const floorTwoCopy: Record<RoomType, string> = {
-      entry: "传送残响正在湖岸退去。森林、湖泊和泥沼会沿同一 Seed 重新分布。",
-      tutorial: "林间足迹不断交换位置，只有排序后的结果能够锁定猎犬。",
-      lesson: "怪物档案和区域记录分散在不同数据表，等待明确的连接条件。",
-      rest: "湖畔篝火可以恢复生命；靠近后按 E 休息或复盘。",
-      treasure: "猎具仓只增强本轮构筑，不改变必修课程。",
-      event: "泥沼古井等待调查，结果只影响当前 Run。",
-      elite: "树妖校验场会放大每一条错误连接。",
-      boss: "丛林王正在同时控制房间、怪物与装备三张表。",
+      entry: "潮声正从码头木桩间退去。浅滩、沉水村落与远处灯塔由同一 Seed 固定。",
+      tutorial: "ID #010 打乱七盏浮标的强弱次序，只有排序后的结果能点亮第一段航线。",
+      lesson: "岛屿、怪物与房间记录分散在不同数据表，等待明确的连接条件。",
+      rest: "浅滩篝火可以恢复生命；靠近后按 E 休息或复盘。",
+      treasure: "沉船补给舱只增强本轮构筑，不改变必修课程。",
+      event: "沉水村落的屋顶与门牌等待退潮，不会替代必修查询。",
+      elite: "ID #012 守着双端根桥，错误连接会让桥身重新断开。",
+      boss: "ID #014 正在用灯塔强光同时锁住房间、怪物与装备三张表。",
     };
     return floorTwoCopy[type];
   }
   const copy: Record<RoomType, string> = {
-    entry: "铸铁门后的路线每局都会重排，但所有必修知识都不会消失。",
-    tutorial: "青色数据页从书架间飘落，史莱姆守着第一条 SELECT。",
-    lesson: "数据库石砖正在渗出紫光。这里封存着一条必修查询。",
-    rest: "篝火像一次尚未提交的回滚，靠近后按 E 结算。",
-    treasure: "索引箱只改变本轮构筑，不会随机夺走课程所需武器。",
-    event: "事务祭坛等待一次选择；结果只影响当前 Run。",
-    elite: "聚合钟摆把每一组信号压成沉重的一击。",
-    boss: "HAVING 魔王正在等待最终结果集。",
+    entry: "地下排水渠仍在运转，登记册却找不到你的当前记录。沿余烬与水声向内调查。",
+    tutorial: "铜质水轮旁散落着信号页，ID #001 守着第一条 SELECT。",
+    lesson: "浸水档案架保存着一条必修查询；完成后环境会留下可见变化。",
+    rest: "实体篝火照亮安全圈；靠近后按 E 休息或复盘本层答案。",
+    treasure: "旧仓库宝箱只改变本轮构筑，不会随机夺走课程所需武器。",
+    event: "恢复回执台等待归档；结果只影响当前 Run。",
+    elite: "回执按 channel 归组后，通往登记厅的中央路才会亮起。",
+    boss: "ID #005 正在回燃登记厅执行“只保留多数”的旧规则。",
   };
   return copy[type];
 }

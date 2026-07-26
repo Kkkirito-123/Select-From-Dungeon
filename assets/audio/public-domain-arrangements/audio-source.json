@@ -1,0 +1,411 @@
+{
+  "schemaVersion": 1,
+  "status": "runtime",
+  "generatedAt": "2026-07-26",
+  "generator": {
+    "path": "scripts/generate-runtime-classical-audio.mjs",
+    "sha256": "3be4d952f3a43bb0b994c9a4288519d6508a79bb27cd430c5bf407f7250f3e1b",
+    "deterministic": true,
+    "requiredTool": "ffmpeg (only for OGG/MP3 encoding)",
+    "containerNormalization": "OGG stream serials and page CRCs are normalized from the stable track id."
+  },
+  "license": "The underlying compositions are public domain. The new transcription data, arrangements, synthesis, and recordings are project-owned and distributed under the repository MIT license.",
+  "records": [
+    {
+      "schemaVersion": 1,
+      "id": "f01-ember-archive-explore",
+      "floor": 1,
+      "mode": "explore",
+      "titleZh": "余烬里的旧歌",
+      "sourceWork": {
+        "title": "12 Variations on “Ah vous dirai-je, Maman”, K.265",
+        "composer": "Wolfgang Amadeus Mozart",
+        "composerLife": "1756–1791",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Mozart died in 1791. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered the familiar public-domain theme as note data. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 72,
+        "beatsPerBar": 4,
+        "bars": 16,
+        "durationSeconds": 53.333333,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5400,
+        "highpassHz": 52,
+        "measuredRmsDbfs": -18.079,
+        "measuredPeakDbfs": -6.698,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 53.333333
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f01/explore.ogg",
+          "bytes": 201013,
+          "sha256": "14609b8ecc8a1198fe90b01bcc8d4e13fea8ab2ea2410ef49d447b9749be9b18"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f01/explore.mp3",
+          "bytes": 427437,
+          "sha256": "2e8da3a7d88a83a366e442c45e510b66dd3f4ecf3e740a3369125b9890122617"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f01-ember-archive-combat",
+      "floor": 1,
+      "mode": "combat",
+      "titleZh": "纸页疾行",
+      "sourceWork": {
+        "title": "12 Variations on “Ah vous dirai-je, Maman”, K.265",
+        "composer": "Wolfgang Amadeus Mozart",
+        "composerLife": "1756–1791",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Mozart died in 1791. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered the familiar public-domain theme as note data. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 104,
+        "beatsPerBar": 4,
+        "bars": 24,
+        "durationSeconds": 55.384615,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5000,
+        "highpassHz": 55,
+        "measuredRmsDbfs": -16.775,
+        "measuredPeakDbfs": -2.47,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 55.384615
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f01/combat.ogg",
+          "bytes": 182709,
+          "sha256": "366a2ef57badea3ef5c7d49c8f639729e573de6178ea01ff57e32c95f12f575e"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f01/combat.mp3",
+          "bytes": 443757,
+          "sha256": "16898aab3da4172ddfd6d0628a79e782f26f76e7f7e8d7f68afb43d2cc12bab8"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f01-ember-archive-boss",
+      "floor": 1,
+      "mode": "boss",
+      "titleZh": "铜印之下",
+      "sourceWork": {
+        "title": "12 Variations on “Ah vous dirai-je, Maman”, K.265",
+        "composer": "Wolfgang Amadeus Mozart",
+        "composerLife": "1756–1791",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Mozart died in 1791. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered the familiar public-domain theme as note data. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 112,
+        "beatsPerBar": 3,
+        "bars": 32,
+        "durationSeconds": 51.428571,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5200,
+        "highpassHz": 54,
+        "measuredRmsDbfs": -16.503,
+        "measuredPeakDbfs": -2.246,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 51.428571
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f01/boss.ogg",
+          "bytes": 180886,
+          "sha256": "c971a2ce9a6383f7ed2c561daa06df04c5b9d29fc581eb3dcdf62442a09ce66a"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f01/boss.mp3",
+          "bytes": 412077,
+          "sha256": "7071fb73ab0ac1530fe9ea6612a1a320dedb5b02fa7849ef9d906ae45d5fdeba"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f02-tidal-archipelago-explore",
+      "floor": 2,
+      "mode": "explore",
+      "titleZh": "潮汐水上曲",
+      "sourceWork": {
+        "title": "Water Music, HWV 348–350",
+        "composer": "George Frideric Handel",
+        "composerLife": "1685–1759",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Handel died in 1759. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered a short Water Music-derived contour as note data, then rewrote the harmony, structure, rhythm, and orchestration. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 76,
+        "beatsPerBar": 2,
+        "bars": 32,
+        "durationSeconds": 50.526316,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5800,
+        "highpassHz": 50,
+        "measuredRmsDbfs": -17.597,
+        "measuredPeakDbfs": -5.747,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 50.526316
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f02/explore.ogg",
+          "bytes": 194322,
+          "sha256": "2b8ce5684fbd414555e149eda3df8ecd527d6376f04eff9d416c2625be4a82cf"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f02/explore.mp3",
+          "bytes": 404973,
+          "sha256": "e23690c36bb921441c7c436195b543dde3b1621b599ab709de3ce1feea153f3c"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f02-tidal-archipelago-combat",
+      "floor": 2,
+      "mode": "combat",
+      "titleZh": "逆潮",
+      "sourceWork": {
+        "title": "Water Music, HWV 348–350",
+        "composer": "George Frideric Handel",
+        "composerLife": "1685–1759",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Handel died in 1759. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered a short Water Music-derived contour as note data, then rewrote the harmony, structure, rhythm, and orchestration. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 104,
+        "beatsPerBar": 2,
+        "bars": 40,
+        "durationSeconds": 46.153846,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5300,
+        "highpassHz": 55,
+        "measuredRmsDbfs": -16.163,
+        "measuredPeakDbfs": -3.233,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 46.153846
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f02/combat.ogg",
+          "bytes": 160884,
+          "sha256": "5032982e8627da3c988a8231adf4b352cb65ba6f70bcfa719ce5be071b24a77a"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f02/combat.mp3",
+          "bytes": 370029,
+          "sha256": "e5fd95a92a74a23d25d3d6a3fb9ffae4c7bec5ce86b1ffc7782a7f386ab57fbc"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f02-tidal-archipelago-boss",
+      "floor": 2,
+      "mode": "boss",
+      "titleZh": "七束灯火",
+      "sourceWork": {
+        "title": "Water Music, HWV 348–350",
+        "composer": "George Frideric Handel",
+        "composerLife": "1685–1759",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Handel died in 1759. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered a short Water Music-derived contour as note data, then rewrote the harmony, structure, rhythm, and orchestration. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 116,
+        "beatsPerBar": 2,
+        "bars": 48,
+        "durationSeconds": 49.655172,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5600,
+        "highpassHz": 55,
+        "measuredRmsDbfs": -15.615,
+        "measuredPeakDbfs": -2.618,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 49.655172
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f02/boss.ogg",
+          "bytes": 194598,
+          "sha256": "beaad25a7b11ca77357d8a648214fa1ed49cacd75c9ed11605bff6654e998472"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f02/boss.mp3",
+          "bytes": 397869,
+          "sha256": "4243106e8654bf3cd1aef290bf16f5ef886d8a442b9534c2d334e68ded2fad0c"
+        }
+      ]
+    }
+  ]
+}

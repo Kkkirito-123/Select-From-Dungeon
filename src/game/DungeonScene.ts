@@ -29,17 +29,22 @@ import {
 import {
   createMonsterActorParts,
   createPlayerActor,
-  createScribeActor,
 } from "./PixelActorFactory";
 import { monsterIdentityPresentation } from "../domain/monsterIdentity";
 import { newlyOpenedGate, pickedItemsBetween } from "./snapshotFeedback";
 import {
   INTERACTION_LABEL_DISTANCE,
   MONSTER_LABEL_DISTANCE,
-  OBJECTIVE_HIDE_DISTANCE,
   isNearPlayer,
+  shouldShowTutorialBeacon,
   tutorialObjective,
 } from "./worldOverlay";
+import { FloorSetpieceLayer } from "./FloorSetpieceLayer";
+import {
+  floorArtReady,
+  queueFloorArtAssets,
+  supportsFloorArt,
+} from "./floorArtAssets";
 
 interface MonsterView {
   container: Phaser.GameObjects.Container;
@@ -65,7 +70,6 @@ interface CampfireView {
   container: Phaser.GameObjects.Container;
   checkpointRing: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
-  scribeLabel: Phaser.GameObjects.Text;
   frameTimer?: Phaser.Time.TimerEvent;
 }
 
@@ -372,6 +376,7 @@ export class DungeonScene extends Phaser.Scene {
   private fog!: Phaser.GameObjects.Graphics;
   private entityLayer!: Phaser.GameObjects.Container;
   private playerView!: Phaser.GameObjects.Container;
+  private setpieceLayer: FloorSetpieceLayer | null = null;
   private objectiveBeacon: Phaser.GameObjects.Container | null = null;
   private readonly monsterViews = new Map<number, MonsterView>();
   private readonly itemViews = new Map<string, ItemView>();
@@ -386,6 +391,7 @@ export class DungeonScene extends Phaser.Scene {
   private battleTransitioning = false;
   private pagePaused = false;
   private patrolTimer: Phaser.Time.TimerEvent | null = null;
+  private pendingArtFloor: GameSnapshot["floor"] | null = null;
   private readonly reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
@@ -468,6 +474,10 @@ export class DungeonScene extends Phaser.Scene {
     this.snapshot = session.snapshot();
   }
 
+  preload(): void {
+    queueFloorArtAssets(this, this.snapshot.floor);
+  }
+
   create(): void {
     this.snapshot = this.session.snapshot();
     this.cameras.main.setBackgroundColor(COLORS.void);
@@ -523,6 +533,8 @@ export class DungeonScene extends Phaser.Scene {
     this.unsubscribe = null;
     this.patrolTimer?.destroy();
     this.patrolTimer = null;
+    this.setpieceLayer?.destroy();
+    this.setpieceLayer = null;
     this.clearCampfireViews();
     this.pressedDirections.clear();
   }
@@ -530,6 +542,9 @@ export class DungeonScene extends Phaser.Scene {
   private receiveSnapshot(snapshot: GameSnapshot): void {
     const previous = this.snapshot;
     this.snapshot = snapshot;
+    if (previous.floor !== snapshot.floor) {
+      this.ensureFloorArt(snapshot.floor);
+    }
     if (
       previous.floor !== snapshot.floor ||
       previous.mazeFloor.topologyHash !== snapshot.mazeFloor.topologyHash
@@ -616,6 +631,23 @@ export class DungeonScene extends Phaser.Scene {
       .forEach((item) => this.playPickupFeedback(item, snapshot.banner));
   }
 
+  private ensureFloorArt(floor: GameSnapshot["floor"]): void {
+    if (
+      !supportsFloorArt(floor) ||
+      floorArtReady(this, floor) ||
+      this.pendingArtFloor === floor
+    ) return;
+    const queued = queueFloorArtAssets(this, floor);
+    if (!queued) return;
+    this.pendingArtFloor = floor;
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.pendingArtFloor = null;
+      if (!this.scene.isActive() || this.snapshot.floor !== floor) return;
+      this.rebuildWorld();
+    });
+    if (!this.load.isLoading()) this.load.start();
+  }
+
   private rebuildWorld(): void {
     this.renderedTopology = this.snapshot.mazeFloor.topologyHash;
     this.terrain.clear();
@@ -626,7 +658,13 @@ export class DungeonScene extends Phaser.Scene {
     }
     this.objectiveBeacon = null;
     this.clearCampfireViews();
+    this.setpieceLayer?.destroy();
     this.entityLayer?.removeAll(true);
+    this.setpieceLayer = new FloorSetpieceLayer(
+      this,
+      this.entityLayer,
+      this.reducedMotion,
+    );
     this.monsterViews.clear();
     this.itemViews.forEach((view) => view.tween?.destroy());
     this.itemViews.clear();
@@ -640,6 +678,7 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.drawTerrain();
     this.drawDecorations();
+    this.setpieceLayer.build(this.snapshot);
     this.drawZoneLabels();
     this.createGates();
     this.createShortcutViews();
@@ -1035,25 +1074,6 @@ export class DungeonScene extends Phaser.Scene {
         backgroundColor: "#08090cdd",
         padding: { x: 4, y: 2 },
       }).setOrigin(0.5);
-      const restDx = campfire.restPosition.x - campfire.x;
-      const scribeX = restDx === 0 ? -24 : -restDx * 25;
-      const scribe = createScribeActor(this, {
-        // Keep the Scribe opposite the horizontal rest slot. Vertical rest
-        // slots use the left display rail so the actor never occupies the
-        // player's interaction tile or the label above the fire.
-        x: scribeX,
-        y: 4,
-        scale: 0.7,
-        depth: 24,
-      }).container;
-      const scribeLabel = this.add.text(scribeX, -22, "抄写员", {
-        color: "#f0ddbd",
-        fontFamily: "monospace",
-        fontSize: "7px",
-        fontStyle: "bold",
-        backgroundColor: "#08090cdd",
-        padding: { x: 3, y: 2 },
-      }).setOrigin(0.5);
       container.add([
         checkpointRing,
         stoneRing,
@@ -1062,8 +1082,6 @@ export class DungeonScene extends Phaser.Scene {
         logRight,
         flameFrameOne,
         flameFrameTwo,
-        scribe,
-        scribeLabel,
         label,
       ]);
       this.entityLayer.add(container);
@@ -1085,11 +1103,11 @@ export class DungeonScene extends Phaser.Scene {
         container,
         checkpointRing,
         label,
-        scribeLabel,
         frameTimer,
       });
     });
     this.syncCampfireViews();
+    this.setpieceLayer?.sync(this.snapshot);
   }
 
   private syncCampfireViews(): void {
@@ -1227,13 +1245,7 @@ export class DungeonScene extends Phaser.Scene {
     }
     const pixel = gridToPixels(objective.position);
     this.objectiveBeacon.setPosition(pixel.x, pixel.y - 47);
-    this.objectiveBeacon.setVisible(
-      !isNearPlayer(
-        this.snapshot.player,
-        objective.position,
-        OBJECTIVE_HIDE_DISTANCE,
-      ),
-    );
+    this.objectiveBeacon.setVisible(shouldShowTutorialBeacon(this.snapshot, objective));
   }
 
   private createMonsterBody(monster: Monster): Phaser.GameObjects.GameObject[] {
@@ -1275,6 +1287,7 @@ export class DungeonScene extends Phaser.Scene {
     this.syncGateViews();
     this.syncShortcutViews();
     this.syncCampfireViews();
+    this.setpieceLayer?.sync(this.snapshot);
     this.syncZoneLabels();
     this.drawFog();
   }

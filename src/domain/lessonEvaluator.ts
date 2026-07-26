@@ -26,6 +26,179 @@ function normalizeStructure(sql: string): string {
   return stripComments(sql).replace(/\s+/g, " ").trim();
 }
 
+const SQL_ALIAS_STOP_WORDS = new Set([
+  "where",
+  "inner",
+  "left",
+  "right",
+  "full",
+  "cross",
+  "join",
+  "on",
+  "group",
+  "having",
+  "order",
+  "limit",
+  "union",
+]);
+
+const UNREVEALED_IDENTITY_MESSAGE =
+  "身份字段仍被封存。本回合只允许使用题目要求的非身份字段。";
+
+type IdentityColumn = "name" | "species";
+
+function normalizeIdentitySql(sql: string): string {
+  return stripComments(sql)
+    .replace(/'(?:''|[^'])*'/g, "''")
+    .replace(/"((?:""|[^"])*)"/g, (_, identifier: string) => (
+      identifier.replace(/""/g, '"')
+    ))
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\[([^\]]*)\]/g, "$1");
+}
+
+function monsterAliasesForSql(sql: string): Set<string> | null {
+  if (!/\b(?:from|join)\s+(?:(?:[a-z_]\w*)\s*\.\s*)?monsters\b/i.test(sql)) {
+    return null;
+  }
+  const aliases = new Set(["monsters"]);
+  for (const match of sql.matchAll(
+    /\b(?:from|join)\s+(?:(?:[a-z_]\w*)\s*\.\s*)?monsters\b(?:\s+(?:as\s+)?([a-z_]\w*))?/gi,
+  )) {
+    const alias = match[1]?.toLowerCase();
+    if (alias && !SQL_ALIAS_STOP_WORDS.has(alias)) aliases.add(alias);
+  }
+  return aliases;
+}
+
+function identityColumnsInFragment(
+  fragment: string,
+  monsterAliases: ReadonlySet<string>,
+): Set<IdentityColumn> {
+  const columns = new Set<IdentityColumn>();
+  const unqualified = fragment.replace(
+    /\b([a-z_]\w*)\s*\.\s*\b(name|species)\b/gi,
+    (_reference, qualifier: string, column: string) => {
+      if (monsterAliases.has(qualifier.toLowerCase())) {
+        columns.add(column.toLowerCase() as IdentityColumn);
+      }
+      return " ";
+    },
+  ).replace(/\bas\s+(?:name|species)\b/gi, " ");
+
+  for (const match of unqualified.matchAll(/\b(name|species)\b/gi)) {
+    columns.add(match[1].toLowerCase() as IdentityColumn);
+  }
+  return columns;
+}
+
+function splitProjection(projection: string): string[] {
+  const expressions: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < projection.length; index += 1) {
+    const character = projection[index];
+    if (character === "(") depth += 1;
+    else if (character === ")") depth = Math.max(0, depth - 1);
+    else if (character === "," && depth === 0) {
+      expressions.push(projection.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  expressions.push(projection.slice(start).trim());
+  return expressions.filter(Boolean);
+}
+
+function directMonsterIdentityProjection(
+  expression: string,
+  monsterAliases: ReadonlySet<string>,
+): IdentityColumn | null {
+  const match = expression.trim().match(
+    /^(?:distinct\s+)?(?:([a-z_]\w*)\s*\.\s*)?(name|species)(?:\s+(?:as\s+)?[a-z_]\w*)?$/i,
+  );
+  if (!match) return null;
+  const qualifier = match[1]?.toLowerCase();
+  if (qualifier && !monsterAliases.has(qualifier)) return null;
+  return match[2].toLowerCase() as IdentityColumn;
+}
+
+function allowedIdentityProjections(sql: string): Set<IdentityColumn> {
+  const normalized = normalizeIdentitySql(sql);
+  const aliases = monsterAliasesForSql(normalized);
+  const projection = normalized.match(/^\s*select\s+([\s\S]*?)\s+from\b/i)?.[1];
+  if (!aliases || !projection) return new Set();
+  return new Set(splitProjection(projection).flatMap((expression) => {
+    const column = directMonsterIdentityProjection(expression, aliases);
+    return column ? [column] : [];
+  }));
+}
+
+function hasSealedIdentityUse(
+  sql: string,
+  allowedProjectionColumns: ReadonlySet<IdentityColumn>,
+): boolean {
+  const normalized = normalizeIdentitySql(sql);
+  const aliases = monsterAliasesForSql(normalized);
+  if (!aliases) return false;
+  const projectionMatch = normalized.match(/^\s*select\s+([\s\S]*?)\s+from\b/i);
+  if (!projectionMatch || projectionMatch.index === undefined) {
+    return identityColumnsInFragment(normalized, aliases).size > 0;
+  }
+
+  const projection = projectionMatch[1];
+  for (const expression of splitProjection(projection)) {
+    const used = identityColumnsInFragment(expression, aliases);
+    if (used.size === 0) continue;
+    const direct = directMonsterIdentityProjection(expression, aliases);
+    if (!direct || used.size !== 1 || !allowedProjectionColumns.has(direct)) {
+      return true;
+    }
+  }
+
+  const projectionStart = projectionMatch.index + projectionMatch[0].indexOf(projection);
+  const remainder = `${normalized.slice(0, projectionStart)} ${normalized.slice(
+    projectionStart + projection.length,
+  )}`;
+  return identityColumnsInFragment(remainder, aliases).size > 0;
+}
+
+export function evaluateUnrevealedIdentityQuery(
+  floor: number,
+  stage: LessonStageDefinition,
+  sql: string,
+  identityRevealed: boolean,
+): QueryEvaluation | null {
+  const message = unrevealedIdentityQueryMessage(
+    floor,
+    stage.answerSql,
+    sql,
+    identityRevealed,
+  );
+  if (!message) return null;
+
+  return {
+    accepted: false,
+    kind: "wrong-result",
+    message,
+    locksBroken: [],
+    locksRemaining: [...stage.locks],
+    attackTargetIds: [],
+  };
+}
+
+export function unrevealedIdentityQueryMessage(
+  floor: number,
+  answerSql: string,
+  sql: string,
+  identityRevealed: boolean,
+): string | null {
+  if (floor < 1 || floor > 2 || identityRevealed) return null;
+  const allowedIdentityColumns = allowedIdentityProjections(answerSql);
+  return hasSealedIdentityUse(sql, allowedIdentityColumns)
+    ? UNREVEALED_IDENTITY_MESSAGE
+    : null;
+}
+
 function isFlatBeginnerSelect(sql: string): boolean {
   const keywordSql = stripLiteralsAndComments(sql).replace(/\s+/g, " ").trim();
   const selectCount = keywordSql.match(/\bselect\b/gi)?.length ?? 0;
@@ -348,9 +521,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "where-weakness":
       return (
         projectsOnlyColumn(normalizedSql, "weakness") &&
-        columnEqualsString(whereClause, "name", "水胶怪") &&
+        columnEqualsNumber(whereClause, "id", 2) &&
         columnEqualsString(whereClause, "status", "escaped") &&
-        !filtersByDirectId(whereClause) &&
         hasSingleValue(result, "weakness", "focus")
       );
     case "null-target":
@@ -368,7 +540,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnIsNull(whereClause, "master_id") &&
         columnEqualsString(whereClause, "status", "cursed") &&
         !filtersByDirectId(whereClause) &&
-        hasSingleValue(result, "name", "毒胶怪")
+        hasSingleValue(result, "name", "毒史莱姆")
       );
     case "group-signals":
       return (
@@ -410,7 +582,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         projectsOnlyColumn(normalizedSql, "name") &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
         columnEqualsNumber(whereClause, "id", 6) &&
-        hasSingleValue(result, "name", "软泥怪")
+        hasSingleValue(result, "name", "小水怪")
       );
     case "practice-where":
       return (
@@ -427,7 +599,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnIsNull(whereClause, "master_id") &&
         columnEqualsString(whereClause, "status", "toxic") &&
         !filtersByDirectId(whereClause) &&
-        hasSingleValue(result, "name", "毒胶怪")
+        hasSingleValue(result, "name", "灰史莱姆")
       );
     case "practice-group":
       return (
@@ -446,7 +618,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         projectsOnlyColumn(normalizedSql, "name") &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
         columnEqualsNumber(whereClause, "id", 9) &&
-        hasSingleValue(result, "name", "铁胶怪")
+        hasSingleValue(result, "name", "铁泥怪")
       );
     case "order-peak":
       return (
@@ -487,8 +659,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "id", 12) &&
-        hasExactOrderedRows(result, ["name", "sector"], [
-          ["树妖", "forest-bridge"],
+        hasExactOrderedRows(result, ["id", "sector"], [
+          [12, "forest"],
         ])
       );
     case "left-join-unarmed":
@@ -504,11 +676,12 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "floor", 2) &&
         new RegExp(qualifiedColumn("sector"), "i").test(groupClause) &&
-        /\b(?:count\s*\([^)]*\)|total)\s*(?:>=\s*2\b|>\s*1\b)/i.test(havingClause) &&
-        /\border\s+by\s+(?:\w+\.)?total\s+desc\b/i.test(normalizedSql) &&
+        /\b(?:count\s*\([^)]*\)|total)\s*(?:>=\s*3\b|>\s*2\b)/i.test(havingClause) &&
+        /\border\s+by\s+(?:\w+\.)?total\s+desc\s*,\s*(?:\w+\.)?sector(?:\s+asc)?\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["sector", "total"], [
-          ["ambush", 4],
-          ["storm", 2],
+          ["lake", 4],
+          ["swamp", 4],
+          ["forest", 3],
         ])
       );
     case "join-boss-core":
@@ -518,7 +691,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         /\border\s+by\s+(?:\w+\.)?power\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["name", "power"], [
-          ["丛林王", 21],
+          ["灯塔守卫", 21],
         ])
       );
     case "practice-order":
@@ -570,7 +743,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "id", 20) &&
-        hasExactOrderedRows(result, ["name", "room_name"], [["树妖", "树妖林地"]])
+        hasExactOrderedRows(result, ["id", "room_name"], [[20, "盘根林地"]])
       );
     case "practice-forest-join-core":
       return (
@@ -578,20 +751,26 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "id", 20) &&
         /\border\s+by\s+(?:\w+\.)?sector(?:\s+asc)?\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["name", "sector"], [["树妖", "forest-treant"]])
+        hasExactOrderedRows(result, ["name", "room_sector"], [["树妖", "forest"]])
       );
     case "lake-boss-scan":
       return (
-        /\bfrom\s+monsters\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 21) &&
-        hasExactOrderedRows(result, ["name", "status"], [["湖怪", "submerged"]])
+        /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
+        columnEqualsNumber(whereClause, "monster_id", 21) &&
+        /\border\s+by\s+(?:\w+\.)?charge\s+desc\b/i.test(normalizedSql) &&
+        /\blimit\s+2\b/i.test(normalizedSql) &&
+        hasExactOrderedRows(result, ["channel", "charge"], [
+          ["surge", 14],
+          ["surge", 13],
+        ])
       );
     case "lake-boss-sort":
       return (
-        /^select\s+distinct\s+(?:\w+\.)?status\b/i.test(normalizedSql) &&
-        columnEqualsNumber(whereClause, "id", 21) &&
-        /\border\s+by\s+(?:\w+\.)?status(?:\s+asc)?\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["status"], [["submerged"]])
+        /^select\s+distinct\s+(?:\w+\.)?channel\b/i.test(normalizedSql) &&
+        /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
+        columnEqualsNumber(whereClause, "monster_id", 21) &&
+        /\border\s+by\s+(?:\w+\.)?channel(?:\s+asc)?\b/i.test(normalizedSql) &&
+        hasExactOrderedRows(result, ["channel"], [["deep"], ["surge"], ["wake"]])
       );
     case "frog-boss-left":
       return (
@@ -607,8 +786,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "floor", 2) &&
         columnEqualsNumber(whereClause, "id", 22) &&
-        /\border\s+by\s+(?:\w+\.)?name(?:\s+asc)?\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["name"], [["蛙王"]])
+        /\border\s+by\s+(?:\w+\.)?id(?:\s+asc)?\b/i.test(normalizedSql) &&
+        hasExactOrderedRows(result, ["name", "room_name"], [["蛙王", "泥冠宫"]])
       );
     case "f3-inner-room":
       return (
@@ -983,40 +1162,40 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
 }
 
 const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
-  "select-name": "结果没有精确读出史莱姆的 name。检查列名、来源表和 id = 1。",
-  "select-weakness": "结果没有精确读出史莱姆的 weakness。检查完整 SELECT。",
-  "where-target": "结果不是唯一的水胶怪。检查 room_id、status 和多余行。",
-  "where-weakness": "没有按怪物名字与状态读出 weakness。不要只用 id 绕过过滤训练。",
-  "null-target": "没有锁定无主毒胶怪。NULL 不能使用等号比较。",
-  "null-name": "没有按空主人和诅咒状态读出毒胶怪名字。",
-  "group-signals": "分组结果应为 echo = 3、noise = 1；检查执行官 ID、COUNT(*) 与 channel。",
+  "select-name": "结果没有精确读出 ID #001 的 name。检查列名、来源表和 id = 1。",
+  "select-weakness": "结果没有精确读出 ID #001 的 weakness。检查完整 SELECT。",
+  "where-target": "结果没有唯一锁定 ID #002。检查 room_id、status 和多余行。",
+  "where-weakness": "没有按 id 与 status 读出 ID #002 的 weakness。",
+  "null-target": "没有锁定无主的 ID #003。NULL 不能使用等号比较。",
+  "null-name": "没有按空主人和诅咒状态读出 ID #003 的名字。",
+  "group-signals": "分组结果应为 echo = 3、noise = 1；检查 ID #004、COUNT(*) 与 channel。",
   "having-shield": "护盾阶段应保留 echo = 3 与 ward = 2；HAVING 要过滤聚合后的组。",
   "having-core": "核心阶段只应保留 echo = 3；把 HAVING 阈值提高到 3。",
-  "practice-select": "结果没有精确读出软泥怪的 name。检查列名、表名与 id = 6。",
-  "practice-where": "结果没有锁定水胶怪。需要同时过滤 room_id 与 status。",
-  "practice-null": "结果没有读出无主毒胶怪。检查 IS NULL 与 toxic 状态。",
-  "practice-group": "铁胶怪信号应得到 echo = 2、noise = 2；检查 COUNT(*) 与 GROUP BY。",
-  "practice-group-core": "没有按 id 读出铁胶怪的 name。",
+  "practice-select": "结果没有精确读出 ID #006 的 name。检查列名、表名与 id = 6。",
+  "practice-where": "结果没有锁定 ID #007。需要同时过滤 room_id 与 status。",
+  "practice-null": "结果没有读出无主的 ID #008。检查 IS NULL 与 toxic 状态。",
+  "practice-group": "ID #009 的信号应得到 echo = 2、noise = 2；检查 COUNT(*) 与 GROUP BY。",
+  "practice-group-core": "没有按 id 读出 ID #009 的 name。",
   "order-peak": "没有取出 charge 最高的 surge；检查 DESC 与 LIMIT 1。",
   "order-top-two": "前两行应依次是 surge = 13、arc = 11；检查排序方向与 LIMIT 2。",
   "distinct-status": "去重结果应只有 echo、mirror；检查 DISTINCT 与排序。",
-  "inner-join-room": "没有把树妖与“古树桥”正确连接；检查 room_id = rooms.id 与别名。",
-  "inner-join-sector": "连接结果应显示树妖位于 forest-bridge sector。",
+  "inner-join-room": "没有用 m.name 与 r.name AS room_name 返回 ID #012 和“古树桥”。",
+  "inner-join-sector": "连接结果应只返回 ID #012 的 id = 12 与 sector = forest，不要把 id 改名为 monster_id。",
   "left-join-unarmed": "没有找到右表缺失的 #13；检查 LEFT JOIN 与 g.monster_id IS NULL。",
-  "join-boss-groups": "综合结果应依次为 ambush = 4、storm = 2；检查 JOIN、分组、HAVING 与排序。",
-  "join-boss-core": "没有定位丛林王 power = 21 的最强装备；检查 JOIN、DESC 与 LIMIT 1。",
-  "practice-order": "没有取出水怪的最高 surge 信号；检查 DESC 与 LIMIT。",
-  "practice-distinct": "水蛇信号应去重为 echo、mirror。",
-  "practice-inner-join": "没有把青蛙与泥沼石径正确连接。",
-  "practice-left-join": "没有找出 room_id = 34 且无装备记录的毒蛙。",
-  "practice-left-core": "没有按 id 与 toxic 状态读出毒蛙。",
-  "practice-forest-order": "没有按 hp 降序取出猎犬记录。",
-  "practice-forest-join": "没有把树妖与树妖林地正确连接。",
-  "practice-forest-join-core": "没有返回树妖的 forest-treant 区域。",
-  "lake-boss-scan": "没有按 id 读出湖怪的 name 与 status。",
-  "lake-boss-sort": "没有用 DISTINCT 与 ORDER BY 读出湖怪状态。",
-  "frog-boss-left": "没有用 LEFT JOIN 找出无装备的蛙王。",
-  "frog-boss-distinct": "没有连接二层房间并去重返回蛙王名字。",
+  "join-boss-groups": "综合结果应依次为 lake = 4、swamp = 4、forest = 3；检查 JOIN、HAVING 与双重排序。",
+  "join-boss-core": "没有定位 ID #014 的 power = 21 最强装备；检查 JOIN、DESC 与 LIMIT 1。",
+  "practice-order": "没有取出 ID #015 的最高 surge 信号；检查 DESC 与 LIMIT。",
+  "practice-distinct": "ID #016 的信号应去重为 echo、mirror。",
+  "practice-inner-join": "没有把 ID #017 与泥沼石径正确连接。",
+  "practice-left-join": "没有找出 room_id = 34 且无装备记录的 ID #018。",
+  "practice-left-core": "没有按 id 与 toxic 状态读出 ID #018。",
+  "practice-forest-order": "没有按 hp 降序取出 ID #019 的记录。",
+  "practice-forest-join": "没有用 id 与 room_name 把 ID #020 和盘根林地正确连接。",
+  "practice-forest-join-core": "没有返回 ID #020 的 name 与 forest 区域。",
+  "lake-boss-scan": "没有按 charge 降序读出 ID #021 的两条最强信号。",
+  "lake-boss-sort": "没有用 DISTINCT 与 ORDER BY 读出 ID #021 的三类信号。",
+  "frog-boss-left": "没有用 LEFT JOIN 找出无装备的 ID #022。",
+  "frog-boss-distinct": "没有连接二层房间并去重返回 ID #022 的 name 与 room_name。",
   "f3-inner-room": "没有连接骷髅与骨桥前庭；检查 room_id = rooms.id。",
   "f3-left-unarmed": "没有用 LEFT JOIN 找出 42 号房间中无装备的僵尸。",
   "f3-self-master": "没有用两个别名返回幽灵与死灵王。",

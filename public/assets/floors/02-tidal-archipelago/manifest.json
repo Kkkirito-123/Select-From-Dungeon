@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "floor": 2,
+  "id": "02-tidal-archipelago",
+  "theme": "潮汐群岛",
+  "sources": [
+    {
+      "id": "shade-puny-world",
+      "title": "16x16 Puny World",
+      "author": "Shade / Merchant Shade",
+      "canonicalUrl": "https://merchant-shade.itch.io/16x16-puny-world",
+      "license": "CC0-1.0",
+      "sourceRecord": "../../../../assets/vendor/shade-puny-world/source.json",
+      "attributionRequired": false
+    },
+    {
+      "id": "foozle-scallywag-water-islands",
+      "title": "Scallywag — Water and Islands",
+      "author": "Pixel Carvel, distributed by Foozle",
+      "canonicalUrl": "https://foozlecc.itch.io/scallywag-water-islands",
+      "license": "CC0-1.0",
+      "sourceRecord": "../../../../assets/vendor/foozle-scallywag-water-islands/source.json",
+      "attributionRequired": false
+    }
+  ],
+  "textures": [
+    {
+      "key": "f02-cc0-puny-overworld",
+      "runtimePath": "sources/shade-puny-world/overworld-16x16.png",
+      "sourcePath": "assets/vendor/shade-puny-world/selected/punyworld-overworld-tileset.png",
+      "bytes": 100779,
+      "sha256": "d52cfc84e46cfd1ee30c2165576d7d86d253b72109c808382409a8af378c7fbb",
+      "dimensions": "432x1040",
+      "frame": "16x16"
+    },
+    {
+      "key": "f02-cc0-scallywag-water",
+      "runtimePath": "sources/foozle-scallywag-water-islands/water-and-islands-16x16.png",
+      "sourcePath": "assets/vendor/foozle-scallywag-water-islands/selected/Water and Island tiles.png",
+      "bytes": 12584,
+      "sha256": "db8189236d5eb5b3efc31d3825cf6115f9e49027d30e82f56509d524f6fc1deb",
+      "dimensions": "384x144",
+      "frame": "16x16"
+    }
+  ],
+  "compressedBytes": 113363,
+  "decodedTextureBytes": 2018304
+}
