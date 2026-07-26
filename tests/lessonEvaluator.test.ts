@@ -566,6 +566,18 @@ describe("evaluateLesson stages", () => {
     expect(evaluateLesson("inner-join", 0, bypass).accepted).toBe(false);
   });
 
+  it("第二层 INNER JOIN 写成 m.id = r.id 时明确指出正确连接键", () => {
+    const wrongRelation = makeResult(
+      "SELECT m.id, r.sector FROM monsters m INNER JOIN rooms r ON m.id = r.id WHERE m.id = 12",
+      ["id", "sector"],
+      [{ id: 12, sector: "archive" }],
+    );
+    const evaluation = evaluateLesson("inner-join", 0, wrongRelation);
+    expect(evaluation.accepted).toBe(false);
+    expect(evaluation.message).toContain("ON m.room_id = r.id");
+    expect(evaluation.message).not.toContain("改名为 monster_id");
+  });
+
   it("第二层 INNER JOIN 拒绝把 monsters.id 改名为 monster_id，最后一击才返回两个 name", () => {
     const misleadingAlias = makeResult(
       "SELECT m.id AS monster_id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",

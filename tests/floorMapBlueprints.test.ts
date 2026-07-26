@@ -6,6 +6,7 @@ import {
   MVP2_MAZE_WIDTH,
   compatibleFloorLayoutNames,
   floorTransitPresentation,
+  regionPortalsEnabledForFloor,
 } from "../src/content/floorMapBlueprints";
 import {
   generateRoomGraph,
@@ -32,12 +33,14 @@ describe("FLOOR_MAP_BLUEPRINTS", () => {
     });
   });
 
-  it("第一层区域交通与唯一实体水闸使用不同名称", () => {
+  it("第一层只保留连续步行与唯一实体水闸，不启用通用区域传送点", () => {
     const transit = floorTransitPresentation(
       FLOOR_MAP_BLUEPRINTS[1].routeTransit,
     );
     expect(transit.label).toBe("排水水闸");
     expect(transit.regionLabel).toBe("排水渡点");
+    expect(regionPortalsEnabledForFloor(1)).toBe(false);
+    expect(regionPortalsEnabledForFloor(2)).toBe(true);
   });
 
   it("第一、二层保留已发布 v11 布局名作为只读存档兼容身份", () => {

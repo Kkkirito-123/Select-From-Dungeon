@@ -274,3 +274,11 @@ export function floorTransitPresentation(
 ): FloorTransitPresentation {
   return FLOOR_TRANSIT_PRESENTATIONS[kind];
 }
+
+/**
+ * 第一层是一张连续回环地图，排水渠之间必须靠步行、水位变化和实体捷径理解空间。
+ * BiomePlan 仍保留旧区域门数据以兼容已保存的 v11 Run，但运行时不再展示或启用它们。
+ */
+export function regionPortalsEnabledForFloor(floor: FloorNumber): boolean {
+  return floor !== 1;
+}

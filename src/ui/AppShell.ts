@@ -8,6 +8,7 @@ import {
 import {
   floorMapBlueprint,
   floorTransitPresentation,
+  regionPortalsEnabledForFloor,
 } from "../content/floorMapBlueprints";
 import { floorExperience } from "../content/floorExperience";
 import type { OnboardingMilestone } from "../content/onboarding";
@@ -1691,8 +1692,11 @@ export class AppShell {
     if (!this.adminMenu) return;
     const living = snapshot.monsters.filter((monster) => monster.hp > 0);
     const bosses = living.filter((monster) => monster.isBoss);
+    const regionPortalCount = regionPortalsEnabledForFloor(snapshot.floor)
+      ? snapshot.biomePlan.portals.length
+      : 0;
     requiredElement(this.adminMenu, "#admin-summary").textContent =
-      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length} · 区域交通 ${snapshot.biomePlan.portals.length}`;
+      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length} · 区域交通 ${regionPortalCount}`;
     const floors = requiredElement(this.adminMenu, "#admin-floor-list");
     floors.replaceChildren();
     for (let floor = 1; floor <= 8; floor += 1) {
@@ -2632,8 +2636,9 @@ export class AppShell {
     const routeTransit = floorTransitPresentation(
       floorMapBlueprint(snapshot.floor).routeTransit,
     );
-    requiredElement(this.root, "#map-region-transit").textContent =
-      `◉ ${routeTransit.regionLabel ?? routeTransit.label}`;
+    const regionTransitLegend = requiredElement(this.root, "#map-region-transit");
+    regionTransitLegend.hidden = !regionPortalsEnabledForFloor(snapshot.floor);
+    regionTransitLegend.textContent = `◉ ${routeTransit.regionLabel ?? routeTransit.label}`;
     const target = snapshot.focusMonsterId === null
       ? undefined
       : snapshot.monsters.find((monster) => monster.id === snapshot.focusMonsterId);
@@ -3362,7 +3367,10 @@ export class AppShell {
         svg.append(marker);
       });
     });
-    snapshot.biomePlan.portals.forEach((portal) => {
+    const regionPortals = regionPortalsEnabledForFloor(snapshot.floor)
+      ? snapshot.biomePlan.portals
+      : [];
+    regionPortals.forEach((portal) => {
       [portal.entry, portal.exit].forEach((position) => {
         if (!discovered.has(`${position.x}:${position.y}`)) return;
         const marker = document.createElementNS(SVG_NS, "circle");

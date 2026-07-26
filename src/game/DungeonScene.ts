@@ -4,6 +4,7 @@ import { playerActorProfile } from "../content/actorVisuals";
 import {
   floorMapBlueprint,
   floorTransitPresentation,
+  regionPortalsEnabledForFloor,
   type FloorTransitKind,
 } from "../content/floorMapBlueprints";
 import {
@@ -1373,7 +1374,11 @@ export class DungeonScene extends Phaser.Scene {
     const transitPresentation = floorTransitPresentation(routeTransit);
     const regionTransitLabel =
       transitPresentation.regionLabel ?? transitPresentation.label;
-    const portalItems: GroundItem[] = this.snapshot.biomePlan.portals.flatMap(
+    const portalItems: GroundItem[] = (
+      regionPortalsEnabledForFloor(this.snapshot.floor)
+        ? this.snapshot.biomePlan.portals
+        : []
+    ).flatMap(
       (portal) => [
         {
           id: `${portal.id}:entry`,

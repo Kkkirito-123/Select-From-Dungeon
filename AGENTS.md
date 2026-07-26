@@ -108,10 +108,13 @@ Gravefield, Elemental Furnace, Black-Iron Outer City, Dragon Ridge, Sunset
 Index Garden, and Black-Gold High Hall. Ambushes draw only from the current biome pool, with
 seeded 5%, 7%, 9%, 11%, 13%, 15%, 17%, and 19% mini-elite weights by floor.
 Authored optional area Bosses use multi-stage floor-appropriate exercises, award
-3 XP, but do not guarantee random items. Two physical region portals connect
-the three biomes on each floor; defeating the middle area Boss transfers the
-player into the rear main-path region. These actors never enter entrance or
-campfire safe zones and do not gate curriculum completion.
+3 XP, but do not guarantee random items. Floors two through eight use two
+physical region portals to connect their three biomes; defeating the middle
+area Boss transfers the player into the rear main-path region. Floor one is an
+explicit exception: it remains one continuous authored route and uses water
+state plus the guaranteed physical shortcut instead of generic region portals.
+These actors never enter entrance or campfire safe zones and do not gate
+curriculum completion.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL

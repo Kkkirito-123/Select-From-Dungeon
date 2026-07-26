@@ -1180,7 +1180,7 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "order-top-two": "前两行应依次是 surge = 13、arc = 11；检查排序方向与 LIMIT 2。",
   "distinct-status": "去重结果应只有 echo、mirror；检查 DISTINCT 与排序。",
   "inner-join-room": "没有用 m.name 与 r.name AS room_name 返回 ID #012 和“古树桥”。",
-  "inner-join-sector": "连接结果应只返回 ID #012 的 id = 12 与 sector = forest，不要把 id 改名为 monster_id。",
+  "inner-join-sector": "连接结果应只返回 ID #012 的 m.id = 12 与 rooms 表的 r.sector = forest；检查投影列和 WHERE 条件。",
   "left-join-unarmed": "没有找到右表缺失的 #13；检查 LEFT JOIN 与 g.monster_id IS NULL。",
   "join-boss-groups": "综合结果应依次为 lake = 4、swamp = 4、forest = 3；检查 JOIN、HAVING 与双重排序。",
   "join-boss-core": "没有定位 ID #014 的 power = 21 最强装备；检查 JOIN、DESC 与 LIMIT 1。",
@@ -1282,6 +1282,25 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "throne-boss-core": "参数化且最小权限的方法应只返回 prepared-select。",
 };
 
+function wrongResultMessage(
+  stageId: LessonStageId,
+  result: SqlQueryResult,
+): string {
+  if (
+    stageId === "inner-join-sector" &&
+    !joinsTables(
+      normalizeStructure(result.sql),
+      "monsters",
+      "rooms",
+      "room_id",
+      "id",
+    )
+  ) {
+    return "连接键写错了：monsters.room_id 才对应 rooms.id。使用 ON m.room_id = r.id，不要写成 m.id = r.id。";
+  }
+  return WRONG_RESULT_MESSAGE[stageId];
+}
+
 function stageFor(lessonId: LessonId, stageIndex: number): LessonStageDefinition {
   const lesson = lessonById(lessonId);
   return lesson.stages[Math.min(Math.max(stageIndex, 0), lesson.stages.length - 1)];
@@ -1322,7 +1341,7 @@ export function evaluateStage(
     return {
       accepted: false,
       kind: "wrong-result",
-      message: WRONG_RESULT_MESSAGE[stage.id],
+      message: wrongResultMessage(stage.id, result),
       locksBroken,
       locksRemaining: [],
       attackTargetIds: [],
