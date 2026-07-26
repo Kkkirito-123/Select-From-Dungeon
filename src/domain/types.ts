@@ -700,8 +700,14 @@ export interface ExperienceSettlement {
   currentMaxHp: number;
 }
 
+export type QueryResultDisclosure =
+  | "shape-only"
+  | "safe-values"
+  | "full-values";
+
 export interface TurnResolution {
   accepted: boolean;
+  resultDisclosure: QueryResultDisclosure;
   message: string;
   queryTargetIds: number[];
   attackTargetIds: number[];
@@ -721,6 +727,7 @@ export interface TurnResolution {
 
 export interface GateChallengeResolution {
   accepted: boolean;
+  resultDisclosure: QueryResultDisclosure;
   opened: boolean;
   gateId: string;
   message: string;

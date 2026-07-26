@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "floor": 1,
+  "tracks": [
+    {
+      "schemaVersion": 1,
+      "id": "f01-ember-archive-explore",
+      "floor": 1,
+      "mode": "explore",
+      "titleZh": "余烬里的旧歌",
+      "sourceWork": {
+        "title": "12 Variations on “Ah vous dirai-je, Maman”, K.265",
+        "composer": "Wolfgang Amadeus Mozart",
+        "composerLife": "1756–1791",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Mozart died in 1791. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered the familiar public-domain theme as note data. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 72,
+        "beatsPerBar": 4,
+        "bars": 16,
+        "durationSeconds": 53.333333,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5400,
+        "highpassHz": 52,
+        "measuredRmsDbfs": -18.079,
+        "measuredPeakDbfs": -6.698,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 53.333333
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f01/explore.ogg",
+          "bytes": 201013,
+          "sha256": "14609b8ecc8a1198fe90b01bcc8d4e13fea8ab2ea2410ef49d447b9749be9b18"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f01/explore.mp3",
+          "bytes": 427437,
+          "sha256": "2e8da3a7d88a83a366e442c45e510b66dd3f4ecf3e740a3369125b9890122617"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f01-ember-archive-combat",
+      "floor": 1,
+      "mode": "combat",
+      "titleZh": "纸页疾行",
+      "sourceWork": {
+        "title": "12 Variations on “Ah vous dirai-je, Maman”, K.265",
+        "composer": "Wolfgang Amadeus Mozart",
+        "composerLife": "1756–1791",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Mozart died in 1791. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered the familiar public-domain theme as note data. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 104,
+        "beatsPerBar": 4,
+        "bars": 24,
+        "durationSeconds": 55.384615,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5000,
+        "highpassHz": 55,
+        "measuredRmsDbfs": -16.775,
+        "measuredPeakDbfs": -2.47,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 55.384615
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f01/combat.ogg",
+          "bytes": 182709,
+          "sha256": "366a2ef57badea3ef5c7d49c8f639729e573de6178ea01ff57e32c95f12f575e"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f01/combat.mp3",
+          "bytes": 443757,
+          "sha256": "16898aab3da4172ddfd6d0628a79e782f26f76e7f7e8d7f68afb43d2cc12bab8"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f01-ember-archive-boss",
+      "floor": 1,
+      "mode": "boss",
+      "titleZh": "铜印之下",
+      "sourceWork": {
+        "title": "12 Variations on “Ah vous dirai-je, Maman”, K.265",
+        "composer": "Wolfgang Amadeus Mozart",
+        "composerLife": "1756–1791",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Mozart died in 1791. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered the familiar public-domain theme as note data. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 112,
+        "beatsPerBar": 3,
+        "bars": 32,
+        "durationSeconds": 51.428571,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5200,
+        "highpassHz": 54,
+        "measuredRmsDbfs": -16.503,
+        "measuredPeakDbfs": -2.246,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 51.428571
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f01/boss.ogg",
+          "bytes": 180886,
+          "sha256": "c971a2ce9a6383f7ed2c561daa06df04c5b9d29fc581eb3dcdf62442a09ce66a"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f01/boss.mp3",
+          "bytes": 412077,
+          "sha256": "7071fb73ab0ac1530fe9ea6612a1a320dedb5b02fa7849ef9d906ae45d5fdeba"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "id": "shade-puny-world",
+  "title": "16x16 Puny World",
+  "author": "Shade / Merchant Shade",
+  "canonicalUrl": "https://merchant-shade.itch.io/16x16-puny-world",
+  "finalDownloadUrl": "https://merchant-shade.itch.io/16x16-puny-world/file/9480120?source=view_game&as_props=1",
+  "version": "1",
+  "upstreamUploadId": 9480120,
+  "upstreamUploadedAt": null,
+  "downloadedAt": "2026-07-25T21:58:35Z",
+  "license": {
+    "spdx": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "legalCodePath": "LICENSE-CC0-1.0.txt",
+    "legalCodeSha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+    "evidence": [
+      {
+        "type": "official-source-page",
+        "url": "https://merchant-shade.itch.io/16x16-puny-world",
+        "capturedAt": "2026-07-25T21:58:35Z",
+        "summary": "The official itch.io page contains a CC0 license section and identifies the asset license as Creative Commons Zero v1.0 Universal."
+      }
+    ]
+  },
+  "archives": [
+    {
+      "path": "original/PUNY_WORLD_v1.zip",
+      "bytes": 112010,
+      "sha256": "218429e25d6d1420eb9c126d63dd3d2ca722cac2014ac9e70f39be6efceef1c5",
+      "entryCount": 10,
+      "unsafePathCount": 0,
+      "executableFileCount": 0
+    }
+  ],
+  "selectedFiles": [
+    {
+      "path": "selected/punyworld-overworld-tileset.png",
+      "role": "second-floor overworld, coast, vegetation, building, and path source sheet",
+      "bytes": 100779,
+      "sha256": "d52cfc84e46cfd1ee30c2165576d7d86d253b72109c808382409a8af378c7fbb",
+      "dimensions": "432x1040",
+      "grid": "16x16"
+    },
+    {
+      "path": "selected/Tiled/punyworld-overworld-tiles.tsx",
+      "role": "upstream Tiled grid and animation metadata",
+      "bytes": 28699,
+      "sha256": "622970c90ead497cec7ec4797629aab5224bbf93dd98cff24e99b99cbb3bdf44"
+    }
+  ],
+  "derivedFiles": [],
+  "attributionRequired": false,
+  "voluntaryCredit": "Shade — 16x16 Puny World",
+  "notes": [
+    "The archive contains no LICENSE or README file; the official source page is the license evidence.",
+    "The official source page does not expose an upload timestamp for upload 9480120; downloadedAt records this acquisition.",
+    "The expiring signed CDN URL is intentionally not retained; finalDownloadUrl records the stable official itch.io upload endpoint.",
+    "Sample maps remain in the immutable original archive and were not copied into selected."
+  ]
+}

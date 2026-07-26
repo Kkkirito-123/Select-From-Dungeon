@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "generatedFor": "MVP 2.1 — The First Two Records",
+  "licensePolicy": "Only files from verified CC0-1.0 source records may enter the runtime packs.",
+  "sources": [
+    {
+      "id": "0x72-dungeontileset-ii",
+      "sourceRecord": "vendor/0x72-dungeontileset-ii/source.json",
+      "license": "CC0-1.0",
+      "runtimePack": "../public/assets/floors/01-ember-archive/manifest.json"
+    },
+    {
+      "id": "shade-puny-world",
+      "sourceRecord": "vendor/shade-puny-world/source.json",
+      "license": "CC0-1.0",
+      "runtimePack": "../public/assets/floors/02-tidal-archipelago/manifest.json"
+    },
+    {
+      "id": "foozle-scallywag-water-islands",
+      "sourceRecord": "vendor/foozle-scallywag-water-islands/source.json",
+      "license": "CC0-1.0",
+      "runtimePack": "../public/assets/floors/02-tidal-archipelago/manifest.json"
+    }
+  ]
+}

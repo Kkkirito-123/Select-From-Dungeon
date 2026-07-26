@@ -7,6 +7,7 @@ export type FeedbackEvent =
   | { type: "query-cast" }
   | { type: "enemy-hurt"; amount: number }
   | { type: "player-hurt"; amount: number }
+  | { type: "identity-recovered"; monsterName: string; monsterId: number; xp: number }
   | { type: "stage-clear"; message: string }
   | { type: "item-drop"; itemName: string }
   | { type: "item-pickup"; itemName: string; kind: "weapon" | "relic" | "heal" | "key" | "event"; message: string }
@@ -31,6 +32,7 @@ function cueFor(event: FeedbackEvent): ArcadeSfx {
     case "query-cast": return "query-cast";
     case "enemy-hurt": return "enemy-hurt";
     case "player-hurt": return "player-hurt";
+    case "identity-recovered": return "stage-clear";
     case "stage-clear": return "stage-clear";
     case "item-drop": return "drop";
     case "item-pickup":
@@ -51,6 +53,11 @@ function noticeFor(event: FeedbackEvent): FeedbackNotice | null {
       return { message: `遭遇 ${event.monsterName}`, tone: "danger" };
     case "player-hurt":
       return { message: `受到 ${event.amount} 点反击伤害`, tone: "danger" };
+    case "identity-recovered":
+      return {
+        message: `名字恢复：${event.monsterName} · 图鉴 +1 · +${event.xp} XP`,
+        tone: "reward",
+      };
     case "stage-clear":
       return { message: event.message, tone: "success" };
     case "item-drop":

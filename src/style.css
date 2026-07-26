@@ -638,11 +638,38 @@ h1 span {
     7px 7px 0 rgba(0, 0, 0, 0.62);
 }
 
+.combat-result-card.is-new-identity.is-visible {
+  animation: identity-card-pulse 620ms steps(5, end) 1;
+}
+
 .combat-result-card.is-new-identity .combat-result-card__identity {
   border-color: var(--gold);
   background:
     linear-gradient(90deg, rgba(215, 173, 85, 0.13), transparent 72%),
     #0d1118;
+}
+
+.combat-result-card.is-new-identity .combat-result-card__identity b {
+  font-size: 22px;
+  text-shadow: 0 0 14px rgba(215, 173, 85, 0.42);
+}
+
+@keyframes identity-card-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(120, 201, 184, 0.64),
+      7px 7px 0 rgba(0, 0, 0, 0.62);
+  }
+  55% {
+    box-shadow:
+      0 0 0 7px rgba(120, 201, 184, 0.12),
+      7px 7px 0 rgba(0, 0, 0, 0.62);
+  }
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(120, 201, 184, 0.22),
+      7px 7px 0 rgba(0, 0, 0, 0.62);
+  }
 }
 
 .combat-result-card__xp {
@@ -1704,6 +1731,8 @@ h1 span {
 }
 
 .monster-codex__meta,
+.monster-codex__habitat,
+.monster-codex__world-effect,
 .monster-codex__lore {
   margin: 7px 0 0;
   line-height: 1.55;
@@ -1718,6 +1747,18 @@ h1 span {
 .monster-codex__lore {
   color: #c7cbd2;
   font-size: 12px;
+}
+
+.monster-codex__habitat,
+.monster-codex__world-effect {
+  color: #aeb6c3;
+  font-size: 11px;
+}
+
+.monster-codex__world-effect {
+  border-left: 2px solid var(--gold);
+  padding-left: 8px;
+  color: #d8ceb8;
 }
 
 .narrative-codex[hidden] {
@@ -1790,6 +1831,7 @@ h1 span {
 }
 
 .narrative-codex__chapter,
+.narrative-codex__moment-section,
 .narrative-codex__evidence-section,
 .narrative-codex__ascent-section,
 .narrative-codex__migration {
@@ -1802,6 +1844,24 @@ h1 span {
   grid-row: span 2;
 }
 
+.narrative-codex__moment-section {
+  grid-column: 1 / -1;
+}
+
+.narrative-codex__moment-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.narrative-codex__moment-progress {
+  margin: 0;
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
 .narrative-codex__chapter-title,
 .narrative-codex__section-title,
 .narrative-codex__migration-title {
@@ -1812,6 +1872,7 @@ h1 span {
 }
 
 .narrative-codex__beat-list,
+.narrative-codex__moment-list,
 .narrative-codex__ascent-list,
 .narrative-codex__migration-list {
   display: grid;
@@ -1819,6 +1880,82 @@ h1 span {
   margin: 11px 0 0;
   padding: 0;
   list-style: none;
+}
+
+.narrative-codex__moment-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.narrative-codex__moment {
+  border: 1px solid #3d4553;
+  border-left: 4px solid #555d6b;
+  padding: 11px;
+  background: #0d1118;
+}
+
+.narrative-codex__moment.is-complete {
+  border-left-color: var(--query);
+  background:
+    linear-gradient(110deg, rgba(120, 201, 184, 0.07), transparent 62%),
+    #0d1118;
+}
+
+.narrative-codex__moment-kicker,
+.narrative-codex__story-query-title,
+.narrative-codex__story-query-shape {
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.narrative-codex__moment-title {
+  display: block;
+  margin-top: 5px;
+  color: var(--gold-light);
+  font-size: 14px;
+}
+
+.narrative-codex__moment.is-locked {
+  color: #707684;
+  opacity: 0.58;
+}
+
+.narrative-codex__moment-line,
+.narrative-codex__moment-finding,
+.narrative-codex__story-query-purpose {
+  margin: 5px 0 0;
+  color: #c1c6cf;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.narrative-codex__moment-finding {
+  border-left: 2px solid var(--gold);
+  padding-left: 8px;
+  color: #ddd2b8;
+}
+
+.narrative-codex__story-query {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+  border: 1px solid #3f5e5a;
+  padding: 9px;
+  background: rgba(5, 16, 17, 0.82);
+}
+
+.narrative-codex__story-query-sql {
+  overflow-wrap: anywhere;
+  color: #d9eee9;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: normal;
+}
+
+.narrative-codex__story-query-shape {
+  color: #b9c0ca;
+  letter-spacing: 0;
 }
 
 .narrative-codex__beat {
@@ -2058,6 +2195,7 @@ h1 span {
 
 .admin-menu__header p,
 .admin-menu__warning,
+.admin-preset-section p,
 .admin-region-list p {
   margin: 0;
   color: var(--muted);
@@ -2082,6 +2220,7 @@ h1 span {
 }
 
 .admin-floor-list button,
+.admin-preset-list button,
 .admin-region-list button {
   border: 1px solid #4c5363;
   padding: 9px;
@@ -2092,6 +2231,7 @@ h1 span {
 }
 
 .admin-floor-list button:hover,
+.admin-preset-list button:hover,
 .admin-region-list button:hover,
 .admin-floor-list button.is-active {
   border-color: var(--query);
@@ -2100,6 +2240,30 @@ h1 span {
 
 .admin-floor-list button.is-active {
   background: #17312d;
+}
+
+.admin-preset-section {
+  margin-top: 12px;
+  border: 1px solid #3f4654;
+  padding: 11px;
+  background: rgba(17, 21, 29, 0.72);
+}
+
+.admin-preset-section .card-heading {
+  margin-bottom: 6px;
+}
+
+.admin-preset-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.admin-preset-list p {
+  grid-column: 1 / -1;
+  border-left: 2px solid #4d5260;
+  padding-left: 9px;
 }
 
 .admin-region-list {
@@ -2128,6 +2292,32 @@ h1 span {
   border-top: 1px dashed #4d5260;
   padding-top: 10px;
   color: #e8bc73;
+}
+
+.table-wrap.result-shape {
+  display: grid;
+  min-height: 112px;
+  align-content: center;
+  gap: 10px;
+  padding: 20px 22px;
+  border-left: 4px solid var(--gold);
+  background:
+    linear-gradient(90deg, rgb(213 171 83 / 10%), transparent 42%),
+    var(--basalt);
+}
+
+.table-wrap.result-shape strong {
+  color: var(--paper);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: clamp(15px, 1.3vw, 19px);
+  letter-spacing: 0.04em;
+}
+
+.table-wrap.result-shape p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .answer-review__columns {
@@ -3605,11 +3795,16 @@ h1 span {
     grid-row: auto;
   }
 
+  .narrative-codex__moment-section {
+    grid-column: auto;
+  }
+
   .narrative-codex__migration {
     grid-column: auto;
   }
 
   .narrative-codex__ascent-list,
+  .narrative-codex__moment-list,
   .narrative-codex__evidence-list {
     grid-template-columns: 1fr;
   }
@@ -3635,6 +3830,10 @@ h1 span {
 
   .admin-floor-list {
     grid-template-columns: repeat(4, minmax(54px, 1fr));
+  }
+
+  .admin-preset-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-region-list {
@@ -3907,7 +4106,8 @@ h1 span {
 
 @media (max-width: 390px) {
   .title-sub { display: none; }
-  .run-console { grid-template-columns: 54px minmax(0, 1fr) auto auto auto; }
+  .run-console { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .run-console .audio-toggle { grid-column: 1 / -1; }
   .audio-toggle,
   .monster-codex-toggle,
   .narrative-toggle,

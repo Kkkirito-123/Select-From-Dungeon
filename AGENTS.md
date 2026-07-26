@@ -392,9 +392,14 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - The renderer targets 30 FPS. Page-hidden lifecycle handling flushes progress,
   sleeps the Phaser loop, stops scheduled audio, and resumes safely when visible.
   Unchanged heavy HUD lists are reused instead of rebuilt on every snapshot.
-- Pixel characters, tiles, room decoration, music, and sound effects are
-  generated from project code. Do not add third-party art, fonts, audio, or
-  copied level text without a license review and attribution update.
+- Characters and UI effects remain generated from project code. The first two
+  floor slices may also load the audited CC0 tile/prop packs declared in their
+  runtime manifests; source archives, hashes, licenses, and transformed outputs
+  must stay reproducible through the asset scripts. Music and sound effects are
+  rendered from project-authored score/event code using public-domain musical
+  material, not bundled commercial recordings. Do not add any third-party art,
+  fonts, audio, or copied level text without a license review and attribution
+  update.
 - Runtime dependencies are pinned in `package.json` and `pnpm-lock.yaml`.
   Dependency changes remain approval-gated and require license, bundle, build,
   and browser checks proportional to risk.

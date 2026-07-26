@@ -45,3 +45,15 @@ export function tutorialObjective(snapshot: GameSnapshot): TutorialObjective | n
     position: { x: actor.x, y: actor.y },
   };
 }
+
+export function shouldShowTutorialBeacon(
+  snapshot: GameSnapshot,
+  objective: TutorialObjective,
+): boolean {
+  const objectiveCell = `${objective.position.x}:${objective.position.y}`;
+  return (
+    !snapshot.adminMode &&
+    !snapshot.discoveredCells.includes(objectiveCell) &&
+    !isNearPlayer(snapshot.player, objective.position, OBJECTIVE_HIDE_DISTANCE)
+  );
+}

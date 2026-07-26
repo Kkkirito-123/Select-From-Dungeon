@@ -37,7 +37,7 @@ export const SQL_TABLES: readonly SqlTableDefinition[] = [
     columns: [
       column("id", "INTEGER", "怪物主键；从 1 连续编号", { primaryKey: true }),
       column("room_id", "INTEGER", "怪物所在房间编号"),
-      column("name", "TEXT", "游戏画面显示的怪物名称"),
+      column("name", "TEXT", "最后一击恢复的怪物名称；战前界面仅显示 ID"),
       column("species", "TEXT", "怪物种族代号"),
       column("hp", "INTEGER", "怪物当前生命值"),
       column("armor", "INTEGER", "怪物护甲值"),

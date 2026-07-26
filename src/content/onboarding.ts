@@ -30,7 +30,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     id: "find-monster",
     title: "跟随青色信标",
-    body: "找到守在 SELECT 排水石碑旁的史莱姆。青色箭头只负责指路，真正碰到怪物所在格才会进入战斗。",
+    body: "找到守在 SELECT 排水石碑旁的 ID #001。青色箭头只负责指路，真正碰到未识别记录所在格才会进入战斗。",
     shortcut: "触碰怪物",
   },
   {

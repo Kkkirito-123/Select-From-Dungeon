@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "id": "foozle-scallywag-water-islands",
+  "title": "Scallywag — Water and Islands",
+  "author": "Pixel Carvel, distributed by Foozle",
+  "canonicalUrl": "https://foozlecc.itch.io/scallywag-water-islands",
+  "finalDownloadUrl": "https://foozlecc.itch.io/scallywag-water-islands/file/9126175?source=view_game&as_props=1",
+  "version": "1.0",
+  "upstreamUploadId": 9126175,
+  "upstreamUploadedAt": "2023-11-18T13:49:00Z",
+  "downloadedAt": "2026-07-25T21:58:35Z",
+  "license": {
+    "spdx": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "legalCodePath": "LICENSE-CC0-1.0.txt",
+    "legalCodeSha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+    "evidence": [
+      {
+        "type": "official-source-page",
+        "url": "https://foozlecc.itch.io/scallywag-water-islands",
+        "capturedAt": "2026-07-25T21:58:35Z",
+        "summary": "The official itch.io page states Creative Commons Zero (CC0)."
+      },
+      {
+        "type": "package-readme",
+        "path": "selected/Readme.txt",
+        "sha256": "aef9fa5f56af8a0883e5cc52e82426677a9278547b8debd3d0c9500756cbeded",
+        "summary": "The package README identifies the license as Creative Commons Zero (CC0), permits commercial modification, and does not require attribution."
+      }
+    ]
+  },
+  "archives": [
+    {
+      "path": "original/Foozle_2DT0014_Scallywag_WaterAndIslands.zip",
+      "bytes": 139418,
+      "sha256": "b8ddb4980d0c26b982ad5eb83e1ef1ad164f98fed84fb55c66154e1fdc64bfdc",
+      "entryCount": 13,
+      "unsafePathCount": 0,
+      "executableFileCount": 0
+    }
+  ],
+  "selectedFiles": [
+    {
+      "path": "selected/Readme.txt",
+      "role": "upstream authorship and license evidence",
+      "bytes": 744,
+      "sha256": "aef9fa5f56af8a0883e5cc52e82426677a9278547b8debd3d0c9500756cbeded"
+    },
+    {
+      "path": "selected/Water and Island tiles.png",
+      "role": "second-floor island, coast, water, debris, and treasure source sheet",
+      "bytes": 12584,
+      "sha256": "db8189236d5eb5b3efc31d3825cf6115f9e49027d30e82f56509d524f6fc1deb",
+      "dimensions": "384x144"
+    },
+    {
+      "path": "selected/Water and Island tiles.aseprite",
+      "role": "editable upstream island and water source",
+      "bytes": 11566,
+      "sha256": "ef578643bc38ae3e4fd8c3665e2bd98c97e9ad643f6ced3d2c96948fad21c6e1"
+    },
+    {
+      "path": "selected/Wave shore animations.aseprite",
+      "role": "editable upstream shoreline animation source",
+      "bytes": 4488,
+      "sha256": "af7c25a9a9ff4fa6b5aa94b7947f2198f33676c2a571c412128a47f5e1732501"
+    },
+    {
+      "path": "selected/Waves and teasure Animations.aseprite",
+      "role": "editable upstream wave and treasure animation source",
+      "bytes": 6022,
+      "sha256": "49141e23f16759ba2da2611561643a05c83db144496de35d6a6cd3c5a81ecb70"
+    }
+  ],
+  "derivedFiles": [],
+  "attributionRequired": false,
+  "voluntaryCredit": "Scallywag — art commissioned from Pixel Carvel and distributed by Foozle",
+  "notes": [
+    "The package README and the official source page agree on CC0.",
+    "The filename 'Waves and teasure Animations.aseprite' preserves the upstream spelling for traceability.",
+    "The expiring signed CDN URL is intentionally not retained; finalDownloadUrl records the stable official itch.io upload endpoint.",
+    "Mockups and preview GIFs remain in the immutable original archive and were not copied into selected."
+  ]
+}

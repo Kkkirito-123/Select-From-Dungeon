@@ -69,7 +69,7 @@ export const FLOOR_ONE_BIOME_MONSTERS: readonly Monster[] = [
     id: 6,
     lessonId: "select",
     roomId: 11,
-    name: "软泥怪",
+    name: "小水怪",
     species: "small_slime",
     kind: "projection-slime",
     hp: 6,
@@ -88,7 +88,7 @@ export const FLOOR_ONE_BIOME_MONSTERS: readonly Monster[] = [
     id: 7,
     lessonId: "where",
     roomId: 12,
-    name: "水胶怪",
+    name: "小史莱姆",
     species: "water_slime",
     kind: "projection-slime",
     hp: 7,
@@ -107,7 +107,7 @@ export const FLOOR_ONE_BIOME_MONSTERS: readonly Monster[] = [
     id: 8,
     lessonId: "is-null",
     roomId: 13,
-    name: "毒胶怪",
+    name: "灰史莱姆",
     species: "poison_slime",
     kind: "projection-slime",
     hp: 7,
@@ -126,7 +126,7 @@ export const FLOOR_ONE_BIOME_MONSTERS: readonly Monster[] = [
     id: 9,
     lessonId: "group-by",
     roomId: 14,
-    name: "铁胶怪",
+    name: "铁泥怪",
     species: "iron_slime",
     kind: "projection-slime",
     hp: 12,
@@ -262,7 +262,7 @@ export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
     id: 21,
     lessonId: "distinct",
     roomId: 37,
-    name: "湖怪",
+    name: "湖兽",
     species: "lake_boss",
     kind: "sort-drake",
     hp: 22,
@@ -757,13 +757,13 @@ export const FLOOR_EIGHT_BIOME_MONSTERS: readonly Monster[] = [
 
 const PRACTICE_SELECT: LessonStageDefinition = {
   id: "practice-select",
-  objective: "查询 id = 6 的软泥怪名字 name。",
+  objective: "查询 id = 6 的怪物名字 name。",
   queryTemplate: "",
   answerSql: "SELECT name FROM monsters WHERE id = 6;",
   hints: [
     "读取怪物名字。",
     "目标表是 monsters。",
-    "用 id = 6 锁定软泥怪。",
+    "用 id = 6 锁定目标记录。",
     "完整写法：SELECT name FROM monsters WHERE id = 6;",
   ],
   locks: ["SELECT", "FROM"],
@@ -773,7 +773,7 @@ const PRACTICE_SELECT: LessonStageDefinition = {
 
 const PRACTICE_WHERE: LessonStageDefinition = {
   id: "practice-where",
-  objective: "返回 room_id = 12 且 status = 'wet' 的水胶怪 id。",
+  objective: "返回 room_id = 12 且 status = 'wet' 的怪物 id。",
   queryTemplate: "",
   answerSql: "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet';",
   hints: [
@@ -789,7 +789,7 @@ const PRACTICE_WHERE: LessonStageDefinition = {
 
 const PRACTICE_NULL: LessonStageDefinition = {
   id: "practice-null",
-  objective: "查询 status = 'toxic' 且 master_id 为空的毒胶怪 name。",
+  objective: "查询 status = 'toxic' 且 master_id 为空的怪物 name。",
   queryTemplate: "",
   answerSql: "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic';",
   hints: [
@@ -822,13 +822,13 @@ const PRACTICE_GROUP: LessonStageDefinition = {
 
 const PRACTICE_GROUP_CORE: LessonStageDefinition = {
   id: "practice-group-core",
-  objective: "第二击：查询 id = 9 的铁胶怪 name。",
+  objective: "第二击：查询 id = 9 的怪物 name。",
   queryTemplate: "",
   answerSql: "SELECT name FROM monsters WHERE id = 9;",
   hints: [
     "读取 name。",
     "目标表是 monsters。",
-    "用 id = 9 锁定铁胶怪。",
+    "用 id = 9 锁定目标记录。",
     "完整写法：SELECT name FROM monsters WHERE id = 9;",
   ],
   locks: ["SELECT", "FROM", "WHERE"],
@@ -871,7 +871,7 @@ const PRACTICE_DISTINCT: LessonStageDefinition = {
 
 const PRACTICE_INNER_JOIN: LessonStageDefinition = {
   id: "practice-inner-join",
-  objective: "连接 monsters 与 rooms，查询 id = 17 的青蛙 name 和 room_name。",
+  objective: "给 monsters 使用别名 m、rooms 使用别名 r；连接后返回 m.id = 17 的 m.name，并把 r.name 命名为 room_name。",
   queryTemplate: "",
   answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17;",
   hints: [
@@ -887,7 +887,7 @@ const PRACTICE_INNER_JOIN: LessonStageDefinition = {
 
 const PRACTICE_LEFT_JOIN: LessonStageDefinition = {
   id: "practice-left-join",
-  objective: "LEFT JOIN 装备表，找出 room_id = 34 且没有装备的毒蛙 id。",
+  objective: "给 monsters 使用别名 m、monster_gear 使用别名 g；LEFT JOIN 后返回 m.room_id = 34 且 g.monster_id 为空的 m.id。",
   queryTemplate: "",
   answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL;",
   hints: [
@@ -903,7 +903,7 @@ const PRACTICE_LEFT_JOIN: LessonStageDefinition = {
 
 const PRACTICE_LEFT_CORE: LessonStageDefinition = {
   id: "practice-left-core",
-  objective: "第二击：按 id 与 toxic 状态查询毒蛙 name。",
+  objective: "第二击：从 monsters 返回 id = 18 且 status = 'toxic' 的 name。",
   queryTemplate: "",
   answerSql: "SELECT name FROM monsters WHERE id = 18 AND status = 'toxic';",
   hints: [
@@ -919,12 +919,12 @@ const PRACTICE_LEFT_CORE: LessonStageDefinition = {
 
 const FOREST_ORDER: LessonStageDefinition = {
   id: "practice-forest-order",
-  objective: "按 hp 降序查询 id = 19 的猎犬 name 与 hp，只取一行。",
+  objective: "从 monsters 返回 id = 19 的 name 与 hp，按 hp 降序并只取一行。",
   queryTemplate: "",
   answerSql: "SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;",
   hints: [
     "读取 name 与 hp。",
-    "先用 WHERE 锁定猎犬。",
+    "先用 WHERE 锁定 ID #019。",
     "按 hp DESC 排序并 LIMIT 1。",
     "完整写法：SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;",
   ],
@@ -935,14 +935,14 @@ const FOREST_ORDER: LessonStageDefinition = {
 
 const FOREST_JOIN: LessonStageDefinition = {
   id: "practice-forest-join",
-  objective: "连接 monsters 与 rooms，查询 id = 20 的树妖 name 与 room_name。",
+  objective: "第一击：给 monsters 使用别名 m、rooms 使用别名 r，查询 m.id = 20 的 m.id 与 room_name。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20;",
+  answerSql: "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20;",
   hints: [
-    "连接 monsters 与 rooms。",
+    "连接 monsters AS m 与 rooms AS r。",
     "ON m.room_id = r.id。",
-    "WHERE 锁定 id = 20。",
-    "完整写法：SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20;",
+    "读取 m.id，并把 r.name 命名为 room_name。",
+    "完整写法：SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20;",
   ],
   locks: ["INNER JOIN", "ON"],
   requiredFeatures: ["join", "on"],
@@ -951,14 +951,14 @@ const FOREST_JOIN: LessonStageDefinition = {
 
 const FOREST_JOIN_CORE: LessonStageDefinition = {
   id: "practice-forest-join-core",
-  objective: "第二击：连接房间后按 sector 排序，查询树妖 name 与 sector，只取一行。",
+  objective: "第二击：连接 monsters AS m 与 rooms AS r，返回 m.id = 20 的 m.name，并把 r.sector 命名为 room_sector；按 r.sector 排序且只取一行。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
+  answerSql: "SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
   hints: [
     "保持 monsters 与 rooms 的连接。",
-    "读取 m.name 与 r.sector。",
+    "读取 m.name，并把 r.sector 命名为 room_sector。",
     "按 r.sector 排序并 LIMIT 1。",
-    "完整写法：SELECT m.name, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
+    "完整写法：SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
   ],
   locks: ["INNER JOIN", "ON", "ORDER BY", "LIMIT"],
   requiredFeatures: ["join", "on", "order-by", "limit"],
@@ -967,14 +967,14 @@ const FOREST_JOIN_CORE: LessonStageDefinition = {
 
 const LAKE_BOSS_SCAN: LessonStageDefinition = {
   id: "lake-boss-scan",
-  objective: "湖怪第一击：查询 id = 21 的 name 与 status。",
+  objective: "第一击：按 charge 从高到低查询 monster_id = 21 的前两条 channel 与 charge。",
   queryTemplate: "",
-  answerSql: "SELECT name, status FROM monsters WHERE id = 21;",
+  answerSql: "SELECT channel, charge FROM monster_signals WHERE monster_id = 21 ORDER BY charge DESC LIMIT 2;",
   hints: [
-    "读取 name 与 status。",
-    "从 monsters 查询。",
-    "用 WHERE id = 21 锁定湖怪。",
-    "完整写法：SELECT name, status FROM monsters WHERE id = 21;",
+    "从 monster_signals 读取 channel 与 charge。",
+    "用 WHERE monster_id = 21 锁定信号。",
+    "按 charge DESC 排序并 LIMIT 2。",
+    "完整写法：SELECT channel, charge FROM monster_signals WHERE monster_id = 21 ORDER BY charge DESC LIMIT 2;",
   ],
   locks: ["SELECT", "FROM", "WHERE"],
   requiredFeatures: ["select", "from", "where"],
@@ -983,14 +983,14 @@ const LAKE_BOSS_SCAN: LessonStageDefinition = {
 
 const LAKE_BOSS_SORT: LessonStageDefinition = {
   id: "lake-boss-sort",
-  objective: "湖怪第二击：去重查询 id = 21 的 status，并按 status 排序。",
+  objective: "第二击：去重查询 monster_id = 21 的 channel，并按 channel 排序。",
   queryTemplate: "",
-  answerSql: "SELECT DISTINCT status FROM monsters WHERE id = 21 ORDER BY status;",
+  answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 21 ORDER BY channel;",
   hints: [
-    "读取不同的 status。",
+    "读取不同的 channel。",
     "使用 DISTINCT 去重。",
-    "按 status 排序。",
-    "完整写法：SELECT DISTINCT status FROM monsters WHERE id = 21 ORDER BY status;",
+    "按 channel 排序。",
+    "完整写法：SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 21 ORDER BY channel;",
   ],
   locks: ["DISTINCT", "ORDER BY"],
   requiredFeatures: ["distinct", "order-by"],
@@ -999,7 +999,7 @@ const LAKE_BOSS_SORT: LessonStageDefinition = {
 
 const FROG_BOSS_LEFT: LessonStageDefinition = {
   id: "frog-boss-left",
-  objective: "蛙王第一击：LEFT JOIN 装备表，查询没有装备记录的 id = 22。",
+  objective: "第一击：给 monsters 使用别名 m、monster_gear 使用别名 g；LEFT JOIN 后返回 m.id = 22 且 g.monster_id 为空的 m.id。",
   queryTemplate: "",
   answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 22 AND g.monster_id IS NULL;",
   hints: [
@@ -1015,14 +1015,14 @@ const FROG_BOSS_LEFT: LessonStageDefinition = {
 
 const FROG_BOSS_DISTINCT: LessonStageDefinition = {
   id: "frog-boss-distinct",
-  objective: "蛙王第二击：连接房间，去重查询二层 id = 22 的 name，并按 name 排序。",
+  objective: "第二击：连接 monsters AS m 与 rooms AS r，去重返回二层 m.id = 22 的 m.name，并把 r.name 命名为 room_name；按 m.id 排序。",
   queryTemplate: "",
-  answerSql: "SELECT DISTINCT m.name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.name;",
+  answerSql: "SELECT DISTINCT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;",
   hints: [
     "连接 monsters 与 rooms。",
-    "用 DISTINCT 读取 m.name。",
-    "WHERE 限定二层和蛙王 id，最后排序。",
-    "完整写法：SELECT DISTINCT m.name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.name;",
+    "用 DISTINCT 读取 m.name，并把 r.name 命名为 room_name。",
+    "WHERE 限定二层和 ID #022，最后排序。",
+    "完整写法：SELECT DISTINCT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;",
   ],
   locks: ["DISTINCT", "INNER JOIN", "ON", "ORDER BY"],
   requiredFeatures: ["distinct", "join", "on", "order-by"],

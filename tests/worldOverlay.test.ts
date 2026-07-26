@@ -6,6 +6,7 @@ import {
   OBJECTIVE_HIDE_DISTANCE,
   gridDistance,
   isNearPlayer,
+  shouldShowTutorialBeacon,
   tutorialObjective,
 } from "../src/game/worldOverlay";
 
@@ -59,6 +60,20 @@ describe("world overlay presentation", () => {
     expect(tutorialObjective(snapshot)?.position).toEqual({ x: actor.x, y: actor.y });
     snapshot.completedLessons.push(initial.lessonId);
     expect(tutorialObjective(snapshot)).toBeNull();
+  });
+
+  it("目标怪物格一旦可见就隐藏课程信标，避免与 ID 标签重叠", () => {
+    const snapshot = new GameSession(null, null, "objective-label-dedup").snapshot();
+    const objective = tutorialObjective(snapshot);
+    if (!objective) throw new Error("首层缺少教程目标");
+    snapshot.player.x = 0;
+    snapshot.player.y = 0;
+    snapshot.discoveredCells = snapshot.discoveredCells.filter(
+      (cell) => cell !== `${objective.position.x}:${objective.position.y}`,
+    );
+    expect(shouldShowTutorialBeacon(snapshot, objective)).toBe(true);
+    snapshot.discoveredCells.push(`${objective.position.x}:${objective.position.y}`);
+    expect(shouldShowTutorialBeacon(snapshot, objective)).toBe(false);
   });
 
   it("交互标签只在相邻格出现，怪物名允许多一格识别距离", () => {

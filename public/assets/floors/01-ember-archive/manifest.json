@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "floor": 1,
+  "id": "01-ember-archive",
+  "theme": "地下余烬档案",
+  "sources": [
+    {
+      "id": "0x72-dungeontileset-ii",
+      "title": "16x16 DungeonTileset II",
+      "author": "0x72",
+      "canonicalUrl": "https://0x72.itch.io/dungeontileset-ii",
+      "license": "CC0-1.0",
+      "sourceRecord": "../../../../assets/vendor/0x72-dungeontileset-ii/source.json",
+      "attributionRequired": false
+    }
+  ],
+  "textures": [
+    {
+      "key": "f01-cc0-floor",
+      "runtimePath": "sources/0x72-dungeontileset-ii/atlas-floor-16x16.png",
+      "sourcePath": "assets/vendor/0x72-dungeontileset-ii/selected/atlas_floor-16x16.png",
+      "bytes": 3023,
+      "sha256": "0f12a514fa61cd82db9cd9f61371c22f715cd3d34de28fb488cfe1f76a49fbe1",
+      "dimensions": "112x112",
+      "frame": "16x16"
+    },
+    {
+      "key": "f01-cc0-walls",
+      "runtimePath": "sources/0x72-dungeontileset-ii/atlas-walls-low-16x16.png",
+      "sourcePath": "assets/vendor/0x72-dungeontileset-ii/selected/atlas_walls_low-16x16.png",
+      "bytes": 2119,
+      "sha256": "3326eec4c0eba7ddfa606918becc75ab30a45fc09ca6b87432db2ca60b33c52e",
+      "dimensions": "192x64",
+      "frame": "16x16"
+    },
+    {
+      "key": "f01-cc0-door-closed",
+      "runtimePath": "sources/0x72-dungeontileset-ii/door-closed.png",
+      "sourcePath": "assets/vendor/0x72-dungeontileset-ii/selected/frames/doors_leaf_closed.png",
+      "bytes": 858,
+      "sha256": "a465a6d28db3ed58c57e9dd3ae8edab96440f818f3f84bd41ac5bd6afd52cc46",
+      "dimensions": "32x32"
+    },
+    {
+      "key": "f01-cc0-door-open",
+      "runtimePath": "sources/0x72-dungeontileset-ii/door-open.png",
+      "sourcePath": "assets/vendor/0x72-dungeontileset-ii/selected/frames/doors_leaf_open.png",
+      "bytes": 651,
+      "sha256": "bd3f62b616269d32a8058ce2527cd20855045b58936763c12d17aaf7ad213c4f",
+      "dimensions": "32x32"
+    },
+    {
+      "key": "f01-cc0-lever-closed",
+      "runtimePath": "sources/0x72-dungeontileset-ii/lever-closed.png",
+      "sourcePath": "assets/vendor/0x72-dungeontileset-ii/selected/frames/lever_left.png",
+      "bytes": 255,
+      "sha256": "7fe940635eb067cd12957763b53ac42c0115d843950614174a7e278f89595ad5",
+      "dimensions": "16x16"
+    },
+    {
+      "key": "f01-cc0-lever-open",
+      "runtimePath": "sources/0x72-dungeontileset-ii/lever-open.png",
+      "sourcePath": "assets/vendor/0x72-dungeontileset-ii/selected/frames/lever_right.png",
+      "bytes": 256,
+      "sha256": "23f2db2e166ad2a2df7766a896dfe0c483f411d33823f66d5e4758f95e7e27de",
+      "dimensions": "16x16"
+    }
+  ],
+  "compressedBytes": 7162,
+  "decodedTextureBytes": 109568
+}

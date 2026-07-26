@@ -29,7 +29,7 @@ export interface GateChallengeEvaluation {
 const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   id: "aggregate-breach",
   title: "聚合越权协议 · HAVING 王门",
-  objective: "从 monsters 与 monster_signals 中找出至少拥有 3 条 echo 信号、且 echo 总电荷不少于 24 的怪物。依次返回 id、name、echo_count、total_charge；按 total_charge 降序、id 升序。",
+  objective: "从 monsters 与 monster_signals 中找出至少拥有 3 条 echo 信号、且 echo 总电荷不少于 24 的未知记录。击败前不得读取 name；依次返回 id、echo_count、total_charge，按 total_charge 降序、id 升序。",
   schema: [
     sqlSchemaLine("monsters"),
     sqlSchemaLine("monster_signals"),
@@ -37,7 +37,7 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   ],
   hints: [
     "先 JOIN 两张表，只保留 channel = 'echo'。",
-    "按怪物 id、name 分组，用 COUNT 与 SUM 计算两种聚合值。",
+    "只按 monsters.id 分组，用 COUNT 与 SUM 计算两种聚合值；身份会在击败后揭示。",
     "聚合条件写在 HAVING；最后按 total_charge DESC、id ASC 排序。",
   ],
   requiredFeatures: [
@@ -51,10 +51,10 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
     "having",
     "order-by",
   ],
-  expectedColumns: ["id", "name", "echo_count", "total_charge"],
+  expectedColumns: ["id", "echo_count", "total_charge"],
   expectedRows: [
-    { id: 4, name: "铁胶怪", echo_count: 3, total_charge: 24 },
-    { id: 5, name: "泥王", echo_count: 3, total_charge: 24 },
+    { id: 4, echo_count: 3, total_charge: 24 },
+    { id: 5, echo_count: 3, total_charge: 24 },
   ],
 };
 
@@ -88,7 +88,7 @@ const FLOOR_TWO_CHALLENGE: GateChallengeDefinition = {
   ],
   expectedColumns: ["id", "room_name", "monster_count", "total_power"],
   expectedRows: [
-    { id: 25, room_name: "丛林王庭", monster_count: 1, total_power: 38 },
+    { id: 25, room_name: "灯塔岛", monster_count: 1, total_power: 38 },
     { id: 23, room_name: "古树桥", monster_count: 1, total_power: 15 },
   ],
 };

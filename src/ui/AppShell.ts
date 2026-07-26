@@ -9,6 +9,7 @@ import {
   floorMapBlueprint,
   floorTransitPresentation,
 } from "../content/floorMapBlueprints";
+import { floorExperience } from "../content/floorExperience";
 import type { OnboardingMilestone } from "../content/onboarding";
 import {
   INITIAL_MONSTERS,
@@ -29,9 +30,16 @@ import {
   narrativeFloorFor,
 } from "../domain/narrative";
 import {
+  FloorStoryMomentQueue,
+  floorStoryProgress,
+  type FloorStoryMoment,
+} from "../domain/floorStory";
+import {
   monsterIdLabel,
   monsterIdentityPresentation,
+  monsterIntentName,
 } from "../domain/monsterIdentity";
+import { redactUndiscoveredQueryIdentities } from "../domain/queryDisclosure";
 import type { FloorNumber } from "../domain/runGraph";
 import type {
   ExperienceSettlement,
@@ -40,6 +48,7 @@ import type {
   LootItem,
   Monster,
   PatrolMove,
+  QueryResultDisclosure,
   SqlQueryResult,
   TurnResolution,
 } from "../domain/types";
@@ -89,6 +98,31 @@ export function shouldDismissTransientCard(
   currentTotalMoves: number,
 ): boolean {
   return shownAtMove !== null && currentTotalMoves - shownAtMove >= 3;
+}
+
+export function canPresentQueuedNarrativeMoment(
+  mode: GameSnapshot["mode"] | undefined,
+  busy: boolean,
+  combatSettlementVisible: boolean,
+  blockingOverlayOpen: boolean,
+): boolean {
+  if (busy || combatSettlementVisible || blockingOverlayOpen) return false;
+  return mode !== "transition" &&
+    mode !== "victory" &&
+    mode !== "defeat" &&
+    mode !== "death-review";
+}
+
+export function shapeOnlyQueryResultCopy(result: SqlQueryResult): {
+  title: string;
+  detail: string;
+} {
+  return {
+    title: `查询已执行 · 结果值与行数已封存 · ${result.columns.length} 个字段`,
+    detail: result.columns.length > 0
+      ? `字段：${result.columns.join(", ")}。本次答案未通过，结果值与行数已封存。`
+      : "本次答案未通过，结果值与行数已封存。",
+  };
 }
 
 export type SchemaTaskRole = "primary" | "related";
@@ -195,10 +229,14 @@ export interface CombatSettlementCopy {
 
 export interface NarrativeRuntimeProgress {
   seenBeatIds: readonly string[];
+  seenMomentIds: readonly string[];
+  unlockedMoments: readonly FloorStoryMoment[];
   discoveredEvidenceIds: readonly string[];
   completedAscentIds: readonly string[];
   completedMigrationStepIds: readonly NarrativeEndingStep["id"][];
   latestBeat: NarrativeBeat | null;
+  latestMoment: FloorStoryMoment | null;
+  storyMomentTotal: number;
 }
 
 export function narrativeProgressForSnapshot(
@@ -210,6 +248,7 @@ export function narrativeProgressForSnapshot(
     | "focusMonsterId"
     | "mode"
     | "monsters"
+    | "openedGateIds"
     | "respawnCampfireId"
     | "roomGraph"
   >,
@@ -234,6 +273,15 @@ export function narrativeProgressForSnapshot(
     focusMonster.lessonId === floorBossLessonId
   ) || snapshot.completedRoomIds.includes(snapshot.roomGraph.bossId);
   const floorCompleted = snapshot.mode === "transition" || snapshot.mode === "victory";
+  const story = floorStoryProgress({
+    floor: snapshot.floor,
+    mode: snapshot.mode,
+    completedLessons: snapshot.completedLessons,
+    defeatedMonsterIds: snapshot.monsters
+      .filter((monster) => monster.hp <= 0)
+      .map((monster) => monster.id),
+    openedGateIds: snapshot.openedGateIds,
+  });
 
   const seenBeats = floor.beats.filter((beat) => {
     if (beat.kind === "floor-entry") return true;
@@ -260,10 +308,14 @@ export function narrativeProgressForSnapshot(
 
   return {
     seenBeatIds: seenBeats.map((beat) => beat.id),
+    seenMomentIds: story.unlockedIds,
+    unlockedMoments: story.unlocked,
     discoveredEvidenceIds: seenBeats.flatMap((beat) => beat.evidenceIds),
     completedAscentIds,
     completedMigrationStepIds,
     latestBeat: seenBeats.at(-1) ?? null,
+    latestMoment: story.latest,
+    storyMomentTotal: story.total,
   };
 }
 
@@ -335,6 +387,8 @@ export class AppShell {
   private settlementShownAtMove: number | null = null;
   private narrativeBeatShownAtMove: number | null = null;
   private lastNarrativeBeatId: string | null = null;
+  private readonly narrativeMomentQueue = new FloorStoryMomentQueue();
+  private narrativeMomentQueuePrimed = false;
   private floorTransitionTimer: number | null = null;
   private defeatRespawnTimer: number | null = null;
   private regionTransitionTimer: number | null = null;
@@ -579,7 +633,7 @@ export class AppShell {
                 <strong id="target-name">等待进入课程房</strong>
                 <div class="target-card__meta">
                   <span id="target-id">ID —</span>
-                  <span id="target-species">species —</span>
+                  <span id="target-species">类型 —</span>
                 </div>
                 <div class="target-card__hp-row">
                   <div id="target-hp-progress" class="target-card__hp" role="progressbar" aria-label="怪物生命值" aria-valuemin="0" aria-valuenow="0" aria-valuemax="1"><span id="target-hp-bar"></span></div>
@@ -625,8 +679,8 @@ export class AppShell {
                 <h2 id="campfire-menu-title">篝火</h2>
                 <p id="campfire-menu-status">选择接下来的行动。</p>
                 <blockquote class="scribe-recap">
-                  <strong>抄写员</strong>
-                  <p id="scribe-recap">我会把这一层发生过的事整理好。你不必一次记住全部。</p>
+                  <strong>复盘页 · 抄写员留存</strong>
+                  <p id="scribe-recap">这里保存抄写员此前整理的本层事实，不代表她就在篝火旁。</p>
                 </blockquote>
                 <div class="campfire-menu__actions">
                   <button id="rest-at-campfire" type="button" class="primary-action">在此休息</button>
@@ -918,8 +972,16 @@ export class AppShell {
             </header>
             <div id="admin-summary" class="admin-summary"></div>
             <div id="admin-floor-list" class="admin-floor-list" aria-label="选择预览楼层"></div>
+            <section class="admin-preset-section" aria-labelledby="admin-preset-title">
+              <div class="card-heading">
+                <span id="admin-preset-title">世界状态预设</span>
+                <span>F1 / F2 精修切片</span>
+              </div>
+              <p>直接检查入层、中段、捷径与通关后的地图变化；只影响本次管理员预览。</p>
+              <div id="admin-preset-list" class="admin-preset-list"></div>
+            </section>
             <div id="admin-region-list" class="admin-region-list"></div>
-            <p class="admin-menu__warning">管理员模式只用于 Debug。关闭面板仍保持全图可见；刷新页面才退出预览并恢复正式进度。</p>
+            <p class="admin-menu__warning">管理员模式只用于 Debug，包含未击败怪物真名、Boss 与剧情状态剧透。关闭面板仍保持全图可见；刷新页面才退出预览并恢复正式进度。</p>
           </div>
         </section>
 
@@ -1046,6 +1108,11 @@ export class AppShell {
     requiredElement(this.root, "#admin-region-list").addEventListener(
       "click",
       (event) => this.handleAdminRegionAction(event),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#admin-preset-list").addEventListener(
+      "click",
+      (event) => this.handleAdminPresetAction(event),
       listenerOptions,
     );
     requiredElement(this.root, "#close-review").addEventListener("click", () => this.closeReview(), listenerOptions);
@@ -1211,6 +1278,8 @@ export class AppShell {
     this.settlementShownAtMove = null;
     this.narrativeBeatShownAtMove = null;
     this.lastNarrativeBeatId = null;
+    this.narrativeMomentQueue.clear();
+    this.narrativeMomentQueuePrimed = false;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
     this.floorTransitionTimer = null;
     if (this.defeatRespawnTimer !== null) window.clearTimeout(this.defeatRespawnTimer);
@@ -1259,6 +1328,8 @@ export class AppShell {
       let result: SqlQueryResult | null = null;
       let queryError: unknown = null;
       try {
+        const identityPolicy = this.session.validateCombatQuery(this.textarea.value);
+        if (!identityPolicy.ok) throw new Error(identityPolicy.message);
         result = this.sql.execute(
           this.textarea.value,
           this.lastSnapshot?.floor ?? 1,
@@ -1271,7 +1342,7 @@ export class AppShell {
       if (result) {
         resolution = this.session.resolveQuery(result);
         if (resolution.hpUpdates.length > 0) this.sql.updateMonsterHp(resolution.hpUpdates);
-        this.renderResult(result);
+        this.renderResult(result, resolution.resultDisclosure);
         this.queryStatus.textContent = resolution.message;
         this.queryStatus.dataset.kind = resolution.accepted ? "success" : "warning";
         this.showFeedbackNotice({
@@ -1301,7 +1372,17 @@ export class AppShell {
         this.showFeedbackNotice({ message, tone: "danger" });
         if (resolution.mode !== "combat") this.getBattleScene()?.abortEncounter();
       }
-      if (resolution.experience) this.showCombatSettlement(resolution);
+      if (resolution.experience) {
+        if (resolution.events.some((event) => event.type === "identity-recovered")) {
+          this.feedback.dispatch({
+            type: "identity-recovered",
+            monsterName: resolution.experience.monsterName,
+            monsterId: resolution.experience.monsterId,
+            xp: resolution.experience.gained,
+          });
+        }
+        this.showCombatSettlement(resolution);
+      }
       reopenAfterResolution = resolution.mode === "combat";
     } catch (error) {
       console.error("战斗回合结算失败", error);
@@ -1348,6 +1429,10 @@ export class AppShell {
       let result: SqlQueryResult | null = null;
       let queryError: unknown = null;
       try {
+        const identityPolicy = this.session.validateGateChallengeQuery(
+          this.gateTextarea.value,
+        );
+        if (!identityPolicy.ok) throw new Error(identityPolicy.message);
         result = this.sql.executeSelect(this.gateTextarea.value);
       } catch (error) {
         queryError = error;
@@ -1363,6 +1448,7 @@ export class AppShell {
           result,
           requiredElement(this.root, "#gate-query-result"),
           requiredElement(this.root, "#gate-query-plan"),
+          resolution.resultDisclosure,
         );
       }
       this.gateQueryStatus.textContent = resolution.message;
@@ -1582,6 +1668,25 @@ export class AppShell {
     });
   }
 
+  private handleAdminPresetAction(event: Event): void {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-admin-preset]",
+    );
+    const presetId = button?.dataset.adminPreset;
+    if (!presetId) return;
+    const resolution = this.session.adminApplyPreset(presetId);
+    this.showFeedbackNotice({
+      message: resolution.message,
+      tone: resolution.ok ? "success" : "info",
+    });
+    if (!resolution.ok) return;
+    const snapshot = this.session.snapshot();
+    this.sql.reset(snapshot.monsters);
+    this.getBattleScene()?.abortEncounter();
+    this.clearQueryArtifacts();
+    this.renderAdminMenu(snapshot);
+  }
+
   private renderAdminMenu(snapshot: GameSnapshot): void {
     if (!this.adminMenu) return;
     const living = snapshot.monsters.filter((monster) => monster.hp > 0);
@@ -1597,6 +1702,21 @@ export class AppShell {
       button.className = floor === snapshot.floor ? "is-active" : "";
       button.textContent = `F${String(floor).padStart(2, "0")}`;
       floors.append(button);
+    }
+    const presets = requiredElement(this.adminMenu, "#admin-preset-list");
+    presets.replaceChildren();
+    if (snapshot.floor === 1 || snapshot.floor === 2) {
+      for (const preset of floorExperience(snapshot.floor).adminPresets) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.adminPreset = preset.id;
+        button.textContent = preset.label;
+        presets.append(button);
+      }
+    } else {
+      const unavailable = document.createElement("p");
+      unavailable.textContent = "本轮世界状态预设只覆盖完成精修的第一、二层。";
+      presets.append(unavailable);
     }
     const regions = requiredElement(this.adminMenu, "#admin-region-list");
     regions.replaceChildren();
@@ -1978,13 +2098,13 @@ export class AppShell {
         : "后段篝火";
     requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
     requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
-      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点。`;
+      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；篝火只负责恢复、复活与打开复盘页。`;
     const recap = buildScribeRecap(snapshot.floorReview);
     const campfireBeat = narrativeFloorFor(snapshot.floor).beats.find(
       (beat) => beat.kind === "campfire",
     );
     requiredElement(this.campfireMenu, "#scribe-recap").textContent =
-      `${campfireBeat?.lines[0] ?? "我会替你保存这一层的事实。"} ${recap.summary}`;
+      `${campfireBeat?.lines[0] ?? "抄写员此前留下了本层事实。"} ${recap.summary}`;
     if (entered && !this.isReviewOpen()) {
       requiredElement<HTMLButtonElement>(
         this.campfireMenu,
@@ -1999,28 +2119,32 @@ export class AppShell {
 
   private renderNarrativeProgress(snapshot: GameSnapshot): void {
     const progress = narrativeProgressForSnapshot(snapshot);
+    if (this.narrativeMomentQueuePrimed) {
+      this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
+    } else {
+      this.narrativeMomentQueue.prime(progress.unlockedMoments);
+      this.narrativeMomentQueuePrimed = true;
+    }
     this.narrativeCodex.render({
       floor: snapshot.floor,
       seenBeatIds: progress.seenBeatIds,
+      seenMomentIds: progress.seenMomentIds,
       discoveredEvidenceIds: progress.discoveredEvidenceIds,
       completedAscentIds: progress.completedAscentIds,
       completedMigrationStepIds: progress.completedMigrationStepIds,
     });
     requiredElement<HTMLButtonElement>(this.root, "#open-narrative").textContent =
-      `▧ 剧情档案 ${progress.seenBeatIds.length}/5`;
+      progress.storyMomentTotal > 0
+        ? `▧ 剧情档案 ${progress.seenMomentIds.length}/${progress.storyMomentTotal}`
+        : `▧ 剧情档案 ${progress.seenBeatIds.length}/5`;
     const latestBeat = progress.latestBeat ?? narrativeFloorFor(snapshot.floor).beats[0];
+    const latestRecord = progress.latestMoment ?? latestBeat;
     requiredElement(this.root, "#story-thread-title").textContent =
-      latestBeat?.title ?? "记录尚未恢复";
+      latestRecord?.title ?? "记录尚未恢复";
     requiredElement(this.root, "#story-thread-line").textContent =
-      latestBeat?.lines[0] ?? "继续探索，寻找这一层留下的记录。";
+      latestRecord?.lines[0] ?? "继续探索，寻找这一层留下的记录。";
 
     if (
-      progress.latestBeat &&
-      progress.latestBeat.id !== this.lastNarrativeBeatId
-    ) {
-      this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeBeatCard(progress.latestBeat, snapshot.totalMoves);
-    } else if (
       shouldDismissTransientCard(
         this.narrativeBeatShownAtMove,
         snapshot.totalMoves,
@@ -2028,6 +2152,44 @@ export class AppShell {
     ) {
       this.hideNarrativeBeatCard();
     }
+
+    if (this.narrativeBeatShownAtMove !== null) return;
+    if (!this.canPresentNarrativeCard(snapshot)) return;
+
+    const nextMoment = this.narrativeMomentQueue.takeNext();
+    if (nextMoment) {
+      if (progress.latestBeat) this.lastNarrativeBeatId = progress.latestBeat.id;
+      this.showNarrativeMomentCard(nextMoment, snapshot.totalMoves);
+      return;
+    }
+
+    if (
+      progress.latestBeat &&
+      progress.latestBeat.id !== this.lastNarrativeBeatId
+    ) {
+      this.lastNarrativeBeatId = progress.latestBeat.id;
+      this.showNarrativeBeatCard(progress.latestBeat, snapshot.totalMoves);
+    }
+  }
+
+  private canPresentNarrativeCard(snapshot: GameSnapshot): boolean {
+    const blockingOverlayOpen = (
+      this.isTerminalOpen() ||
+      this.isGateTerminalOpen() ||
+      this.isCampfireMenuOpen() ||
+      this.isInventoryMenuOpen() ||
+      this.isLootMenuOpen() ||
+      this.isReviewOpen() ||
+      this.isNarrativeCodexOpen() ||
+      this.isMonsterCodexOpen() ||
+      this.isAdminMenuOpen()
+    );
+    return canPresentQueuedNarrativeMoment(
+      snapshot.mode,
+      this.busy,
+      this.isCombatSettlementVisible(),
+      blockingOverlayOpen,
+    );
   }
 
   private showNarrativeBeatCard(beat: NarrativeBeat, totalMoves: number): void {
@@ -2043,6 +2205,24 @@ export class AppShell {
     requiredElement(card, "#narrative-beat-title").textContent = beat.title;
     const lines = requiredElement(card, "#narrative-beat-lines");
     lines.replaceChildren(...beat.lines.map((line) => {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = line;
+      return paragraph;
+    }));
+    this.narrativeBeatShownAtMove = totalMoves;
+    card.hidden = false;
+    card.classList.add("is-visible");
+  }
+
+  private showNarrativeMomentCard(
+    moment: FloorStoryMoment,
+    totalMoves: number,
+  ): void {
+    const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
+    requiredElement(card, "#narrative-beat-kind").textContent = moment.kicker;
+    requiredElement(card, "#narrative-beat-title").textContent = moment.title;
+    const lines = requiredElement(card, "#narrative-beat-lines");
+    lines.replaceChildren(...moment.lines.map((line) => {
       const paragraph = document.createElement("p");
       paragraph.textContent = line;
       return paragraph;
@@ -2282,6 +2462,7 @@ export class AppShell {
 
   private showCombatSettlement(resolution: TurnResolution): void {
     if (!resolution.experience) return;
+    this.hideNarrativeBeatCard();
     const card = requiredElement<HTMLElement>(this.root, "#combat-result-card");
     const recoveredIdentity = resolution.events.some(
       (event) => event.type === "identity-recovered",
@@ -2323,6 +2504,11 @@ export class AppShell {
     this.settlementShownAtMove = null;
     card.classList.remove("is-visible");
     card.hidden = true;
+  }
+
+  private isCombatSettlementVisible(): boolean {
+    return this.root.querySelector<HTMLElement>("#combat-result-card")
+      ?.classList.contains("is-visible") ?? false;
   }
 
   private dismissTransientCards(snapshot: GameSnapshot): void {
@@ -2388,6 +2574,8 @@ export class AppShell {
     this.hideCombatSettlement();
     this.hideNarrativeBeatCard();
     this.lastNarrativeBeatId = null;
+    this.narrativeMomentQueue.clear();
+    this.narrativeMomentQueuePrimed = false;
     if (this.defeatRespawnTimer !== null) {
       window.clearTimeout(this.defeatRespawnTimer);
       this.defeatRespawnTimer = null;
@@ -2865,6 +3053,9 @@ export class AppShell {
         snapshot.profile.discoveredMonsterIds,
       )
       : null;
+    const intentName = target
+      ? monsterIntentName(target, snapshot.profile.discoveredMonsterIds)
+      : null;
     requiredElement(this.root, "#target-name").textContent =
       identity?.nameLabel ?? "当前房间没有怪物";
     requiredElement(this.root, "#target-id").textContent =
@@ -2882,11 +3073,11 @@ export class AppShell {
       ? `${target.hp} / ${target.maxHp}`
       : "— / —";
     requiredElement(this.root, "#target-intent").textContent = snapshot.combat
-      ? `${snapshot.combat.intent.name} · 最高 ${snapshot.combat.intent.damage} 伤害`
+      ? `${intentName ?? "攻击正在蓄力"} · 最高 ${snapshot.combat.intent.damage} 伤害`
       : target?.hp === 0
         ? "记录已清除"
         : target
-          ? `${target.attackName} · 最高 ${target.damage} 伤害`
+          ? `${intentName} · 最高 ${target.damage} 伤害`
           : snapshot.claimableReward?.name ?? "探索 / 领取";
   }
 
@@ -3300,25 +3491,45 @@ export class AppShell {
     });
   }
 
-  private renderResult(result: SqlQueryResult): void {
-    this.renderResultInto(result, this.resultRoot, this.planRoot);
+  private renderResult(
+    result: SqlQueryResult,
+    disclosure: QueryResultDisclosure,
+  ): void {
+    this.renderResultInto(result, this.resultRoot, this.planRoot, disclosure);
   }
 
   private renderResultInto(
     result: SqlQueryResult,
     resultRoot: HTMLElement,
     planRoot: HTMLElement,
+    disclosure: QueryResultDisclosure = "shape-only",
   ): void {
+    const snapshot = this.session.snapshot();
+    const visibleResult = disclosure === "safe-values"
+      ? redactUndiscoveredQueryIdentities(
+          result,
+          snapshot.monsters,
+          snapshot.profile.discoveredMonsterIds,
+        )
+      : result;
     resultRoot.replaceChildren();
     resultRoot.className = "table-wrap";
-    if (result.rows.length === 0) {
+    if (disclosure === "shape-only") {
+      resultRoot.classList.add("result-shape");
+      const copy = shapeOnlyQueryResultCopy(result);
+      const title = document.createElement("strong");
+      title.textContent = copy.title;
+      const detail = document.createElement("p");
+      detail.textContent = copy.detail;
+      resultRoot.append(title, detail);
+    } else if (visibleResult.rows.length === 0) {
       resultRoot.classList.add("empty-state");
       resultRoot.textContent = "查询返回 0 行。";
     } else {
       const table = document.createElement("table");
       const head = document.createElement("thead");
       const headRow = document.createElement("tr");
-      result.columns.forEach((column) => {
+      visibleResult.columns.forEach((column) => {
         const cell = document.createElement("th");
         cell.textContent = column;
         headRow.append(cell);
@@ -3326,9 +3537,9 @@ export class AppShell {
       head.append(headRow);
       table.append(head);
       const body = document.createElement("tbody");
-      result.rows.forEach((row) => {
+      visibleResult.rows.forEach((row) => {
         const rowElement = document.createElement("tr");
-        result.columns.forEach((column) => {
+        visibleResult.columns.forEach((column) => {
           const cell = document.createElement("td");
           const value = row[column];
           cell.textContent = value === null ? "NULL" : String(value ?? "");
@@ -3342,7 +3553,7 @@ export class AppShell {
 
     planRoot.replaceChildren();
     planRoot.className = "plan-list";
-    result.plan.forEach((detail, index) => {
+    visibleResult.plan.forEach((detail, index) => {
       const line = document.createElement("div");
       line.className = "plan-line";
       const number = document.createElement("span");
@@ -3352,7 +3563,7 @@ export class AppShell {
       line.append(number, text);
       planRoot.append(line);
     });
-    if (result.plan.length === 0) {
+    if (visibleResult.plan.length === 0) {
       planRoot.classList.add("empty-state");
       planRoot.textContent = "SQLite 未返回查询计划。";
     }

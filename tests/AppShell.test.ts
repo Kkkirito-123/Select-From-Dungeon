@@ -4,13 +4,42 @@ import { GameSession } from "../src/domain/GameSession";
 import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/types";
 import { answerReviewSummary } from "../src/ui/AnswerReviewView";
 import {
+  canPresentQueuedNarrativeMoment,
   canOpenCombatTerminal,
   combatSettlementCopy,
   narrativeProgressForSnapshot,
   schemaRenderSignature,
   schemaTaskTableRoles,
+  shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+
+describe("shape-only 查询结果", () => {
+  it("封存提示不包含实际行数", () => {
+    const oneRow = shapeOnlyQueryResultCopy({
+      sql: "SELECT name FROM monsters WHERE id = 1",
+      columns: ["name"],
+      rows: [{ name: "史莱姆" }],
+      targetIds: [1],
+      plan: [],
+      baseHeat: 1,
+      features: ["select", "from", "where"],
+    });
+    const zeroRows = shapeOnlyQueryResultCopy({
+      sql: "SELECT name FROM monsters WHERE id = 999",
+      columns: ["name"],
+      rows: [],
+      targetIds: [],
+      plan: [],
+      baseHeat: 1,
+      features: ["select", "from", "where"],
+    });
+
+    expect(oneRow).toEqual(zeroRows);
+    expect(oneRow.title).not.toMatch(/\b[01]\s*行\b/);
+    expect(oneRow.detail).toContain("行数已封存");
+  });
+});
 
 describe("narrativeProgressForSnapshot", () => {
   it("入层先显示第一拍，中段、篝火与层主按真实进度逐步解锁", () => {
@@ -18,6 +47,11 @@ describe("narrativeProgressForSnapshot", () => {
     const entry = narrativeProgressForSnapshot(snapshot);
     expect(entry.seenBeatIds).toEqual(["narrative:f1:floor-entry"]);
     expect(entry.latestBeat?.kind).toBe("floor-entry");
+    expect(entry.seenMomentIds).toEqual([
+      "story:f1-story-fire-remembers",
+    ]);
+    expect(entry.storyMomentTotal).toBe(8);
+    expect(entry.latestMoment?.query?.expectedRowCount).toBe(0);
 
     const midpoint = narrativeProgressForSnapshot({
       ...snapshot,
@@ -32,6 +66,11 @@ describe("narrativeProgressForSnapshot", () => {
     expect(midpoint.discoveredEvidenceIds).toContain(
       "lost-name:f1:current-record",
     );
+    expect(midpoint.seenMomentIds).toEqual(expect.arrayContaining([
+      "story:f1-wheel-turning",
+      "story:f1-water-low",
+      "story:f1-beds-revealed",
+    ]));
 
     const boss = snapshot.monsters.find(
       (monster) =>
@@ -87,6 +126,7 @@ describe("narrativeProgressForSnapshot", () => {
       ],
     });
     expect(progress.latestBeat?.kind).toBe("floor-end");
+    expect(progress.latestMoment?.kind).toBe("ascent");
     expect(progress.completedAscentIds).toEqual(["ascent:f1:f2"]);
     expect(progress.completedMigrationStepIds).toEqual([]);
   });
@@ -108,6 +148,19 @@ describe("shouldDismissTransientCard", () => {
     expect(shouldDismissTransientCard(9, 10)).toBe(false);
     expect(shouldDismissTransientCard(9, 11)).toBe(false);
     expect(shouldDismissTransientCard(9, 12)).toBe(true);
+  });
+});
+
+describe("canPresentQueuedNarrativeMoment", () => {
+  it("战斗结算卡关闭前保留队列，关闭后才允许展示", () => {
+    expect(canPresentQueuedNarrativeMoment("explore", false, true, false))
+      .toBe(false);
+    expect(canPresentQueuedNarrativeMoment("explore", false, false, false))
+      .toBe(true);
+    expect(canPresentQueuedNarrativeMoment("explore", true, false, false))
+      .toBe(false);
+    expect(canPresentQueuedNarrativeMoment("transition", false, false, false))
+      .toBe(false);
   });
 });
 

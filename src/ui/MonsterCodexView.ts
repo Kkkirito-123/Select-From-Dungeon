@@ -1,5 +1,13 @@
+import {
+  biomeEncounterFor,
+  type BiomeKind,
+} from "../content/biomeContent";
+import { floorExperience } from "../content/floorExperience";
 import { INITIAL_MONSTERS, lessonById } from "../content/mvpLevel";
-import { monsterIdLabel } from "../domain/monsterIdentity";
+import {
+  monsterIdLabel,
+  monsterKindLabel,
+} from "../domain/monsterIdentity";
 import type { FloorNumber } from "../domain/runGraph";
 import type { Monster } from "../domain/types";
 
@@ -17,6 +25,8 @@ export interface MonsterCodexEntryModel {
   species: string | null;
   rank: string | null;
   concept: string | null;
+  habitat: string | null;
+  worldEffect: string | null;
   lore: string;
 }
 
@@ -35,14 +45,73 @@ const RANK_LABEL: Readonly<Record<Monster["rank"], string>> = {
   boss: "首领记录",
 };
 
-function identityLore(monster: Monster): string {
+const BIOME_LABEL: Readonly<Record<BiomeKind, string>> = {
+  drainage: "青石排水渠",
+  "slime-pool": "软泥池",
+  "ember-cellar": "余烬地窖",
+  lake: "月影湖",
+  swamp: "芦苇沼泽",
+  forest: "古树林",
+  "bone-yard": "白骨荒地",
+  "grave-mire": "墓地泥沼",
+  "spirit-crypt": "游魂墓室",
+  "fire-forge": "熔火锻炉",
+  "frost-vault": "白霜冰库",
+  "storm-core": "雷暴核心",
+  "iron-yard": "铸铁庭院",
+  barracks: "王城兵营",
+  "black-citadel": "黑色城塞",
+  "magma-nest": "熔岩龙巢",
+  "crystal-cavern": "水晶洞窟",
+  "dragon-throne": "古龙王座",
+  "crystal-grove": "水晶索引林",
+  "root-maze": "盘根迷径",
+  "index-heart": "索引树心",
+  "obsidian-hall": "黑曜大厅",
+  "void-court": "空值王庭",
+  "data-throne": "数据王座",
+};
+
+function habitatFor(monster: Monster): string {
+  const biome = biomeEncounterFor(monster.id)?.biome;
+  if (biome) return BIOME_LABEL[biome];
+  if (monster.floor === 1 || monster.floor === 2) {
+    const region = floorExperience(monster.floor).regions.find(
+      (entry) => entry.lessonIds.includes(monster.lessonId),
+    );
+    if (region) return region.name;
+  }
+  return lessonById(monster.lessonId).title.split("·")[0]?.trim()
+    ?? `第 ${monster.floor} 层`;
+}
+
+function worldEffectFor(monster: Monster): string {
+  if (monster.floor === 1 || monster.floor === 2) {
+    const rules = floorExperience(monster.floor).environmentRules;
+    const rule = rules.find(
+      (entry) => entry.when === `monster:${monster.id}:defeated`,
+    ) ?? rules.find(
+      (entry) => entry.when === `${monster.lessonId}:completed`,
+    );
+    if (rule) return rule.visibleResult;
+  }
   if (monster.isBoss) {
-    return `它守住了第 ${monster.floor} 层最后一段记录。名字被确认后，这一层的故事才有了结尾。`;
+    return `名字归档后，第 ${monster.floor} 层的上升路线获得继续通行的证据。`;
   }
   if (monster.encounterType === "ambush") {
-    return `它游荡在第 ${monster.floor} 层的支路中。击败它不会替代课程，却会补全这片区域的生态记录。`;
+    return "这条支路生态记录已经补全；主线课程进度不会被替代。";
   }
-  return `它把「${lessonById(monster.lessonId).concept}」藏进自己的记录。完成查询，才能确认这是谁。`;
+  return `「${lessonById(monster.lessonId).concept}」对应记录已写入永久图鉴。`;
+}
+
+function identityLore(monster: Monster): string {
+  if (monster.isBoss) {
+    return `它守住了第 ${monster.floor} 层最后一段规则。致命查询先清空生命，再把编号恢复成名字并盖入图鉴。`;
+  }
+  if (monster.encounterType === "ambush") {
+    return `它游荡在第 ${monster.floor} 层的支路中。名字恢复后，这片区域不再只剩一个无意义的编号。`;
+  }
+  return `它把「${lessonById(monster.lessonId).concept}」藏进自己的记录。击败前只能读取编号；最后一击才把名字写回档案。`;
 }
 
 export function buildMonsterCodexModel(
@@ -72,9 +141,11 @@ export function buildMonsterCodexModel(
         floor: monster.floor,
         discovered: isDiscovered,
         name: isDiscovered ? monster.name : "尚未获得名字",
-        species: isDiscovered ? monster.species : null,
+        species: isDiscovered ? monsterKindLabel(monster) : null,
         rank: isDiscovered ? RANK_LABEL[monster.rank] : null,
         concept: isDiscovered ? lessonById(monster.lessonId).concept : null,
+        habitat: isDiscovered ? habitatFor(monster) : null,
+        worldEffect: isDiscovered ? worldEffectFor(monster) : null,
         lore: isDiscovered
           ? identityLore(monster)
           : "在地牢中找到这条记录，并完成它守护的 SQL 战斗。",
@@ -315,6 +386,20 @@ export class MonsterCodexView {
         : `第 ${entry.floor} 层 · 身份未确认`;
       copy.append(
         meta,
+        ...(entry.discovered ? [
+          element(
+            this.documentRoot,
+            "p",
+            "monster-codex__habitat",
+            `栖息地：${entry.habitat}`,
+          ),
+          element(
+            this.documentRoot,
+            "p",
+            "monster-codex__world-effect",
+            `世界变化：${entry.worldEffect}`,
+          ),
+        ] : []),
         element(
           this.documentRoot,
           "p",

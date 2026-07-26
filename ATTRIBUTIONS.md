@@ -9,15 +9,17 @@ work or imply endorsement by its owner.
 外部来源；它不会重新许可任何第三方作品，也不表示上游作者对本项目的认可。
 
 Runtime code from the package-manager dependencies recorded below is bundled
-into generated `dist/` output. No third-party image, font, audio, or substantial
-expressive passage is vendored. Unless an entry says otherwise, documentation
-and engineering-practice sources are reference-only: general methods or
-published interface facts were independently implemented. Source names and
-trademarks remain the property of their respective owners.
+into generated `dist/` output. The first two floor packs also include the
+audited CC0 pixel-art files recorded in the dedicated section below. No
+third-party font, audio, or substantial expressive passage is vendored. Unless
+an entry says otherwise, documentation and engineering-practice sources are
+reference-only: general methods or published interface facts were independently
+implemented. Source names and trademarks remain the property of their
+respective owners.
 
-下方记录的包管理器运行依赖会进入生成的 `dist/` 构建。本仓库没有引入第三方图片、字体、音频
-或实质性表达段落。除非条目另有说明，文档与工程实践来源仅作参考：本项目独立实现通用方法或
-公开接口事实。来源名称和商标归各自权利人所有。
+下方记录的包管理器运行依赖会进入生成的 `dist/` 构建；前两层资源包还会包含下文逐项登记的
+CC0 像素图。本仓库没有引入第三方字体、音频或实质性表达段落。除非条目另有说明，文档与工程
+实践来源仅作参考：本项目独立实现通用方法或公开接口事实。来源名称和商标归各自权利人所有。
 
 `pnpm build` copies the authoritative root `LICENSE` and this file byte-for-byte
 into `dist/`. Those generated copies travel with the deployable static bundle;
@@ -114,6 +116,54 @@ edit only the root sources and rebuild instead of maintaining duplicate notices.
   [dedicated to the public domain](https://www.sqlite.org/copyright.html).
 - Status: installed through pnpm and bundled into generated JavaScript/WASM.
 
+## Vendored CC0 runtime art / 随包分发的 CC0 运行时美术
+
+Of the vendored art, only the selected PNG files named below enter
+`public/assets/floors/`; original ZIP
+archives, editable Aseprite files, sample maps, previews, and community
+extensions remain outside the runtime bundle. The immutable downloads,
+per-file SHA-256 values, official-page license evidence, legal text, and
+selection boundary are recorded under `assets/vendor/<source>/source.json`.
+`scripts/assets/verify-runtime-assets.mjs` verifies each runtime copy against
+that selected source.
+
+只有下列精选 PNG 会进入 `public/assets/`；原始 ZIP、Aseprite 工程、示例地图、预览图和社区
+扩展均不进入运行时包。不可变下载、逐文件 SHA-256、官方页面许可证据、法律文本与选择边界记录
+在 `assets/vendor/<source>/source.json`，并由
+`scripts/assets/verify-runtime-assets.mjs` 校验运行时副本。
+
+### 0x72 — 16x16 DungeonTileset II
+
+- Official source: [0x72 DungeonTileset II](https://0x72.itch.io/dungeontileset-ii).
+- License: [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/);
+  attribution is not required.
+- Runtime use: first-floor stone floor and low-wall atlases, one door pair, and
+  one lever pair in `public/assets/floors/01-ember-archive/`.
+- Inclusion boundary: selected upstream files only; no extension or community
+  edit is included.
+
+### Shade / Merchant Shade — 16x16 Puny World
+
+- Official source: [16x16 Puny World](https://merchant-shade.itch.io/16x16-puny-world).
+- License: [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/);
+  attribution is not required.
+- Runtime use: second-floor sand, grass, cliff, tree, sign, and village
+  structures in `public/assets/floors/02-tidal-archipelago/`.
+- Inclusion boundary: the selected upstream overworld PNG only; sample maps and
+  Tiled metadata are not shipped.
+
+### Pixel Carvel / Foozle — Scallywag: Water and Islands
+
+- Official source:
+  [Scallywag — Water and Islands](https://foozlecc.itch.io/scallywag-water-islands).
+- License: [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/);
+  both the official page and package README state CC0, and attribution is not
+  required.
+- Runtime use: second-floor water, coast, boat, reeds, rocks, and treasure
+  frames in `public/assets/floors/02-tidal-archipelago/`.
+- Inclusion boundary: the selected exported PNG only; editable Aseprite files
+  remain source evidence and are not shipped.
+
 ### Bundled MIT notices / 构建内 MIT 声明
 
 The following notices apply to the generated runtime bundles:
@@ -164,7 +214,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Original procedural audio / 原创程序化音频
+## Project-generated audio / 项目自行生成音频
 
 The concept packs under `docs/design/assets/region-01/` and
 `docs/design/assets/music-ascent-v1/` contain project-original procedural WAV
@@ -194,18 +244,32 @@ They are not production sprites, tiles, or runtime assets.
 MVP 2.0 角色阵容只使用仓库自有的抄写员概念图作为图片参考。生成过程没有输入或复制第三方
 图片。它们不是正式 Sprite、Tile 或运行时素材。
 
-The MVP 2.0 runtime score is defined in `src/audio/musicScore.ts`. Its eight
-floor profiles, exploration/combat/boss motifs, rhythms, orchestration
-parameters, synthesis, and sequencing are project-original. The score uses
-only generated sine/triangle voices and sparse generated noise; it does not
-transcribe, arrange, sample, or load a named classical work, Seer track, or
-other third-party game music. Earlier experimental classical-reference
-playlists were removed from the runtime before the MVP 2.0 release.
+The F1/F2 runtime score under `public/assets/audio/` is generated by
+`scripts/generate-runtime-classical-audio.mjs`. It independently enters short
+themes from Mozart's public-domain K.265 and Handel's public-domain
+*Water Music*, then supplies project-owned harmony, form, rhythm, synthesis,
+mixing, performance, and recordings. No modern performance, commercial game
+track, sample, SoundFont, imported MIDI, score scan, or streaming-platform file
+is used. OGG and MP3 are alternate encodings of the same project-generated
+masters; exact sources, rights reasoning, durations, byte sizes, and SHA-256
+hashes are recorded in `public/assets/audio/audio-source.json` and
+`assets/audio/public-domain-arrangements/audio-source.json`.
 
-MVP 2.0 的运行时乐谱统一定义于 `src/audio/musicScore.ts`。八层的探索 / 战斗 / Boss 动机、
-节奏、配器参数、合成与编排均为项目原创，只使用实时生成的正弦波、三角波与稀疏噪声；不会转录、
-改编、采样或加载具名古典作品、《赛尔号》或其他第三方游戏音乐。早期用于方向讨论的古典参考歌单
-已在 MVP 2.0 发布前从运行时移除。
+第一、第二层位于 `public/assets/audio/` 的运行时音乐由
+`scripts/generate-runtime-classical-audio.mjs` 生成。脚本独立录入莫扎特公版 K.265 与亨德尔
+公版《水上音乐》的短主题，再由项目自行完成和声、曲式、节奏、合成、混音、演奏与录音。它不使用
+现代演奏录音、商业游戏音乐、采样、SoundFont、导入 MIDI、乐谱扫描件或流媒体文件。OGG 与 MP3
+只是同一项目自制母带的兼容编码；具体来源、权利依据、时长、字节数和 SHA-256 记录在
+`public/assets/audio/audio-source.json` 与
+`assets/audio/public-domain-arrangements/audio-source.json`。
+
+Floors 3–8 retain the small real-time procedural score in
+`src/audio/musicScore.ts` as a compatibility fallback. It never loads the
+F1/F2 recordings or any commercial game audio. In particular, no music from
+*Seer* is copied, transposed, sampled, or arranged.
+
+第三至第八层暂时保留 `src/audio/musicScore.ts` 的轻量实时程序化乐谱作为兼容降级；它不会加载
+第一、第二层录音或任何商业游戏音频。尤其不会复制、变调、采样或改编《赛尔号》音乐。
 
 ## Learning-game and combat-design references / 教学游戏与战斗设计参考
 

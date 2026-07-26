@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "floor": 2,
+  "tracks": [
+    {
+      "schemaVersion": 1,
+      "id": "f02-tidal-archipelago-explore",
+      "floor": 2,
+      "mode": "explore",
+      "titleZh": "潮汐水上曲",
+      "sourceWork": {
+        "title": "Water Music, HWV 348–350",
+        "composer": "George Frideric Handel",
+        "composerLife": "1685–1759",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Handel died in 1759. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered a short Water Music-derived contour as note data, then rewrote the harmony, structure, rhythm, and orchestration. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 76,
+        "beatsPerBar": 2,
+        "bars": 32,
+        "durationSeconds": 50.526316,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5800,
+        "highpassHz": 50,
+        "measuredRmsDbfs": -17.597,
+        "measuredPeakDbfs": -5.747,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 50.526316
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f02/explore.ogg",
+          "bytes": 194322,
+          "sha256": "2b8ce5684fbd414555e149eda3df8ecd527d6376f04eff9d416c2625be4a82cf"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f02/explore.mp3",
+          "bytes": 404973,
+          "sha256": "e23690c36bb921441c7c436195b543dde3b1621b599ab709de3ce1feea153f3c"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f02-tidal-archipelago-combat",
+      "floor": 2,
+      "mode": "combat",
+      "titleZh": "逆潮",
+      "sourceWork": {
+        "title": "Water Music, HWV 348–350",
+        "composer": "George Frideric Handel",
+        "composerLife": "1685–1759",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Handel died in 1759. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered a short Water Music-derived contour as note data, then rewrote the harmony, structure, rhythm, and orchestration. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 104,
+        "beatsPerBar": 2,
+        "bars": 40,
+        "durationSeconds": 46.153846,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5300,
+        "highpassHz": 55,
+        "measuredRmsDbfs": -16.163,
+        "measuredPeakDbfs": -3.233,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 46.153846
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f02/combat.ogg",
+          "bytes": 160884,
+          "sha256": "5032982e8627da3c988a8231adf4b352cb65ba6f70bcfa719ce5be071b24a77a"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f02/combat.mp3",
+          "bytes": 370029,
+          "sha256": "e5fd95a92a74a23d25d3d6a3fb9ffae4c7bec5ce86b1ffc7782a7f386ab57fbc"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "f02-tidal-archipelago-boss",
+      "floor": 2,
+      "mode": "boss",
+      "titleZh": "七束灯火",
+      "sourceWork": {
+        "title": "Water Music, HWV 348–350",
+        "composer": "George Frideric Handel",
+        "composerLife": "1685–1759",
+        "compositionStatus": "public-domain",
+        "territoryBasis": "Handel died in 1759. The underlying composition is public domain in China and life-plus-70 territories.",
+        "transcriptionBasis": "The project independently entered a short Water Music-derived contour as note data, then rewrote the harmony, structure, rhythm, and orchestration. No score scan, MIDI, recording, sample, or SoundFont was imported."
+      },
+      "transcription": {
+        "author": "SELECT FROM DUNGEON project",
+        "sourcePath": "scripts/generate-runtime-classical-audio.mjs",
+        "method": "independently entered declarative note data"
+      },
+      "arrangement": {
+        "author": "SELECT FROM DUNGEON project",
+        "ownership": "project-owned",
+        "notes": "New harmony, form, rhythm, dynamics, synthesis, filtering, and game-state arrangement."
+      },
+      "performance": {
+        "ownership": "project-generated",
+        "engine": "deterministic additive synthesis in Node.js"
+      },
+      "thirdPartyInputs": {
+        "recordings": [],
+        "midi": [],
+        "samples": [],
+        "soundfonts": [],
+        "impulseResponses": []
+      },
+      "audio": {
+        "bpm": 116,
+        "beatsPerBar": 2,
+        "bars": 48,
+        "durationSeconds": 49.655172,
+        "sampleRate": 24000,
+        "channels": 1,
+        "lowpassHz": 5600,
+        "highpassHz": 55,
+        "measuredRmsDbfs": -15.615,
+        "measuredPeakDbfs": -2.618,
+        "loopStartSeconds": 0,
+        "loopEndSeconds": 49.655172
+      },
+      "runtimeFiles": [
+        {
+          "format": "audio/ogg",
+          "channels": 2,
+          "path": "/assets/audio/f02/boss.ogg",
+          "bytes": 194598,
+          "sha256": "beaad25a7b11ca77357d8a648214fa1ed49cacd75c9ed11605bff6654e998472"
+        },
+        {
+          "format": "audio/mpeg",
+          "channels": 1,
+          "path": "/assets/audio/f02/boss.mp3",
+          "bytes": 397869,
+          "sha256": "4243106e8654bf3cd1aef290bf16f5ef886d8a442b9534c2d334e68ded2fad0c"
+        }
+      ]
+    }
+  ]
+}

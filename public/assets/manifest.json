@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "loading": "current-floor-only",
+  "fallback": "FloorSetpieceLayer keeps project-original procedural geometry when a texture is unavailable.",
+  "floorPacks": [
+    {
+      "floor": 1,
+      "id": "01-ember-archive",
+      "manifest": "floors/01-ember-archive/manifest.json",
+      "compressedBytes": 7162,
+      "decodedTextureBytes": 109568
+    },
+    {
+      "floor": 2,
+      "id": "02-tidal-archipelago",
+      "manifest": "floors/02-tidal-archipelago/manifest.json",
+      "compressedBytes": 113363,
+      "decodedTextureBytes": 2018304
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import {
   NARRATIVE_ENDINGS,
   NARRATIVE_FLOORS,
 } from "../src/content/narrativeContent";
+import { floorStoryMoments } from "../src/domain/floorStory";
 import {
   NarrativeCodexView,
   buildNarrativeCodexModel,
@@ -264,6 +265,38 @@ describe("buildNarrativeCodexModel", () => {
     expect(model.migration.steps.every((step) => step.complete)).toBe(true);
     expect(model.migration.finalLine).toBe(NARRATIVE_ENDINGS[0].finalLine);
     expect(model.ascents.every((entry) => entry.state !== "available")).toBe(true);
+  });
+
+  it("F1/F2 把已发现现场与真实调查 SQL 收入档案，未抵达节点不泄露内容", () => {
+    const firstFloorMoments = floorStoryMoments(1);
+    const model = buildNarrativeCodexModel({
+      floor: 1,
+      seenMomentIds: [
+        firstFloorMoments[0]!.id,
+        firstFloorMoments[5]!.id,
+      ],
+    });
+
+    expect(model.moments).toHaveLength(8);
+    expect(model.moments[0]).toMatchObject({
+      complete: true,
+      query: {
+        title: "当前居民查询",
+        resultShape: "真实结果：0 行",
+      },
+    });
+    expect(model.moments[0]?.query?.sql).toContain("FROM residents");
+    expect(model.moments[5]?.query).toMatchObject({
+      title: "旧恢复轨迹计数",
+    });
+    expect(model.moments[1]).toMatchObject({
+      complete: false,
+      title: "尚未抵达",
+      lines: [],
+      archiveLine: null,
+      query: null,
+    });
+    expect(model.moments[1]?.title).not.toContain("水轮");
   });
 
   it("最终记录未解锁时不泄露 MIGRATE 名称、步骤或未来上升区域", () => {

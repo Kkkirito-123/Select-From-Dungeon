@@ -6,7 +6,11 @@ import {
 } from "../content/biomeContent";
 import { playerActorProfile } from "../content/actorVisuals";
 import { GameSession } from "../domain/GameSession";
-import { monsterIdentityPresentation } from "../domain/monsterIdentity";
+import {
+  monsterIdLabel,
+  monsterIdentityPresentation,
+  monsterIntentName,
+} from "../domain/monsterIdentity";
 import type { GameSnapshot, Monster, TurnResolution } from "../domain/types";
 import {
   createMonsterActor,
@@ -650,9 +654,15 @@ export class BattleScene extends Phaser.Scene {
       this.playerHp.setScale(this.snapshot.player.hp / this.snapshot.player.maxHp, 1);
     }
     if (this.intentText) {
+      const target = this.targetMonster();
       this.intentText.setText(
-        this.snapshot.combat
-          ? `敌方预告：${this.snapshot.combat.intent.name} · 错误时最高 ${this.snapshot.combat.intent.damage} 伤害`
+        this.snapshot.combat && target
+          ? `敌方预告：${
+              monsterIntentName(
+                target,
+                this.snapshot.profile.discoveredMonsterIds,
+              )
+            } · 错误时最高 ${this.snapshot.combat.intent.damage} 伤害`
           : "遭遇已经结算",
       );
     }
@@ -706,7 +716,7 @@ export class BattleScene extends Phaser.Scene {
       this.holdPlayerPose();
       if (!this.reducedMotion) this.cameras.main.shake(135, 0.009);
     } else if (event.type === "death") {
-      this.playDeath();
+      this.playDeath(resolution);
     } else if (event.type === "loot-drop") {
       this.playLootDrop();
     }
@@ -904,18 +914,108 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  private playDeath(): void {
+  private playDeath(resolution: TurnResolution): void {
+    const experience = resolution.experience;
+    const recovered = resolution.events.some(
+      (event) => event.type === "identity-recovered",
+    );
+    const idText = this.trackTransient(
+      this.add.text(
+        470,
+        166,
+        experience ? monsterIdLabel(experience.monsterId) : "RECORD CLEARED",
+        {
+          color: "#b9c2cf",
+          fontFamily: "monospace",
+          fontSize: "12px",
+          fontStyle: "bold",
+          backgroundColor: "#08090cee",
+          padding: { x: 7, y: 4 },
+        },
+      ).setOrigin(0.5).setDepth(23),
+    );
+
     if (this.reducedMotion) {
       this.monsterContainer.setVisible(false);
+      if (recovered && experience) {
+        idText.setText(
+          `${monsterIdLabel(experience.monsterId)} → ${experience.monsterName}`,
+        ).setColor("#f0cf7a");
+      }
+      this.scheduleEffect(420, () => this.destroyTransient(idText));
       return;
+    }
+
+    for (let index = 0; index < 12; index += 1) {
+      const direction = index % 2 === 0 ? -1 : 1;
+      const fragment = this.trackTransient(
+        this.add.rectangle(
+          470 + direction * (index % 3) * 5,
+          215 + (index - 6) * 3,
+          5 + (index % 3) * 2,
+          4 + ((index + 1) % 2) * 3,
+          index % 3 === 0 ? COLORS.gold : COLORS.query,
+          0.94,
+        ).setDepth(22),
+      );
+      this.addEffectTween({
+        targets: fragment,
+        x: fragment.x + direction * (34 + index * 3),
+        y: fragment.y + (index - 5.5) * 9,
+        angle: direction * (90 + index * 7),
+        alpha: 0,
+        duration: 300 + (index % 4) * 35,
+        ease: "Cubic.out",
+        onComplete: () => this.destroyTransient(fragment),
+      });
     }
     this.addEffectTween({
       targets: this.monsterContainer,
       alpha: 0,
       y: this.monsterContainer.y + 20,
-      duration: 300,
+      scaleY: 0.35,
+      duration: 210,
       ease: "Cubic.in",
     });
+    this.cameras.main.flash(125, 120, 201, 184, false);
+
+    if (recovered && experience) {
+      this.scheduleEffect(105, () => {
+        idText.setText(`${monsterIdLabel(experience.monsterId)}  →`);
+        const recoveredName = this.trackTransient(
+          this.add.text(470, 193, experience.monsterName, {
+            color: "#f0cf7a",
+            fontFamily: "Georgia, serif",
+            fontSize: "22px",
+            fontStyle: "bold",
+            backgroundColor: "#08090cf2",
+            padding: { x: 11, y: 6 },
+          }).setOrigin(0.5).setDepth(24),
+        );
+        const stamp = this.trackTransient(
+          this.add.text(470, 235, "NAME RECOVERED · CODEX +1", {
+            color: "#91e3d1",
+            fontFamily: "monospace",
+            fontSize: "10px",
+            fontStyle: "bold",
+            backgroundColor: "#0b1718ee",
+            padding: { x: 7, y: 4 },
+          }).setOrigin(0.5).setDepth(24),
+        );
+        recoveredName.setScale(0.78);
+        this.addEffectTween({
+          targets: recoveredName,
+          scale: 1,
+          duration: 180,
+          ease: "Back.out",
+        });
+        this.scheduleEffect(390, () => {
+          this.destroyTransient(recoveredName);
+          this.destroyTransient(stamp);
+        });
+      });
+    }
+    this.scheduleEffect(475, () => this.destroyTransient(idText));
   }
 
   private playLootDrop(): void {

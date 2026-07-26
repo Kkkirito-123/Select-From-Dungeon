@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import legacyV11Fixture from "./fixtures/legacy-v11-before-mvp2-1.json";
 import { legacyMonsterIdForCurrent } from "../src/content/monsterIds";
 import { GameSession } from "../src/domain/GameSession";
 import {
@@ -138,14 +139,14 @@ function completeSelect(session: GameSession): void {
   if (!actor) throw new Error("测试迷宫缺少 SELECT Actor");
   expect(session.startEncounter(actor.monsterId).ok).toBe(true);
   expect(session.resolveQuery(queryResult(
-    "SELECT name FROM monsters WHERE id = 1",
-    ["name"],
-    [{ name: "史莱姆" }],
-  )).accepted).toBe(true);
-  expect(session.resolveQuery(queryResult(
     "SELECT weakness FROM monsters WHERE id = 1",
     ["weakness"],
     [{ weakness: "slash" }],
+  )).accepted).toBe(true);
+  expect(session.resolveQuery(queryResult(
+    "SELECT name FROM monsters WHERE id = 1",
+    ["name"],
+    [{ name: "史莱姆" }],
   )).lessonCompleted).toBe("select");
 }
 
@@ -156,6 +157,31 @@ function expectRunRejected(storage: MemoryStorage, run: SavedRun): void {
 }
 
 describe("localProgress", () => {
+  it("真实旧 v11 第一、二层布局存档在布局改名后仍无损恢复", () => {
+    const fixtures = legacyV11Fixture as unknown as {
+      floor1: SavedRun;
+      floor2: SavedRun;
+    };
+
+    ([fixtures.floor1, fixtures.floor2] as const).forEach((legacyRun) => {
+      const storage = new MemoryStorage();
+      const originalJson = JSON.stringify(legacyRun);
+      storage.setItem(RUN_SAVE_KEY, originalJson);
+
+      const loaded = loadRun(storage);
+
+      expect(loaded).not.toBeNull();
+      expect(loaded?.floor).toBe(legacyRun.floor);
+      expect(loaded?.graph.seed).toBe(legacyRun.graph.seed);
+      expect(loaded?.mazeFloor).toEqual(legacyRun.mazeFloor);
+      expect(loaded?.player).toEqual(legacyRun.player);
+      expect(loaded?.worldActors).toEqual(legacyRun.worldActors);
+      expect(loaded?.campfires).toEqual(legacyRun.campfires);
+      expect(storage.getItem(RUN_SAVE_KEY)).toBe(originalJson);
+      expect(storage.removedKeys).toEqual([]);
+    });
+  });
+
   it("v11 Run 与 v3 永久 Profile 使用独立 key并完整恢复地图、篝火、背包和答题状态", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "storage-seed");

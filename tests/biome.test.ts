@@ -67,7 +67,7 @@ describe("seeded biome plan", () => {
   // but allow slower CI runners and parallel local suites enough wall time.
   }, 60_000);
 
-  it("第二层稳定生成湖怪与蛙王，首领不会落在安全区", () => {
+  it("第二层稳定生成湖兽与蛙王，首领不会落在安全区", () => {
     for (let index = 0; index < 60; index += 1) {
       const current = fixture(`biome-boss-${index}`, 2);
       const bosses = current.biome.regions.filter((region) => region.areaBossId !== null);
