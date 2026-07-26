@@ -1,9 +1,10 @@
 # MVP 2.1 / 第一、二层垂直切片发布检查表
 
-> 状态：`LOCAL VALIDATED / PR PENDING`
+> 状态：`DRAFT PR #24 / CI PENDING`
 >
 > [PR #23](https://github.com/Kkkirito-123/select-from-dungeon/pull/23) 是八层 MVP 2.0 基线；
-> 本表只验收在该基线上完成的第一、二层正式垂直切片。归档链接将在本轮统一 PR 创建后回填。
+> 本表只验收在该基线上完成的第一、二层正式垂直切片；本轮统一归档为
+> [PR #24](https://github.com/Kkkirito-123/select-from-dungeon/pull/24)。
 
 ## 1. 目标与边界
 
@@ -88,8 +89,8 @@
   页面隐藏 / 恢复继续由专项运行时测试覆盖。
 - [ ] 真实耳机 / 扬声器检查连续性、切换、疲劳、静音和音量。
 - [x] 完整 Diff、未追踪文件、依赖、版权和归因审阅完成。
-- [ ] 最终功能分支已推送并创建一个 MVP 2.1 Draft PR。
-- [ ] PR 链接已回填至本表与 `CHANGELOG.md`。
+- [x] 最终功能分支已推送并创建一个 MVP 2.1 Draft PR。
+- [x] PR 链接已回填至本表与 `CHANGELOG.md`。
 - [ ] 当前补丁推送后的 PR CI 通过并完成合并归档。
 
 ## 5. 已知人工边界
