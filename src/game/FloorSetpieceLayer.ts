@@ -23,6 +23,7 @@ interface ScribeView {
   container: Phaser.GameObjects.Container;
   label: Phaser.GameObjects.Text;
   roomNodeId: string;
+  point: PixelPoint;
 }
 
 interface FloorOneWaterBand {
@@ -65,7 +66,11 @@ export class FloorSetpieceLayer {
   private floorOneWaterBands: FloorOneWaterBand[] = [];
   private wheel: Phaser.GameObjects.Container | null = null;
   private wheelTween: Phaser.Tweens.Tween | null = null;
+  private wheelLabel: Phaser.GameObjects.Text | null = null;
+  private wheelPoint: PixelPoint | null = null;
   private bedLabels: Phaser.GameObjects.Text[] = [];
+  private dormitoryLabel: Phaser.GameObjects.Text | null = null;
+  private dormitoryPoint: PixelPoint | null = null;
   private registryRule: Phaser.GameObjects.Text | null = null;
   private liftLight: Phaser.GameObjects.Rectangle | null = null;
   private floorOneLever: Phaser.GameObjects.Image | null = null;
@@ -106,10 +111,15 @@ export class FloorSetpieceLayer {
       const visible = discoveredRoom(snapshot, this.scribe.roomNodeId);
       this.scribe.container.setVisible(visible);
       this.scribe.label.setVisible(visible);
+      this.scribe.label.setText(
+        this.isPlayerNear(snapshot, this.scribe.point)
+          ? "E · 与抄写员交谈"
+          : "抄写员",
+      );
     }
 
     if (world.floor === 1) {
-      this.syncFloorOne(world);
+      this.syncFloorOne(world, snapshot);
     } else {
       this.syncFloorTwo(world);
     }
@@ -126,7 +136,11 @@ export class FloorSetpieceLayer {
     this.waterLayer = null;
     this.floorOneWaterBands = [];
     this.wheel = null;
+    this.wheelLabel = null;
+    this.wheelPoint = null;
     this.bedLabels = [];
+    this.dormitoryLabel = null;
+    this.dormitoryPoint = null;
     this.registryRule = null;
     this.liftLight = null;
     this.floorOneLever = null;
@@ -191,6 +205,19 @@ export class FloorSetpieceLayer {
     }).setOrigin(0.5);
     this.root?.add(label);
     return label;
+  }
+
+  private isPlayerNear(
+    snapshot: GameSnapshot,
+    point: PixelPoint | null,
+    maxTiles = 3,
+  ): boolean {
+    if (!point) return false;
+    const playerX = (snapshot.player.x + 0.5) * TILE_SIZE;
+    const playerY = (snapshot.player.y + 0.5) * TILE_SIZE;
+    return (
+      Math.abs(playerX - point.x) + Math.abs(playerY - point.y)
+    ) <= maxTiles * TILE_SIZE;
   }
 
   private buildFloorOne(snapshot: GameSnapshot): void {
@@ -341,6 +368,7 @@ export class FloorSetpieceLayer {
   private createWaterWheel(snapshot: GameSnapshot): void {
     const point = this.anchorPoint(snapshot, "f1-water-wheel");
     if (!point) return;
+    this.wheelPoint = point;
     this.wheel = this.scene.add.container(point.x, point.y);
     const rim = this.scene.add.ellipse(0, 0, 54, 54, 0x312a24, 0.6)
       .setStrokeStyle(5, F1.brass, 1);
@@ -361,12 +389,13 @@ export class FloorSetpieceLayer {
         FLOOR_ART_KEYS.floorOne.leverClosed,
       ).setDepth(1);
     }
-    this.addLabel(point, "档案水轮", "#e5c17b", -38);
+    this.wheelLabel = this.addLabel(point, "档案水轮 · 停转", "#e5c17b", -38);
   }
 
   private createNamelessBeds(snapshot: GameSnapshot): void {
     const point = this.anchorPoint(snapshot, "f1-nameless-beds");
     if (!point) return;
+    this.dormitoryPoint = point;
     const container = this.scene.add.container(point.x, point.y);
     [-34, 0, 34].forEach((offset, index) => {
       const bed = this.scene.add.rectangle(offset, 9, 27, 42, 0x5d4a3d, 0.95)
@@ -384,7 +413,7 @@ export class FloorSetpieceLayer {
       if (index === 1) bed.setFillStyle(0x4b4037, 1);
     });
     this.root?.add(container);
-    this.addLabel(point, "无名宿舍", "#e5dbc2", -52);
+    this.dormitoryLabel = this.addLabel(point, "无名宿舍 · 淹没", "#e5dbc2", -52);
   }
 
   private createRegistry(snapshot: GameSnapshot): void {
@@ -461,10 +490,18 @@ export class FloorSetpieceLayer {
       padding: { x: 4, y: 2 },
     }).setOrigin(0.5);
     this.root?.add([actor, label]);
-    this.scribe = { container: actor, label, roomNodeId: npc.anchor.roomNodeId };
+    this.scribe = {
+      container: actor,
+      label,
+      roomNodeId: npc.anchor.roomNodeId,
+      point,
+    };
   }
 
-  private syncFloorOne(world: ReturnType<typeof floorWorldStateFromSnapshot> & { floor: 1 }): void {
+  private syncFloorOne(
+    world: ReturnType<typeof floorWorldStateFromSnapshot> & { floor: 1 },
+    snapshot: GameSnapshot,
+  ): void {
     const waterScale = world.water === "high" ? 1.7 : world.water === "middle" ? 1.12 : 0.58;
     this.floorOneWaterBands.forEach((band) => {
       const geometry = anchoredWaterBandGeometry(
@@ -491,11 +528,27 @@ export class FloorSetpieceLayer {
         this.wheel.setAngle(-12);
       }
     }
+    this.wheelLabel?.setText(
+      this.isPlayerNear(snapshot, this.wheelPoint)
+        ? "E · 调查档案水轮"
+        : world.wheel === "turning"
+          ? "档案水轮 · 运转"
+          : "档案水轮 · 停转",
+    );
     this.bedLabels.forEach((label) => {
       label.setText(world.beds === "revealed" ? "NULL" : "???");
       label.setColor(world.beds === "revealed" ? "#89e0ce" : "#d8cab1");
       label.setAlpha(world.beds === "hidden" ? 0.22 : 1);
     });
+    this.dormitoryLabel?.setText(
+      this.isPlayerNear(snapshot, this.dormitoryPoint)
+        ? "E · 读取无名床牌"
+        : world.beds === "revealed"
+          ? "无名宿舍 · NULL"
+          : world.beds === "visible"
+            ? "无名宿舍 · ???"
+            : "无名宿舍 · 淹没",
+    );
     this.registryRule?.setText(
       world.registry === "amended"
         ? "RESTORE TRACE ACCEPTED"

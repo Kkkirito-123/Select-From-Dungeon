@@ -36,9 +36,11 @@ complete SQLite query, and turn the correct result into an animated attack.
   press, or menu choice. Level, XP, equipment, inventory, relics, and query
   count carry across.
 - Reveal the discovery minimap by walking through fog. The minimap itself is
-  not clickable. Two physical region portals connect each floor's front,
-  middle, and rear biomes without bypassing curriculum gates; defeating the
-  middle area Boss automatically transfers the player into the rear main path.
+  not clickable. Floors two through eight use two physical region portals to
+  connect their front, middle, and rear biomes without bypassing curriculum
+  gates; defeating the middle area Boss automatically transfers the player
+  into the rear main path. Floor one stays continuous and uses water-state
+  changes plus its guaranteed physical shortcut instead of generic portals.
 - The same seed deterministically rebuilds course-route beacons, two
   middle/rear campfires, the entrance safe anchor, dead-end caches, and one
   two-way shortcut.

@@ -30,6 +30,7 @@ import {
 import {
   floorMapBlueprint,
   floorTransitPresentation,
+  regionPortalsEnabledForFloor,
 } from "../content/floorMapBlueprints";
 import { floorExperience } from "../content/floorExperience";
 import {
@@ -1261,6 +1262,8 @@ export class GameSession {
       this.emit();
       return { ok: true, kind: "challenge", message: this.banner };
     }
+    const floorLandmark = this.nearbyInspectableFloorLandmark();
+    if (floorLandmark) return this.inspectFloorLandmark(floorLandmark.id);
     return this.interactionFailure("附近没有可调查对象。松散掉落需要走到它所在的格子。");
   }
 
@@ -1635,6 +1638,12 @@ export class GameSession {
       return { moves: [], encounterId: null };
     }
     const moves: PatrolBatchResolution["moves"] = [];
+    const regionPortalCells = regionPortalsEnabledForFloor(this.floorNumber)
+      ? this.biomePlan.portals.flatMap((portal) => [
+          positionKey(portal.entry),
+          positionKey(portal.exit),
+        ])
+      : [];
     const blocked = new Set([
       ...this.groundItems.map(positionKey),
       ...this.lootBundles.map(positionKey),
@@ -1648,10 +1657,7 @@ export class GameSession {
       ...this.guidedMap.deadEndCaches
         .filter((cache) => !this.openedGateIds.has(cache.id))
         .map(positionKey),
-      ...this.biomePlan.portals.flatMap((portal) => [
-        positionKey(portal.entry),
-        positionKey(portal.exit),
-      ]),
+      ...regionPortalCells,
     ]);
     const occupied = new Set(
       this.worldActors
@@ -2592,6 +2598,7 @@ export class GameSession {
   }
 
   private autoTransferAfterAreaBoss(monster: Monster): string | null {
+    if (!regionPortalsEnabledForFloor(this.floorNumber)) return null;
     const portal = this.biomePlan.portals.find(
       (entry) => entry.requiredBossId === monster.id,
     );
@@ -3095,6 +3102,7 @@ export class GameSession {
     portal: BiomePortal;
     side: "entry" | "exit";
   } | null {
+    if (!regionPortalsEnabledForFloor(this.floorNumber)) return null;
     for (const portal of this.biomePlan.portals) {
       if (distance(portal.entry, this.player) <= 1) {
         return { portal, side: "entry" };
@@ -3104,6 +3112,84 @@ export class GameSession {
       }
     }
     return null;
+  }
+
+  private floorLandmarkPosition(landmarkId: string): Position | null {
+    if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
+    const landmark = floorExperience(this.floorNumber).landmarks.find(
+      (entry) => entry.id === landmarkId,
+    );
+    if (!landmark) return null;
+    const zone = this.mazeFloor.zones.find(
+      (entry) => entry.roomNodeId === landmark.anchor.roomNodeId,
+    );
+    if (!zone) return null;
+    return {
+      x: Math.round(zone.x + landmark.anchor.position.x * zone.width),
+      y: Math.round(zone.y + landmark.anchor.position.y * zone.height),
+    };
+  }
+
+  private floorNpcPosition(npcId: string): Position | null {
+    if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
+    const npc = floorExperience(this.floorNumber).npcPlacements.find(
+      (entry) => entry.id === npcId,
+    );
+    if (!npc) return null;
+    const zone = this.mazeFloor.zones.find(
+      (entry) => entry.roomNodeId === npc.anchor.roomNodeId,
+    );
+    if (!zone) return null;
+    return {
+      x: Math.round(zone.x + npc.anchor.position.x * zone.width),
+      y: Math.round(zone.y + npc.anchor.position.y * zone.height),
+    };
+  }
+
+  private nearbyInspectableFloorLandmark(): { id: string; position: Position } | null {
+    if (this.floorNumber !== 1) return null;
+    return [
+      { id: "npc-scribe-f1", position: this.floorNpcPosition("npc-scribe-f1") },
+      { id: "f1-water-wheel", position: this.floorLandmarkPosition("f1-water-wheel") },
+      { id: "f1-nameless-beds", position: this.floorLandmarkPosition("f1-nameless-beds") },
+    ]
+      .filter((entry): entry is { id: string; position: Position } => entry.position !== null)
+      .filter((entry) => distance(entry.position, this.player) <= 3)
+      .sort((left, right) => (
+        distance(left.position, this.player) - distance(right.position, this.player)
+      ))[0] ?? null;
+  }
+
+  private inspectFloorLandmark(landmarkId: string): InteractionResolution {
+    if (landmarkId === "npc-scribe-f1") {
+      this.banner = !this.completedLessons.has("select")
+        ? "抄写员：先去档案水轮。找出 ID #001 的记录，学会用 SELECT 读取字段、用 FROM 指定表。"
+        : !this.completedLessons.has("where")
+          ? "抄写员：水轮已经醒了。下一步用 WHERE 只留下目标记录，让积水退去。"
+          : !this.completedLessons.has("is-null")
+            ? "抄写员：宿舍床牌露出来了。NULL 不是空字符串；去确认那条真正缺失关联值的记录。"
+            : !this.completedLessons.has("group-by")
+              ? "抄写员：名字散在多条信号里。用 COUNT 与 GROUP BY 把同类记录聚成一组。"
+              : !this.completedLessons.has("having")
+                ? "抄写员：分组已经完成。最后用 HAVING 筛选聚合后的结果，打开登记大厅。"
+                : "抄写员：这一层的记录已经完整。前往回燃登记大厅，击败守门者后乘升降机上行。";
+    } else if (landmarkId === "f1-water-wheel") {
+      this.banner = !this.completedLessons.has("select")
+        ? "档案水轮停在 ID #001 卡住的控制记录上。击败它并完成 SELECT / FROM，水轮会自动启动。"
+        : !this.completedLessons.has("where")
+          ? "档案水轮正在转动，但排水记录仍未筛准。继续完成 WHERE，让水位降到宿舍门槛以下。"
+          : "档案水轮稳定运转，排水渠已降到低水位；它是 SQL 结果驱动的世界机关，不需要再次启动。";
+    } else if (landmarkId === "f1-nameless-beds") {
+      this.banner = !this.completedLessons.has("where")
+        ? "无名宿舍仍被高水遮住。先完成 SELECT / FROM 与 WHERE，让水位下降。"
+        : !this.completedLessons.has("is-null")
+          ? "床牌已经露出，但仍显示 ???。击败 ID #003，并用 IS NULL 确认缺失的 master_id。"
+          : "床牌已经显示 NULL：这条记录真实存在，只是名字关联值缺失。";
+    } else {
+      return this.interactionFailure("这处地标没有可读取的记录。");
+    }
+    this.emit();
+    return { ok: true, kind: "none", message: this.banner };
   }
 
   private travelThroughRegionPortal(

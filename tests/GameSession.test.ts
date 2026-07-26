@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { floorExperience } from "../src/content/floorExperience";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { safeZoneCellKeys } from "../src/domain/campfire";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
@@ -139,6 +140,62 @@ function collectLessonChest(
   expect(session.setPlayerPosition(item.x, item.y)).toBe(true);
   expect(session.interact()).toMatchObject({ ok: true });
   return item;
+}
+
+function placeNearFloorLandmark(session: GameSession, landmarkId: string): void {
+  const snapshot = session.snapshot();
+  if (snapshot.floor !== 1 && snapshot.floor !== 2) {
+    throw new Error("只有前两层拥有正式地标定义");
+  }
+  const landmark = floorExperience(snapshot.floor).landmarks.find(
+    (entry) => entry.id === landmarkId,
+  );
+  if (!landmark) throw new Error(`缺少地标：${landmarkId}`);
+  const zone = snapshot.mazeFloor.zones.find(
+    (entry) => entry.roomNodeId === landmark.anchor.roomNodeId,
+  );
+  if (!zone) throw new Error(`缺少地标房间：${landmark.anchor.roomNodeId}`);
+  const focus = {
+    x: Math.round(zone.x + landmark.anchor.position.x * zone.width),
+    y: Math.round(zone.y + landmark.anchor.position.y * zone.height),
+  };
+  for (let radius = 0; radius <= 3; radius += 1) {
+    for (let y = focus.y - radius; y <= focus.y + radius; y += 1) {
+      for (let x = focus.x - radius; x <= focus.x + radius; x += 1) {
+        if (Math.abs(x - focus.x) + Math.abs(y - focus.y) !== radius) continue;
+        if (session.setPlayerPosition(x, y)) return;
+      }
+    }
+  }
+  throw new Error(`地标附近没有可站立位置：${landmarkId}`);
+}
+
+function placeNearFloorNpc(session: GameSession, npcId: string): void {
+  const snapshot = session.snapshot();
+  if (snapshot.floor !== 1 && snapshot.floor !== 2) {
+    throw new Error("只有前两层拥有正式 NPC 定义");
+  }
+  const npc = floorExperience(snapshot.floor).npcPlacements.find(
+    (entry) => entry.id === npcId,
+  );
+  if (!npc) throw new Error(`缺少 NPC：${npcId}`);
+  const zone = snapshot.mazeFloor.zones.find(
+    (entry) => entry.roomNodeId === npc.anchor.roomNodeId,
+  );
+  if (!zone) throw new Error(`缺少 NPC 房间：${npc.anchor.roomNodeId}`);
+  const focus = {
+    x: Math.round(zone.x + npc.anchor.position.x * zone.width),
+    y: Math.round(zone.y + npc.anchor.position.y * zone.height),
+  };
+  for (let radius = 0; radius <= 3; radius += 1) {
+    for (let y = focus.y - radius; y <= focus.y + radius; y += 1) {
+      for (let x = focus.x - radius; x <= focus.x + radius; x += 1) {
+        if (Math.abs(x - focus.x) + Math.abs(y - focus.y) !== radius) continue;
+        if (session.setPlayerPosition(x, y)) return;
+      }
+    }
+  }
+  throw new Error(`NPC 附近没有可站立位置：${npcId}`);
 }
 
 function freshFloorEightRun(seed: string): SavedRun {
@@ -311,12 +368,9 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().completedLessons).not.toContain("select");
   });
 
-  it("区域门不会越过知识门，并把玩家送到无怪物占位的目标生态", () => {
+  it("第一层旧区域门数据仅用于存档兼容，不再提供传送交互", () => {
     const session = new GameSession(null, null, "portal-access");
     const portal = session.snapshot().biomePlan.portals[0];
-    const targetRegion = session.snapshot().biomePlan.regions.find(
-      (region) => region.id === portal.toRegionId,
-    );
     const placeBesideEntry = (): void => {
       const candidates = [
         portal.entry,
@@ -331,29 +385,30 @@ describe("GameSession SQL 魔王城 Run", () => {
     };
 
     placeBesideEntry();
-    const beforeBlockedTravel = session.snapshot().player;
-    expect(session.interact()).toMatchObject({
-      ok: false,
-      kind: "none",
-    });
-    expect(session.snapshot().player).toEqual(beforeBlockedTravel);
+    const before = session.snapshot().player;
+    expect(session.interact().kind).not.toBe("region-portal");
+    expect(session.snapshot().player).toEqual(before);
+  });
 
-    clearSelect(session);
-    placeBesideEntry();
+  it("抄写员、档案水轮与无名宿舍都可以调查，并直说当前目标", () => {
+    const session = new GameSession(null, null, "landmark-interaction");
+    placeNearFloorNpc(session, "npc-scribe-f1");
     expect(session.interact()).toMatchObject({
       ok: true,
-      kind: "region-portal",
+      message: expect.stringContaining("ID #001"),
     });
-    const arrived = session.snapshot();
-    expect(arrived.currentBiome).toBe(targetRegion?.kind);
-    expect(arrived.regionTransfer?.toName).toBe(targetRegion?.name);
-    expect(arrived.worldActors.some((actor) => (
-      actor.x === arrived.player.x &&
-      actor.y === arrived.player.y &&
-      arrived.monsters.some((monster) => (
-        monster.id === actor.monsterId && monster.hp > 0
-      ))
-    ))).toBe(false);
+
+    placeNearFloorLandmark(session, "f1-water-wheel");
+    expect(session.interact()).toMatchObject({
+      ok: true,
+      message: expect.stringContaining("完成 SELECT / FROM"),
+    });
+
+    placeNearFloorLandmark(session, "f1-nameless-beds");
+    expect(session.interact()).toMatchObject({
+      ok: true,
+      message: expect.stringContaining("水位"),
+    });
   });
 
   it("管理员视图可预览八层全图并定位生态区", () => {
