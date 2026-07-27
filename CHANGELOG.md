@@ -16,6 +16,7 @@
   `monsters.room_id = rooms.id`，不再给出无关的字段改名提示。
 - 全量 49 个测试文件、334 项测试、类型检查、生产构建、规则回归和浏览器现场交互均通过。
 - 归档：[PR #25](https://github.com/Kkkirito-123/select-from-dungeon/pull/25)。
+- 主框调查交互归档：[PR #26](https://github.com/Kkkirito-123/select-from-dungeon/pull/26)。
 
 ## `2.1.0-rc.1` — 2026-07-26（第一、二层正式垂直切片）
 
