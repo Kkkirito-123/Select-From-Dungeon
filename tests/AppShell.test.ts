@@ -7,12 +7,29 @@ import {
   canPresentQueuedNarrativeMoment,
   canOpenCombatTerminal,
   combatSettlementCopy,
+  inspectionDialogCopy,
   narrativeProgressForSnapshot,
   schemaRenderSignature,
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+
+describe("inspectionDialogCopy", () => {
+  it("把角色署名从正文拆到主框标题", () => {
+    expect(inspectionDialogCopy("抄写员：先去档案水轮。找出 ID #001 的记录。")).toEqual({
+      title: "抄写员",
+      body: "先去档案水轮。找出 ID #001 的记录。",
+    });
+  });
+
+  it("为无署名地标提供明确标题且保留完整指导", () => {
+    expect(inspectionDialogCopy("档案水轮正在转动，但排水记录仍未筛准。")).toEqual({
+      title: "档案水轮",
+      body: "档案水轮正在转动，但排水记录仍未筛准。",
+    });
+  });
+});
 
 describe("shape-only 查询结果", () => {
   it("封存提示不包含实际行数", () => {

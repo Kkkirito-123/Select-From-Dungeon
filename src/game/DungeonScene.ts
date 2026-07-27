@@ -406,7 +406,13 @@ export class DungeonScene extends Phaser.Scene {
 
   private readonly externalInteractHandler = (): void => {
     if (!this.canAcceptGameplayInput()) return;
-    this.session.interact();
+    const resolution = this.session.interact();
+    if (resolution.ok && resolution.kind === "inspection") {
+      this.resetPlayerMovement();
+      window.dispatchEvent(new CustomEvent("dungeon:inspection", {
+        detail: { message: resolution.message },
+      }));
+    }
   };
 
   private readonly keyDownHandler = (event: KeyboardEvent): void => {
@@ -453,18 +459,21 @@ export class DungeonScene extends Phaser.Scene {
   };
 
   private canAcceptGameplayInput(event?: KeyboardEvent): boolean {
-    const narrativeOpen = document
-      .querySelector("#app")
-      ?.classList.contains("narrative-active") ?? false;
     if (
       !this.scene.isActive() ||
       this.snapshot.mode !== "explore" ||
       this.battleTransitioning ||
       this.pagePaused ||
-      narrativeOpen
+      this.hasBlockingExplorationOverlay()
     ) return false;
     if (!event) return true;
     return !isGameplayShortcutCaptured(event.target);
+  }
+
+  private hasBlockingExplorationOverlay(): boolean {
+    const app = document.querySelector("#app");
+    return app?.classList.contains("narrative-active") === true ||
+      app?.classList.contains("inspection-active") === true;
   }
 
   constructor(
@@ -1788,6 +1797,7 @@ export class DungeonScene extends Phaser.Scene {
       this.moveLocked ||
       this.snapshot.mode !== "explore" ||
       this.pagePaused ||
+      this.hasBlockingExplorationOverlay() ||
       !this.scene.isActive()
     ) return;
     const result = this.session.advanceMonsterPatrols();

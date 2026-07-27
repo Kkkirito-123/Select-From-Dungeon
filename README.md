@@ -51,6 +51,10 @@ complete SQLite query, and turn the correct result into an animated attack.
   shortcut permanently for the Run, and travel through it. Because the player
   must first reach the key physically, the shortcut reduces repeat walking
   without skipping required SQL.
+- Press `E` beside the first-floor Scribe, archive wheel, or nameless dormitory
+  to open its guidance in a centered game-stage record. Movement and patrols
+  pause while it is open; press `E` again (`Escape` and the visible close action
+  also work) to resume without replacing the persistent right-rail objective.
 - Move into a living curriculum monster's tile or trigger a step-based ambush to
   start a Pokémon-like single-target battle. Outside safe zones, eligible
   successful steps use a 2% base ambush chance after the safe window and
