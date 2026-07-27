@@ -393,22 +393,36 @@ describe("GameSession SQL 魔王城 Run", () => {
   it("抄写员、档案水轮与无名宿舍都可以调查，并直说当前目标", () => {
     const session = new GameSession(null, null, "landmark-interaction");
     placeNearFloorNpc(session, "npc-scribe-f1");
+    const bannerBeforeInspection = session.snapshot().banner;
     expect(session.interact()).toMatchObject({
       ok: true,
+      kind: "inspection",
       message: expect.stringContaining("ID #001"),
     });
+    expect(session.snapshot().banner).toBe(bannerBeforeInspection);
 
     placeNearFloorLandmark(session, "f1-water-wheel");
+    const bannerBeforeWaterWheel = session.snapshot().banner;
     expect(session.interact()).toMatchObject({
       ok: true,
+      kind: "inspection",
       message: expect.stringContaining("完成 SELECT / FROM"),
     });
+    expect(session.snapshot().banner).toBe(bannerBeforeWaterWheel);
 
     placeNearFloorLandmark(session, "f1-nameless-beds");
+    const bannerBeforeBeds = session.snapshot().banner;
     expect(session.interact()).toMatchObject({
       ok: true,
+      kind: "inspection",
       message: expect.stringContaining("水位"),
     });
+    expect(session.snapshot().banner).toBe(bannerBeforeBeds);
+
+    const legacySave = session.toSavedRun();
+    legacySave.banner = "抄写员：这是旧版留在右栏的调查说明。";
+    const restored = new GameSession(legacySave, session.toProfile());
+    expect(restored.snapshot().banner).not.toContain("抄写员：");
   });
 
   it("管理员视图可预览八层全图并定位生态区", () => {

@@ -382,6 +382,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   entrance with full HP, while mastery, XP, gear, doors, defeated enemies, and
   the surviving enemy's current HP remain intact. The automatically opened
   review is scoped to the battle that caused death.
+- First-floor Scribe, archive-wheel, and nameless-dormitory investigations use a
+  dedicated main-stage record dialog instead of overwriting the persistent
+  right-rail banner. The dialog pauses held movement and monster patrols while
+  open; `E`, `Escape`, or its visible close action returns focus to exploration.
 - Web Audio music and event cues are authored in project code. All eight floors
   electronically re-synthesize identified public-domain classical themes with
   region variations and separate exploration, combat, and Boss movements.

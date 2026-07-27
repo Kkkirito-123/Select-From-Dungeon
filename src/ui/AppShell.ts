@@ -87,6 +87,23 @@ function dispatchInteract(): void {
   window.dispatchEvent(new CustomEvent("dungeon:interact"));
 }
 
+export function inspectionDialogCopy(message: string): {
+  title: string;
+  body: string;
+} {
+  const speaker = message.match(/^([^：]{1,12})：\s*(.+)$/s);
+  if (speaker) {
+    return { title: speaker[1], body: speaker[2] };
+  }
+  if (message.startsWith("档案水轮")) {
+    return { title: "档案水轮", body: message };
+  }
+  if (message.startsWith("无名宿舍")) {
+    return { title: "无名宿舍", body: message };
+  }
+  return { title: "现场调查", body: message };
+}
+
 export function canOpenCombatTerminal(
   mode: GameSnapshot["mode"] | null | undefined,
   busy: boolean,
@@ -357,6 +374,7 @@ export class AppShell {
   private hintsRoot!: HTMLElement;
   private terminal!: HTMLElement;
   private gateTerminal!: HTMLElement;
+  private inspectionOverlay!: HTMLElement;
   private campfireMenu!: HTMLElement;
   private inventoryMenu!: HTMLElement;
   private lootMenu!: HTMLElement;
@@ -382,6 +400,7 @@ export class AppShell {
   private unsubscribeOnboarding: (() => void) | null = null;
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
+  private focusBeforeInspection: HTMLElement | null = null;
   private toastTimer: number | null = null;
   private terminalFocusTimer: number | null = null;
   private pickupShownAtMove: number | null = null;
@@ -405,7 +424,32 @@ export class AppShell {
   private readonly noticeQueue: FeedbackNotice[] = [];
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
+  private readonly inspectionHandler = (event: Event): void => {
+    const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+    if (typeof message === "string" && message.trim() !== "") {
+      this.openInspection(message);
+    }
+  };
   private readonly keydownHandler = (event: KeyboardEvent): void => {
+    if (this.isInspectionOpen()) {
+      if (event.code === "KeyE" && !event.repeat) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.closeInspection();
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.closeInspection();
+        return;
+      }
+      if (event.key === "Tab") {
+        this.trapDialogFocus(event, this.inspectionOverlay);
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Escape" && this.isMonsterCodexOpen()) {
       event.preventDefault();
       this.monsterCodex.close();
@@ -621,6 +665,15 @@ export class AppShell {
 
             <div class="game-stage">
               <div id="game-root" class="game-root" tabindex="-1"></div>
+
+              <section id="inspection-overlay" class="inspection-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="inspection-title" inert hidden>
+                <article class="inspection-overlay__frame">
+                  <span>FIELD NOTE / 现场记录</span>
+                  <h2 id="inspection-title">现场调查</h2>
+                  <p id="inspection-message"></p>
+                  <button id="close-inspection" type="button">E · 关闭记录</button>
+                </article>
+              </section>
 
               <aside id="narrative-beat-card" class="narrative-beat-card" role="status" aria-live="polite" aria-atomic="true" hidden>
                 <span id="narrative-beat-kind">LOST NAME / 入层</span>
@@ -1006,6 +1059,7 @@ export class AppShell {
     this.hintsRoot = requiredElement(this.root, "#hint-list");
     this.terminal = requiredElement(this.root, "#combat-terminal");
     this.gateTerminal = requiredElement(this.root, "#gate-terminal");
+    this.inspectionOverlay = requiredElement(this.root, "#inspection-overlay");
     this.campfireMenu = requiredElement(this.root, "#campfire-menu");
     this.inventoryMenu = requiredElement(this.root, "#inventory-menu");
     this.lootMenu = requiredElement(this.root, "#loot-menu");
@@ -1052,6 +1106,11 @@ export class AppShell {
     requiredElement(this.root, "#close-gate-terminal").addEventListener(
       "click",
       () => this.closeGateTerminal(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#close-inspection").addEventListener(
+      "click",
+      () => this.closeInspection(),
       listenerOptions,
     );
     requiredElement(this.root, "#cancel-gate-query").addEventListener(
@@ -1189,7 +1248,11 @@ export class AppShell {
       (event) => this.handleLootAction(event),
       listenerOptions,
     );
-    requiredElement(this.root, "#interact").addEventListener("click", dispatchInteract, listenerOptions);
+    requiredElement(this.root, "#interact").addEventListener(
+      "click",
+      () => this.isInspectionOpen() ? this.closeInspection() : dispatchInteract(),
+      listenerOptions,
+    );
     this.sqlButton.addEventListener("click", () => this.openTerminal(), listenerOptions);
     requiredElement(this.root, "#reset-game").addEventListener("click", () => this.reset(), listenerOptions);
     requiredElement(this.root, "#skip-onboarding").addEventListener("click", () => this.onboarding.skip(), listenerOptions);
@@ -1243,6 +1306,7 @@ export class AppShell {
 
     this.releaseAudioGesture = this.audio.armFirstGesture(window);
     window.addEventListener("dungeon:open-terminal", this.openTerminalHandler, listenerOptions);
+    window.addEventListener("dungeon:inspection", this.inspectionHandler, listenerOptions);
     window.addEventListener("dungeon:milestone", this.milestoneHandler, listenerOptions);
     window.addEventListener("dungeon:patrol", this.patrolHandler, listenerOptions);
     window.addEventListener("keydown", this.keydownHandler, listenerOptions);
@@ -1296,6 +1360,7 @@ export class AppShell {
       "review-active",
       "admin-active",
       "narrative-active",
+      "inspection-active",
       "monster-codex-active",
       "victory-active",
     );
@@ -2186,6 +2251,7 @@ export class AppShell {
       this.isReviewOpen() ||
       this.isNarrativeCodexOpen() ||
       this.isMonsterCodexOpen() ||
+      this.isInspectionOpen() ||
       this.isAdminMenuOpen()
     );
     return canPresentQueuedNarrativeMoment(
@@ -2241,6 +2307,52 @@ export class AppShell {
     card?.classList.remove("is-visible");
     if (card) card.hidden = true;
     this.narrativeBeatShownAtMove = null;
+  }
+
+  private openInspection(message: string): void {
+    if (!this.isInspectionOpen()) {
+      this.focusBeforeInspection = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    }
+    const copy = inspectionDialogCopy(message);
+    requiredElement(this.inspectionOverlay, "#inspection-title").textContent = copy.title;
+    requiredElement(this.inspectionOverlay, "#inspection-message").textContent = copy.body;
+    this.hideNarrativeBeatCard();
+    this.inspectionOverlay.hidden = false;
+    this.inspectionOverlay.inert = false;
+    this.inspectionOverlay.setAttribute("aria-hidden", "false");
+    this.root.classList.add("inspection-active");
+    requiredElement<HTMLButtonElement>(this.inspectionOverlay, "#close-inspection").focus({
+      preventScroll: true,
+    });
+  }
+
+  private closeInspection(returnFocus = true): void {
+    if (!this.isInspectionOpen()) return;
+    this.inspectionOverlay.hidden = true;
+    this.inspectionOverlay.inert = true;
+    this.inspectionOverlay.setAttribute("aria-hidden", "true");
+    this.root.classList.remove("inspection-active");
+    if (!returnFocus) {
+      this.focusBeforeInspection = null;
+      return;
+    }
+    const focusTarget = this.focusBeforeInspection;
+    this.focusBeforeInspection = null;
+    if (
+      focusTarget?.isConnected &&
+      !focusTarget.matches(":disabled") &&
+      !this.inspectionOverlay.contains(focusTarget)
+    ) {
+      focusTarget.focus({ preventScroll: true });
+    } else {
+      requiredElement<HTMLElement>(this.root, "#game-root").focus({ preventScroll: true });
+    }
+  }
+
+  private isInspectionOpen(): boolean {
+    return !this.inspectionOverlay.hidden;
   }
 
   private openTerminal(): void {
@@ -2609,6 +2721,9 @@ export class AppShell {
   }
 
   private render(snapshot: GameSnapshot): void {
+    if (snapshot.mode !== "explore" && this.isInspectionOpen()) {
+      this.closeInspection(false);
+    }
     const pickedItems = this.lastSnapshot
       ? pickedItemsBetween(this.lastSnapshot, snapshot)
       : [];

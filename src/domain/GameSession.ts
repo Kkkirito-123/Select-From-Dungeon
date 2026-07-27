@@ -139,6 +139,20 @@ import type {
 
 type SessionListener = (snapshot: GameSnapshot) => void;
 
+const INITIAL_EXPLORATION_BANNER =
+  "迷宫已经生成。沿青色箭头找到 ID #001，触碰它进入 SELECT 战斗。";
+const LEGACY_INSPECTION_BANNER_PREFIXES = [
+  "抄写员：",
+  "档案水轮",
+  "无名宿舍",
+] as const;
+
+function restoredWorldBanner(banner: string): string {
+  return LEGACY_INSPECTION_BANNER_PREFIXES.some((prefix) => banner.startsWith(prefix))
+    ? INITIAL_EXPLORATION_BANNER
+    : banner;
+}
+
 interface LootSpawnResolution {
   bundleCount: number;
   recoveryNames: string[];
@@ -508,7 +522,7 @@ export class GameSession {
   private answerHistory: AnswerAttemptRecord[] = [];
   private battleSequence = 0;
   private reviewBattleId: number | null = null;
-  private banner = "迷宫已经生成。沿青色箭头找到 ID #001，触碰它进入 SELECT 战斗。";
+  private banner = INITIAL_EXPLORATION_BANNER;
   private adminMode = false;
   private adminPanelOpen = false;
   private adminIdentityMonsterIds = new Set<number>();
@@ -647,7 +661,7 @@ export class GameSession {
       this.answerHistory = cloneAnswerHistory(savedRun.answerHistory);
       this.battleSequence = savedRun.battleSequence;
       this.reviewBattleId = savedRun.reviewBattleId;
-      this.banner = savedRun.banner;
+      this.banner = restoredWorldBanner(savedRun.banner);
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
       this.revealAt(this.player);
     }
@@ -3161,8 +3175,9 @@ export class GameSession {
   }
 
   private inspectFloorLandmark(landmarkId: string): InteractionResolution {
+    let message: string;
     if (landmarkId === "npc-scribe-f1") {
-      this.banner = !this.completedLessons.has("select")
+      message = !this.completedLessons.has("select")
         ? "抄写员：先去档案水轮。找出 ID #001 的记录，学会用 SELECT 读取字段、用 FROM 指定表。"
         : !this.completedLessons.has("where")
           ? "抄写员：水轮已经醒了。下一步用 WHERE 只留下目标记录，让积水退去。"
@@ -3174,13 +3189,13 @@ export class GameSession {
                 ? "抄写员：分组已经完成。最后用 HAVING 筛选聚合后的结果，打开登记大厅。"
                 : "抄写员：这一层的记录已经完整。前往回燃登记大厅，击败守门者后乘升降机上行。";
     } else if (landmarkId === "f1-water-wheel") {
-      this.banner = !this.completedLessons.has("select")
+      message = !this.completedLessons.has("select")
         ? "档案水轮停在 ID #001 卡住的控制记录上。击败它并完成 SELECT / FROM，水轮会自动启动。"
         : !this.completedLessons.has("where")
           ? "档案水轮正在转动，但排水记录仍未筛准。继续完成 WHERE，让水位降到宿舍门槛以下。"
           : "档案水轮稳定运转，排水渠已降到低水位；它是 SQL 结果驱动的世界机关，不需要再次启动。";
     } else if (landmarkId === "f1-nameless-beds") {
-      this.banner = !this.completedLessons.has("where")
+      message = !this.completedLessons.has("where")
         ? "无名宿舍仍被高水遮住。先完成 SELECT / FROM 与 WHERE，让水位下降。"
         : !this.completedLessons.has("is-null")
           ? "床牌已经露出，但仍显示 ???。击败 ID #003，并用 IS NULL 确认缺失的 master_id。"
@@ -3188,8 +3203,7 @@ export class GameSession {
     } else {
       return this.interactionFailure("这处地标没有可读取的记录。");
     }
-    this.emit();
-    return { ok: true, kind: "none", message: this.banner };
+    return { ok: true, kind: "inspection", message };
   }
 
   private travelThroughRegionPortal(

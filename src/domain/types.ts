@@ -631,6 +631,7 @@ export interface InteractionResolution {
   ok: boolean;
   kind:
     | "none"
+    | "inspection"
     | "campfire"
     | "challenge"
     | "combat"
