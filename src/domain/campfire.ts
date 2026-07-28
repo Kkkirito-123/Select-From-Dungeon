@@ -54,7 +54,11 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
  * safe recovery anchor, so an additional front fire only adds visual clutter.
  * Exact corners remain seeded.
  */
-export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[] {
+export function generateCampfires(
+  graph: RoomGraph,
+  floor: MazeFloor,
+  options: { includeHiddenTreasureRooms?: boolean } = {},
+): Campfire[] {
   const candidates = floor.zones
     .filter((zone) => {
       const room = graph.nodes.find((node) => node.id === zone.roomNodeId);
@@ -63,6 +67,11 @@ export function generateCampfires(graph: RoomGraph, floor: MazeFloor): Campfire[
         !room.required &&
         room.type !== "entry" &&
         room.type !== "boss" &&
+        (
+          room.type !== "treasure" ||
+          graph.floor > 2 ||
+          options.includeHiddenTreasureRooms === true
+        ) &&
         !room.lessonId,
       );
     })

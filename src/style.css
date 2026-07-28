@@ -1458,6 +1458,19 @@ h1 span {
   font-size: clamp(16px, 1.65vw, 21px);
   font-weight: 650;
   line-height: 1.75;
+  white-space: pre-line;
+}
+
+.inspection-overlay[data-record-kind="story"] {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(121, 91, 45, 0.16), transparent 42%),
+    rgba(3, 6, 9, 0.84);
+}
+
+.inspection-overlay[data-record-kind="story"] .inspection-overlay__frame {
+  border-color: var(--gold);
+  border-top-color: var(--query);
+  background: linear-gradient(180deg, #11100f 0%, #090d12 100%);
 }
 
 .inspection-overlay__frame button {

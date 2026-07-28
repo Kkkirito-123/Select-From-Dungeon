@@ -118,6 +118,12 @@ export function shouldDismissTransientCard(
   return shownAtMove !== null && currentTotalMoves - shownAtMove >= 3;
 }
 
+export function narrativeMomentUsesRecordOverlay(
+  kind: FloorStoryMoment["kind"],
+): boolean {
+  return ["entry", "secret", "scribe", "boss", "ascent"].includes(kind);
+}
+
 export function canPresentQueuedNarrativeMoment(
   mode: GameSnapshot["mode"] | undefined,
   busy: boolean,
@@ -668,7 +674,7 @@ export class AppShell {
 
               <section id="inspection-overlay" class="inspection-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="inspection-title" inert hidden>
                 <article class="inspection-overlay__frame">
-                  <span>FIELD NOTE / 现场记录</span>
+                  <span id="inspection-kicker">FIELD NOTE / 现场记录</span>
                   <h2 id="inspection-title">现场调查</h2>
                   <p id="inspection-message"></p>
                   <button id="close-inspection" type="button">E · 关闭记录</button>
@@ -2288,6 +2294,10 @@ export class AppShell {
     moment: FloorStoryMoment,
     totalMoves: number,
   ): void {
+    if (narrativeMomentUsesRecordOverlay(moment.kind)) {
+      this.openStoryMoment(moment);
+      return;
+    }
     const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
     requiredElement(card, "#narrative-beat-kind").textContent = moment.kicker;
     requiredElement(card, "#narrative-beat-title").textContent = moment.title;
@@ -2310,14 +2320,46 @@ export class AppShell {
   }
 
   private openInspection(message: string): void {
+    const copy = inspectionDialogCopy(message);
+    this.openRecordOverlay({
+      kicker: "FIELD NOTE / 现场记录",
+      title: copy.title,
+      body: copy.body,
+      closeLabel: "E · 关闭记录",
+      kind: "inspection",
+    });
+  }
+
+  private openStoryMoment(moment: FloorStoryMoment): void {
+    this.openRecordOverlay({
+      kicker: moment.kicker,
+      title: moment.title,
+      body: moment.lines.join("\n"),
+      closeLabel: "E · 继续探索",
+      kind: "story",
+    });
+  }
+
+  private openRecordOverlay(copy: {
+    kicker: string;
+    title: string;
+    body: string;
+    closeLabel: string;
+    kind: "inspection" | "story";
+  }): void {
     if (!this.isInspectionOpen()) {
       this.focusBeforeInspection = document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
     }
-    const copy = inspectionDialogCopy(message);
+    requiredElement(this.inspectionOverlay, "#inspection-kicker").textContent = copy.kicker;
     requiredElement(this.inspectionOverlay, "#inspection-title").textContent = copy.title;
     requiredElement(this.inspectionOverlay, "#inspection-message").textContent = copy.body;
+    requiredElement<HTMLButtonElement>(
+      this.inspectionOverlay,
+      "#close-inspection",
+    ).textContent = copy.closeLabel;
+    this.inspectionOverlay.dataset.recordKind = copy.kind;
     this.hideNarrativeBeatCard();
     this.inspectionOverlay.hidden = false;
     this.inspectionOverlay.inert = false;
@@ -2333,6 +2375,7 @@ export class AppShell {
     this.inspectionOverlay.hidden = true;
     this.inspectionOverlay.inert = true;
     this.inspectionOverlay.setAttribute("aria-hidden", "true");
+    delete this.inspectionOverlay.dataset.recordKind;
     this.root.classList.remove("inspection-active");
     if (!returnFocus) {
       this.focusBeforeInspection = null;

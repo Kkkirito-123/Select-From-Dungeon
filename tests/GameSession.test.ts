@@ -198,6 +198,20 @@ function placeNearFloorNpc(session: GameSession, npcId: string): void {
   throw new Error(`NPC 附近没有可站立位置：${npcId}`);
 }
 
+function placeOutsideFloorGate(session: GameSession, gateId: string): void {
+  const gate = session.snapshot().mazeFloor.gates.find((entry) => entry.id === gateId);
+  if (!gate) throw new Error(`缺少实体门：${gateId}`);
+  const candidates = [
+    gate.outside,
+    { x: gate.x + 1, y: gate.y },
+    { x: gate.x - 1, y: gate.y },
+    { x: gate.x, y: gate.y + 1 },
+    { x: gate.x, y: gate.y - 1 },
+  ].filter((position) => Math.abs(position.x - gate.x) + Math.abs(position.y - gate.y) <= 1);
+  if (candidates.some((position) => session.setPlayerPosition(position.x, position.y))) return;
+  throw new Error(`实体门外没有可站立位置：${gateId}`);
+}
+
 function freshFloorEightRun(seed: string): SavedRun {
   const preview = new GameSession(null, null, seed);
   expect(preview.enableAdminMode().ok).toBe(true);
@@ -423,6 +437,67 @@ describe("GameSession SQL 魔王城 Run", () => {
     legacySave.banner = "抄写员：这是旧版留在右栏的调查说明。";
     const restored = new GameSession(legacySave, session.toProfile());
     expect(restored.snapshot().banner).not.toContain("抄写员：");
+  });
+
+  it("第一、二层隐藏区域需要完成前置课程并开启实体暗门，发现状态可随 Run 恢复", () => {
+    const first = new GameSession(null, null, "hidden-floor-one");
+    placeOutsideFloorGate(first, "gate:floor-1-treasure");
+    expect(first.interact()).toMatchObject({
+      ok: true,
+      kind: "inspection",
+      message: expect.stringContaining("WHERE 与 IS NULL"),
+    });
+    expect(first.snapshot().openedGateIds).not.toContain("gate:floor-1-treasure");
+
+    expect(first.enableAdminMode()).toMatchObject({ ok: true });
+    expect(first.adminApplyPreset("f1-admin-dormitory")).toMatchObject({ ok: true });
+    placeOutsideFloorGate(first, "gate:floor-1-treasure");
+    expect(first.snapshot().interactionPrompt).toContain("封存旧库");
+    expect(first.interact()).toMatchObject({
+      ok: true,
+      kind: "secret",
+      message: expect.stringContaining("未被焚毁"),
+    });
+    expect(first.snapshot().openedGateIds).toContain("gate:floor-1-treasure");
+    expect(new GameSession(first.toSavedRun()).snapshot().openedGateIds)
+      .toContain("gate:floor-1-treasure");
+    expect(first.adminApplyPreset("f1-admin-hidden")).toMatchObject({ ok: true });
+    expect(first.snapshot().openedGateIds).toContain("gate:floor-1-treasure");
+    expect(first.snapshot().currentRoomId).toBe("floor-1-treasure");
+
+    const second = new GameSession(null, null, "hidden-floor-two");
+    expect(second.enableAdminMode()).toMatchObject({ ok: true });
+    expect(second.adminLoadFloor(2)).toMatchObject({ ok: true });
+    expect(second.adminApplyPreset("f2-admin-village")).toMatchObject({ ok: true });
+    placeOutsideFloorGate(second, "gate:floor-2-treasure");
+    expect(second.snapshot().interactionPrompt).toContain("沉船记录舱");
+    expect(second.interact()).toMatchObject({
+      ok: true,
+      kind: "secret",
+      message: expect.stringContaining("七只防水匣"),
+    });
+    expect(second.adminApplyPreset("f2-admin-hidden")).toMatchObject({ ok: true });
+    expect(second.snapshot().openedGateIds).toContain("gate:floor-2-treasure");
+    expect(second.snapshot().currentRoomId).toBe("floor-2-treasure");
+  });
+
+  it("第二层抄写员、浮标、沉水村落与根桥均提供当前步骤指导", () => {
+    const session = new GameSession(null, null, "floor-two-landmark-guidance");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminLoadFloor(2)).toMatchObject({ ok: true });
+
+    placeNearFloorNpc(session, "npc-scribe-f2");
+    expect(session.interact()).toMatchObject({
+      ok: true,
+      kind: "inspection",
+      message: expect.stringContaining("ORDER BY"),
+    });
+    placeNearFloorLandmark(session, "f2-ranked-beacons");
+    expect(session.interact().message).toContain("ORDER BY / LIMIT");
+    placeNearFloorLandmark(session, "f2-drowned-village");
+    expect(session.interact().message).toContain("DISTINCT");
+    placeNearFloorLandmark(session, "f2-root-bridge");
+    expect(session.interact().message).toContain("INNER JOIN");
   });
 
   it("管理员视图可预览八层全图并定位生态区", () => {

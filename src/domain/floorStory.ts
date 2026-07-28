@@ -15,6 +15,7 @@ export type FloorStoryMomentKind =
   | "entry"
   | "world-change"
   | "evidence"
+  | "secret"
   | "scribe"
   | "boss"
   | "ascent";
@@ -24,6 +25,7 @@ export type FloorStoryUnlock =
   | { type: "lesson-completed"; lessonId: RunLessonId }
   | { type: "monster-defeated"; monsterId: number }
   | { type: "shortcut-opened"; floor: 1 | 2 }
+  | { type: "gate-opened"; gateId: string }
   | { type: "floor-completed" };
 
 export interface FloorStoryMoment {
@@ -126,6 +128,10 @@ const FLOOR_STORY_ROUTES: Readonly<Record<1 | 2, readonly FloorStoryRoute[]>> = 
       kind: "evidence",
     },
     {
+      source: { type: "event", id: "f1-story-sealed-vault" },
+      kind: "secret",
+    },
+    {
       source: { type: "event", id: "f1-story-shortcut-return" },
       kind: "scribe",
     },
@@ -153,6 +159,10 @@ const FLOOR_STORY_ROUTES: Readonly<Record<1 | 2, readonly FloorStoryRoute[]>> = 
     {
       source: { type: "rule", id: "f2-channels-distinct" },
       kind: "evidence",
+    },
+    {
+      source: { type: "event", id: "f2-story-wreck-ledger" },
+      kind: "secret",
     },
     {
       source: { type: "rule", id: "f2-root-linked" },
@@ -201,6 +211,8 @@ function parseCanonicalTrigger(trigger: string): FloorStoryUnlock {
       floor: Number(shortcutFloor) as 1 | 2,
     };
   }
+  const gateId = trigger.match(/^(gate:.+):opened$/)?.[1];
+  if (gateId) return { type: "gate-opened", gateId };
   throw new Error(`不支持的剧情触发条件：${trigger}`);
 }
 
@@ -342,6 +354,8 @@ function isUnlocked(
       return state.defeatedMonsterIds.includes(moment.unlock.monsterId);
     case "shortcut-opened":
       return shortcutOpened(moment.unlock.floor, state.openedGateIds);
+    case "gate-opened":
+      return state.openedGateIds.includes(moment.unlock.gateId);
     case "floor-completed":
       return state.mode === "transition" || state.mode === "victory";
   }

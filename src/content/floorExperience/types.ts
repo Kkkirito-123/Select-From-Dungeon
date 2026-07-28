@@ -82,6 +82,20 @@ export interface FloorNpcPlacement {
   alwaysShowName: boolean;
 }
 
+export interface FloorHiddenAreaDefinition {
+  id: string;
+  title: string;
+  roomNodeId: string;
+  gateId: string;
+  landmarkId: string;
+  requiredLessonIds: readonly RunLessonId[];
+  sealedPrompt: string;
+  sealedMessage: string;
+  openPrompt: string;
+  openedMessage: string;
+  discoveryEventId: string;
+}
+
 export type StoryAction =
   | { type: "banner"; text: string }
   | { type: "dialogue"; speaker: string; lines: readonly string[] }
@@ -128,6 +142,7 @@ export interface FloorExperienceDefinition {
   regions: readonly FloorRegionDefinition[];
   landmarks: readonly FloorLandmarkDefinition[];
   npcPlacements: readonly FloorNpcPlacement[];
+  hiddenAreas: readonly FloorHiddenAreaDefinition[];
   storyEvents: readonly StoryEventDefinition[];
   environmentRules: readonly FloorEnvironmentRuleDefinition[];
   adminPresets: readonly FloorAdminPreset[];

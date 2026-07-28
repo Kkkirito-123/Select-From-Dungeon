@@ -273,11 +273,11 @@ describe("buildNarrativeCodexModel", () => {
       floor: 1,
       seenMomentIds: [
         firstFloorMoments[0]!.id,
-        firstFloorMoments[5]!.id,
+        firstFloorMoments[6]!.id,
       ],
     });
 
-    expect(model.moments).toHaveLength(8);
+    expect(model.moments).toHaveLength(9);
     expect(model.moments[0]).toMatchObject({
       complete: true,
       query: {
@@ -286,7 +286,7 @@ describe("buildNarrativeCodexModel", () => {
       },
     });
     expect(model.moments[0]?.query?.sql).toContain("FROM residents");
-    expect(model.moments[5]?.query).toMatchObject({
+    expect(model.moments[6]?.query).toMatchObject({
       title: "旧恢复轨迹计数",
     });
     expect(model.moments[1]).toMatchObject({

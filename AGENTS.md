@@ -81,6 +81,11 @@ evidence entries per floor unlock from existing Run progress; the local
 `失名录` distinguishes unknown, confirmed `NULL`, and actual values. The eighth
 floor resolves the sole MVP 2.0 ending, `MIGRATE`; no Agent, account, backend,
 or network log is used.
+Floors one and two also each contain exactly one optional physical hidden room:
+the first-floor sealed archive opens after `WHERE / IS NULL`, and the
+second-floor wreck ledger opens after `ORDER BY / LIMIT / DISTINCT`. Their
+gate state reuses `openedGateIds`, campfires are never placed inside them, and
+their evidence may reinforce but never gate the main story or curriculum.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
 exploration is active. Each floor's locked Boss gate also exposes one optional
 high-difficulty SQL breach: a correct composite query opens only that physical
@@ -295,7 +300,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   bundles, inventory, armor, consumables, unique-item history, key items, fog,
   two campfires, the entrance anchor, active checkpoint, encounter meter,
   level/XP, opened
-  challenge gates/shortcuts/dead-end caches, active gate challenge, at most 200
+  challenge gates/shortcuts/dead-end caches/first-two-floor hidden rooms,
+  active gate challenge, at most 200
   local answer records, and disposable current Run state),
   `select-from-dungeon:profile:v3` (47 mastered lessons, recovered monster IDs,
   attempts, victories, and best query count), and
@@ -382,8 +388,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   entrance with full HP, while mastery, XP, gear, doors, defeated enemies, and
   the surviving enemy's current HP remain intact. The automatically opened
   review is scoped to the battle that caused death.
-- First-floor Scribe, archive-wheel, and nameless-dormitory investigations use a
-  dedicated main-stage record dialog instead of overwriting the persistent
+- First- and second-floor entry, hidden-room discovery, Scribe, Boss, and ascent
+  story nodes use a dedicated main-stage record dialog; first-floor Scribe,
+  archive-wheel, nameless-dormitory, and authored second-floor landmark
+  investigations use the same dialog instead of overwriting the persistent
   right-rail banner. The dialog pauses held movement and monster patrols while
   open; `E`, `Escape`, or its visible close action returns focus to exploration.
 - Web Audio music and event cues are authored in project code. All eight floors
