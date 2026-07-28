@@ -64,7 +64,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       lessonIds: ["distinct"],
       material: "深蓝湖水、屋顶、旧钟架和芦苇",
       ambience: "低频水流、远钟与缓慢木管",
-      landmarkIds: ["f2-drowned-village", "f2-lake-beast", "f2-ship-lock"],
+      landmarkIds: ["f2-drowned-village", "f2-wreck-ledger", "f2-lake-beast", "f2-ship-lock"],
     },
     {
       id: "f2-forest-swamp",
@@ -144,6 +144,18 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       interaction: "调查水下门牌",
       stateKeys: ["submerged", "revealed"],
       minimapIcon: "village",
+    }),
+    landmark({
+      id: "f2-wreck-ledger",
+      name: "沉船记录舱",
+      kind: "story",
+      regionId: "f2-lake",
+      anchor: anchor("floor-2-treasure", 0.5, 0.4, "south", 6, 5),
+      assetKey: "f02-cc0-scallywag-water",
+      fallback: "moonlit-wreck-ledger",
+      interaction: "读取七只防水匣",
+      stateKeys: ["sealed", "discovered"],
+      minimapIcon: "secret",
     }),
     landmark({
       id: "f2-lake-beast",
@@ -241,6 +253,21 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       alwaysShowName: true,
     },
   ],
+  hiddenAreas: [
+    {
+      id: "f2-hidden-wreck-ledger",
+      title: "沉船记录舱",
+      roomNodeId: "floor-2-treasure",
+      gateId: "gate:floor-2-treasure",
+      landmarkId: "f2-wreck-ledger",
+      requiredLessonIds: ["order-by", "distinct"],
+      sealedPrompt: "E  调查退潮后露出的船腹裂口",
+      sealedMessage: "裂口后传来纸匣碰撞声。先用 ORDER BY 排清航线，再用 DISTINCT 分清重复水纹与不同来源。",
+      openPrompt: "E  钻入沉船记录舱",
+      openedMessage: "船腹裂口已经能通过。舷窗下排着七只防水匣，每一只都标着不同港口。",
+      discoveryEventId: "f2-story-wreck-ledger",
+    },
+  ],
   storyEvents: [
     {
       id: "f2-story-seven-wet-pages",
@@ -254,6 +281,19 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
         { type: "dialogue", speaker: "抄写员", lines: ["同一段恢复轨迹回来了七次。", "先别把它们叫作重复。"] },
       ],
       completionFact: "story:f2:entry-seen",
+    },
+    {
+      id: "f2-story-wreck-ledger",
+      title: "七只防水匣",
+      trigger: "gate:floor-2-treasure:opened",
+      repeat: "once",
+      priority: 85,
+      actions: [
+        { type: "camera-focus", landmarkId: "f2-wreck-ledger" },
+        { type: "world-effect", effect: "f2-wreck-ledger-open" },
+        { type: "dialogue", speaker: "抄写员", lines: ["七只匣子共享恢复印，却分别来自七个港口。", "把相似的记录放在一起，不等于可以扔掉其中六份。"] },
+      ],
+      completionFact: "story:f2:wreck-ledger",
     },
     {
       id: "f2-story-first-route",
@@ -321,6 +361,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
   adminPresets: [
     { id: "f2-admin-entry", label: "F2 入层", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f2-ranked-beacons" },
     { id: "f2-admin-village", label: "F2 沉水村落", completedLessonIds: ["order-by", "distinct"], defeatedMonsterIds: [10, 11], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f2-drowned-village" },
+    { id: "f2-admin-hidden", label: "F2 沉船记录舱", completedLessonIds: ["order-by", "distinct"], defeatedMonsterIds: [10, 11], openedGateIds: ["gate:floor-2-treasure"], collectedKeyItems: [], focusLandmarkId: "f2-wreck-ledger" },
     { id: "f2-admin-low-tide", label: "F2 退潮与船闸", completedLessonIds: ["order-by", "distinct", "inner-join"], defeatedMonsterIds: [10, 11, 12, 21], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["shortcut-key:2"], focusLandmarkId: "f2-ship-lock" },
     { id: "f2-admin-complete", label: "F2 通关", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join", "join-boss"], defeatedMonsterIds: [10, 11, 12, 13, 14, 21], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["floor-key:2"], focusLandmarkId: "f2-north-ferry" },
   ],

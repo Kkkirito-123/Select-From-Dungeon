@@ -638,6 +638,7 @@ export interface InteractionResolution {
     | "loot"
     | "reward"
     | "loot-bundle"
+    | "secret"
     | "shortcut"
     | "region-portal";
   message: string;

@@ -35,6 +35,7 @@ import {
   gateChallengeIdForFloor,
 } from "../content/gateChallenges";
 import { compatibleFloorLayoutNames } from "../content/floorMapBlueprints";
+import { hiddenAreaGateIdsForFloor } from "../content/floorExperience";
 import {
   CURRENT_MONSTER_IDS_BY_FLOOR,
   currentMasterIdForLegacyMonster,
@@ -1172,12 +1173,19 @@ function validatedCampfires(
   ) return null;
   if (legacy) return campfires;
   let expected: Campfire[];
+  let legacyExpected: Campfire[];
   try {
     expected = generateCampfires(graph, floor);
+    legacyExpected = generateCampfires(graph, floor, {
+      includeHiddenTreasureRooms: true,
+    });
   } catch {
     return null;
   }
-  return JSON.stringify(campfires) === JSON.stringify(expected) ? campfires : null;
+  return (
+    JSON.stringify(campfires) === JSON.stringify(expected) ||
+    JSON.stringify(campfires) === JSON.stringify(legacyExpected)
+  ) ? campfires : null;
 }
 
 function isSavedRunVersion(
@@ -1217,6 +1225,7 @@ function isSavedRunVersion(
   if (!isMazeFloor(run.mazeFloor, graph)) return false;
   const mazeFloor = run.mazeFloor;
   const challengeGateId = `gate:${graph.bossId}`;
+  const hiddenAreaGateIds = hiddenAreaGateIdsForFloor(Number(run.floor));
   const expectedChallengeId = gateChallengeIdForFloor(run.floor);
   const openedGateIds = version >= 5 ? run.openedGateIds : [];
   const activeGateChallengeId = version >= 5 ? run.activeGateChallengeId : null;
@@ -1257,6 +1266,7 @@ function isSavedRunVersion(
     !Array.isArray(openedGateIds) ||
     !openedGateIds.every((id) => (
       id === challengeGateId ||
+      hiddenAreaGateIds.includes(id) ||
       guidedMap?.shortcuts.some((shortcut) => shortcut.id === id) ||
       guidedMap?.deadEndCaches.some((cache) => cache.id === id)
     )) ||

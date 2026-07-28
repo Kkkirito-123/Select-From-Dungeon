@@ -55,6 +55,11 @@ complete SQLite query, and turn the correct result into an animated attack.
   to open its guidance in a centered game-stage record. Movement and patrols
   pause while it is open; press `E` again (`Escape` and the visible close action
   also work) to resume without replacing the persistent right-rail objective.
+- Floors one and two each contain one optional physical hidden room with its own
+  visual language: the sealed archive opens after `WHERE / IS NULL`, while the
+  wreck ledger opens after `ORDER BY / LIMIT / DISTINCT`. Inspect the entrance
+  with `E`; the gate remains open for the Run, but neither room is required for
+  story completion or curriculum progress.
 - Move into a living curriculum monster's tile or trigger a step-based ambush to
   start a Pokémon-like single-target battle. Outside safe zones, eligible
   successful steps use a 2% base ambush chance after the safe window and

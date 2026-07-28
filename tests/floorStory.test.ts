@@ -10,8 +10,8 @@ import { storyQuery } from "../src/sql/storyQueryCatalog";
 describe("F1/F2 现场剧情展示适配器", () => {
   it("只从现有楼层事件、环境规则与故事查询目录组装可见节点", () => {
     expect(validateFloorStoryContent()).toEqual([]);
-    expect(floorStoryMoments(1)).toHaveLength(8);
-    expect(floorStoryMoments(2)).toHaveLength(9);
+    expect(floorStoryMoments(1)).toHaveLength(9);
+    expect(floorStoryMoments(2)).toHaveLength(10);
 
     const opening = floorStoryMoments(1)[0];
     expect(opening?.sourceId).toBe("f1-story-fire-remembers");
@@ -23,6 +23,32 @@ describe("F1/F2 现场剧情展示适配器", () => {
     const sevenPages = floorStoryMoments(2)[0];
     expect(sevenPages?.sourceId).toBe("f2-story-seven-wet-pages");
     expect(sevenPages?.query).toEqual(storyQuery("f2-seven-source-pages"));
+  });
+
+  it("隐藏区域只在对应实体暗门开启后进入现场档案", () => {
+    const sealed = floorStoryProgress({
+      floor: 1,
+      mode: "explore",
+      completedLessons: ["select", "where", "is-null"],
+      defeatedMonsterIds: [],
+      openedGateIds: [],
+    });
+    expect(sealed.unlocked.map((entry) => entry.sourceId)).not.toContain(
+      "f1-story-sealed-vault",
+    );
+
+    const opened = floorStoryProgress({
+      floor: 1,
+      mode: "explore",
+      completedLessons: ["select", "where", "is-null"],
+      defeatedMonsterIds: [],
+      openedGateIds: ["gate:floor-1-treasure"],
+    });
+    expect(opened.latest).toMatchObject({
+      kind: "secret",
+      sourceId: "f1-story-sealed-vault",
+      title: "被撕下的页",
+    });
   });
 
   it("同一次结算解锁多个节点时按策划顺序排队，重复刷新不会重复入队", () => {

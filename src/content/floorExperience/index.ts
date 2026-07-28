@@ -16,6 +16,11 @@ export function floorExperience(
   return floor === 1 ? FLOOR_ONE_EXPERIENCE : FLOOR_TWO_EXPERIENCE;
 }
 
+export function hiddenAreaGateIdsForFloor(floor: number): readonly string[] {
+  if (floor !== 1 && floor !== 2) return [];
+  return floorExperience(floor).hiddenAreas.map((area) => area.gateId);
+}
+
 export function validateFloorExperience(
   experience: FloorExperienceDefinition,
 ): string[] {
@@ -57,6 +62,25 @@ export function validateFloorExperience(
       !npc.assetKey.startsWith("shared.")
     ) {
       errors.push(`${npc.id} 的素材键 ${npc.assetKey} 没有包内声明。`);
+    }
+  });
+  if (experience.hiddenAreas.length !== 1) {
+    errors.push(`${experience.id} 必须恰好拥有一个可选隐藏区域。`);
+  }
+  experience.hiddenAreas.forEach((area) => {
+    if (!landmarkIds.has(area.landmarkId)) {
+      errors.push(`${area.id} 引用了不存在的隐藏区域地标 ${area.landmarkId}。`);
+    }
+    if (!experience.storyEvents.some((event) => event.id === area.discoveryEventId)) {
+      errors.push(`${area.id} 缺少发现剧情事件 ${area.discoveryEventId}。`);
+    }
+    if (
+      area.requiredLessonIds.length === 0 ||
+      area.requiredLessonIds.some((lessonId) => !experience.regions.some(
+        (region) => region.lessonIds.includes(lessonId),
+      ))
+    ) {
+      errors.push(`${area.id} 的发现前置课程无效。`);
     }
   });
   experience.storyEvents.forEach((event) => {

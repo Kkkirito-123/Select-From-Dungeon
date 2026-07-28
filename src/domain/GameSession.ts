@@ -1211,6 +1211,24 @@ export class GameSession {
       this.emit();
       return { ok: true, kind: "campfire", message: this.banner };
     }
+    const hiddenAreaEntrance = this.nearbyHiddenAreaEntrance();
+    if (hiddenAreaEntrance) {
+      const { area } = hiddenAreaEntrance;
+      const missingLessons = area.requiredLessonIds.filter(
+        (lessonId) => !this.completedLessons.has(lessonId),
+      );
+      if (missingLessons.length > 0) {
+        return {
+          ok: true,
+          kind: "inspection",
+          message: `${area.title}：${area.sealedMessage}`,
+        };
+      }
+      this.openedGateIds.add(area.gateId);
+      this.banner = area.openedMessage;
+      this.emit();
+      return { ok: true, kind: "secret", message: this.banner };
+    }
     const deadEndCache = this.guidedMap.deadEndCaches.find((cache) => (
       !this.openedGateIds.has(cache.id) &&
       distance(cache, this.player) <= 1
@@ -2188,6 +2206,12 @@ export class GameSession {
   }
 
   private roomAccessMessage(room: RoomNode): string | null {
+    const hiddenArea = this.floorHiddenAreas().find(
+      (area) => area.roomNodeId === room.id,
+    );
+    if (hiddenArea && !this.openedGateIds.has(hiddenArea.gateId)) {
+      return `${hiddenArea.title}没有出现在当前路线中。留意附近不自然的墙缝或船体裂口。`;
+    }
     if (this.openedGateIds.has(`gate:${room.id}`)) return null;
     const missingLessons = room.prerequisiteLessons.filter(
       (lesson) => !this.completedLessons.has(lesson),
@@ -3144,6 +3168,24 @@ export class GameSession {
     };
   }
 
+  private floorHiddenAreas() {
+    if (this.floorNumber !== 1 && this.floorNumber !== 2) return [];
+    return floorExperience(this.floorNumber).hiddenAreas;
+  }
+
+  private nearbyHiddenAreaEntrance(): {
+    area: ReturnType<GameSession["floorHiddenAreas"]>[number];
+    gate: MazeFloor["gates"][number];
+  } | null {
+    const areas = this.floorHiddenAreas();
+    for (const area of areas) {
+      if (this.openedGateIds.has(area.gateId)) continue;
+      const gate = this.mazeFloor.gates.find((entry) => entry.id === area.gateId);
+      if (gate && distance(gate, this.player) <= 1) return { area, gate };
+    }
+    return null;
+  }
+
   private floorNpcPosition(npcId: string): Position | null {
     if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
     const npc = floorExperience(this.floorNumber).npcPlacements.find(
@@ -3161,11 +3203,14 @@ export class GameSession {
   }
 
   private nearbyInspectableFloorLandmark(): { id: string; position: Position } | null {
-    if (this.floorNumber !== 1) return null;
+    if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
+    const ids = this.floorNumber === 1
+      ? ["f1-water-wheel", "f1-nameless-beds", "f1-sealed-vault"]
+      : ["f2-ranked-beacons", "f2-drowned-village", "f2-root-bridge", "f2-wreck-ledger"];
+    const npcId = this.floorNumber === 1 ? "npc-scribe-f1" : "npc-scribe-f2";
     return [
-      { id: "npc-scribe-f1", position: this.floorNpcPosition("npc-scribe-f1") },
-      { id: "f1-water-wheel", position: this.floorLandmarkPosition("f1-water-wheel") },
-      { id: "f1-nameless-beds", position: this.floorLandmarkPosition("f1-nameless-beds") },
+      { id: npcId, position: this.floorNpcPosition(npcId) },
+      ...ids.map((id) => ({ id, position: this.floorLandmarkPosition(id) })),
     ]
       .filter((entry): entry is { id: string; position: Position } => entry.position !== null)
       .filter((entry) => distance(entry.position, this.player) <= 3)
@@ -3200,6 +3245,36 @@ export class GameSession {
         : !this.completedLessons.has("is-null")
           ? "床牌已经露出，但仍显示 ???。击败 ID #003，并用 IS NULL 确认缺失的 master_id。"
           : "床牌已经显示 NULL：这条记录真实存在，只是名字关联值缺失。";
+    } else if (landmarkId === "f1-sealed-vault") {
+      message = "封存旧库：旧页右下角都有同一枚恢复印，姓名栏却被裁去。宝箱只提供本轮构筑奖励；真正留下的是‘被移出当前表仍可能存在’这条证据。";
+    } else if (landmarkId === "npc-scribe-f2") {
+      message = !this.completedLessons.has("order-by")
+        ? "抄写员：先读取七盏浮标的强度，用 ORDER BY 排出第一条可走航线。"
+        : !this.completedLessons.has("distinct")
+          ? "抄写员：航线已经有顺序。接下来用 DISTINCT 判断哪些水纹重复、哪些仍来自不同岛屿。"
+          : !this.completedLessons.has("inner-join")
+            ? "抄写员：沉水村落已经露出。去双端根桥，用 INNER JOIN 说明怪物记录与房间记录如何相连。"
+            : !this.completedLessons.has("left-join")
+              ? "抄写员：根桥接通了两端。再用 LEFT JOIN 保留没有装备记录的怪物，别让缺失关系把整行吞掉。"
+              : !this.completedLessons.has("join-boss")
+                ? "抄写员：七个来源都已保留。前往月潮灯塔，用完整 JOIN 阻止守卫只留下出现最多的一页。"
+                : "抄写员：灯塔已经同时照亮七个方向。北岸渡船会带我们去白霜墓原。";
+    } else if (landmarkId === "f2-ranked-beacons") {
+      message = !this.completedLessons.has("order-by")
+        ? "七盏月潮浮标的信号强弱混在一起。完成 ORDER BY / LIMIT 后，最强信号会先点亮可走航线。"
+        : "浮标已按强度排列，但顺序只决定先去哪里，不能证明七份记录是同一个人。";
+    } else if (landmarkId === "f2-drowned-village") {
+      message = !this.completedLessons.has("distinct")
+        ? "水下门牌在重复波纹中重叠。先完成 DISTINCT，分清重复显示与真实存在的不同来源。"
+        : !this.completedLessons.has("left-join")
+          ? "七块门牌已经分开，其中一扇门没有装备记录。之后用 LEFT JOIN 保留它，再确认缺失的一侧。"
+          : "沉水村落的无装备门牌仍被保留：右表没有匹配记录，不等于左表居民不存在。";
+    } else if (landmarkId === "f2-root-bridge") {
+      message = !this.completedLessons.has("inner-join")
+        ? "古树根桥的两端分别刻着 monsters.room_id 与 rooms.id。完成 INNER JOIN 后，两端才会接合。"
+        : "根桥已经按 monsters.room_id = rooms.id 接通。关系必须说明两端，不能只凭相似名字猜测。";
+    } else if (landmarkId === "f2-wreck-ledger") {
+      message = "沉船记录舱：七只防水匣来自七个港口，共享同一枚恢复印。构筑宝箱不会替你选出唯一真名；这间舱室只证明来源不能被粗暴去重。";
     } else {
       return this.interactionFailure("这处地标没有可读取的记录。");
     }
@@ -3359,6 +3434,15 @@ export class GameSession {
         : this.keyItems.includes(guidedShortcut.shortcut.keyId)
           ? `E  使用捷径钥匙 · ${guidedShortcut.shortcut.name}`
           : `E  检查锁住的${guidedShortcut.shortcut.name}`;
+    }
+    const hiddenAreaEntrance = this.nearbyHiddenAreaEntrance();
+    if (hiddenAreaEntrance) {
+      const ready = hiddenAreaEntrance.area.requiredLessonIds.every(
+        (lessonId) => this.completedLessons.has(lessonId),
+      );
+      return ready
+        ? hiddenAreaEntrance.area.openPrompt
+        : hiddenAreaEntrance.area.sealedPrompt;
     }
     const regionPortal = this.nearbyRegionPortal();
     if (regionPortal) {

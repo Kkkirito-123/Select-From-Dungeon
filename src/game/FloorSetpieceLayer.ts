@@ -33,6 +33,20 @@ interface FloorOneWaterBand {
   baseHeight: number;
 }
 
+interface HiddenAreaView {
+  gateId: string;
+  gatePoint: PixelPoint;
+  sealed: Phaser.GameObjects.Container;
+  opened: Phaser.GameObjects.Container;
+  entranceLabel: Phaser.GameObjects.Text;
+  roomNodeId: string;
+  backdrop: Phaser.GameObjects.Container | null;
+  interior: Phaser.GameObjects.Container;
+  interiorLabel: Phaser.GameObjects.Text;
+  sealedLabel: string;
+  openedLabel: string;
+}
+
 const F1 = {
   water: 0x2b7183,
   waterLine: 0x78c9d3,
@@ -84,6 +98,7 @@ export class FloorSetpieceLayer {
   private lighthouseOverwriteBeam: Phaser.GameObjects.Triangle | null = null;
   private lighthousePreserveBeams: Phaser.GameObjects.Triangle[] = [];
   private northFerry: Phaser.GameObjects.Container | null = null;
+  private hiddenArea: HiddenAreaView | null = null;
   private timers: Phaser.Time.TimerEvent[] = [];
 
   constructor(
@@ -117,6 +132,7 @@ export class FloorSetpieceLayer {
           : "抄写员",
       );
     }
+    this.syncHiddenArea(snapshot);
 
     if (world.floor === 1) {
       this.syncFloorOne(world, snapshot);
@@ -154,6 +170,7 @@ export class FloorSetpieceLayer {
     this.lighthouseOverwriteBeam = null;
     this.lighthousePreserveBeams = [];
     this.northFerry = null;
+    this.hiddenArea = null;
   }
 
   private anchorPoint(snapshot: GameSnapshot, landmarkId: string): PixelPoint | null {
@@ -227,7 +244,47 @@ export class FloorSetpieceLayer {
     this.createWaterWheel(snapshot);
     this.createNamelessBeds(snapshot);
     this.createRegistry(snapshot);
+    this.createFloorOneHiddenArea(snapshot);
     this.createUniqueScribe(snapshot, "npc-scribe-f1");
+  }
+
+  private createFloorOneHiddenArea(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f1-sealed-vault");
+    if (!point) return;
+    const backdrop = this.createHiddenRoomBackdrop(
+      snapshot,
+      "floor-1-treasure",
+      0x261d17,
+      F1.brass,
+      false,
+    );
+    const interior = this.scene.add.container(point.x, point.y);
+    const dryFloor = this.scene.add.rectangle(0, 10, 86, 66, 0x3b3023, 0.96)
+      .setStrokeStyle(3, F1.brass, 0.72);
+    const backCloth = this.scene.add.rectangle(0, -12, 74, 22, 0x5b4025, 0.78);
+    const shelves = [-27, 0, 27].map((x) => (
+      this.scene.add.rectangle(x, 8, 20, 48, 0x60452d, 0.94)
+        .setStrokeStyle(2, 0x9b7042, 0.8)
+    ));
+    const pages = [-31, -19, -4, 8, 23, 33].map((x, index) => (
+      this.scene.add.rectangle(x, index % 2 === 0 ? -10 : 1, 9, 13, F1.paper, 0.92)
+        .setAngle(index % 2 === 0 ? -4 : 5)
+    ));
+    const restoreSeal = this.scene.add.ellipse(0, 28, 18, 18, F1.ember, 0.85)
+      .setStrokeStyle(2, F1.brassLight, 0.92);
+    interior.add([dryFloor, backCloth, ...shelves, ...pages, restoreSeal]);
+    this.root?.add(interior);
+    const interiorLabel = this.addLabel(point, "封存旧库 · 未焚旧页", "#f0c879", -47);
+    this.createHiddenAreaEntrance(
+      snapshot,
+      backdrop,
+      interior,
+      interiorLabel,
+      "纸屑砖缝",
+      "旧库暗门",
+      0x6b5134,
+      0xe5c17b,
+    );
   }
 
   private createFloorOneTerrainSkin(snapshot: GameSnapshot): void {
@@ -579,7 +636,145 @@ export class FloorSetpieceLayer {
     this.createRootBridge(snapshot);
     this.createShipLock(snapshot);
     this.createLighthouse(snapshot);
+    this.createFloorTwoHiddenArea(snapshot);
     this.createUniqueScribe(snapshot, "npc-scribe-f2");
+  }
+
+  private createFloorTwoHiddenArea(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f2-wreck-ledger");
+    if (!point) return;
+    const backdrop = this.createHiddenRoomBackdrop(
+      snapshot,
+      "floor-2-treasure",
+      0x0d2433,
+      F2.foam,
+      true,
+    );
+    const interior = this.scene.add.container(point.x, point.y);
+    const hull = this.scene.add.ellipse(0, 11, 102, 66, 0x3d3026, 0.96)
+      .setStrokeStyle(4, F2.wood, 0.94);
+    const deck = this.scene.add.rectangle(0, 22, 84, 6, 0x8c6d47, 0.92);
+    const ribs = [-34, -17, 0, 17, 34].map((x) => (
+      this.scene.add.rectangle(x, 8, 4, 48, 0x9d7b4f, 0.74)
+    ));
+    const porthole = this.scene.add.ellipse(0, -12, 28, 28, F2.waterDeep, 1)
+      .setStrokeStyle(4, F2.foam, 0.9);
+    const moon = this.scene.add.ellipse(4, -15, 9, 9, 0xe9e3bd, 0.94);
+    const boxes = [-31, -21, -10, 0, 10, 21, 31].map((x, index) => (
+      this.scene.add.rectangle(x, 12 + index % 2 * 4, 10, 13, 0x486b69, 0.96)
+        .setStrokeStyle(1, F2.foam, 0.76)
+    ));
+    interior.add([hull, deck, ...ribs, porthole, moon, ...boxes]);
+    this.root?.add(interior);
+    const interiorLabel = this.addLabel(point, "沉船记录舱 · 七只防水匣", "#b9eced", -51);
+    this.createHiddenAreaEntrance(
+      snapshot,
+      backdrop,
+      interior,
+      interiorLabel,
+      "破损船腹",
+      "记录舱裂口",
+      0x344d58,
+      0xa8e2e8,
+    );
+  }
+
+  private createHiddenRoomBackdrop(
+    snapshot: GameSnapshot,
+    roomNodeId: string,
+    fillColor: number,
+    lineColor: number,
+    horizontalPlanks: boolean,
+  ): Phaser.GameObjects.Container | null {
+    const zone = snapshot.mazeFloor.zones.find((entry) => entry.roomNodeId === roomNodeId);
+    if (!zone) return null;
+    const centerX = (zone.x + zone.width / 2) * TILE_SIZE;
+    const centerY = (zone.y + zone.height / 2) * TILE_SIZE;
+    const width = Math.max(84, (zone.width - 1.05) * TILE_SIZE);
+    const height = Math.max(76, (zone.height - 1.05) * TILE_SIZE);
+    const backdrop = this.scene.add.rectangle(centerX, centerY, width, height, fillColor, 0.97)
+      .setStrokeStyle(3, lineColor, 0.68);
+    const inset = this.scene.add.rectangle(
+      centerX,
+      centerY,
+      Math.max(64, width - 18),
+      Math.max(56, height - 18),
+      fillColor,
+      0.12,
+    ).setStrokeStyle(1, lineColor, 0.24);
+    const grain: Phaser.GameObjects.Rectangle[] = [];
+    const axisLength = horizontalPlanks ? height : width;
+    for (let offset = -axisLength / 2 + 22; offset < axisLength / 2 - 12; offset += 28) {
+      grain.push(horizontalPlanks
+        ? this.scene.add.rectangle(centerX, centerY + offset, width - 20, 2, lineColor, 0.12)
+        : this.scene.add.rectangle(centerX + offset, centerY, 2, height - 20, lineColor, 0.12));
+    }
+    const container = this.scene.add.container(0, 0);
+    container.add([backdrop, inset, ...grain]);
+    this.root?.add(container);
+    return container;
+  }
+
+  private createHiddenAreaEntrance(
+    snapshot: GameSnapshot,
+    backdrop: Phaser.GameObjects.Container | null,
+    interior: Phaser.GameObjects.Container,
+    interiorLabel: Phaser.GameObjects.Text,
+    sealedLabel: string,
+    openedLabel: string,
+    darkColor: number,
+    lightColor: number,
+  ): void {
+    if (snapshot.floor !== 1 && snapshot.floor !== 2) return;
+    const area = floorExperience(snapshot.floor).hiddenAreas[0];
+    if (!area) return;
+    const gate = snapshot.mazeFloor.gates.find((entry) => entry.id === area.gateId);
+    if (!gate) return;
+    const gatePoint = {
+      x: (gate.x + 0.5) * TILE_SIZE,
+      y: (gate.y + 0.5) * TILE_SIZE,
+    };
+    const sealed = this.scene.add.container(gatePoint.x, gatePoint.y);
+    const sealedStone = this.scene.add.rectangle(0, 0, 22, 22, darkColor, 0.96)
+      .setStrokeStyle(2, lightColor, 0.38);
+    const seam = this.scene.add.line(0, 0, -7, -9, 2, 9, lightColor, 0.76)
+      .setLineWidth(2);
+    const trace = this.scene.add.rectangle(7, 6, 5, 2, lightColor, 0.88);
+    sealed.add([sealedStone, seam, trace]);
+    const opened = this.scene.add.container(gatePoint.x, gatePoint.y);
+    const aperture = this.scene.add.rectangle(0, 0, 22, 22, 0x080b0d, 0.98)
+      .setStrokeStyle(3, lightColor, 0.92);
+    const threshold = this.scene.add.rectangle(0, 9, 18, 3, lightColor, 0.72);
+    opened.add([aperture, threshold]);
+    this.root?.add([sealed, opened]);
+    const entranceLabel = this.addLabel(gatePoint, sealedLabel, `#${lightColor.toString(16).padStart(6, "0")}`, -27);
+    this.hiddenArea = {
+      gateId: area.gateId,
+      gatePoint,
+      sealed,
+      opened,
+      entranceLabel,
+      roomNodeId: area.roomNodeId,
+      backdrop,
+      interior,
+      interiorLabel,
+      sealedLabel,
+      openedLabel,
+    };
+  }
+
+  private syncHiddenArea(snapshot: GameSnapshot): void {
+    const view = this.hiddenArea;
+    if (!view) return;
+    const opened = snapshot.openedGateIds.includes(view.gateId);
+    const interiorVisible = discoveredRoom(snapshot, view.roomNodeId);
+    view.sealed.setVisible(!opened);
+    view.opened.setVisible(opened);
+    view.backdrop?.setVisible(interiorVisible);
+    view.interior.setVisible(interiorVisible);
+    view.interiorLabel.setVisible(interiorVisible);
+    view.entranceLabel.setVisible(this.isPlayerNear(snapshot, view.gatePoint, 2));
+    view.entranceLabel.setText(opened ? view.openedLabel : view.sealedLabel);
   }
 
   private createNavigationLight(snapshot: GameSnapshot): void {

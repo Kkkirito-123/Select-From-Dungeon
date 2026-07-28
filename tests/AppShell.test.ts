@@ -9,6 +9,7 @@ import {
   combatSettlementCopy,
   inspectionDialogCopy,
   narrativeProgressForSnapshot,
+  narrativeMomentUsesRecordOverlay,
   schemaRenderSignature,
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
@@ -67,7 +68,7 @@ describe("narrativeProgressForSnapshot", () => {
     expect(entry.seenMomentIds).toEqual([
       "story:f1-story-fire-remembers",
     ]);
-    expect(entry.storyMomentTotal).toBe(8);
+    expect(entry.storyMomentTotal).toBe(9);
     expect(entry.latestMoment?.query?.expectedRowCount).toBe(0);
 
     const midpoint = narrativeProgressForSnapshot({
@@ -146,6 +147,16 @@ describe("narrativeProgressForSnapshot", () => {
     expect(progress.latestMoment?.kind).toBe("ascent");
     expect(progress.completedAscentIds).toEqual(["ascent:f1:f2"]);
     expect(progress.completedMigrationStepIds).toEqual([]);
+  });
+});
+
+describe("剧情节点呈现层级", () => {
+  it("关键剧情占据主画面，机关变化继续使用三步短反馈", () => {
+    expect(narrativeMomentUsesRecordOverlay("entry")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("secret")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("boss")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("world-change")).toBe(false);
+    expect(narrativeMomentUsesRecordOverlay("evidence")).toBe(false);
   });
 });
 

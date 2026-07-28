@@ -94,6 +94,16 @@ describe("campfire generation", () => {
     );
   }, 15_000);
 
+  it.each([1, 2] as const)("第 %i 层篝火不会占用隐藏宝库", (floorNumber) => {
+    for (let index = 0; index < GENERATED_SEED_SAMPLES; index += 1) {
+      const graph = generateRoomGraph(`campfire-secret:${floorNumber}:${index}`, floorNumber);
+      const floor = generateMazeFloor(graph);
+      expect(generateCampfires(graph, floor).some(
+        (campfire) => graph.nodes.find((room) => room.id === campfire.roomNodeId)?.type === "treasure",
+      )).toBe(false);
+    }
+  });
+
   it("出生区域与篝火半径共同组成安全区，且相邻休息点能定位篝火", () => {
     const graph = generateRoomGraph("campfire-safe-zone");
     const floor = generateMazeFloor(graph);

@@ -46,6 +46,19 @@ describe("two-floor experience contracts", () => {
     );
   });
 
+  it("每层只声明一个有课程前置、实体门与发现剧情的隐藏区域", () => {
+    FLOOR_EXPERIENCES.forEach((experience) => {
+      expect(experience.hiddenAreas).toHaveLength(1);
+      const hidden = experience.hiddenAreas[0]!;
+      expect(hidden.gateId).toBe(`gate:${hidden.roomNodeId}`);
+      expect(hidden.requiredLessonIds.length).toBeGreaterThan(0);
+      expect(experience.landmarks.some((entry) => entry.id === hidden.landmarkId))
+        .toBe(true);
+      expect(experience.storyEvents.some((entry) => entry.id === hidden.discoveryEventId))
+        .toBe(true);
+    });
+  });
+
   it("keeps every declared pack path and texture key aligned with public manifests", async () => {
     for (const experience of FLOOR_EXPERIENCES) {
       const manifestFile = new URL(

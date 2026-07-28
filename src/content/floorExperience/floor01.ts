@@ -93,7 +93,7 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
       lessonIds: ["is-null"],
       material: "浸水木床、湿墙姓名线、旧铜牌",
       ambience: "近水、空管回声与纸页摩擦",
-      landmarkIds: ["f1-nameless-beds", "f1-back-shortcut"],
+      landmarkIds: ["f1-nameless-beds", "f1-sealed-vault", "f1-back-shortcut"],
     },
     {
       id: "f1-registry",
@@ -152,6 +152,18 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
       interaction: "读取床牌",
       stateKeys: ["submerged", "visible", "null-confirmed"],
       minimapIcon: "evidence",
+    }),
+    landmark({
+      id: "f1-sealed-vault",
+      name: "封存旧库",
+      kind: "story",
+      regionId: "f1-dormitory",
+      anchor: anchor("floor-1-treasure", 0.5, 0.38, "south", 5, 4),
+      assetKey: "f01-cc0-walls",
+      fallback: "dry-archive-vault",
+      interaction: "读取未焚毁的旧页",
+      stateKeys: ["sealed", "discovered"],
+      minimapIcon: "secret",
     }),
     landmark({
       id: "f1-back-shortcut",
@@ -225,6 +237,21 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
       alwaysShowName: true,
     },
   ],
+  hiddenAreas: [
+    {
+      id: "f1-hidden-sealed-vault",
+      title: "封存旧库",
+      roomNodeId: "floor-1-treasure",
+      gateId: "gate:floor-1-treasure",
+      landmarkId: "f1-sealed-vault",
+      requiredLessonIds: ["where", "is-null"],
+      sealedPrompt: "E  调查渗出纸屑的砖缝",
+      sealedMessage: "砖缝后有干燥纸页，但积水和三块空床牌仍压着暗锁。先完成 WHERE 与 IS NULL。",
+      openPrompt: "E  推开封存旧库暗门",
+      openedMessage: "封存旧库暗门开启。墙后没有尸骨，只有被登记册撕下、却未被焚毁的旧页。",
+      discoveryEventId: "f1-story-sealed-vault",
+    },
+  ],
   storyEvents: [
     {
       id: "f1-story-fire-remembers",
@@ -251,6 +278,19 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
         { type: "banner", text: "查询结果已写入水轮控制记录" },
       ],
       completionFact: "story:f1:wheel-seen",
+    },
+    {
+      id: "f1-story-sealed-vault",
+      title: "被撕下的页",
+      trigger: "gate:floor-1-treasure:opened",
+      repeat: "once",
+      priority: 85,
+      actions: [
+        { type: "camera-focus", landmarkId: "f1-sealed-vault" },
+        { type: "world-effect", effect: "f1-sealed-vault-open" },
+        { type: "dialogue", speaker: "抄写员", lines: ["这些页没有被烧掉，只是被从当前登记册中撕走。", "每页都留着同一枚恢复印，姓名栏却被整齐裁去。"] },
+      ],
+      completionFact: "story:f1:sealed-vault",
     },
     {
       id: "f1-story-shortcut-return",
@@ -289,6 +329,7 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
   adminPresets: [
     { id: "f1-admin-entry", label: "F1 入层", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f1-spawn-ember" },
     { id: "f1-admin-dormitory", label: "F1 无名宿舍", completedLessonIds: ["select", "where", "is-null"], defeatedMonsterIds: [1, 2, 3], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f1-nameless-beds" },
+    { id: "f1-admin-hidden", label: "F1 封存旧库", completedLessonIds: ["select", "where", "is-null"], defeatedMonsterIds: [1, 2, 3], openedGateIds: ["gate:floor-1-treasure"], collectedKeyItems: [], focusLandmarkId: "f1-sealed-vault" },
     { id: "f1-admin-shortcut", label: "F1 捷径回访", completedLessonIds: ["select", "where", "is-null", "group-by"], defeatedMonsterIds: [1, 2, 3, 4], openedGateIds: ["shortcut:1:return"], collectedKeyItems: ["shortcut-key:1"], focusLandmarkId: "f1-back-shortcut" },
     { id: "f1-admin-complete", label: "F1 通关", completedLessonIds: ["select", "where", "is-null", "group-by", "having"], defeatedMonsterIds: [1, 2, 3, 4, 5], openedGateIds: ["shortcut:1:return"], collectedKeyItems: ["floor-key:1"], focusLandmarkId: "f1-lift" },
   ],
