@@ -8,13 +8,26 @@ import {
   canOpenCombatTerminal,
   combatSettlementCopy,
   inspectionDialogCopy,
+  isInspectionPrimaryKey,
   narrativeProgressForSnapshot,
   narrativeMomentUsesRecordOverlay,
+  storyMomentRecordBody,
   schemaRenderSignature,
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+
+describe("主框确认键", () => {
+  it("E、不同键盘布局的 e/E 与 Enter 都能确认，长按不会重复触发", () => {
+    expect(isInspectionPrimaryKey({ code: "KeyE", key: "Process", repeat: false })).toBe(true);
+    expect(isInspectionPrimaryKey({ code: "", key: "e", repeat: false })).toBe(true);
+    expect(isInspectionPrimaryKey({ code: "", key: "E", repeat: false })).toBe(true);
+    expect(isInspectionPrimaryKey({ code: "Enter", key: "Enter", repeat: false })).toBe(true);
+    expect(isInspectionPrimaryKey({ code: "KeyE", key: "e", repeat: true })).toBe(false);
+    expect(isInspectionPrimaryKey({ code: "Escape", key: "Escape", repeat: false })).toBe(false);
+  });
+});
 
 describe("inspectionDialogCopy", () => {
   it("把角色署名从正文拆到主框标题", () => {
@@ -68,8 +81,14 @@ describe("narrativeProgressForSnapshot", () => {
     expect(entry.seenMomentIds).toEqual([
       "story:f1-story-fire-remembers",
     ]);
-    expect(entry.storyMomentTotal).toBe(9);
+    expect(entry.storyMomentTotal).toBe(10);
     expect(entry.latestMoment?.query?.expectedRowCount).toBe(0);
+    expect(storyMomentRecordBody(entry.latestMoment!)).toContain(
+      "SQL 证据 · 当前居民查询",
+    );
+    expect(storyMomentRecordBody(entry.latestMoment!)).toContain(
+      "真实结果 · 0 行 · 无返回字段",
+    );
 
     const midpoint = narrativeProgressForSnapshot({
       ...snapshot,
@@ -157,6 +176,7 @@ describe("剧情节点呈现层级", () => {
     expect(narrativeMomentUsesRecordOverlay("boss")).toBe(true);
     expect(narrativeMomentUsesRecordOverlay("world-change")).toBe(false);
     expect(narrativeMomentUsesRecordOverlay("evidence")).toBe(false);
+    expect(narrativeMomentUsesRecordOverlay("evidence", true)).toBe(true);
   });
 });
 

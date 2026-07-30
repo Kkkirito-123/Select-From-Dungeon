@@ -1,8 +1,15 @@
+import type { Armor } from "../../domain/types";
 import type { FloorNumber, RunLessonId } from "../../domain/runGraph";
 
 export type FloorExperienceId =
   | "floor-01-ember-archive"
-  | "floor-02-tidal-archipelago";
+  | "floor-02-tidal-archipelago"
+  | "floor-03-frost-gravefield"
+  | "floor-04-elemental-furnace"
+  | "floor-05-black-iron-order"
+  | "floor-06-dragon-ridge-workshop"
+  | "floor-07-sunset-index-garden"
+  | "floor-08-black-gold-hall";
 
 export type FloorAssetKind =
   | "tileset"
@@ -54,6 +61,7 @@ export type FloorLandmarkKind =
   | "campfire"
   | "story"
   | "world-machine"
+  | "sql-seal"
   | "shortcut"
   | "transit"
   | "boss-arena"
@@ -89,6 +97,8 @@ export interface FloorHiddenAreaDefinition {
   gateId: string;
   landmarkId: string;
   requiredLessonIds: readonly RunLessonId[];
+  requiredMonsterIds?: readonly number[];
+  rewardArmorId?: Armor["id"];
   sealedPrompt: string;
   sealedMessage: string;
   openPrompt: string;
@@ -133,7 +143,7 @@ export interface FloorAdminPreset {
 
 export interface FloorExperienceDefinition {
   id: FloorExperienceId;
-  floor: Extract<FloorNumber, 1 | 2>;
+  floor: FloorNumber;
   title: string;
   subtitle: string;
   version: number;

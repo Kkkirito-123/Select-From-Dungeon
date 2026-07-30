@@ -285,20 +285,20 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
     requiredCount: 6,
     beats: [
       beat(3, "floor-entry", 0, "没有主人的遗物", [
-        "墓碑、遗物和王家档案各自保存了一部分关系。",
-        "单看任何一张表，都只会得到残缺的人。",
+        "冻岸上没有完整姓名，只有墓碑、墓室和遗物编号。",
+        "抄写员说：别急着找你是谁，先看这些记录怎样彼此找到。",
       ]),
       beat(3, "midpoint-evidence", 3, "相同的旧物", [
-        "多名死者的遗物记录都指向玩家正在携带的旧编号。",
-        "连接关系互相矛盾，但没有一条可以直接丢弃。",
+        "双名墓碑给同一张表分出死者与主人，三段遗物链随之闭合。",
+        "多名死者的可靠关系指向同一旧编号；矛盾不能靠删行解决。",
       ], ["lost-name:f3:relic-links"]),
       beat(3, "campfire", 3, "守墓人的问题", [
         "事实：墓籍已经确认一件遗物的当前主人为 NULL。",
         "疑点：没有当前主人，是否等于它从未属于任何人？",
       ]),
       beat(3, "boss", 5, "冰下的见证", [
-        "墓主要求档案给出唯一继承人，查询却返回多条可靠关系。",
-        "冰层下的人没有被当前表承认，他们的遗物仍记得玩家。",
+        "墓主试图删去互相冲突的证词，死灵王则要求唯一继承人。",
+        "UNION 保留两片墓园；完整审计证明，冰下的关系共同指向玩家。",
       ], ["lost-name:f3:current-owner"]),
       beat(3, "floor-end", 6, "葬火井", [
         "墓门从内部打开，避风营地重新出现在身后。",
@@ -339,20 +339,20 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
     requiredCount: 6,
     beats: [
       beat(4, "floor-entry", 0, "同一次命令", [
-        "火、冰、雷三个炉区看似互不相关。",
-        "每个异常却都依赖同一个更早的结果。",
+        "火、冰、雷像三场灾难，却都在等待同一个内层结果。",
+        "炉壁深处偶尔闪过第一层的余烬轮廓，像一段仍被调用的旧记录。",
       ]),
       beat(4, "midpoint-evidence", 3, "嵌套的源头", [
-        "沿依赖链向内查询，所有异常都回到同一批全城更新。",
-        "命令没有完成，也没有被撤销。",
+        "标量、IN 与 EXISTS 分别确认单值、集合和存在关系。",
+        "中层炉主倒下后，依赖链露出一扇指向第一层登记厅残响的回燃门。",
       ], ["lost-name:f4:command-batch"]),
       beat(4, "campfire", 3, "升炉旁的复盘", [
-        "事实：三种异常共享同一个未结束的命令批次。",
-        "疑点：是谁让一次临时更新持续了数百年？",
+        "事实：恢复权限从第一层穿过四层，仍能打开回燃门。",
+        "疑点：是谁让一次临时更新和一次恢复权限同时持续了数百年？",
       ]),
       beat(4, "boss", 5, "炉心的执行记录", [
-        "炉心守卫把每个故障描述成独立事故。",
-        "完整依赖链证明，它们只是同一次命令的不同后果。",
+        "元素王把每个故障描述成独立事故，拒绝展示共同源头。",
+        "CTE 命名中间结果，递归链最终落在 ROYAL-UPDATE-01：状态仍是 OPEN。",
       ], ["lost-name:f4:unfinished-state"]),
       beat(4, "floor-end", 6, "穿过云层", [
         "升炉完成最后一段校验，带着玩家冲出城墙地基。",
@@ -383,29 +383,29 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
       4,
       5,
       "垂直升炉",
-      "黑铁外城",
+      "黑铁轮值城",
       "升炉越过云层，大调和弦第一次随夕阳照进城墙。",
     ),
   },
   {
     floor: 5,
-    regionName: "黑铁外城",
+    regionName: "黑铁轮值城",
     requiredCount: 6,
     beats: [
       beat(5, "floor-entry", 0, "被排序的人", [
         "外城把居民分区、编号，再按王室需要重新排序。",
         "城墙上的肖像顺序与档案中的历史顺序并不相同。",
       ]),
-      beat(5, "midpoint-evidence", 3, "多个历史位置", [
+      beat(5, "midpoint-evidence", 3, "位置不是身份", [
         "玩家的恢复痕迹同时出现在多个分区和多个历史位置。",
-        "这些位置前后相连，却不属于同一个人的连续生平。",
+        "岗次能决定公开顺序，却不能把其中一格宣布成完整的玩家。",
       ], ["lost-name:f5:history-positions"]),
       beat(5, "campfire", 3, "城墙上的复盘", [
         "事实：玩家在同一历史序列中拥有多个互相重叠的位置。",
         "疑点：若顺序可以被重写，哪一个位置才算原本的你？",
       ]),
-      beat(5, "boss", 5, "竞技场的唯一名次", [
-        "外城统领要求为玩家选出唯一的第一名记录。",
+      beat(5, "boss", 5, "黑铁军钟的唯一名次", [
+        "军钟要求为玩家选出唯一第一名，并按这个顺序处理全城。",
         "窗口中的前后版本证明，任何单选都会截断其余历史。",
       ], ["lost-name:f5:overlap"]),
       beat(5, "floor-end", 6, "吊桥向上", [
@@ -437,13 +437,13 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
       5,
       6,
       "黑铁吊桥",
-      "龙脊上城",
+      "龙脊回滚工坊",
       "吊桥跨过云海，低音增加一个八度，远处工坊开始应答。",
     ),
   },
   {
     floor: 6,
-    regionName: "龙脊上城",
+    regionName: "龙脊回滚工坊",
     requiredCount: 6,
     beats: [
       beat(6, "floor-entry", 0, "可以撤销的工坊", [
@@ -497,7 +497,7 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
   },
   {
     floor: 7,
-    regionName: "残照王苑",
+    regionName: "残照索引王苑",
     requiredCount: 6,
     beats: [
       beat(7, "floor-entry", 0, "看不见不等于不存在", [
@@ -545,13 +545,13 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
       7,
       8,
       "金色长阶",
-      "黑金高堂",
+      "黑金迁移高堂",
       "A 大调主题第一次完整出现，高窗只剩最后一道残晖。",
     ),
   },
   {
     floor: 8,
-    regionName: "黑金高堂",
+    regionName: "黑金迁移高堂",
     requiredCount: 7,
     beats: [
       beat(8, "floor-entry", 0, "仍未结束的王国", [

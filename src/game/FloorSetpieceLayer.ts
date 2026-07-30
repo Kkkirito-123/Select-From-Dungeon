@@ -1,7 +1,18 @@
 import Phaser from "phaser";
-import { floorExperience } from "../content/floorExperience";
+import {
+  floorExperience,
+  hasFloorExperience,
+} from "../content/floorExperience";
 import { TILE_SIZE } from "../content/mvpLevel";
-import { floorWorldStateFromSnapshot } from "../domain/floorWorldState";
+import {
+  floorWorldStateFromSnapshot,
+  type FloorEightWorldState,
+  type FloorFiveWorldState,
+  type FloorFourWorldState,
+  type FloorSevenWorldState,
+  type FloorSixWorldState,
+  type FloorThreeWorldState,
+} from "../domain/floorWorldState";
 import type { GameSnapshot } from "../domain/types";
 import { createScribeActor } from "./PixelActorFactory";
 import {
@@ -13,6 +24,11 @@ import {
   FLOOR_TWO_MARSH_ROOM_IDS,
   FLOOR_TWO_SAND_ROOM_IDS,
 } from "./floorSetpieceGeometry";
+import {
+  WORLD_VISUAL_LANGUAGE,
+  landmarkInteractionLabel,
+} from "./worldVisualLanguage";
+import type { FloorLandmarkKind } from "../content/floorExperience";
 
 interface PixelPoint {
   x: number;
@@ -47,6 +63,27 @@ interface HiddenAreaView {
   openedLabel: string;
 }
 
+interface SqlSealView {
+  container: Phaser.GameObjects.Container;
+  core: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+  point: PixelPoint;
+  gateId: string;
+}
+
+interface LateSetpieceView {
+  container: Phaser.GameObjects.Container;
+  stateDot: Phaser.GameObjects.Ellipse;
+  stateText: Phaser.GameObjects.Text;
+  label: Phaser.GameObjects.Text;
+  interactionRing: Phaser.GameObjects.Ellipse;
+  interactionKey: Phaser.GameObjects.Text;
+  point: PixelPoint;
+  title: string;
+  kind: FloorLandmarkKind;
+  interaction: string | null;
+}
+
 const F1 = {
   water: 0x2b7183,
   waterLine: 0x78c9d3,
@@ -67,6 +104,32 @@ const F2 = {
   green: 0x557b54,
   light: 0xf2d478,
   stone: 0xb7b6aa,
+} as const;
+
+const F3 = {
+  frost: 0xa9d7df,
+  ice: 0x5b8e9b,
+  bone: 0xd9d1b8,
+  soil: 0x292932,
+  peat: 0x3a3035,
+  ghost: 0x74d4c6,
+  bronze: 0xa27a4e,
+} as const;
+
+const F4 = {
+  ember: 0xdf6544,
+  brass: 0xd6ab55,
+  frost: 0x7ecbe0,
+  storm: 0xa47ad4,
+  stone: 0x282833,
+  iron: 0x4a4448,
+} as const;
+
+const LATE_FLOOR_PALETTES = {
+  5: { dark: 0x24272e, mid: 0x54525a, light: 0xd7b565, accent: 0x9f3f3f },
+  6: { dark: 0x22272c, mid: 0x465f69, light: 0x8ed9d0, accent: 0xd46b42 },
+  7: { dark: 0x29253a, mid: 0x59607a, light: 0xe2c56f, accent: 0x78cfd0 },
+  8: { dark: 0x171820, mid: 0x4c3c54, light: 0xe4c878, accent: 0xb35a63 },
 } as const;
 
 function discoveredRoom(snapshot: GameSnapshot, roomNodeId: string): boolean {
@@ -99,6 +162,24 @@ export class FloorSetpieceLayer {
   private lighthousePreserveBeams: Phaser.GameObjects.Triangle[] = [];
   private northFerry: Phaser.GameObjects.Container | null = null;
   private hiddenArea: HiddenAreaView | null = null;
+  private floorThreeBoneBridge: Phaser.GameObjects.Container | null = null;
+  private floorThreeSteleLabels: Phaser.GameObjects.Text[] = [];
+  private floorThreeRelicChain: Phaser.GameObjects.Container | null = null;
+  private floorThreeWitnesses: Phaser.GameObjects.Ellipse[] = [];
+  private floorThreeShaftLight: Phaser.GameObjects.Ellipse | null = null;
+  private floorFourSourceCore: Phaser.GameObjects.Ellipse | null = null;
+  private floorFourFrostCells: Phaser.GameObjects.Rectangle[] = [];
+  private floorFourPipes: Phaser.GameObjects.Rectangle[] = [];
+  private floorFourDependencyRings: Phaser.GameObjects.Ellipse[] = [];
+  private floorFourEchoDoor: Phaser.GameObjects.Container | null = null;
+  private floorFourAscentLight: Phaser.GameObjects.Rectangle | null = null;
+  private sqlSeal: SqlSealView | null = null;
+  private lateSetpieces = new Map<string, LateSetpieceView>();
+  private proximityLabels: Array<{
+    label: Phaser.GameObjects.Text;
+    point: PixelPoint;
+    radius: number;
+  }> = [];
   private timers: Phaser.Time.TimerEvent[] = [];
 
   constructor(
@@ -109,19 +190,24 @@ export class FloorSetpieceLayer {
 
   build(snapshot: GameSnapshot): void {
     this.destroy();
-    if (snapshot.floor !== 1 && snapshot.floor !== 2) return;
+    if (!hasFloorExperience(snapshot.floor)) return;
     this.root = this.scene.add.container(0, 0).setDepth(12);
     this.parent.addAt(this.root, 0);
     if (snapshot.floor === 1) this.buildFloorOne(snapshot);
-    else this.buildFloorTwo(snapshot);
+    else if (snapshot.floor === 2) this.buildFloorTwo(snapshot);
+    else if (snapshot.floor === 3) this.buildFloorThree(snapshot);
+    else if (snapshot.floor === 4) this.buildFloorFour(snapshot);
+    else this.buildLateFloor(snapshot);
+    this.createSqlSeal(snapshot);
     this.sync(snapshot);
   }
 
   sync(snapshot: GameSnapshot): void {
-    if (!this.root || (snapshot.floor !== 1 && snapshot.floor !== 2)) return;
+    if (!this.root || !hasFloorExperience(snapshot.floor)) return;
     const world = floorWorldStateFromSnapshot(snapshot);
     if (!world) return;
 
+    this.syncProximityLabels(snapshot);
     if (this.scribe) {
       const visible = discoveredRoom(snapshot, this.scribe.roomNodeId);
       this.scribe.container.setVisible(visible);
@@ -134,11 +220,15 @@ export class FloorSetpieceLayer {
     }
     this.syncHiddenArea(snapshot);
 
-    if (world.floor === 1) {
-      this.syncFloorOne(world, snapshot);
-    } else {
-      this.syncFloorTwo(world);
+    if (world.floor === 1) this.syncFloorOne(world, snapshot);
+    else if (world.floor === 2) this.syncFloorTwo(world);
+    else if (world.floor === 3) this.syncFloorThree(world);
+    else if (world.floor === 4) this.syncFloorFour(world);
+    else {
+      this.syncLateFloor(world);
+      this.syncLateSetpieceLabels(snapshot);
     }
+    this.syncSqlSeal(snapshot, world.cipher);
   }
 
   destroy(): void {
@@ -171,10 +261,24 @@ export class FloorSetpieceLayer {
     this.lighthousePreserveBeams = [];
     this.northFerry = null;
     this.hiddenArea = null;
+    this.floorThreeBoneBridge = null;
+    this.floorThreeSteleLabels = [];
+    this.floorThreeRelicChain = null;
+    this.floorThreeWitnesses = [];
+    this.floorThreeShaftLight = null;
+    this.floorFourSourceCore = null;
+    this.floorFourFrostCells = [];
+    this.floorFourPipes = [];
+    this.floorFourDependencyRings = [];
+    this.floorFourEchoDoor = null;
+    this.floorFourAscentLight = null;
+    this.sqlSeal = null;
+    this.lateSetpieces.clear();
+    this.proximityLabels = [];
   }
 
   private anchorPoint(snapshot: GameSnapshot, landmarkId: string): PixelPoint | null {
-    if (snapshot.floor !== 1 && snapshot.floor !== 2) return null;
+    if (!hasFloorExperience(snapshot.floor)) return null;
     const landmark = floorExperience(snapshot.floor).landmarks.find(
       (entry) => entry.id === landmarkId,
     );
@@ -219,9 +323,16 @@ export class FloorSetpieceLayer {
       backgroundColor: "#080b0ddd",
       padding: { x: 4, y: 2 },
       align: "center",
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setVisible(false);
     this.root?.add(label);
+    this.proximityLabels.push({ label, point, radius: 3 });
     return label;
+  }
+
+  private syncProximityLabels(snapshot: GameSnapshot): void {
+    this.proximityLabels.forEach(({ label, point, radius }) => {
+      label.setVisible(this.isPlayerNear(snapshot, point, radius));
+    });
   }
 
   private isPlayerNear(
@@ -519,7 +630,7 @@ export class FloorSetpieceLayer {
   }
 
   private createUniqueScribe(snapshot: GameSnapshot, npcId: string): void {
-    if (snapshot.floor !== 1 && snapshot.floor !== 2) return;
+    if (!hasFloorExperience(snapshot.floor)) return;
     const npc = floorExperience(snapshot.floor).npcPlacements.find(
       (entry) => entry.id === npcId,
     );
@@ -725,7 +836,7 @@ export class FloorSetpieceLayer {
     darkColor: number,
     lightColor: number,
   ): void {
-    if (snapshot.floor !== 1 && snapshot.floor !== 2) return;
+    if (!hasFloorExperience(snapshot.floor)) return;
     const area = floorExperience(snapshot.floor).hiddenAreas[0];
     if (!area) return;
     const gate = snapshot.mazeFloor.gates.find((entry) => entry.id === area.gateId);
@@ -1119,6 +1230,959 @@ export class FloorSetpieceLayer {
       this.root?.add(this.northFerry);
       this.addLabel(ferryPoint, "北岸渡船", "#f2d478", -42);
     }
+  }
+
+  private createZoneSkin(
+    snapshot: GameSnapshot,
+    colors: readonly [number, number, number],
+  ): void {
+    snapshot.mazeFloor.zones.forEach((zone, index) => {
+      const centerX = (zone.x + zone.width / 2) * TILE_SIZE;
+      const centerY = (zone.y + zone.height / 2) * TILE_SIZE;
+      const colorIndex = Math.min(2, Math.floor(index * 3 / snapshot.mazeFloor.zones.length));
+      const plate = this.scene.add.rectangle(
+        centerX,
+        centerY,
+        Math.max(TILE_SIZE, (zone.width - 1.1) * TILE_SIZE),
+        Math.max(TILE_SIZE, (zone.height - 1.1) * TILE_SIZE),
+        colors[colorIndex],
+        zone.type === "boss"
+          ? WORLD_VISUAL_LANGUAGE.bossZoneWashAlpha
+          : WORLD_VISUAL_LANGUAGE.zoneWashAlpha,
+      );
+      this.root?.add(plate);
+    });
+  }
+
+  private buildFloorThree(snapshot: GameSnapshot): void {
+    this.createZoneSkin(snapshot, [F3.soil, F3.peat, 0x202937]);
+    this.createFloorThreeBoneBridge(snapshot);
+    this.createFloorThreeSteles(snapshot);
+    this.createFloorThreeRelicChain(snapshot);
+    this.createFloorThreeWitnessAltar(snapshot);
+    this.createFloorThreeThrone(snapshot);
+    this.createFloorThreeHiddenArea(snapshot);
+    this.createUniqueScribe(snapshot, "npc-scribe-f3");
+  }
+
+  private createFloorThreeBoneBridge(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f3-relation-bridge");
+    if (!point) return;
+    this.floorThreeBoneBridge = this.scene.add.container(point.x, point.y);
+    for (let index = -3; index <= 3; index += 1) {
+      const bone = this.scene.add.rectangle(
+        index * 17,
+        Math.abs(index) * 2,
+        21,
+        6,
+        F3.bone,
+        0.95,
+      ).setAngle(index % 2 === 0 ? 8 : -7)
+        .setStrokeStyle(1, F3.ice, 0.66);
+      this.floorThreeBoneBridge.add(bone);
+    }
+    const anchors = [-61, 61].map((x) => (
+      this.scene.add.ellipse(x, 8, 16, 22, F3.bronze, 0.9)
+        .setStrokeStyle(2, F3.frost, 0.62)
+    ));
+    this.floorThreeBoneBridge.add(anchors);
+    this.root?.add(this.floorThreeBoneBridge);
+    this.addLabel(point, "断裂骨桥 · monsters.room_id ⇄ rooms.id", "#d9e5d9", -32);
+  }
+
+  private createFloorThreeSteles(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f3-master-steles");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    [-24, 24].forEach((x, index) => {
+      const stele = this.scene.add.rectangle(x, 7, 32, 57, 0x4a4648, 0.96)
+        .setStrokeStyle(2, F3.frost, 0.58);
+      const cap = this.scene.add.triangle(x, -26, -18, 10, 0, -11, 18, 10, 0x575256, 0.96);
+      const label = this.scene.add.text(x, 4, "???", {
+        color: "#d9d1b8",
+        fontFamily: "monospace",
+        fontSize: "7px",
+        fontStyle: "bold",
+      }).setOrigin(0.5);
+      this.floorThreeSteleLabels.push(label);
+      container.add([stele, cap, label]);
+      if (index === 1) stele.setAlpha(0.82);
+    });
+    this.root?.add(container);
+    this.addLabel(point, "双名墓碑", "#a9d7df", -50);
+  }
+
+  private createFloorThreeRelicChain(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f3-relic-chain");
+    if (!point) return;
+    this.floorThreeRelicChain = this.scene.add.container(point.x, point.y);
+    const nodes = [
+      { x: -48, label: "M" },
+      { x: 0, label: "R" },
+      { x: 48, label: "G" },
+    ];
+    nodes.forEach(({ x, label }, index) => {
+      if (index < nodes.length - 1) {
+        this.floorThreeRelicChain?.add(
+          this.scene.add.rectangle(x + 24, 0, 42, 3, F3.bronze, 0.9),
+        );
+      }
+      this.floorThreeRelicChain?.add([
+        this.scene.add.ellipse(x, 0, 25, 25, F3.peat, 0.98)
+          .setStrokeStyle(2, F3.ghost, 0.74),
+        this.scene.add.text(x, 0, label, {
+          color: "#d9d1b8",
+          fontFamily: "monospace",
+          fontSize: "8px",
+          fontStyle: "bold",
+        }).setOrigin(0.5),
+      ]);
+    });
+    this.root?.add(this.floorThreeRelicChain);
+    this.addLabel(point, "三段遗物链", "#c5b28c", -30);
+  }
+
+  private createFloorThreeWitnessAltar(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f3-grave-lord");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    const altar = this.scene.add.rectangle(0, 19, 92, 31, 0x34333b, 0.92)
+      .setStrokeStyle(2, F3.bronze, 0.72);
+    container.add(altar);
+    [-44, -22, 0, 22, 44].forEach((x, index) => {
+      const flame = this.scene.add.ellipse(x, -4 - Math.abs(index - 2) * 2, 11, 20, F3.ghost, 0.2);
+      this.floorThreeWitnesses.push(flame);
+      container.add(flame);
+    });
+    this.root?.add(container);
+    this.addLabel(point, "区域首领 · ID #033", "#84dfcf", -40);
+  }
+
+  private createFloorThreeThrone(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f3-necromancer-throne");
+    if (!point) return;
+    const throne = this.scene.add.container(point.x, point.y);
+    throne.add([
+      this.scene.add.rectangle(0, 10, 70, 50, 0x282633, 0.96)
+        .setStrokeStyle(3, F3.frost, 0.66),
+      this.scene.add.rectangle(0, -26, 48, 25, 0x3c3748, 0.96)
+        .setStrokeStyle(2, F3.bronze, 0.72),
+      this.scene.add.text(0, -26, "ONE HEIR", {
+        color: "#d9d1b8",
+        fontFamily: "monospace",
+        fontSize: "8px",
+        fontStyle: "bold",
+      }).setOrigin(0.5),
+    ]);
+    this.root?.add(throne);
+    const shaftPoint = this.anchorPoint(snapshot, "f3-burial-shaft");
+    if (shaftPoint) {
+      const shaft = this.scene.add.container(shaftPoint.x, shaftPoint.y);
+      const well = this.scene.add.ellipse(0, 4, 44, 25, 0x0d1116, 0.98)
+        .setStrokeStyle(3, F3.bronze, 0.78);
+      this.floorThreeShaftLight = this.scene.add.ellipse(0, 2, 28, 14, F3.ghost, 0.18);
+      shaft.add([well, this.floorThreeShaftLight]);
+      this.root?.add(shaft);
+      this.addLabel(shaftPoint, "葬火井", "#c5b28c", -26);
+    }
+  }
+
+  private createFloorThreeHiddenArea(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f3-reliquary");
+    if (!point) return;
+    const backdrop = this.createHiddenRoomBackdrop(
+      snapshot,
+      "floor-3-treasure",
+      0x1c232d,
+      F3.frost,
+      false,
+    );
+    const interior = this.scene.add.container(point.x, point.y);
+    const caseBody = this.scene.add.rectangle(0, 7, 78, 51, 0x31343d, 0.96)
+      .setStrokeStyle(3, F3.bronze, 0.78);
+    const relic = this.scene.add.polygon(
+      0,
+      3,
+      [-9, -18, 9, -18, 17, 0, 0, 19, -17, 0],
+      F3.ghost,
+      0.88,
+    ).setStrokeStyle(2, F3.frost, 0.9);
+    const owner = this.scene.add.text(0, 34, "CURRENT OWNER = NULL", {
+      color: "#a9d7df",
+      fontFamily: "monospace",
+      fontSize: "7px",
+      fontStyle: "bold",
+    }).setOrigin(0.5);
+    interior.add([caseBody, relic, owner]);
+    this.root?.add(interior);
+    const label = this.addLabel(point, "无主遗物室 · 关系仍在", "#a9d7df", -48);
+    this.createHiddenAreaEntrance(
+      snapshot,
+      backdrop,
+      interior,
+      label,
+      "结霜墓志",
+      "遗物室石门",
+      0x34323a,
+      F3.frost,
+    );
+  }
+
+  private syncFloorThree(world: FloorThreeWorldState): void {
+    this.floorThreeBoneBridge?.setAlpha(world.boneBridge === "linked" ? 1 : 0.28);
+    this.floorThreeSteleLabels.forEach((label, index) => {
+      label.setText(world.steles === "aliased" ? (index === 0 ? "child" : "master") : "???");
+      label.setColor(world.steles === "aliased" ? "#74d4c6" : "#d9d1b8");
+    });
+    this.floorThreeRelicChain?.setAlpha(world.relicChain === "linked" ? 1 : 0.26);
+    this.floorThreeWitnesses.forEach((witness) => {
+      witness.setAlpha(world.witnesses === "united" ? 0.88 : 0.14);
+    });
+    this.floorThreeShaftLight?.setAlpha(world.burialShaft === "lit" ? 0.94 : 0.16);
+  }
+
+  private buildFloorFour(snapshot: GameSnapshot): void {
+    this.createZoneSkin(snapshot, [0x3a2628, 0x243746, 0x302743]);
+    this.createFloorFourSource(snapshot);
+    this.createFloorFourFrostArray(snapshot);
+    this.createFloorFourForgeLord(snapshot);
+    this.createFloorFourDependencySpine(snapshot);
+    this.createFloorFourThrone(snapshot);
+    this.createFloorFourHiddenArea(snapshot);
+    this.createUniqueScribe(snapshot, "npc-scribe-f4");
+  }
+
+  private createFloorFourSource(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f4-source-core");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    const body = this.scene.add.rectangle(0, 9, 72, 58, F4.iron, 0.96)
+      .setStrokeStyle(3, F4.brass, 0.74);
+    this.floorFourSourceCore = this.scene.add.ellipse(0, 1, 34, 34, F4.ember, 0.18)
+      .setStrokeStyle(2, F4.brass, 0.8);
+    const inner = this.scene.add.text(0, 1, "( ? )", {
+      color: "#f2c979",
+      fontFamily: "monospace",
+      fontSize: "8px",
+      fontStyle: "bold",
+    }).setOrigin(0.5);
+    container.add([body, this.floorFourSourceCore, inner]);
+    this.root?.add(container);
+    this.addLabel(point, "命令源炉 · 标量结果", "#f2c979", -43);
+  }
+
+  private createFloorFourFrostArray(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f4-frost-array");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    for (let index = 0; index < 6; index += 1) {
+      const x = (index % 3 - 1) * 28;
+      const y = Math.floor(index / 3) * 31 - 10;
+      const cell = this.scene.add.rectangle(x, y, 22, 26, 0x40576b, 0.46)
+        .setStrokeStyle(2, F4.frost, 0.56);
+      this.floorFourFrostCells.push(cell);
+      container.add(cell);
+    }
+    this.root?.add(container);
+    this.addLabel(point, "冻结依赖阵列 · room_id IN (...)", "#9be6f1", -46);
+  }
+
+  private createFloorFourForgeLord(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f4-forge-lord");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    const floor = this.scene.add.ellipse(0, 14, 105, 48, 0x202430, 0.96)
+      .setStrokeStyle(4, F4.frost, 0.72);
+    const mirror = this.scene.add.rectangle(0, -17, 48, 58, 0x314250, 0.84)
+      .setStrokeStyle(3, F4.brass, 0.82);
+    const crackA = this.scene.add.line(0, -17, -9, -25, 7, 8, F4.frost, 0.82).setLineWidth(2);
+    const crackB = this.scene.add.line(0, -17, 7, 8, -10, 20, F4.frost, 0.7).setLineWidth(2);
+    container.add([floor, mirror, crackA, crackB]);
+    this.root?.add(container);
+    this.addLabel(point, "中层首领 · ID #044", "#e8d7a7", -59);
+  }
+
+  private createFloorFourDependencySpine(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f4-dependency-spine");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    [-34, 0, 34].forEach((x, index) => {
+      const colors = [F4.ember, F4.frost, F4.storm] as const;
+      const pipe = this.scene.add.rectangle(x, 12, 13, 73, colors[index], 0.28)
+        .setStrokeStyle(2, colors[index], 0.72);
+      this.floorFourPipes.push(pipe);
+      container.add(pipe);
+    });
+    [31, 47, 64].forEach((size, index) => {
+      const ring = this.scene.add.ellipse(0, -27, size, size, F4.stone, 0.08)
+        .setStrokeStyle(2, index === 0 ? F4.brass : F4.storm, 0.36);
+      this.floorFourDependencyRings.push(ring);
+      container.add(ring);
+    });
+    this.root?.add(container);
+    this.addLabel(point, "三相依赖脊柱 · WITH / RECURSIVE", "#dec982", -69);
+  }
+
+  private createFloorFourThrone(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f4-elemental-throne");
+    if (!point) return;
+    const container = this.scene.add.container(point.x, point.y);
+    const ring = this.scene.add.ellipse(0, 6, 106, 75, 0x191a22, 0.92)
+      .setStrokeStyle(4, F4.storm, 0.72);
+    const status = this.scene.add.text(0, 4, "TRANSACTION\nOPEN", {
+      color: "#f0c86d",
+      fontFamily: "monospace",
+      fontSize: "8px",
+      fontStyle: "bold",
+      align: "center",
+    }).setOrigin(0.5);
+    container.add([ring, status]);
+    this.root?.add(container);
+    const ascentPoint = this.anchorPoint(snapshot, "f4-ascent");
+    if (ascentPoint) {
+      const ascent = this.scene.add.container(ascentPoint.x, ascentPoint.y);
+      const cage = this.scene.add.rectangle(0, 5, 46, 65, 0x23252d, 0.96)
+        .setStrokeStyle(3, F4.brass, 0.75);
+      this.floorFourAscentLight = this.scene.add.rectangle(0, -34, 27, 5, 0x5b4430, 1);
+      ascent.add([cage, this.floorFourAscentLight]);
+      this.root?.add(ascent);
+      this.addLabel(ascentPoint, "垂直升炉", "#e8c66e", -48);
+    }
+  }
+
+  private createFloorFourHiddenArea(snapshot: GameSnapshot): void {
+    const point = this.anchorPoint(snapshot, "f4-echo-gate");
+    if (!point) return;
+    const backdrop = this.createHiddenRoomBackdrop(
+      snapshot,
+      "floor-4-treasure",
+      0x251f22,
+      F4.brass,
+      false,
+    );
+    const interior = this.scene.add.container(point.x, point.y);
+    const room = this.scene.add.rectangle(0, 5, 105, 72, 0x342b2b, 0.96)
+      .setStrokeStyle(3, F4.brass, 0.78);
+    const waterWheel = this.scene.add.ellipse(-28, 0, 34, 34, 0x26252a, 0.9)
+      .setStrokeStyle(4, F4.brass, 0.84);
+    const ember = this.scene.add.triangle(20, 8, -9, 13, 1, -17, 10, 13, F4.ember, 0.92);
+    const bed = this.scene.add.rectangle(34, 19, 26, 34, 0x52433b, 0.92)
+      .setStrokeStyle(2, F4.frost, 0.54);
+    const nullLabel = this.scene.add.text(34, -4, "NULL", {
+      color: "#7dd9cb",
+      fontFamily: "monospace",
+      fontSize: "7px",
+      fontStyle: "bold",
+    }).setOrigin(0.5);
+    const robe = this.scene.add.triangle(0, 8, -14, 19, 0, -22, 14, 19, 0x6f3e38, 0.94)
+      .setStrokeStyle(2, F4.brass, 0.88);
+    const registryLabel = this.scene.add.text(-28, -24, "登记台", {
+      color: "#d8c58d",
+      fontFamily: "monospace",
+      fontSize: "6px",
+    }).setOrigin(0.5);
+    const emberLabel = this.scene.add.text(20, -18, "无温余烬", {
+      color: "#ef9a69",
+      fontFamily: "monospace",
+      fontSize: "6px",
+    }).setOrigin(0.5);
+    const returnLabel = this.scene.add.text(39, 38, "← 返回升炉", {
+      color: "#9be6f1",
+      fontFamily: "monospace",
+      fontSize: "6px",
+    }).setOrigin(0.5);
+    interior.add([
+      room,
+      waterWheel,
+      ember,
+      bed,
+      nullLabel,
+      robe,
+      registryLabel,
+      emberLabel,
+      returnLabel,
+    ]);
+    this.floorFourEchoDoor = interior;
+    this.root?.add(interior);
+    const label = this.addLabel(point, "回燃残响 · 确定换装：回燃衣", "#efc96d", -50);
+    this.createHiddenAreaEntrance(
+      snapshot,
+      backdrop,
+      interior,
+      label,
+      "无温余烬",
+      "回燃门",
+      0x352b31,
+      F4.brass,
+    );
+  }
+
+  private syncFloorFour(world: FloorFourWorldState): void {
+    this.floorFourSourceCore?.setAlpha(world.source === "identified" ? 0.94 : 0.18);
+    this.floorFourFrostCells.forEach((cell, index) => {
+      cell.setAlpha(world.frostArray === "selected" && index < 4 ? 0.92 : 0.28);
+    });
+    this.floorFourPipes.forEach((pipe) => {
+      pipe.setAlpha(world.pipes === "correlated" ? 0.86 : 0.26);
+    });
+    this.floorFourDependencyRings.forEach((ring, index) => {
+      const visibleCount = world.dependency === "traced" ? 3 : world.dependency === "named" ? 2 : 1;
+      ring.setAlpha(index < visibleCount ? 0.9 : 0.16);
+    });
+    this.floorFourEchoDoor?.setAlpha(world.echoGate === "open" ? 1 : world.echoGate === "sealed" ? 0.44 : 0.08);
+    this.floorFourAscentLight?.setFillStyle(
+      world.ascent === "active" ? F4.brass : 0x5b4430,
+      1,
+    );
+  }
+
+  private createSqlSeal(snapshot: GameSnapshot): void {
+    if (!hasFloorExperience(snapshot.floor)) return;
+    const sealLandmark = floorExperience(snapshot.floor).landmarks.find(
+      (landmark) => landmark.kind === "sql-seal",
+    );
+    if (!sealLandmark) return;
+    const gateId = `gate:${snapshot.roomGraph.bossId}`;
+    const gate = snapshot.mazeFloor.gates.find((entry) => entry.id === gateId);
+    const anchor = gate
+      ? { x: (gate.x + 0.5) * TILE_SIZE, y: (gate.y + 0.5) * TILE_SIZE }
+      : this.anchorPoint(snapshot, sealLandmark.id);
+    if (!anchor) return;
+
+    const container = this.scene.add.container(anchor.x, anchor.y);
+    const shadow = this.scene.add.rectangle(0, 0, 30, 34, 0x090b10, 0.94)
+      .setStrokeStyle(3, 0xd0a656, 0.8);
+    const leftRune = this.scene.add.line(0, 0, -10, -11, -2, 0, 0x6ed5d3, 0.86)
+      .setLineWidth(2);
+    const rightRune = this.scene.add.line(0, 0, 10, -11, 2, 0, 0x6ed5d3, 0.86)
+      .setLineWidth(2);
+    const lowerRune = this.scene.add.line(0, 0, -8, 10, 8, 10, 0xd0a656, 0.82)
+      .setLineWidth(2);
+    const core = this.scene.add.rectangle(0, 1, 7, 7, 0x6ed5d3, 0.3)
+      .setStrokeStyle(1, 0xe6d8a6, 0.9);
+    container.add([shadow, leftRune, rightRune, lowerRune, core]);
+    this.root?.add(container);
+    const label = this.addLabel(anchor, sealLandmark.name, "#e6cf83", -31);
+    this.sqlSeal = { container, core, label, point: anchor, gateId };
+  }
+
+  private syncSqlSeal(
+    snapshot: GameSnapshot,
+    state: "sealed" | "decoded",
+  ): void {
+    if (!this.sqlSeal) return;
+    const decoded = state === "decoded";
+    this.sqlSeal.container.setAlpha(decoded ? 0.82 : 1);
+    this.sqlSeal.core.setFillStyle(decoded ? 0xe6cf83 : 0x6ed5d3, decoded ? 0.96 : 0.3);
+    this.sqlSeal.core.setScale(decoded ? 1.45 : 1);
+    const visible = snapshot.adminMode || this.isPlayerNear(snapshot, this.sqlSeal.point, 3);
+    this.sqlSeal.label.setVisible(visible);
+    this.sqlSeal.label.setText(
+      decoded ? "SQL 密文已解 · 侧路永久开放" : "E · 解读 SQL 密文",
+    );
+  }
+
+  private buildLateFloor(snapshot: GameSnapshot): void {
+    if (snapshot.floor < 5 || snapshot.floor > 8) return;
+    const floor = snapshot.floor as 5 | 6 | 7 | 8;
+    const palette = LATE_FLOOR_PALETTES[floor];
+    this.createZoneSkin(snapshot, [palette.dark, palette.mid, palette.accent]);
+
+    const definitions = floor === 5
+      ? [
+          ["f5-muster-board", "分区轮值表", "board"],
+          ["f5-rank-standards", "并列双旗", "flags"],
+          ["f5-patrol-chain", "前后岗灯", "chain"],
+          ["f5-alert-wall", "累计警戒墙", "bars"],
+          ["f5-command-clock", "黑铁军钟", "clock"],
+          ["f5-ascent", "上行吊桥", "bridge"],
+        ] as const
+      : floor === 6
+        ? [
+            ["f6-sandbox-incubator", "一次性孵化副本", "incubator"],
+            ["f6-cleanup-sluice", "鳞片清理槽", "sluice"],
+            ["f6-constraint-door", "龙晶约束门", "door"],
+            ["f6-state-bridge", "原始／候选双轨", "bridge"],
+            ["f6-savepoint-altar", "保存点祭台", "altar"],
+            ["f6-dragon-throne", "事务提交巢", "throne"],
+            ["f6-ascent", "王室升降台", "lift"],
+          ] as const
+        : floor === 7
+          ? [
+              ["f7-scan-road", "完整扫描长路", "road"],
+              ["f7-index-road", "索引晶枝短路", "branch"],
+              ["f7-covering-lake", "覆盖镜湖", "lake"],
+              ["f7-broken-root", "函数缠绕根门", "root"],
+              ["f7-plan-tree", "执行计划巨树", "tree"],
+              ["f7-index-throne", "路径审计树心", "throne"],
+              ["f7-ascent", "金色长阶", "stairs"],
+            ] as const
+          : [
+              ["f8-version-gallery", "可见版本长廊", "gallery"],
+              ["f8-deadlock-gate", "双骑等待门", "deadlock"],
+              ["f8-incident-wings", "事故证据翼", "wings"],
+              ["f8-migration-dais", "七步迁移台", "steps"],
+              ["f8-archivist-throne", "最终迁移王座", "throne"],
+              ["f8-sunset-vista", "最后一道残晖", "vista"],
+            ] as const;
+
+    definitions.forEach(([id, title, shape]) => {
+      this.createLateSetpiece(snapshot, id, title, shape, palette);
+    });
+    this.createLateHiddenArea(snapshot, palette);
+    this.createUniqueScribe(snapshot, `npc-scribe-f${floor}`);
+  }
+
+  private createLateSetpiece(
+    snapshot: GameSnapshot,
+    landmarkId: string,
+    title: string,
+    shape: string,
+    palette: { dark: number; mid: number; light: number; accent: number },
+  ): void {
+    const point = this.anchorPoint(snapshot, landmarkId);
+    if (!point) return;
+    const landmark = floorExperience(snapshot.floor).landmarks.find(
+      (entry) => entry.id === landmarkId,
+    );
+    if (!landmark) return;
+    const container = this.scene.add.container(point.x, point.y);
+    const shadow = this.scene.add.ellipse(0, 31, 68, 22, 0x070809, 0.46);
+    const interactionRing = this.scene.add.ellipse(
+      0,
+      31,
+      56,
+      18,
+      WORLD_VISUAL_LANGUAGE.interactionInk,
+      0.2,
+    ).setStrokeStyle(
+      2,
+      WORLD_VISUAL_LANGUAGE.interactionGold,
+      landmark.interaction
+        ? WORLD_VISUAL_LANGUAGE.interactionIdleAlpha
+        : 0,
+    );
+    const interactionKey = this.scene.add.text(31, 28, "E", {
+      color: "#f0d58a",
+      fontFamily: "monospace",
+      fontSize: "7px",
+      fontStyle: "bold",
+      backgroundColor: "#15130fee",
+      padding: { x: 3, y: 2 },
+    }).setOrigin(0.5).setVisible(landmark.interaction !== null);
+    container.add([shadow, interactionRing]);
+    const panel = () => this.scene.add.rectangle(0, 4, 82, 54, palette.dark, 0.94)
+      .setStrokeStyle(2, palette.light, 0.54);
+
+    if (shape === "board" || shape === "gallery") {
+      container.add(panel());
+      [-25, 0, 25].forEach((x) => {
+        container.add(this.scene.add.rectangle(x, 1, 18, 35, palette.mid, 0.7)
+          .setStrokeStyle(1, palette.light, 0.62));
+      });
+    } else if (shape === "flags") {
+      [-22, 22].forEach((x, index) => {
+        container.add([
+          this.scene.add.rectangle(x, 4, 4, 54, palette.light, 0.76),
+          this.scene.add.triangle(x + (index === 0 ? 10 : -10), -14, -15, -9, 15, -9, 0, 11, palette.accent, 0.9),
+        ]);
+      });
+    } else if (shape === "chain" || shape === "deadlock") {
+      const nodes = shape === "deadlock"
+        ? [{ x: -28, y: -10 }, { x: 28, y: -10 }, { x: 0, y: 23 }]
+        : [-36, -12, 12, 36].map((x, index) => ({ x, y: index % 2 === 0 ? -5 : 8 }));
+      nodes.forEach((node, index) => {
+        const next = nodes[(index + 1) % nodes.length];
+        if (shape === "deadlock" || index < nodes.length - 1) {
+          container.add(this.scene.add.line(
+            0,
+            0,
+            node.x,
+            node.y,
+            next.x,
+            next.y,
+            palette.accent,
+            0.66,
+          ).setLineWidth(2));
+        }
+        container.add(this.scene.add.ellipse(node.x, node.y, 15, 15, palette.mid, 0.94)
+          .setStrokeStyle(2, palette.light, 0.72));
+      });
+    } else if (shape === "bars") {
+      container.add(panel());
+      [-30, -18, -6, 6, 18, 30].forEach((x, index) => {
+        container.add(this.scene.add.rectangle(x, 11 - index * 4, 7, 15 + index * 8, palette.accent, 0.74));
+      });
+    } else if (shape === "clock") {
+      container.add(this.scene.add.ellipse(0, 1, 78, 78, palette.dark, 0.96)
+        .setStrokeStyle(5, palette.light, 0.8));
+      for (let index = 0; index < 8; index += 1) {
+        const angle = index * Math.PI / 4;
+        container.add(this.scene.add.ellipse(
+          Math.cos(angle) * 29,
+          Math.sin(angle) * 29,
+          5,
+          5,
+          palette.light,
+          0.82,
+        ));
+      }
+      container.add([
+        this.scene.add.line(0, 0, 0, 0, 0, -24, palette.accent, 0.96).setLineWidth(3),
+        this.scene.add.line(0, 0, 0, 0, 19, 8, palette.light, 0.92).setLineWidth(2),
+      ]);
+    } else if (shape === "incubator") {
+      container.add(panel());
+      [-24, 0, 24].forEach((x, index) => {
+        container.add(this.scene.add.ellipse(x, 7, 18, 27, index === 1 ? palette.accent : palette.mid, 0.84)
+          .setStrokeStyle(2, palette.light, 0.7));
+      });
+    } else if (shape === "sluice") {
+      container.add([
+        this.scene.add.rectangle(0, 10, 88, 30, palette.mid, 0.84)
+          .setStrokeStyle(3, palette.light, 0.62),
+        this.scene.add.triangle(0, -13, -43, -9, 43, -9, 0, 15, palette.dark, 0.96),
+      ]);
+      [-25, -8, 9, 26].forEach((x) => {
+        container.add(this.scene.add.polygon(x, 9, [-6, -5, 6, -5, 9, 3, 0, 8, -9, 3], palette.accent, 0.74));
+      });
+    } else if (shape === "door" || shape === "root") {
+      container.add(this.scene.add.rectangle(0, 5, 58, 72, palette.dark, 0.96)
+        .setStrokeStyle(4, palette.light, 0.74));
+      [-16, 0, 16].forEach((x, index) => {
+        container.add(this.scene.add.line(0, 0, x, -27, -x / 2, 31, shape === "root" ? palette.accent : palette.mid, 0.84)
+          .setLineWidth(index === 1 ? 4 : 2));
+      });
+    } else if (shape === "bridge" || shape === "road" || shape === "stairs") {
+      const count = shape === "stairs" ? 6 : 5;
+      for (let index = 0; index < count; index += 1) {
+        const y = (index - (count - 1) / 2) * 10;
+        const width = shape === "stairs" ? 35 + index * 10 : 88;
+        container.add(this.scene.add.rectangle(0, y, width, 7, index % 2 === 0 ? palette.mid : palette.dark, 0.9)
+          .setStrokeStyle(1, palette.light, 0.54));
+      }
+    } else if (shape === "altar" || shape === "steps") {
+      const count = shape === "steps" ? 7 : 3;
+      for (let index = 0; index < count; index += 1) {
+        container.add(this.scene.add.rectangle(
+          0,
+          25 - index * 8,
+          90 - index * 9,
+          7,
+          index === count - 1 ? palette.accent : palette.mid,
+          0.88,
+        ).setStrokeStyle(1, palette.light, 0.5));
+      }
+    } else if (shape === "branch" || shape === "tree") {
+      container.add(this.scene.add.rectangle(0, 17, 9, 62, palette.dark, 0.96)
+        .setStrokeStyle(2, palette.light, 0.58));
+      const branches = shape === "tree" ? 6 : 3;
+      for (let index = 0; index < branches; index += 1) {
+        const side = index % 2 === 0 ? -1 : 1;
+        container.add(this.scene.add.line(
+          0,
+          0,
+          0,
+          8 - index * 8,
+          side * (24 + index * 3),
+          -4 - index * 8,
+          palette.accent,
+          0.82,
+        ).setLineWidth(3));
+      }
+    } else if (shape === "lake") {
+      container.add([
+        this.scene.add.ellipse(0, 8, 104, 48, palette.mid, 0.54)
+          .setStrokeStyle(3, palette.light, 0.72),
+        this.scene.add.ellipse(0, 5, 58, 20, palette.accent, 0.24)
+          .setStrokeStyle(2, palette.light, 0.46),
+      ]);
+    } else if (shape === "wings") {
+      container.add(panel());
+      [-36, -12, 12, 36].forEach((x) => {
+        container.add(this.scene.add.triangle(x, 1, -10, 19, 0, -20, 10, 19, palette.mid, 0.7)
+          .setStrokeStyle(1, palette.light, 0.56));
+      });
+    } else if (shape === "vista") {
+      container.add([
+        this.scene.add.rectangle(0, 0, 74, 68, palette.dark, 0.9)
+          .setStrokeStyle(4, palette.light, 0.78),
+        this.scene.add.rectangle(0, 4, 58, 48, palette.accent, 0.4),
+        this.scene.add.ellipse(18, 0, 25, 25, palette.light, 0.84),
+      ]);
+    } else {
+      container.add([
+        this.scene.add.rectangle(0, 11, 72, 49, palette.dark, 0.96)
+          .setStrokeStyle(3, palette.light, 0.72),
+        this.scene.add.rectangle(0, -18, 49, 23, palette.mid, 0.9)
+          .setStrokeStyle(2, palette.accent, 0.7),
+      ]);
+    }
+
+    const stateDot = this.scene.add.ellipse(-35, 34, 8, 8, palette.mid, 0.72)
+      .setStrokeStyle(1, palette.light, 0.72);
+    const stateText = this.scene.add.text(-27, 34, "未响应", {
+      color: "#aeb5be",
+      fontFamily: "monospace",
+      fontSize: "7px",
+      fontStyle: "bold",
+    }).setOrigin(0, 0.5);
+    container.add([stateDot, stateText, interactionKey]);
+    this.root?.add(container);
+    const label = this.addLabel(
+      point,
+      title,
+      `#${palette.light.toString(16).padStart(6, "0")}`,
+      -48,
+    );
+    this.lateSetpieces.set(landmarkId, {
+      container,
+      stateDot,
+      stateText,
+      label,
+      interactionRing,
+      interactionKey,
+      point,
+      title,
+      kind: landmark.kind,
+      interaction: landmark.interaction,
+    });
+  }
+
+  private createLateHiddenArea(
+    snapshot: GameSnapshot,
+    palette: { dark: number; mid: number; light: number; accent: number },
+  ): void {
+    if (!hasFloorExperience(snapshot.floor)) return;
+    const area = floorExperience(snapshot.floor).hiddenAreas[0];
+    if (!area) return;
+    const point = this.anchorPoint(snapshot, area.landmarkId);
+    if (!point) return;
+    const backdrop = this.createHiddenRoomBackdrop(
+      snapshot,
+      area.roomNodeId,
+      palette.dark,
+      palette.light,
+      snapshot.floor % 2 === 0,
+    );
+    const interior = this.scene.add.container(point.x, point.y);
+    const room = this.scene.add.rectangle(0, 6, 98, 68, palette.dark, 0.96)
+      .setStrokeStyle(3, palette.light, 0.76);
+    const armor = this.scene.add.polygon(
+      0,
+      2,
+      [-18, -19, -7, -27, 0, -19, 7, -27, 18, -19, 13, 25, -13, 25],
+      palette.accent,
+      0.9,
+    ).setStrokeStyle(2, palette.light, 0.9);
+    const evidence = this.scene.add.text(0, 32, `REWARD · ${area.rewardArmorId ?? "ARCHIVE"}`, {
+      color: `#${palette.light.toString(16).padStart(6, "0")}`,
+      fontFamily: "monospace",
+      fontSize: "7px",
+      fontStyle: "bold",
+    }).setOrigin(0.5);
+    interior.add([room, armor, evidence]);
+    this.root?.add(interior);
+    const label = this.addLabel(point, `${area.title} · 专属换装`, "#f0d88b", -49);
+    this.createHiddenAreaEntrance(
+      snapshot,
+      backdrop,
+      interior,
+      label,
+      "未解暗门",
+      area.title,
+      palette.dark,
+      palette.light,
+    );
+  }
+
+  private setLateState(
+    id: string,
+    active: boolean,
+    text: string,
+    ratio = active ? 1 : 0,
+  ): void {
+    const view = this.lateSetpieces.get(id);
+    if (!view) return;
+    view.container.setAlpha(active ? 1 : 0.46);
+    view.stateDot.setFillStyle(active ? 0x78d5c4 : 0x6a6570, active ? 0.96 : 0.64);
+    view.stateDot.setScale(0.78 + Math.max(0, Math.min(1, ratio)) * 0.35);
+    view.stateText.setText(text);
+    view.stateText.setColor(active ? "#8ce0cf" : "#aeb5be");
+  }
+
+  private syncLateSetpieceLabels(snapshot: GameSnapshot): void {
+    this.lateSetpieces.forEach((view) => {
+      const nearby = this.isPlayerNear(snapshot, view.point, 3);
+      view.label.setVisible(nearby);
+      view.label.setText(landmarkInteractionLabel({
+        name: view.title,
+        kind: view.kind,
+        interaction: view.interaction,
+        nearby,
+      }));
+      view.stateDot.setVisible(nearby);
+      view.stateText.setVisible(nearby);
+      view.interactionRing.setStrokeStyle(
+        2,
+        WORLD_VISUAL_LANGUAGE.interactionGold,
+        view.interaction === null
+          ? 0
+          : nearby
+            ? WORLD_VISUAL_LANGUAGE.interactionNearAlpha
+            : WORLD_VISUAL_LANGUAGE.interactionIdleAlpha,
+      );
+      view.interactionKey.setAlpha(nearby ? 1 : 0.68);
+    });
+  }
+
+  private syncLateFloor(
+    world: FloorFiveWorldState | FloorSixWorldState | FloorSevenWorldState | FloorEightWorldState,
+  ): void {
+    if (world.floor === 5) {
+      this.setLateState(
+        "f5-muster-board",
+        world.roster !== "folded",
+        world.roster === "partitioned" ? "分区展开" : "岗次待排",
+      );
+      this.setLateState(
+        "f5-rank-standards",
+        world.standards === "ties-visible",
+        world.standards === "ties-visible" ? "并列已保留" : "名次未明",
+      );
+      this.setLateState(
+        "f5-patrol-chain",
+        world.patrol === "linked",
+        world.patrol === "linked" ? "前后岗接通" : "巡逻断链",
+      );
+      this.setLateState(
+        "f5-alert-wall",
+        world.alert === "framed",
+        world.alert === "framed" ? "当前行范围" : "全城警戒",
+      );
+      this.setLateState(
+        "f5-command-clock",
+        world.clock === "reordered",
+        world.clock === "reordered" ? "唯一名次停止" : "指针乱转",
+      );
+      this.setLateState(
+        "f5-ascent",
+        world.ascent === "lowered",
+        world.ascent === "lowered" ? "吊桥落下" : "吊桥高悬",
+      );
+      return;
+    }
+    if (world.floor === 6) {
+      this.setLateState(
+        "f6-sandbox-incubator",
+        world.sandbox !== "pristine",
+        world.sandbox === "updated"
+          ? "记录已定向更新"
+          : world.sandbox === "written"
+            ? "新记录孵化"
+            : "副本洁净",
+      );
+      this.setLateState(
+        "f6-cleanup-sluice",
+        world.cleanup === "targeted",
+        world.cleanup === "targeted" ? "指定项已清理" : "鳞片淤积",
+      );
+      this.setLateState(
+        "f6-constraint-door",
+        world.constraint === "protected",
+        world.constraint === "protected" ? "约束保护" : "冲突未验",
+      );
+      this.setLateState(
+        "f6-state-bridge",
+        world.bridge === "rolled-back",
+        world.bridge === "rolled-back" ? "状态已回滚" : "候选态悬空",
+      );
+      this.setLateState(
+        "f6-savepoint-altar",
+        world.savepoint === "validated",
+        world.savepoint === "validated" ? "局部撤销通过" : "保存点未立",
+      );
+      this.setLateState(
+        "f6-dragon-throne",
+        world.throne === "validated",
+        world.throne === "validated" ? "龙巢已验证" : "事务未决",
+      );
+      this.setLateState(
+        "f6-ascent",
+        world.ascent === "active",
+        world.ascent === "active" ? "升降台开启" : "升降台停机",
+      );
+      return;
+    }
+    if (world.floor === 7) {
+      this.setLateState(
+        "f7-index-road",
+        world.indexPath !== "dark",
+        world.indexPath === "composite"
+          ? "复合短路"
+          : world.indexPath === "point-search"
+            ? "主键点查"
+            : "索引未亮",
+      );
+      this.setLateState(
+        "f7-covering-lake",
+        world.lake === "covering",
+        world.lake === "covering" ? "覆盖索引" : "仍需回表",
+      );
+      this.setLateState(
+        "f7-broken-root",
+        world.rootGate === "range-open",
+        world.rootGate === "range-open" ? "范围门恢复" : "根门断裂",
+      );
+      this.setLateState(
+        "f7-plan-tree",
+        world.planTree === "explained",
+        world.planTree === "explained" ? "计划已展开" : "执行路未明",
+      );
+      this.setLateState(
+        "f7-index-throne",
+        world.throne === "paths-compared",
+        world.throne === "paths-compared" ? "路径已比较" : "代价待估",
+      );
+      this.setLateState(
+        "f7-ascent",
+        world.ascent === "sunlit",
+        world.ascent === "sunlit" ? "金阶点亮" : "残照未至",
+      );
+      this.setLateState("f7-scan-road", true, "慢路始终保留");
+      return;
+    }
+    this.setLateState(
+      "f8-version-gallery",
+      world.gallery === "snapshot",
+      world.gallery === "snapshot" ? "快照稳定" : "版本重叠",
+    );
+    this.setLateState(
+      "f8-deadlock-gate",
+      world.deadlock === "cycle-exposed",
+      world.deadlock === "cycle-exposed" ? "等待环已显" : "双骑对峙",
+    );
+    this.setLateState(
+      "f8-incident-wings",
+      world.wings > 0,
+      `${world.wings}/4 证据翼`,
+      world.wings / 4,
+    );
+    this.setLateState(
+      "f8-migration-dais",
+      world.migration === "ready",
+      world.migration === "ready" ? "迁移台就绪" : "七步未齐",
+    );
+    this.setLateState(
+      "f8-archivist-throne",
+      world.throne !== "waiting",
+      world.throne === "committed" ? "记录已提交" : "等待审计",
+    );
+    this.setLateState(
+      "f8-sunset-vista",
+      world.vista === "new-dawn",
+      world.vista === "new-dawn" ? "新晨线" : "最后残晖",
+    );
   }
 
   private syncFloorTwo(world: ReturnType<typeof floorWorldStateFromSnapshot> & { floor: 2 }): void {

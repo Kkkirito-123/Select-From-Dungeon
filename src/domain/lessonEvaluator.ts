@@ -122,17 +122,6 @@ function directMonsterIdentityProjection(
   return match[2].toLowerCase() as IdentityColumn;
 }
 
-function allowedIdentityProjections(sql: string): Set<IdentityColumn> {
-  const normalized = normalizeIdentitySql(sql);
-  const aliases = monsterAliasesForSql(normalized);
-  const projection = normalized.match(/^\s*select\s+([\s\S]*?)\s+from\b/i)?.[1];
-  if (!aliases || !projection) return new Set();
-  return new Set(splitProjection(projection).flatMap((expression) => {
-    const column = directMonsterIdentityProjection(expression, aliases);
-    return column ? [column] : [];
-  }));
-}
-
 function hasSealedIdentityUse(
   sql: string,
   allowedProjectionColumns: ReadonlySet<IdentityColumn>,
@@ -188,13 +177,12 @@ export function evaluateUnrevealedIdentityQuery(
 
 export function unrevealedIdentityQueryMessage(
   floor: number,
-  answerSql: string,
+  _answerSql: string,
   sql: string,
   identityRevealed: boolean,
 ): string | null {
-  if (floor < 1 || floor > 2 || identityRevealed) return null;
-  const allowedIdentityColumns = allowedIdentityProjections(answerSql);
-  return hasSealedIdentityUse(sql, allowedIdentityColumns)
+  if (floor < 1 || floor > 8 || identityRevealed) return null;
+  return hasSealedIdentityUse(sql, new Set())
     ? UNREVEALED_IDENTITY_MESSAGE
     : null;
 }
@@ -221,6 +209,20 @@ function projectsOnlyColumn(sql: string, column: string): boolean {
     `^(?:distinct\\s+)?${qualifiedColumn(column)}$`,
     "i",
   ).test(projectionClause(sql).trim());
+}
+
+function projectsOnlyColumns(sql: string, columns: readonly string[]): boolean {
+  const projected = splitProjection(projectionClause(sql)).map((expression) => (
+    expression
+      .replace(/^distinct\s+/i, "")
+      .replace(/\s+(?:as\s+)?[a-z_]\w*$/i, "")
+      .replace(/^[a-z_]\w*\s*\.\s*/i, "")
+      .trim()
+      .toLowerCase()
+  ));
+  return projected.length === columns.length && projected.every(
+    (column, index) => column === columns[index]?.toLowerCase(),
+  );
 }
 
 function columnEqualsNumber(clause: string, column: string, expected: number): boolean {
@@ -497,10 +499,10 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
   switch (stageId) {
     case "select-name":
       return (
-        projectsOnlyColumn(normalizedSql, "name") &&
+        projectsOnlyColumns(normalizedSql, ["id", "status"]) &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
         columnEqualsNumber(whereClause, "id", 1) &&
-        hasSingleValue(result, "name", "史莱姆")
+        hasExactOrderedRows(result, ["id", "status"], [[1, "idle"]])
       );
     case "select-weakness":
       return (
@@ -536,11 +538,12 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "null-name":
       return (
-        projectsOnlyColumn(normalizedSql, "name") &&
+        projectsOnlyColumn(normalizedSql, "id") &&
         columnIsNull(whereClause, "master_id") &&
         columnEqualsString(whereClause, "status", "cursed") &&
         !filtersByDirectId(whereClause) &&
-        hasSingleValue(result, "name", "毒史莱姆")
+        hasExactColumns(result.columns, ["id"]) &&
+        sameIds(result.targetIds, [3])
       );
     case "group-signals":
       return (
@@ -579,10 +582,10 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "practice-select":
       return (
-        projectsOnlyColumn(normalizedSql, "name") &&
+        projectsOnlyColumns(normalizedSql, ["id", "status"]) &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
         columnEqualsNumber(whereClause, "id", 6) &&
-        hasSingleValue(result, "name", "小水怪")
+        hasExactOrderedRows(result, ["id", "status"], [[6, "dripping"]])
       );
     case "practice-where":
       return (
@@ -595,11 +598,12 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "practice-null":
       return (
-        projectsOnlyColumn(normalizedSql, "name") &&
+        projectsOnlyColumn(normalizedSql, "id") &&
         columnIsNull(whereClause, "master_id") &&
         columnEqualsString(whereClause, "status", "toxic") &&
         !filtersByDirectId(whereClause) &&
-        hasSingleValue(result, "name", "灰史莱姆")
+        hasExactColumns(result.columns, ["id"]) &&
+        sameIds(result.targetIds, [8])
       );
     case "practice-group":
       return (
@@ -615,10 +619,10 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "practice-group-core":
       return (
-        projectsOnlyColumn(normalizedSql, "name") &&
+        projectsOnlyColumns(normalizedSql, ["id", "status"]) &&
         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
         columnEqualsNumber(whereClause, "id", 9) &&
-        hasSingleValue(result, "name", "铁泥怪")
+        hasExactOrderedRows(result, ["id", "status"], [[9, "armored"]])
       );
     case "order-peak":
       return (
@@ -651,8 +655,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "id", 12) &&
-        hasExactOrderedRows(result, ["name", "room_name"], [
-          ["树妖", "古树桥"],
+        hasExactOrderedRows(result, ["id", "room_name"], [
+          [12, "古树桥"],
         ])
       );
     case "inner-join-sector":
@@ -690,8 +694,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "id", 14) &&
         /\border\s+by\s+(?:\w+\.)?power\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["name", "power"], [
-          ["灯塔守卫", 21],
+        hasExactOrderedRows(result, ["id", "power"], [
+          [14, 21],
         ])
       );
     case "practice-order":
@@ -712,8 +716,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "id", 17) &&
-        hasExactOrderedRows(result, ["name", "room_name"], [
-          ["青蛙", "泥沼石径"],
+        hasExactOrderedRows(result, ["id", "room_name"], [
+          [17, "泥沼石径"],
         ])
       );
     case "practice-left-join":
@@ -726,10 +730,11 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "practice-left-core":
       return (
-        projectsOnlyColumn(normalizedSql, "name") &&
+        projectsOnlyColumn(normalizedSql, "id") &&
         columnEqualsNumber(whereClause, "id", 18) &&
         columnEqualsString(whereClause, "status", "toxic") &&
-        hasSingleValue(result, "name", "毒蛙")
+        hasExactColumns(result.columns, ["id"]) &&
+        sameIds(result.targetIds, [18])
       );
     case "practice-forest-order":
       return (
@@ -737,7 +742,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "id", 19) &&
         /\border\s+by\s+(?:\w+\.)?hp\s+desc\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["name", "hp"], [["猎犬", 13]])
+        hasExactOrderedRows(result, ["id", "hp"], [[19, 13]])
       );
     case "practice-forest-join":
       return (
@@ -751,7 +756,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "id", 20) &&
         /\border\s+by\s+(?:\w+\.)?sector(?:\s+asc)?\b/i.test(normalizedSql) &&
         /\blimit\s+1\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["name", "room_sector"], [["树妖", "forest"]])
+        hasExactOrderedRows(result, ["id", "room_sector"], [[20, "forest"]])
       );
     case "lake-boss-scan":
       return (
@@ -782,18 +787,18 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       );
     case "frog-boss-distinct":
       return (
-        /^select\s+distinct\s+(?:\w+\.)?name\b/i.test(normalizedSql) &&
+        /^select\s+distinct\s+(?:\w+\.)?id\b/i.test(normalizedSql) &&
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "floor", 2) &&
         columnEqualsNumber(whereClause, "id", 22) &&
         /\border\s+by\s+(?:\w+\.)?id(?:\s+asc)?\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["name", "room_name"], [["蛙王", "泥冠宫"]])
+        hasExactOrderedRows(result, ["id", "room_name"], [[22, "泥冠宫"]])
       );
     case "f3-inner-room":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
         columnEqualsNumber(whereClause, "id", 23) &&
-        hasExactOrderedRows(result, ["name", "room_name"], [["骷髅", "骨桥前庭"]])
+        hasExactOrderedRows(result, ["id", "room_name"], [[23, "骨桥前庭"]])
       );
     case "f3-left-unarmed":
       return (
@@ -807,7 +812,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
       return (
         result.features.includes("self-join") &&
         columnEqualsNumber(whereClause, "id", 25) &&
-        hasExactOrderedRows(result, ["child_name", "master_name"], [["幽灵", "死灵王"]])
+        hasExactOrderedRows(result, ["child_id", "master_id"], [[25, 28]])
       );
     case "f3-chain-gear":
       return (
@@ -815,14 +820,14 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         columnEqualsNumber(whereClause, "id", 26) &&
         hasExactOrderedRows(
           result,
-          ["room_name", "name", "power"],
-          [["骑士墓", "铠骷髅", 18]],
+          ["room_name", "id", "power"],
+          [["骑士墓", 26, 18]],
         )
       );
     case "f3-union-patrol":
-      return hasExactOrderedRows(result, ["id", "name"], [
-        [23, "骷髅"],
-        [25, "幽灵"],
+      return hasExactOrderedRows(result, ["id"], [
+        [23],
+        [25],
       ]);
     case "f3-audit-groups":
       return (
@@ -836,55 +841,55 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "f3-audit-core":
       return (
         /\bbetween\s+41\s+and\s+46\b/i.test(whereClause) &&
-        hasExactOrderedRows(result, ["name", "power"], [["死灵王", 24]])
+        hasExactOrderedRows(result, ["id", "power"], [[28, 24]])
       );
     case "practice-bone":
       return (
         columnEqualsNumber(whereClause, "id", 29) &&
-        hasExactOrderedRows(result, ["name", "room_name"], [["碎骨", "遗骨荒地"]])
+        hasExactOrderedRows(result, ["id", "room_name"], [[29, "遗骨荒地"]])
       );
     case "practice-zombie":
       return (
         columnEqualsNumber(whereClause, "id", 30) &&
         columnIsNull(whereClause, "monster_id") &&
-        hasSingleValue(result, "name", "腐尸")
+        hasSingleValue(result, "id", 30)
       );
     case "practice-spirit":
       return (
         columnEqualsNumber(whereClause, "id", 31) &&
-        hasExactOrderedRows(result, ["name", "master_name"], [["鬼火", "墓主"]])
+        hasExactOrderedRows(result, ["child_id", "master_id"], [[31, 33]])
       );
     case "practice-spirit-core":
       return (
         columnEqualsNumber(whereClause, "id", 31) &&
         columnEqualsString(whereClause, "status", "haunting") &&
-        hasSingleValue(result, "name", "鬼火")
+        hasSingleValue(result, "id", 31)
       );
     case "grave-boss-scan":
-      return hasExactOrderedRows(result, ["id", "name"], [
-        [31, "鬼火"],
-        [32, "游魂"],
-        [33, "墓主"],
+      return hasExactOrderedRows(result, ["id"], [
+        [31],
+        [32],
+        [33],
       ]);
     case "grave-boss-core":
       return (
         columnEqualsNumber(whereClause, "id", 33) &&
-        hasExactOrderedRows(result, ["name", "master_name"], [["墓主", "死灵王"]])
+        hasExactOrderedRows(result, ["child_id", "master_id"], [[33, 28]])
       );
     case "f4-scalar-first":
-      return hasSingleValue(result, "name", "火灵");
+      return hasSingleValue(result, "id", 34);
     case "f4-in-frost":
-      return hasExactOrderedRows(result, ["name"], [["冰灵"]]);
+      return hasExactOrderedRows(result, ["id"], [[35]]);
     case "f4-exists-gear":
       return columnEqualsNumber(whereClause, "id", 36) &&
-        hasSingleValue(result, "name", "雷灵");
+        hasSingleValue(result, "id", 36);
     case "f4-correlated-gear":
       return columnEqualsNumber(whereClause, "id", 37) &&
         /\bmax\s*\(/i.test(normalizedSql) &&
-        hasSingleValue(result, "name", "石巨人");
+        hasSingleValue(result, "id", 37);
     case "f4-cte-armor":
       return columnEqualsNumber(whereClause, "id", 38) &&
-        hasSingleValue(result, "name", "炎王");
+        hasSingleValue(result, "id", 38);
     case "f4-recursive-rooms":
       return hasExactOrderedRows(result, ["room_name"], [
         ["火室"],
@@ -892,115 +897,115 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         ["雷池"],
       ]);
     case "f4-recursive-core":
-      return hasExactOrderedRows(result, ["name", "depth"], [
-        ["火灵", 1],
-        ["石巨人", 2],
-        ["元素王", 3],
+      return hasExactOrderedRows(result, ["id", "depth"], [
+        [34, 1],
+        [37, 2],
+        [39, 3],
       ]);
     case "practice-fire":
-      return hasSingleValue(result, "name", "火苗");
+      return hasSingleValue(result, "id", 40);
     case "practice-ice":
-      return hasExactOrderedRows(result, ["name"], [["冰晶"]]);
+      return hasExactOrderedRows(result, ["id"], [[41]]);
     case "practice-storm":
       return columnEqualsNumber(whereClause, "id", 42) &&
-        hasSingleValue(result, "name", "雷兽");
+        hasSingleValue(result, "id", 42);
     case "practice-storm-core":
       return (
         columnEqualsNumber(whereClause, "id", 42) &&
         columnEqualsString(whereClause, "status", "charged") &&
-        hasSingleValue(result, "name", "雷兽")
+        hasSingleValue(result, "id", 42)
       );
     case "practice-wraith":
       return columnEqualsNumber(whereClause, "id", 32) &&
-        hasExactOrderedRows(result, ["name", "master_name"], [["游魂", "墓主"]]);
+        hasExactOrderedRows(result, ["child_id", "master_id"], [[32, 33]]);
     case "practice-spark":
       return columnEqualsNumber(whereClause, "id", 43) &&
-        hasSingleValue(result, "name", "电球");
+        hasSingleValue(result, "id", 43);
     case "forge-boss-scan":
       return columnEqualsNumber(whereClause, "id", 44) &&
-        hasSingleValue(result, "name", "炉主");
+        hasSingleValue(result, "id", 44);
     case "forge-boss-core":
       return columnEqualsNumber(whereClause, "id", 44) &&
-        hasSingleValue(result, "name", "炉主");
+        hasSingleValue(result, "id", 44);
     case "f5-over-count":
-      return hasExactOrderedRows(result, ["name", "guard_total"], [
-        ["哥布林", 3],
-        ["兽人", 3],
-        ["骑士", 3],
+      return hasExactOrderedRows(result, ["id", "guard_total"], [
+        [45, 3],
+        [46, 3],
+        [47, 3],
       ]);
     case "f5-row-number-order":
-      return hasExactOrderedRows(result, ["name", "sector", "pos"], [
-        ["铁骑", "arena", 1],
-        ["骑士", "arena", 2],
-        ["兽人", "outer", 1],
-        ["哥布林", "outer", 2],
+      return hasExactOrderedRows(result, ["id", "sector", "pos"], [
+        [48, "arena", 1],
+        [47, "arena", 2],
+        [46, "outer", 1],
+        [45, "outer", 2],
       ]);
     case "f5-rank-ties":
-      return hasExactOrderedRows(result, ["name", "power", "rank_no", "dense_no"], [
-        ["铁骑", 22, 1, 1],
-        ["兽人", 20, 2, 2],
-        ["骑士", 20, 2, 2],
+      return hasExactOrderedRows(result, ["id", "power", "rank_no", "dense_no"], [
+        [48, 22, 1, 1],
+        [46, 20, 2, 2],
+        [47, 20, 2, 2],
       ]);
     case "f5-lag-lead-delta":
-      return hasExactOrderedRows(result, ["name", "power", "prev_power", "next_power"], [
-        ["哥布林", 18, null, 20],
-        ["兽人", 20, 18, 20],
-        ["骑士", 20, 20, 22],
-        ["铁骑", 22, 20, 24],
-        ["巨魔", 24, 22, null],
+      return hasExactOrderedRows(result, ["id", "power", "prev_power", "next_power"], [
+        [45, 18, null, 20],
+        [46, 20, 18, 20],
+        [47, 20, 20, 22],
+        [48, 22, 20, 24],
+        [49, 24, 22, null],
       ]);
     case "f5-frame-running":
-      return hasExactOrderedRows(result, ["name", "running_power"], [
-        ["哥布林", 18],
-        ["兽人", 38],
-        ["骑士", 58],
-        ["铁骑", 80],
-        ["巨魔", 104],
+      return hasExactOrderedRows(result, ["id", "running_power"], [
+        [45, 18],
+        [46, 38],
+        [47, 58],
+        [48, 80],
+        [49, 104],
       ]);
     case "f5-top-n-groups":
-      return hasExactOrderedRows(result, ["sector", "name", "power"], [
-        ["arena", "铁骑", 22],
-        ["core", "城主", 28],
-        ["outer", "兽人", 20],
-        ["wall", "巨魔", 24],
+      return hasExactOrderedRows(result, ["sector", "id", "power"], [
+        ["arena", 48, 22],
+        ["core", 50, 28],
+        ["outer", 46, 20],
+        ["wall", 49, 24],
       ]);
     case "f5-top-n-core":
-      return hasExactOrderedRows(result, ["sector", "name", "rn"], [
-        ["arena", "铁骑", 1],
-        ["arena", "骑士", 2],
-        ["outer", "兽人", 1],
-        ["outer", "哥布林", 2],
+      return hasExactOrderedRows(result, ["sector", "id", "rn"], [
+        ["arena", 48, 1],
+        ["arena", 47, 2],
+        ["outer", 46, 1],
+        ["outer", 45, 2],
       ]);
     case "practice-goblin":
-      return hasExactOrderedRows(result, ["name", "guard_total"], [
-        ["小妖", 2],
-        ["战兽", 2],
+      return hasExactOrderedRows(result, ["id", "guard_total"], [
+        [51, 2],
+        [52, 2],
       ]);
     case "practice-orc":
-      return hasExactOrderedRows(result, ["name", "pos"], [
-        ["战兽", 1],
-        ["小妖", 2],
+      return hasExactOrderedRows(result, ["id", "pos"], [
+        [52, 1],
+        [51, 2],
       ]);
     case "practice-knight":
-      return hasExactOrderedRows(result, ["name", "power", "rank_no"], [
-        ["铁卫", 24, 1],
-        ["战兽", 20, 2],
+      return hasExactOrderedRows(result, ["id", "power", "rank_no"], [
+        [53, 24, 1],
+        [52, 20, 2],
       ]);
     case "practice-troll":
-      return hasExactOrderedRows(result, ["name", "running_power"], [
-        ["小妖", 18],
-        ["战兽", 38],
-        ["铁卫", 62],
-        ["巨魔", 84],
+      return hasExactOrderedRows(result, ["id", "running_power"], [
+        [51, 18],
+        [52, 38],
+        [53, 62],
+        [54, 84],
       ]);
     case "iron-boss-scan":
-      return hasExactOrderedRows(result, ["name", "power"], [["铁卫", 24]]);
+      return hasExactOrderedRows(result, ["id", "power"], [[53, 24]]);
     case "iron-boss-core":
-      return hasExactOrderedRows(result, ["name", "prev_power"], [
-        ["小妖", null],
-        ["战兽", 18],
-        ["铁卫", 20],
-        ["巨魔", 24],
+      return hasExactOrderedRows(result, ["id", "prev_power"], [
+        [51, null],
+        [52, 18],
+        [53, 20],
+        [54, 24],
       ]);
     case "f6-insert-row":
       return hasSandboxRows(result, [
@@ -1162,24 +1167,24 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
 }
 
 const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
-  "select-name": "结果没有精确读出 ID #001 的 name。检查列名、来源表和 id = 1。",
+  "select-name": "结果没有精确读出 ID #001 的 id 与 status。检查投影列、来源表和 id = 1。",
   "select-weakness": "结果没有精确读出 ID #001 的 weakness。检查完整 SELECT。",
   "where-target": "结果没有唯一锁定 ID #002。检查 room_id、status 和多余行。",
   "where-weakness": "没有按 id 与 status 读出 ID #002 的 weakness。",
   "null-target": "没有锁定无主的 ID #003。NULL 不能使用等号比较。",
-  "null-name": "没有按空主人和诅咒状态读出 ID #003 的名字。",
+  "null-name": "没有按空主人和诅咒状态读出 ID #003 的 id。",
   "group-signals": "分组结果应为 echo = 3、noise = 1；检查 ID #004、COUNT(*) 与 channel。",
   "having-shield": "护盾阶段应保留 echo = 3 与 ward = 2；HAVING 要过滤聚合后的组。",
   "having-core": "核心阶段只应保留 echo = 3；把 HAVING 阈值提高到 3。",
-  "practice-select": "结果没有精确读出 ID #006 的 name。检查列名、表名与 id = 6。",
+  "practice-select": "结果没有精确读出 ID #006。检查投影列、表名与 id = 6。",
   "practice-where": "结果没有锁定 ID #007。需要同时过滤 room_id 与 status。",
   "practice-null": "结果没有读出无主的 ID #008。检查 IS NULL 与 toxic 状态。",
   "practice-group": "ID #009 的信号应得到 echo = 2、noise = 2；检查 COUNT(*) 与 GROUP BY。",
-  "practice-group-core": "没有按 id 读出 ID #009 的 name。",
+  "practice-group-core": "没有按 id 读出 ID #009。",
   "order-peak": "没有取出 charge 最高的 surge；检查 DESC 与 LIMIT 1。",
   "order-top-two": "前两行应依次是 surge = 13、arc = 11；检查排序方向与 LIMIT 2。",
   "distinct-status": "去重结果应只有 echo、mirror；检查 DISTINCT 与排序。",
-  "inner-join-room": "没有用 m.name 与 r.name AS room_name 返回 ID #012 和“古树桥”。",
+  "inner-join-room": "没有用 m.id 与 r.name AS room_name 返回 ID #012 和“古树桥”。",
   "inner-join-sector": "连接结果应只返回 ID #012 的 m.id = 12 与 rooms 表的 r.sector = forest；检查投影列和 WHERE 条件。",
   "left-join-unarmed": "没有找到右表缺失的 #13；检查 LEFT JOIN 与 g.monster_id IS NULL。",
   "join-boss-groups": "综合结果应依次为 lake = 4、swamp = 4、forest = 3；检查 JOIN、HAVING 与双重排序。",
@@ -1191,52 +1196,52 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-left-core": "没有按 id 与 toxic 状态读出 ID #018。",
   "practice-forest-order": "没有按 hp 降序取出 ID #019 的记录。",
   "practice-forest-join": "没有用 id 与 room_name 把 ID #020 和盘根林地正确连接。",
-  "practice-forest-join-core": "没有返回 ID #020 的 name 与 forest 区域。",
+  "practice-forest-join-core": "没有返回 ID #020 的 id 与 forest 区域。",
   "lake-boss-scan": "没有按 charge 降序读出 ID #021 的两条最强信号。",
   "lake-boss-sort": "没有用 DISTINCT 与 ORDER BY 读出 ID #021 的三类信号。",
   "frog-boss-left": "没有用 LEFT JOIN 找出无装备的 ID #022。",
-  "frog-boss-distinct": "没有连接二层房间并去重返回 ID #022 的 name 与 room_name。",
-  "f3-inner-room": "没有连接骷髅与骨桥前庭；检查 room_id = rooms.id。",
-  "f3-left-unarmed": "没有用 LEFT JOIN 找出 42 号房间中无装备的僵尸。",
-  "f3-self-master": "没有用两个别名返回幽灵与死灵王。",
-  "f3-chain-gear": "没有串联三张表返回骑士墓、铠骷髅与 power = 18。",
-  "f3-union-patrol": "合并结果应依次为骷髅与幽灵；检查两侧字段和 ORDER BY。",
+  "frog-boss-distinct": "没有连接二层房间并去重返回 ID #022 的 id 与 room_name。",
+  "f3-inner-room": "没有连接 ID #023 与骨桥前庭；检查 room_id = rooms.id。",
+  "f3-left-unarmed": "没有用 LEFT JOIN 找出 42 号房间中无装备的 ID #024。",
+  "f3-self-master": "没有用两个别名返回 ID #025 与其 master_id。",
+  "f3-chain-gear": "没有串联三张表返回骑士墓、ID #026 与 power = 18。",
+  "f3-union-patrol": "合并结果应依次为 ID #023 与 #025；检查两侧字段和 ORDER BY。",
   "f3-audit-groups": "第三层分区统计应得到 crypt、grave、throne 各 2 只。",
-  "f3-audit-core": "没有找出死灵王的最高装备 power = 24。",
-  "practice-bone": "没有连接碎骨与遗骨荒地。",
-  "practice-zombie": "没有用 LEFT JOIN 找出无装备的腐尸。",
-  "practice-spirit": "没有用自连接返回鬼火与墓主。",
-  "practice-spirit-core": "没有按 id 与 haunting 状态返回鬼火。",
-  "practice-wraith": "没有用自连接返回游魂与墓主。",
-  "grave-boss-scan": "UNION 结果应依次为鬼火、游魂与墓主。",
-  "grave-boss-core": "没有用自连接返回墓主与死灵王。",
-  "f4-scalar-first": "标量子查询没有返回 51 号房间中 id 最小的火灵。",
-  "f4-in-frost": "IN 子查询没有返回第四层 frost 房间中的冰灵。",
-  "f4-exists-gear": "EXISTS 没有验证雷灵的装备记录。",
-  "f4-correlated-gear": "相关子查询没有验证石巨人的最高装备 power。",
-  "f4-cte-armor": "CTE 没有筛出 power >= 20 的炎王。",
+  "f3-audit-core": "没有找出 ID #028 的最高装备 power = 24。",
+  "practice-bone": "没有连接 ID #029 与遗骨荒地。",
+  "practice-zombie": "没有用 LEFT JOIN 找出无装备的 ID #030。",
+  "practice-spirit": "没有用自连接返回 ID #031 与其 master_id。",
+  "practice-spirit-core": "没有按 id 与 haunting 状态返回 ID #031。",
+  "practice-wraith": "没有用自连接返回 ID #032 与其 master_id。",
+  "grave-boss-scan": "UNION 结果应依次为 ID #031、#032 与 #033。",
+  "grave-boss-core": "没有用自连接返回 ID #033 与其 master_id。",
+  "f4-scalar-first": "标量子查询没有返回 51 号房间中 id 最小的 ID #034。",
+  "f4-in-frost": "IN 子查询没有返回第四层 frost 房间中的 ID #035。",
+  "f4-exists-gear": "EXISTS 没有验证 ID #036 的装备记录。",
+  "f4-correlated-gear": "相关子查询没有验证 ID #037 的最高装备 power。",
+  "f4-cte-armor": "CTE 没有筛出 power >= 20 的 ID #038。",
   "f4-recursive-rooms": "递归房间序列应依次返回火室、冰库、雷池。",
-  "f4-recursive-core": "递归关系应依次返回火灵、石巨人、元素王。",
-  "practice-fire": "标量子查询没有返回火苗。",
-  "practice-ice": "IN 子查询没有返回冰晶。",
-  "practice-storm": "EXISTS 没有验证雷兽的装备记录。",
-  "practice-storm-core": "没有按 id 与 charged 状态返回雷兽。",
-  "practice-spark": "EXISTS 没有验证电球的装备记录。",
-  "forge-boss-scan": "CTE 没有返回拥有高 power 装备的炉主。",
-  "forge-boss-core": "EXISTS 没有验证炉主的装备记录。",
-  "f5-over-count": "分区计数应保留哥布林、兽人、骑士三行，并让 guard_total 均为 3。",
+  "f4-recursive-core": "递归关系应依次返回 ID #034、#037 与 #039。",
+  "practice-fire": "标量子查询没有返回 ID #040。",
+  "practice-ice": "IN 子查询没有返回 ID #041。",
+  "practice-storm": "EXISTS 没有验证 ID #042 的装备记录。",
+  "practice-storm-core": "没有按 id 与 charged 状态返回 ID #042。",
+  "practice-spark": "EXISTS 没有验证 ID #043 的装备记录。",
+  "forge-boss-scan": "CTE 没有返回拥有高 power 装备的 ID #044。",
+  "forge-boss-core": "EXISTS 没有验证 ID #044 的装备记录。",
+  "f5-over-count": "分区计数应保留 ID #045、#046、#047 三行，并让 guard_total 均为 3。",
   "f5-row-number-order": "区域编号顺序不正确；检查 sector 分区、power DESC 和 id 稳定排序。",
-  "f5-rank-ties": "并列排名不正确；兽人与骑士应共享 rank_no = 2、dense_no = 2。",
+  "f5-rank-ties": "并列排名不正确；ID #046 与 #047 应共享 rank_no = 2、dense_no = 2。",
   "f5-lag-lead-delta": "前后行 power 不正确；检查 LAG、LEAD 与 id 顺序。",
   "f5-frame-running": "累计 power 应依次为 18、38、58、80、104。",
   "f5-top-n-groups": "没有返回 arena、core、outer、wall 各自装备 power 最高的守军。",
   "f5-top-n-core": "outer 与 arena 应各保留 rn 1、2 两名守军。",
-  "practice-goblin": "小妖与战兽应各显示 guard_total = 2。",
-  "practice-orc": "ROW_NUMBER 应先返回战兽，再返回小妖。",
-  "practice-knight": "排名结果应为铁卫第一、战兽第二。",
+  "practice-goblin": "ID #051 与 #052 应各显示 guard_total = 2。",
+  "practice-orc": "ROW_NUMBER 应先返回 ID #052，再返回 ID #051。",
+  "practice-knight": "排名结果应为 ID #053 第一、ID #052 第二。",
   "practice-troll": "累计结果应依次为 18、38、62、84。",
-  "iron-boss-scan": "CTE 没有找出 hp = 24 的铁卫。",
-  "iron-boss-core": "LAG 结果没有按 id 返回正确的上一行 hp。",
+  "iron-boss-scan": "CTE 没有找出 power = 24 的 ID #053。",
+  "iron-boss-core": "LAG 结果没有按 id 返回正确的上一行 power。",
   "f6-insert-row": "沙箱最终状态缺少 id = 6 的 claw 记录，或修改了其他行。",
   "f6-update-target": "只应把 id = 2 的 status 改为 fixed。",
   "f6-delete-duplicate": "只应删除 id = 4，id = 3 的重复证据必须保留。",

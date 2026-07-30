@@ -1493,6 +1493,24 @@ h1 span {
   color: #07100f;
 }
 
+.inspection-overlay__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inspection-overlay[data-record-kind="labyrinth"] {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(175, 66, 58, 0.15), transparent 38%),
+    rgba(3, 6, 9, 0.88);
+}
+
+.inspection-overlay[data-record-kind="labyrinth"] #confirm-labyrinth-entry {
+  border-color: var(--query);
+  background: var(--query);
+  color: #07100f;
+}
+
 #app.inspection-active .interaction-prompt {
   opacity: 0;
 }
@@ -4092,6 +4110,11 @@ h1 span {
     min-height: 44px;
   }
 
+  .inspection-overlay__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .inventory-grid,
   .inventory-grid--consumables,
   .loot-grid,
@@ -4125,7 +4148,8 @@ h1 span {
     box-shadow: none;
   }
 
-  #app.terminal-active .dungeon-panel {
+  #app.terminal-active .dungeon-panel,
+  #app.inspection-active .dungeon-panel {
     z-index: 50;
   }
 

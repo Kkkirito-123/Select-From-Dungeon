@@ -199,7 +199,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
   {
     id: "f8-sharding",
     concept: "分片键与路由均衡",
-    title: "巨兽桥 · 审计路由",
+    title: "分片桥 · 审计路由",
     intro: "分片记录已经给出路由结果。按 shard_id 统计有效路由，找出至少承载两户的分片。",
     schema: INCIDENT_SCHEMA,
     primaryMonsterId: 83,
@@ -223,7 +223,7 @@ export const FLOOR_EIGHT_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
   {
     id: "f8-security",
     concept: "综合事故响应与查询安全",
-    title: "魔王座 · 五阶段事故响应",
+    title: "黑曜王座 · 五阶段事故响应",
     intro: "最终战把本层五类证据串成一次事故响应。每阶段仍是可复现的 SQLite 查询，最后用参数化与最小权限关闭入口。",
     schema: INCIDENT_SCHEMA,
     primaryMonsterId: 84,

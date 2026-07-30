@@ -144,9 +144,9 @@ function completeSelect(session: GameSession): void {
     [{ weakness: "slash" }],
   )).accepted).toBe(true);
   expect(session.resolveQuery(queryResult(
-    "SELECT name FROM monsters WHERE id = 1",
-    ["name"],
-    [{ name: "史莱姆" }],
+    "SELECT id, status FROM monsters WHERE id = 1",
+    ["id", "status"],
+    [{ id: 1, status: "idle" }],
   )).lessonCompleted).toBe("select");
 }
 
@@ -590,7 +590,7 @@ describe("localProgress", () => {
     });
     expect(migrated?.campfires).toHaveLength(2);
     expect(migrated?.campfires.map((campfire) => campfire.phase)).toEqual([
-      "middle",
+      "front",
       "rear",
     ]);
     expect(storage.values.has("select-from-dungeon:run:v6")).toBe(true);

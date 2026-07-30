@@ -82,7 +82,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       lessonIds: ["join-boss"],
       material: "风化白石、铜质灯室、黑蓝深海",
       ambience: "圆号、低弦与缓慢扩张的庄严和声",
-      landmarkIds: ["f2-lighthouse-arena", "f2-north-ferry"],
+      landmarkIds: ["f2-sql-seal", "f2-lighthouse-arena", "f2-north-ferry"],
     },
   ],
   landmarks: [
@@ -218,6 +218,18 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       minimapIcon: "area-boss",
     }),
     landmark({
+      id: "f2-sql-seal",
+      name: "七源密文门",
+      kind: "sql-seal",
+      regionId: "f2-lighthouse",
+      anchor: anchor("floor-2-boss", 0.18, 0.56, "east", 3, 4),
+      assetKey: "f02-cc0-puny-overworld",
+      fallback: "query-seal",
+      interaction: "用关系查询提前校准灯塔侧门",
+      stateKeys: ["sealed", "decoded"],
+      minimapIcon: "query",
+    }),
+    landmark({
       id: "f2-lighthouse-arena",
       name: "月潮灯塔",
       kind: "boss-arena",
@@ -333,6 +345,19 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
         { type: "dialogue", speaker: "抄写员", lines: ["它们站在不同的水里。", "如果只是重复，为什么每一个都看向不同方向？"] },
       ],
       completionFact: "story:f2:seven-reflections",
+    },
+    {
+      id: "f2-story-cipher",
+      title: "七源密文被关系证据解开",
+      trigger: "gate:floor-2-boss:opened",
+      repeat: "once",
+      priority: 88,
+      actions: [
+        { type: "camera-focus", landmarkId: "f2-sql-seal" },
+        { type: "world-effect", effect: "f2-cipher-decoded" },
+        { type: "banner", text: "跨岛关系校验通过；灯塔侧门永久开启" },
+      ],
+      completionFact: "story:f2:cipher",
     },
     {
       id: "f2-story-seven-pages",

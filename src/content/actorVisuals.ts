@@ -53,6 +53,7 @@ export interface PlayerActorProfile {
   eye: number;
   weapon: number;
   armor: number | null;
+  armorStyle: "standard" | "ember-echo";
   hasMantle: boolean;
   hasLongCoat: boolean;
 }
@@ -119,7 +120,7 @@ const PLAYER_STAGE_BY_FLOOR: Readonly<Record<FloorNumber, PlayerActorProfile["st
 
 const PLAYER_STAGE_COLORS: Readonly<Record<
   PlayerActorProfile["stage"],
-  Omit<PlayerActorProfile, "stage" | "weapon" | "armor">
+  Omit<PlayerActorProfile, "stage" | "weapon" | "armor" | "armorStyle">
 >> = {
   keyless: {
     coat: 0x3d5078,
@@ -235,6 +236,7 @@ function armorColor(armor: Armor | null): number | null {
   if (armor.id === "dragon-armor") return 0xb64f3b;
   if (armor.id === "iron-armor") return 0x68747b;
   if (armor.id === "rune-armor") return 0x7d5da0;
+  if (armor.id === "ember-echo-robe") return 0x9d533d;
   if (armor.id === "bone-armor") return 0xbeb49a;
   if (armor.id === "vine-armor") return 0x648057;
   return 0x579084;
@@ -245,11 +247,21 @@ export function playerActorProfile(
   player: Pick<PlayerState, "weapon" | "armor">,
 ): PlayerActorProfile {
   const stage = PLAYER_STAGE_BY_FLOOR[floor];
+  const echoRobe = player.armor?.id === "ember-echo-robe";
   return {
     stage,
     ...PLAYER_STAGE_COLORS[stage],
+    ...(echoRobe ? {
+      coat: 0x382a31,
+      coatSecondary: 0x6f3e38,
+      lining: 0x181b22,
+      trim: 0xe0b65d,
+      hasMantle: true,
+      hasLongCoat: true,
+    } : {}),
     weapon: weaponColor(player.weapon),
     armor: armorColor(player.armor),
+    armorStyle: echoRobe ? "ember-echo" : "standard",
   };
 }
 

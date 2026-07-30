@@ -54,7 +54,7 @@ describe("SqlEngine floor-two schema", () => {
       ["inner-join", 0, "SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12"],
       ["left-join", 0, "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 24 AND g.monster_id IS NULL"],
       ["join-boss", 0, "SELECT r.sector, COUNT(*) AS total FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 3 ORDER BY total DESC, r.sector ASC"],
-      ["join-boss", 1, "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1"],
+      ["join-boss", 1, "SELECT m.id, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1"],
     ] as const;
 
     queries.forEach(([lessonId, stageIndex, sql]) => {
@@ -73,20 +73,20 @@ describe("SqlEngine floor-two schema", () => {
     ));
     const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
     const queries = [
-      ["f3-inner", 0, "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 23"],
+      ["f3-inner", 0, "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 23"],
       ["f3-left", 0, "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 42 AND g.monster_id IS NULL"],
-      ["f3-self", 0, "SELECT child.name AS child_name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 25"],
-      ["f3-chain", 0, "SELECT r.name AS room_name, m.name, g.power FROM rooms r INNER JOIN monsters m ON r.id = m.room_id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 26"],
-      ["f3-union", 0, "SELECT id, name FROM monsters WHERE room_id = 41 UNION SELECT id, name FROM monsters WHERE room_id = 43 ORDER BY id"],
+      ["f3-self", 0, "SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 25"],
+      ["f3-chain", 0, "SELECT r.name AS room_name, m.id, g.power FROM rooms r INNER JOIN monsters m ON r.id = m.room_id INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 26"],
+      ["f3-union", 0, "SELECT id FROM monsters WHERE room_id = 41 UNION SELECT id FROM monsters WHERE room_id = 43 ORDER BY id"],
       ["f3-audit", 0, "SELECT r.sector, COUNT(*) AS total FROM rooms r INNER JOIN monsters m ON r.id = m.room_id WHERE r.floor = 3 AND m.room_id BETWEEN 41 AND 46 GROUP BY r.sector HAVING COUNT(*) >= 2 ORDER BY r.sector"],
-      ["f3-audit", 1, "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id BETWEEN 41 AND 46 ORDER BY g.power DESC LIMIT 1"],
-      ["f4-scalar", 0, "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 51)"],
-      ["f4-in", 0, "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE floor = 4 AND sector = 'frost') ORDER BY name"],
-      ["f4-exists", 0, "SELECT m.name FROM monsters m WHERE m.id = 36 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)"],
-      ["f4-correlated", 0, "SELECT m.name FROM monsters m WHERE m.id = 37 AND (SELECT MAX(g.power) FROM monster_gear g WHERE g.monster_id = m.id) >= 18"],
-      ["f4-cte", 0, "WITH armored AS (SELECT monster_id FROM monster_gear WHERE power >= 20) SELECT m.name FROM monsters m INNER JOIN armored a ON m.id = a.monster_id WHERE m.id = 38"],
+      ["f3-audit", 1, "SELECT m.id, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id BETWEEN 41 AND 46 ORDER BY g.power DESC LIMIT 1"],
+      ["f4-scalar", 0, "SELECT id FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 51)"],
+      ["f4-in", 0, "SELECT id FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE floor = 4 AND sector = 'frost') ORDER BY id"],
+      ["f4-exists", 0, "SELECT m.id FROM monsters m WHERE m.id = 36 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)"],
+      ["f4-correlated", 0, "SELECT m.id FROM monsters m WHERE m.id = 37 AND (SELECT MAX(g.power) FROM monster_gear g WHERE g.monster_id = m.id) >= 18"],
+      ["f4-cte", 0, "WITH armored AS (SELECT monster_id FROM monster_gear WHERE power >= 20) SELECT m.id FROM monsters m INNER JOIN armored a ON m.id = a.monster_id WHERE m.id = 38"],
       ["f4-recursive", 0, "WITH RECURSIVE room_ids(id) AS (SELECT 51 UNION ALL SELECT id + 1 FROM room_ids WHERE id < 53) SELECT r.name AS room_name FROM rooms r INNER JOIN room_ids x ON r.id = x.id ORDER BY r.id"],
-      ["f4-recursive", 1, "WITH RECURSIVE lineage(id, name, master_id, depth) AS (SELECT id, name, master_id, 1 FROM monsters WHERE id = 34 UNION ALL SELECT m.id, m.name, m.master_id, l.depth + 1 FROM monsters m INNER JOIN lineage l ON m.id = l.master_id WHERE l.depth < 3) SELECT name, depth FROM lineage ORDER BY depth"],
+      ["f4-recursive", 1, "WITH RECURSIVE lineage(id, master_id, depth) AS (SELECT id, master_id, 1 FROM monsters WHERE id = 34 UNION ALL SELECT m.id, m.master_id, l.depth + 1 FROM monsters m INNER JOIN lineage l ON m.id = l.master_id WHERE l.depth < 3) SELECT id, depth FROM lineage ORDER BY depth"],
     ] as const;
 
     queries.forEach(([lessonId, stageIndex, sql]) => {

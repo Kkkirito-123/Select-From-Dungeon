@@ -277,7 +277,7 @@ export const FLOOR_SEVEN_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
   {
     id: "f7-optimize",
     concept: "查询优化",
-    title: "古树心 · 结果与代价同时正确",
+    title: "水晶树心 · 结果与代价同时正确",
     intro: "最终优化不是追求一个神秘分数，而是在结果正确的前提下复用索引顺序，并避免临时 B-Tree。",
     schema: INDEX_RECORDS_SCHEMA,
     primaryMonsterId: 72,

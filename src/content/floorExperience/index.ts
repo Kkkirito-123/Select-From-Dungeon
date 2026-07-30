@@ -1,24 +1,54 @@
 import { FLOOR_ONE_EXPERIENCE } from "./floor01";
 import { FLOOR_TWO_EXPERIENCE } from "./floor02";
+import { FLOOR_THREE_EXPERIENCE } from "./floor03";
+import { FLOOR_FOUR_EXPERIENCE } from "./floor04";
+import { FLOOR_FIVE_EXPERIENCE } from "./floor05";
+import { FLOOR_SIX_EXPERIENCE } from "./floor06";
+import { FLOOR_SEVEN_EXPERIENCE } from "./floor07";
+import { FLOOR_EIGHT_EXPERIENCE } from "./floor08";
 import type { FloorExperienceDefinition } from "./types";
 
 export * from "./types";
-export { FLOOR_ONE_EXPERIENCE, FLOOR_TWO_EXPERIENCE };
+export {
+  FLOOR_ONE_EXPERIENCE,
+  FLOOR_TWO_EXPERIENCE,
+  FLOOR_THREE_EXPERIENCE,
+  FLOOR_FOUR_EXPERIENCE,
+  FLOOR_FIVE_EXPERIENCE,
+  FLOOR_SIX_EXPERIENCE,
+  FLOOR_SEVEN_EXPERIENCE,
+  FLOOR_EIGHT_EXPERIENCE,
+};
 
 export const FLOOR_EXPERIENCES = [
   FLOOR_ONE_EXPERIENCE,
   FLOOR_TWO_EXPERIENCE,
+  FLOOR_THREE_EXPERIENCE,
+  FLOOR_FOUR_EXPERIENCE,
+  FLOOR_FIVE_EXPERIENCE,
+  FLOOR_SIX_EXPERIENCE,
+  FLOOR_SEVEN_EXPERIENCE,
+  FLOOR_EIGHT_EXPERIENCE,
 ] as const satisfies readonly FloorExperienceDefinition[];
 
+export type FloorExperienceNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export function hasFloorExperience(
+  floor: number,
+): floor is FloorExperienceNumber {
+  return floor >= 1 && floor <= 8;
+}
+
 export function floorExperience(
-  floor: 1 | 2,
+  floor: FloorExperienceNumber,
 ): FloorExperienceDefinition {
-  return floor === 1 ? FLOOR_ONE_EXPERIENCE : FLOOR_TWO_EXPERIENCE;
+  return FLOOR_EXPERIENCES.find((experience) => experience.floor === floor)
+    ?? FLOOR_ONE_EXPERIENCE;
 }
 
 export function hiddenAreaGateIdsForFloor(floor: number): readonly string[] {
-  if (floor !== 1 && floor !== 2) return [];
-  return floorExperience(floor).hiddenAreas.map((area) => area.gateId);
+  const experience = FLOOR_EXPERIENCES.find((entry) => entry.floor === floor);
+  return experience?.hiddenAreas.map((area) => area.gateId) ?? [];
 }
 
 export function validateFloorExperience(
@@ -92,6 +122,9 @@ export function validateFloorExperience(
   });
   if (experience.landmarks.filter((landmark) => landmark.kind === "campfire").length !== 2) {
     errors.push(`${experience.id} 必须恰好拥有两座可休息篝火。`);
+  }
+  if (experience.landmarks.filter((landmark) => landmark.kind === "sql-seal").length !== 1) {
+    errors.push(`${experience.id} 必须恰好拥有一座剧情化 SQL 密文机关。`);
   }
   if (experience.npcPlacements.some((npc) => !npc.alwaysShowName)) {
     errors.push(`${experience.id} 的 NPC 名称必须常亮。`);

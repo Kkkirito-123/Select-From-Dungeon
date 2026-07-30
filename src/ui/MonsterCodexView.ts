@@ -2,7 +2,10 @@ import {
   biomeEncounterFor,
   type BiomeKind,
 } from "../content/biomeContent";
-import { floorExperience } from "../content/floorExperience";
+import {
+  floorExperience,
+  hasFloorExperience,
+} from "../content/floorExperience";
 import { INITIAL_MONSTERS, lessonById } from "../content/mvpLevel";
 import {
   monsterIdLabel,
@@ -75,7 +78,7 @@ const BIOME_LABEL: Readonly<Record<BiomeKind, string>> = {
 function habitatFor(monster: Monster): string {
   const biome = biomeEncounterFor(monster.id)?.biome;
   if (biome) return BIOME_LABEL[biome];
-  if (monster.floor === 1 || monster.floor === 2) {
+  if (hasFloorExperience(monster.floor)) {
     const region = floorExperience(monster.floor).regions.find(
       (entry) => entry.lessonIds.includes(monster.lessonId),
     );
@@ -86,7 +89,7 @@ function habitatFor(monster: Monster): string {
 }
 
 function worldEffectFor(monster: Monster): string {
-  if (monster.floor === 1 || monster.floor === 2) {
+  if (hasFloorExperience(monster.floor)) {
     const rules = floorExperience(monster.floor).environmentRules;
     const rule = rules.find(
       (entry) => entry.when === `monster:${monster.id}:defeated`,

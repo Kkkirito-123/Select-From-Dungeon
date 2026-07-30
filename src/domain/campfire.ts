@@ -57,8 +57,27 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
 export function generateCampfires(
   graph: RoomGraph,
   floor: MazeFloor,
-  options: { includeHiddenTreasureRooms?: boolean } = {},
+  options: {
+    includeHiddenTreasureRooms?: boolean;
+    useLegacyFloorOnePlacement?: boolean;
+  } = {},
 ): Campfire[] {
+  if (graph.floor === 1 && options.useLegacyFloorOnePlacement !== true) {
+    const safeRooms = ["floor-1-entry", "floor-1-rest"] as const;
+    const phases = ["front", "rear"] as const;
+    return safeRooms.map((roomNodeId, index) => {
+      const zone = floor.zones.find((entry) => entry.roomNodeId === roomNodeId);
+      if (!zone) throw new Error(`第一层缺少安全区 ${roomNodeId}。`);
+      const position = campfirePosition(floor, zone);
+      return {
+        id: `campfire:1:${phases[index]}`,
+        phase: phases[index],
+        roomNodeId,
+        ...position,
+        restPosition: restPosition(floor, position, zone),
+      };
+    });
+  }
   const candidates = floor.zones
     .filter((zone) => {
       const room = graph.nodes.find((node) => node.id === zone.roomNodeId);
@@ -159,10 +178,23 @@ export function safeZoneCellKeys(
   floor: MazeFloor,
   campfires: readonly Campfire[],
 ): Set<string> {
-  return new Set([
+  const cells = new Set([
     ...spawnSafeCellKeys(floor),
     ...campfireSafeCellKeys(floor, campfires),
   ]);
+  if (campfires.some((campfire) => campfire.id.startsWith("campfire:1:"))) {
+    const safeRoomIds = new Set(["floor-1-entry", "floor-1-rest"]);
+    floor.zones
+      .filter((zone) => safeRoomIds.has(zone.roomNodeId))
+      .forEach((zone) => {
+        for (let y = zone.y; y < zone.y + zone.height; y += 1) {
+          for (let x = zone.x; x < zone.x + zone.width; x += 1) {
+            if (mazeTileAt(floor, x, y) === ".") cells.add(`${x}:${y}`);
+          }
+        }
+      });
+  }
+  return cells;
 }
 
 export function isSafeZonePosition(

@@ -37,6 +37,21 @@ export default defineConfig({
               test: /node_modules[\\/]phaser/,
               priority: 10,
             },
+            {
+              name: "sqlite-runtime",
+              test: /node_modules[\\/]sql\.js/,
+              priority: 9,
+            },
+            {
+              name: "world-rules",
+              test: /src[\\/](?:content|domain)[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "app-interface",
+              test: /src[\\/](?:audio|feedback|runtime|storage|ui)[\\/]/,
+              priority: 4,
+            },
           ],
         },
       },

@@ -28,7 +28,7 @@ export interface GateChallengeEvaluation {
 
 const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
   id: "aggregate-breach",
-  title: "聚合越权协议 · HAVING 王门",
+  title: "零行密文机关 · HAVING 王门",
   objective: "从 monsters 与 monster_signals 中找出至少拥有 3 条 echo 信号、且 echo 总电荷不少于 24 的未知记录。击败前不得读取 name；依次返回 id、echo_count、total_charge，按 total_charge 降序、id 升序。",
   schema: [
     sqlSchemaLine("monsters"),
@@ -60,7 +60,7 @@ const FLOOR_ONE_CHALLENGE: GateChallengeDefinition = {
 
 const FLOOR_TWO_CHALLENGE: GateChallengeDefinition = {
   id: "relation-breach",
-  title: "关系越权协议 · JOIN 主核",
+  title: "七源密文机关 · JOIN 主核",
   objective: "统计二层每个房间的怪物数量与装备总 power，没有装备也必须保留。只保留装备总 power 不少于 10 的房间，依次返回 id、room_name、monster_count、total_power；按 total_power 降序、id 升序，只取前 2 行。",
   schema: [
     sqlSchemaLine("rooms"),
@@ -95,8 +95,8 @@ const FLOOR_TWO_CHALLENGE: GateChallengeDefinition = {
 
 const FLOOR_THREE_CHALLENGE: GateChallengeDefinition = {
   id: "grave-breach",
-  title: "墓城越权协议 · 三表审计",
-  objective: "连接怪物、房间和装备，找出第三层 power 不低于 20 的记录。依次返回 id、name、room_name、power；按 power 降序、id 升序，只取前 2 行。",
+  title: "三表墓印机关 · 关系审计",
+  objective: "连接怪物、房间和装备，找出第三层 power 不低于 20 的未知记录。击败前不得读取怪物 name；依次返回 id、room_name、power；按 power 降序、id 升序，只取前 2 行。",
   schema: [
     sqlSchemaLine("monsters"),
     sqlSchemaLine("rooms"),
@@ -109,17 +109,17 @@ const FLOOR_THREE_CHALLENGE: GateChallengeDefinition = {
     "按 power DESC、id ASC 排序并 LIMIT 2。",
   ],
   requiredFeatures: ["select", "from", "where", "join", "on", "order-by", "limit"],
-  expectedColumns: ["id", "name", "room_name", "power"],
+  expectedColumns: ["id", "room_name", "power"],
   expectedRows: [
-    { id: 28, name: "死灵王", room_name: "死灵王庭", power: 24 },
-    { id: 33, name: "墓主", room_name: "墓主祭坛", power: 22 },
+    { id: 28, room_name: "死灵王庭", power: 24 },
+    { id: 33, room_name: "墓主祭坛", power: 22 },
   ],
 };
 
 const FLOOR_FOUR_CHALLENGE: GateChallengeDefinition = {
   id: "forge-breach",
-  title: "熔炉越权协议 · CTE 主核",
-  objective: "用 CTE 统计每只怪物的最高装备 power，只保留不低于 20 的第四层怪物。依次返回 id、name、max_power；按 max_power 降序、id 升序，只取前 3 行。",
+  title: "递归炉印机关 · CTE 主核",
+  objective: "用 CTE 统计每只怪物的最高装备 power，只保留不低于 20 的第四层未知记录。击败前不得读取 name；依次返回 id、max_power；按 max_power 降序、id 升序，只取前 3 行。",
   schema: [
     sqlSchemaLine("monsters"),
     sqlSchemaLine("monster_gear"),
@@ -142,18 +142,18 @@ const FLOOR_FOUR_CHALLENGE: GateChallengeDefinition = {
     "limit",
     "cte",
   ],
-  expectedColumns: ["id", "name", "max_power"],
+  expectedColumns: ["id", "max_power"],
   expectedRows: [
-    { id: 39, name: "元素王", max_power: 26 },
-    { id: 44, name: "炉主", max_power: 22 },
-    { id: 38, name: "炎王", max_power: 20 },
+    { id: 39, max_power: 26 },
+    { id: 44, max_power: 22 },
+    { id: 38, max_power: 20 },
   ],
 };
 
 const FLOOR_FIVE_CHALLENGE: GateChallengeDefinition = {
   id: "iron-breach",
-  title: "黑铁越权协议 · 窗口军阵",
-  objective: "用 CTE 与 ROW_NUMBER 找出第五层每个 sector 中装备 power 最高的怪物。依次返回 sector、name、power、rn；按 power 降序、sector 升序，只取前 3 行。",
+  title: "轮值密文机关 · 窗口军阵",
+  objective: "用 CTE 与 ROW_NUMBER 找出第五层每个 sector 中装备 power 最高的未知记录。击败前不得读取 name；依次返回 sector、id、power、rn；按 power 降序、sector 升序，只取前 3 行。",
   schema: [
     sqlSchemaLine("monsters"),
     sqlSchemaLine("rooms"),
@@ -177,18 +177,18 @@ const FLOOR_FIVE_CHALLENGE: GateChallengeDefinition = {
     "order-by",
     "limit",
   ],
-  expectedColumns: ["sector", "name", "power", "rn"],
+  expectedColumns: ["sector", "id", "power", "rn"],
   expectedRows: [
-    { sector: "core", name: "城主", power: 28, rn: 1 },
-    { sector: "citadel-boss", name: "堡主", power: 26, rn: 1 },
-    { sector: "barracks", name: "铁卫", power: 24, rn: 1 },
+    { sector: "core", id: 50, power: 28, rn: 1 },
+    { sector: "citadel-boss", id: 55, power: 26, rn: 1 },
+    { sector: "barracks", id: 53, power: 24, rn: 1 },
   ],
 };
 
 const FLOOR_SIX_CHALLENGE: GateChallengeDefinition = {
   id: "dragon-breach",
-  title: "龙巢越权协议 · 分区预演",
-  objective: "不修改数据：用 CTE 与 ROW_NUMBER 找出第六层每个 sector 中装备 power 最高的怪物。依次返回 id、name、power；按 power 降序、id 升序，只取前 3 行。",
+  title: "逆鳞密文机关 · 分区预演",
+  objective: "不修改数据：用 CTE 与 ROW_NUMBER 找出第六层每个 sector 中装备 power 最高的未知记录。击败前不得读取 name；依次返回 id、power；按 power 降序、id 升序，只取前 3 行。",
   schema: [
     sqlSchemaLine("monsters"),
     sqlSchemaLine("rooms"),
@@ -212,17 +212,17 @@ const FLOOR_SIX_CHALLENGE: GateChallengeDefinition = {
     "order-by",
     "limit",
   ],
-  expectedColumns: ["id", "name", "power"],
+  expectedColumns: ["id", "power"],
   expectedRows: [
-    { id: 61, name: "龙王", power: 32 },
-    { id: 66, name: "古龙", power: 30 },
-    { id: 64, name: "雷龙", power: 29 },
+    { id: 61, power: 32 },
+    { id: 66, power: 30 },
+    { id: 64, power: 29 },
   ],
 };
 
 const FLOOR_SEVEN_CHALLENGE: GateChallengeDefinition = {
   id: "index-breach",
-  title: "索引越权协议 · 分区最优叶",
+  title: "最优叶密文机关 · 分区检索",
   objective: "用 CTE 与 ROW_NUMBER 找出每个 realm 中 score 最高的索引记录。返回 realm、code、score；按 score 降序，只取前 3 行。",
   schema: [
     "index_records(id, realm, category, score, code, payload)",
@@ -246,7 +246,7 @@ const FLOOR_SEVEN_CHALLENGE: GateChallengeDefinition = {
 
 const FLOOR_EIGHT_CHALLENGE: GateChallengeDefinition = {
   id: "throne-breach",
-  title: "王座越权协议 · 副本决策窗",
+  title: "王令校验密文 · 副本决策窗",
   objective: "用 CTE 与 ROW_NUMBER 为健康 replica 按 region 分区、lag_ms 升序排名。返回 region、node、lag_ms，只保留 rn = 1；按 lag_ms 升序。",
   schema: [
     "replica_status(node, region, lag_ms, healthy, role)",
