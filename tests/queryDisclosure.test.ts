@@ -5,6 +5,7 @@ import { GameSession } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { redactUndiscoveredQueryIdentities } from "../src/domain/queryDisclosure";
 import type { LessonId, SqlQueryResult } from "../src/domain/types";
+import { createEmptyProfile } from "../src/storage/localProgress";
 
 function result(
   sql: string,
@@ -142,6 +143,23 @@ describe("查询结果披露等级", () => {
     });
   });
 
+  it("当前目标已揭名时仍不能借子查询猜测本层其他未揭名记录", () => {
+    const profile = createEmptyProfile();
+    profile.discoveredMonsterIds = [1];
+    const session = new GameSession(null, profile, "identity-cross-record-oracle");
+    enterLesson(session, "select");
+
+    const correctGuess = session.validateCombatQuery(
+      "SELECT weakness FROM monsters WHERE id = 1 AND EXISTS (SELECT 1 FROM monsters WHERE id = 2 AND name = '水史莱姆')",
+    );
+    const wrongGuess = session.validateCombatQuery(
+      "SELECT weakness FROM monsters WHERE id = 1 AND EXISTS (SELECT 1 FROM monsters WHERE id = 2 AND name = '不存在')",
+    );
+
+    expect(correctGuess).toEqual(wrongGuess);
+    expect(correctGuess).toMatchObject({ ok: false });
+  });
+
   it("错误查询只披露结构，非最终正确查询披露安全值，致命一击才披露完整值", () => {
     const session = new GameSession(null, null, "query-disclosure-levels");
     enterLesson(session, "select");
@@ -253,5 +271,19 @@ describe("未发现身份的查询结果脱敏", () => {
 
     expect(visible.rows).toEqual(source.rows);
     expect(visible.rows[0]?.hp).toBe(12);
+  });
+
+  it("嵌入文本优先替换较长名称，避免水史莱姆被拆成水加未识别记录", () => {
+    const session = new GameSession(null, null, "query-disclosure-overlap");
+    const monsters = session.snapshot().monsters;
+    const source = result(
+      "SELECT note FROM monsters WHERE id = 2",
+      ["note"],
+      [{ note: "水史莱姆巢穴" }],
+      [2],
+    );
+
+    expect(redactUndiscoveredQueryIdentities(source, monsters, []).rows)
+      .toEqual([{ note: "未识别记录巢穴" }]);
   });
 });

@@ -18,6 +18,8 @@ export function redactUndiscoveredQueryIdentities(
   const hidden = monsters
     .filter((monster) => !discovered.has(monster.id))
     .sort((left, right) => {
+      const nameLength = right.name.length - left.name.length;
+      if (nameLength !== 0) return nameLength;
       const leftTargeted = result.targetIds.includes(left.id) ? 0 : 1;
       const rightTargeted = result.targetIds.includes(right.id) ? 0 : 1;
       return leftTargeted - rightTargeted || left.id - right.id;

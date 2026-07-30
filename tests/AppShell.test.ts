@@ -11,12 +11,23 @@ import {
   isInspectionPrimaryKey,
   narrativeProgressForSnapshot,
   narrativeMomentUsesRecordOverlay,
+  redactSnapshotMonsterIdentity,
   storyMomentRecordBody,
   schemaRenderSignature,
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+
+describe("玩家可见文本身份边界", () => {
+  it("剧情、调查与管理员文本在击杀前只显示稳定 ID", () => {
+    const snapshot = new GameSession(null, null, "app-shell-identity-boundary").snapshot();
+    expect(redactSnapshotMonsterIdentity(
+      "史莱姆发动数据喷射，内部类型 projection_slime。",
+      snapshot,
+    )).toBe("ID #001发动数据喷射，内部类型 未识别类型。");
+  });
+});
 
 describe("主框确认键", () => {
   it("E、不同键盘布局的 e/E 与 Enter 都能确认，长按不会重复触发", () => {

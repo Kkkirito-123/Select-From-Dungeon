@@ -51,7 +51,7 @@ const MONSTER_KIND_LABEL: Readonly<Record<Monster["kind"], string>> = {
   "obsidian-golem": "黑曜石像",
   "replica-twin": "镜像双生",
   "shard-beast": "分片兽",
-  "demon-king": "魔王",
+  "demon-king": "档案领主",
 };
 
 export function monsterKindLabel(
@@ -95,6 +95,30 @@ export function monsterIntentName(
     return monster.attackName;
   }
   return monster.isBoss ? "规则反击正在蓄力" : "攻击正在蓄力";
+}
+
+/**
+ * 最后一层展示边界：内容脚本可以继续持有 canonical 名称，但未恢复身份时，
+ * 任何进入玩家 UI 的自由文本都只能留下稳定 ID，species 也必须隐藏。
+ */
+export function redactUndiscoveredMonsterIdentityText(
+  value: string,
+  monsters: readonly Pick<Monster, "id" | "name" | "species" | "kind">[],
+  discoveredMonsterIds: readonly number[],
+): string {
+  const hidden = monsters
+    .filter((monster) => !isMonsterIdentityDiscovered(
+      monster.id,
+      discoveredMonsterIds,
+    ))
+    .sort((left, right) => (
+      right.name.length - left.name.length || left.id - right.id
+    ));
+  return hidden.reduce((text, monster) => {
+    const identity = monsterIdentityPresentation(monster, discoveredMonsterIds);
+    const withoutName = text.split(monster.name).join(identity.idLabel);
+    return withoutName.split(monster.species).join("未识别类型");
+  }, value);
 }
 
 export function monsterNameForProfile(

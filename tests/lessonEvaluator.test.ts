@@ -86,13 +86,13 @@ describe("课程文案", () => {
       10: "猎犬",
       15: "水怪",
       11: "水蛇",
-      16: "水蛇",
+      16: "镜蛇",
       12: "树妖",
       17: "青蛙",
       13: "毒蛙",
-      18: "毒蛙",
-      19: "猎犬",
-      20: "树妖",
+      18: "沼蛙",
+      19: "林犬",
+      20: "古树精",
       21: "湖兽",
       14: "灯塔守卫",
       22: "蛙王",
@@ -116,7 +116,7 @@ describe("课程文案", () => {
       41: "冰晶",
       42: "雷兽",
       43: "电球",
-      44: "炉主",
+      44: "霜炉主",
       39: "元素王",
       45: "哥布林",
       46: "兽人",
@@ -127,7 +127,7 @@ describe("课程文案", () => {
       51: "小妖",
       52: "战兽",
       53: "铁卫",
-      54: "巨魔",
+      54: "石魔",
       55: "堡主",
       56: "幼龙",
       57: "飞龙",
@@ -137,8 +137,8 @@ describe("课程文案", () => {
       61: "龙王",
       62: "小龙",
       63: "翼龙",
-      64: "雷龙",
-      65: "晶龙",
+      64: "电龙",
+      65: "矿龙",
       66: "古龙",
       67: "树卫",
       68: "根兽",
@@ -147,7 +147,7 @@ describe("课程文案", () => {
       71: "眼魔",
       72: "古树",
       73: "枝妖",
-      74: "根兽",
+      74: "藤兽",
       75: "晶灵",
       76: "树魔",
       77: "林王",
@@ -157,7 +157,7 @@ describe("课程文案", () => {
       81: "魔像",
       82: "双子",
       83: "巨兽",
-      84: "魔王",
+      84: "档案王",
       85: "魔兵",
       86: "黑骑",
       87: "魔将",
@@ -324,6 +324,105 @@ describe("evaluateLesson stages", () => {
       2,
       innerJoin.stages[0],
       "SELECT r.name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 12",
+      false,
+    )).toBeNull();
+  });
+
+  it("房间名和装备名只允许直接投影，不能作为跨记录身份预言机", () => {
+    const select = LESSONS.find((lesson) => lesson.id === "select");
+    if (!select) throw new Error("缺少 SELECT 课程");
+    const stage = select.stages[0];
+    const gearGuess = (
+      value: string,
+    ) => `SELECT m.id, r.name AS room_name FROM monsters m
+      INNER JOIN rooms r ON m.room_id = r.id
+      INNER JOIN monster_gear secret
+        ON secret.monster_id = 33 AND secret.gear_name = '${value}'
+      WHERE m.id = 23`;
+    const roomGuess = (
+      value: string,
+    ) => `SELECT m.id FROM monsters m INNER JOIN rooms r ON m.room_id = r.id
+      WHERE m.id = 23 AND r.name = '${value}'`;
+
+    expect(evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 23",
+      false,
+    )).toBeNull();
+    expect(evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      "SELECT g.gear_name FROM monster_gear g WHERE g.monster_id = 33",
+      false,
+    )).toBeNull();
+
+    const correctGear = evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      gearGuess("墓主印"),
+      false,
+    );
+    const wrongGear = evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      gearGuess("不存在"),
+      false,
+    );
+    expect(correctGear).toEqual(wrongGear);
+    expect(correctGear).not.toBeNull();
+
+    const correctRoom = evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      roomGuess("墓主祭坛"),
+      false,
+    );
+    const wrongRoom = evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      roomGuess("不存在"),
+      false,
+    );
+    expect(correctRoom).toEqual(wrongRoom);
+    expect(correctRoom).not.toBeNull();
+    expect(evaluateUnrevealedIdentityQuery(
+      3,
+      stage,
+      "SELECT r.name || '!' AS room_name FROM rooms r WHERE r.id = 50",
+      false,
+    )).not.toBeNull();
+  });
+
+  it("拒绝用 CTE 通配符重命名身份列，同时保留 COUNT(*)", () => {
+    const select = LESSONS.find((lesson) => lesson.id === "select");
+    if (!select) throw new Error("缺少 SELECT 课程");
+    const stage = select.stages[0];
+    const monsterWildcard = `WITH secret(
+      id, room_id, hidden_name, hidden_species, hp, armor,
+      status, weakness, master_id, is_boss
+    ) AS (SELECT * FROM monsters)
+    SELECT id FROM secret WHERE id = 1 AND hidden_name = '史莱姆'`;
+    const gearWildcard = `WITH secret(id, monster_id, hidden_label, power) AS (
+      SELECT g.* FROM monster_gear g
+    ) SELECT id FROM secret WHERE monster_id = 33 AND hidden_label = '墓主印'`;
+
+    expect(evaluateUnrevealedIdentityQuery(
+      4,
+      stage,
+      monsterWildcard,
+      false,
+    )).not.toBeNull();
+    expect(evaluateUnrevealedIdentityQuery(
+      4,
+      stage,
+      gearWildcard,
+      false,
+    )).not.toBeNull();
+    expect(evaluateUnrevealedIdentityQuery(
+      1,
+      stage,
+      "SELECT COUNT(*) AS total FROM monsters",
       false,
     )).toBeNull();
   });

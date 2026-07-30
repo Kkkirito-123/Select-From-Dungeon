@@ -17,6 +17,11 @@ export interface EncounterAdvance {
   targetId: number | null;
 }
 
+export interface WeightedEncounterCandidate {
+  monsterId: number;
+  weight: number;
+}
+
 function hashUnit(value: string): number {
   return stableStringHash(value) / 0x1_0000_0000;
 }
@@ -25,14 +30,14 @@ function hashUnit(value: string): number {
 export function advanceEncounterMeter(
   current: EncounterMeter,
   seed: string,
-  candidateIds: readonly number[],
+  candidates: readonly WeightedEncounterCandidate[],
 ): EncounterAdvance {
   const meter = {
     totalMoves: current.totalMoves + 1,
     stepsSinceEncounter: current.stepsSinceEncounter,
     safeStepsRemaining: Math.max(0, current.safeStepsRemaining - 1),
   };
-  if (current.safeStepsRemaining > 0 || candidateIds.length === 0) {
+  if (current.safeStepsRemaining > 0 || candidates.length === 0) {
     return { meter, targetId: null };
   }
 
@@ -45,18 +50,45 @@ export function advanceEncounterMeter(
     hashUnit(`${seed}:ambush-roll:${meter.totalMoves}`) < AMBUSH_CHANCE;
   if (!shouldTrigger) return { meter, targetId: null };
 
-  const ordered = [...candidateIds].sort((a, b) => a - b);
-  const targetIndex = Math.floor(
-    hashUnit(`${seed}:ambush-card:${meter.totalMoves}`) * ordered.length,
-  );
+  const ordered = [...candidates]
+    .filter((candidate) => Number.isFinite(candidate.weight) && candidate.weight > 0)
+    .sort((left, right) => left.monsterId - right.monsterId);
+  const totalWeight = ordered.reduce((total, candidate) => total + candidate.weight, 0);
+  if (totalWeight <= 0) return { meter, targetId: null };
+  const roll = hashUnit(`${seed}:ambush-card:${meter.totalMoves}`) * totalWeight;
+  let accumulated = 0;
+  let targetId = ordered.at(-1)?.monsterId ?? null;
+  for (const candidate of ordered) {
+    accumulated += candidate.weight;
+    if (roll < accumulated) {
+      targetId = candidate.monsterId;
+      break;
+    }
+  }
   return {
     meter: {
       ...meter,
       stepsSinceEncounter: 0,
       safeStepsRemaining: POST_BATTLE_SAFE_STEPS,
     },
-    targetId: ordered[Math.min(targetIndex, ordered.length - 1)] ?? null,
+    targetId,
   };
+}
+
+/**
+ * 同一区域仍有其他合法目标时，最近两个遭遇若都是同一 ID，则第三次排除它。
+ * 调用方传入从新到旧的最近战斗 ID；空候选时回退原池，避免破坏保底遭遇。
+ */
+export function suppressThirdConsecutiveEncounter(
+  candidates: readonly WeightedEncounterCandidate[],
+  recentMonsterIds: readonly number[],
+): WeightedEncounterCandidate[] {
+  const [latest, previous] = recentMonsterIds;
+  if (latest === undefined || latest !== previous) return [...candidates];
+  const alternatives = candidates.filter(
+    (candidate) => candidate.monsterId !== latest,
+  );
+  return alternatives.length > 0 ? alternatives : [...candidates];
 }
 
 export function recordSafeZoneMovement(current: EncounterMeter): EncounterMeter {

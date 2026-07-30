@@ -52,6 +52,11 @@ export interface BiomeEncounterDefinition {
   stages: readonly LessonStageDefinition[];
 }
 
+export interface WeightedBiomeEncounter {
+  monsterId: number;
+  weight: number;
+}
+
 function biomeMonster(
   monster: Omit<Monster, "x" | "y" | "encounterType">,
 ): Monster {
@@ -167,7 +172,7 @@ export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
     id: 16,
     lessonId: "distinct",
     roomId: 32,
-    name: "水蛇",
+    name: "镜蛇",
     species: "water_snake",
     kind: "distinct-mimic",
     hp: 13,
@@ -205,7 +210,7 @@ export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
     id: 18,
     lessonId: "left-join",
     roomId: 34,
-    name: "毒蛙",
+    name: "沼蛙",
     species: "poison_frog",
     kind: "left-join-wraith",
     hp: 16,
@@ -224,7 +229,7 @@ export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
     id: 19,
     lessonId: "order-by",
     roomId: 35,
-    name: "猎犬",
+    name: "林犬",
     species: "forest_hound",
     kind: "filter-hound",
     hp: 13,
@@ -243,7 +248,7 @@ export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
     id: 20,
     lessonId: "inner-join",
     roomId: 36,
-    name: "树妖",
+    name: "古树精",
     species: "forest_treant",
     kind: "join-spider",
     hp: 18,
@@ -477,7 +482,7 @@ export const FLOOR_FOUR_BIOME_MONSTERS: readonly Monster[] = [
     id: 44,
     lessonId: "f4-in",
     roomId: 60,
-    name: "炉主",
+    name: "霜炉主",
     species: "mirror_forge_lord",
     kind: "elemental-king",
     hp: 32,
@@ -556,7 +561,7 @@ export const FLOOR_FIVE_BIOME_MONSTERS: readonly Monster[] = [
     id: 54,
     lessonId: "f5-frame",
     roomId: 69,
-    name: "巨魔",
+    name: "石魔",
     species: "citadel_troll",
     kind: "troll",
     hp: 22,
@@ -635,7 +640,7 @@ export const FLOOR_SIX_BIOME_MONSTERS: readonly Monster[] = [
     id: 64,
     lessonId: "f6-transaction",
     roomId: 79,
-    name: "雷龙",
+    name: "电龙",
     species: "cavern_thunder_drake",
     kind: "dragon",
     hp: 29,
@@ -654,7 +659,7 @@ export const FLOOR_SIX_BIOME_MONSTERS: readonly Monster[] = [
     id: 65,
     lessonId: "f6-constraint",
     roomId: 78,
-    name: "晶龙",
+    name: "矿龙",
     species: "cavern_crystal_drake",
     kind: "dragon",
     hp: 23,
@@ -697,7 +702,7 @@ export const FLOOR_SEVEN_BIOME_MONSTERS: readonly Monster[] = [
     masterId: 77, isBoss: false, rank: "normal",
   }),
   biomeMonster({
-    floor: 7, id: 74, lessonId: "f7-composite", roomId: 88, name: "根兽",
+    floor: 7, id: 74, lessonId: "f7-composite", roomId: 88, name: "藤兽",
     species: "grove_root_beast", kind: "root-beast", hp: 24, maxHp: 24, armor: 1,
     damage: 4, attackName: "根撞", status: "rooted", weakness: "left-prefix",
     masterId: 77, isBoss: false, rank: "normal",
@@ -1712,11 +1717,11 @@ export function practiceStagesFor(
   return BIOME_PRACTICE_STAGES[monsterId] ?? [];
 }
 
-export function weightedBiomeEncounterIds(
+export function weightedBiomeEncounterCandidates(
   floor: FloorNumber,
   biome: BiomeKind,
   unlockedLessons: ReadonlySet<Monster["lessonId"]>,
-): number[] {
+): WeightedBiomeEncounter[] {
   const available = BIOME_ENCOUNTERS.filter((encounter) => (
     encounter.floor === floor &&
     encounter.biome === biome &&
@@ -1738,11 +1743,17 @@ export function weightedBiomeEncounterIds(
   const normal = available.filter((encounter) => encounter.role === "normal");
   const elites = available.filter((encounter) => encounter.role === "mini-elite");
   if (normal.length === 0) return [];
-  const eliteShare = MINI_ELITE_PERCENT_BY_FLOOR[floor];
-  const normalCopies = Math.max(1, Math.floor((100 - eliteShare) / normal.length));
-  const eliteCopies = elites.length === 0 ? 0 : Math.max(1, Math.floor(eliteShare / elites.length));
+  const eliteShare = elites.length === 0 ? 0 : MINI_ELITE_PERCENT_BY_FLOOR[floor];
+  const normalWeight = (100 - eliteShare) / normal.length;
+  const eliteWeight = elites.length === 0 ? 0 : eliteShare / elites.length;
   return [
-    ...normal.flatMap((encounter) => Array(normalCopies).fill(encounter.monsterId) as number[]),
-    ...elites.flatMap((encounter) => Array(eliteCopies).fill(encounter.monsterId) as number[]),
-  ];
+    ...normal.map((encounter) => ({
+      monsterId: encounter.monsterId,
+      weight: normalWeight,
+    })),
+    ...elites.map((encounter) => ({
+      monsterId: encounter.monsterId,
+      weight: eliteWeight,
+    })),
+  ].sort((left, right) => left.monsterId - right.monsterId);
 }

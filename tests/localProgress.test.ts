@@ -321,7 +321,13 @@ describe("localProgress", () => {
     expect(loaded?.mode).toBe("combat");
     expect(loaded?.currentRoomId).toBe(selectRoom.id);
     expect(loaded?.combat?.targetId).toBe(actor.monsterId);
-    expect(new GameSession(loaded).snapshot().combat).toEqual(saved.combat);
+    expect(new GameSession(loaded).snapshot().combat).toEqual({
+      ...saved.combat,
+      intent: {
+        ...saved.combat!.intent,
+        name: "攻击正在蓄力",
+      },
+    });
   });
 
   it("非空篝火菜单、复活点与死亡复盘能通过 v11 完整恢复", () => {

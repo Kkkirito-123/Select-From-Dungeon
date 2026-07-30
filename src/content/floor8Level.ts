@@ -56,7 +56,7 @@ export const FLOOR_EIGHT_MONSTERS: readonly Monster[] = [
     encounterType: "curriculum",
   },
   {
-    floor: 8, id: 84, lessonId: "f8-security", roomId: 97, name: "魔王",
+    floor: 8, id: 84, lessonId: "f8-security", roomId: 97, name: "档案王",
     species: "data_demon_king", kind: "demon-king", x: 1, y: 1, hp: 140, maxHp: 140,
     armor: 3, damage: 7, attackName: "数据终焉", status: "ruling",
     weakness: "evidence", masterId: null, isBoss: true, rank: "boss",

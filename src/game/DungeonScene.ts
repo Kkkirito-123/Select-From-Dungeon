@@ -1145,7 +1145,12 @@ export class DungeonScene extends Phaser.Scene {
 
   private syncZoneLabels(): void {
     this.zoneLabelViews.forEach((view) => {
-      view.label.setVisible(view.roomNodeId === this.snapshot.currentRoomId);
+      const room = this.snapshot.roomGraph.nodes.find(
+        (node) => node.id === view.roomNodeId,
+      );
+      view.label
+        .setText(room?.title ?? "未知区域")
+        .setVisible(view.roomNodeId === this.snapshot.currentRoomId);
     });
   }
 

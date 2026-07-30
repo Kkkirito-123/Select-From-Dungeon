@@ -322,6 +322,18 @@ describe("GameSession SQL 魔王城 Run", () => {
   it("身份只在致命一击结算，并能从 Run 中的已击败记录恢复", () => {
     const session = new GameSession(null, null, "identity-recovery");
     enterLesson(session, "select");
+    const hidden = session.snapshot();
+    const hiddenCopy = [
+      hidden.missionTitle,
+      hidden.missionBody,
+      hidden.lessonIntro,
+      hidden.banner,
+      hidden.interactionPrompt,
+      ...hidden.hints,
+    ].join("\n");
+    expect(hiddenCopy).not.toContain("史莱姆");
+    expect(hiddenCopy).not.toContain("projection_slime");
+    expect(hidden.combat?.intent.name).toBe("攻击正在蓄力");
     const first = session.resolveQuery(SELECT_WEAKNESS);
     expect(first.events.some((event) => event.type === "identity-recovered")).toBe(false);
     expect(session.snapshot().profile.discoveredMonsterIds).toEqual([]);
@@ -535,6 +547,39 @@ describe("GameSession SQL 魔王城 Run", () => {
         toName: targetRegion.name,
       },
     });
+  });
+
+  it("八层地图房名与生态区在身份恢复前不泄露怪物姓名", () => {
+    const session = new GameSession(null, null, "identity-safe-map-labels");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+
+    for (let floor = 1; floor <= 8; floor += 1) {
+      expect(session.adminLoadFloor(floor as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8))
+        .toMatchObject({ ok: true });
+      const snapshot = session.snapshot();
+      const serializedMapLabels = JSON.stringify({
+        rooms: snapshot.roomGraph.nodes.map((room) => room.title),
+        regions: snapshot.biomePlan.regions.map((region) => region.name),
+        portals: snapshot.biomePlan.portals.map((portal) => portal.name),
+        transfer: snapshot.regionTransfer,
+      });
+      snapshot.monsters.forEach((monster) => {
+        expect(serializedMapLabels).not.toContain(monster.name);
+        expect(serializedMapLabels).not.toContain(monster.species);
+      });
+    }
+  });
+
+  it("地图房名会在对应怪物身份恢复后显示 canonical 姓名", () => {
+    const profile = new GameSession(null, null, "identity-map-profile").toProfile();
+    profile.discoveredMonsterIds = [28];
+    const session = new GameSession(null, profile, "identity-map-recovered");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminLoadFloor(3)).toMatchObject({ ok: true });
+
+    expect(session.snapshot().roomGraph.nodes.some((room) => (
+      room.title.includes("死灵王")
+    ))).toBe(true);
   });
 
   it("第八层钥匙无论来自战利品包还是地面物品都会原子提交 Campaign", () => {

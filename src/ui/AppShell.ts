@@ -44,6 +44,7 @@ import {
   monsterIdLabel,
   monsterIdentityPresentation,
   monsterIntentName,
+  redactUndiscoveredMonsterIdentityText,
 } from "../domain/monsterIdentity";
 import { redactUndiscoveredQueryIdentities } from "../domain/queryDisclosure";
 import type { FloorNumber } from "../domain/runGraph";
@@ -107,6 +108,17 @@ export function inspectionDialogCopy(message: string): {
     return { title: "无名宿舍", body: message };
   }
   return { title: "现场调查", body: message };
+}
+
+export function redactSnapshotMonsterIdentity(
+  value: string,
+  snapshot: Pick<GameSnapshot, "monsters" | "profile">,
+): string {
+  return redactUndiscoveredMonsterIdentityText(
+    value,
+    snapshot.monsters,
+    snapshot.profile.discoveredMonsterIds,
+  );
 }
 
 export function canOpenCombatTerminal(
@@ -1826,12 +1838,12 @@ export class AppShell {
     const presetId = button?.dataset.adminPreset;
     if (!presetId) return;
     const resolution = this.session.adminApplyPreset(presetId);
+    const snapshot = this.session.snapshot();
     this.showFeedbackNotice({
-      message: resolution.message,
+      message: redactSnapshotMonsterIdentity(resolution.message, snapshot),
       tone: resolution.ok ? "success" : "info",
     });
     if (!resolution.ok) return;
-    const snapshot = this.session.snapshot();
     this.sql.reset(snapshot.monsters);
     this.getBattleScene()?.abortEncounter();
     this.clearQueryArtifacts();
@@ -1865,7 +1877,7 @@ export class AppShell {
         const button = document.createElement("button");
         button.type = "button";
         button.dataset.adminPreset = preset.id;
-        button.textContent = preset.label;
+        button.textContent = redactSnapshotMonsterIdentity(preset.label, snapshot);
         presets.append(button);
       }
     } else {
@@ -1884,7 +1896,12 @@ export class AppShell {
       heading.textContent = `${index + 1}. ${region.name}`;
       const detail = document.createElement("p");
       detail.textContent = boss
-        ? `区域首领：${boss.name} · ID #${boss.id} · ${boss.hp}/${boss.maxHp} HP`
+        ? `区域首领：${
+            monsterIdentityPresentation(
+              boss,
+              snapshot.profile.discoveredMonsterIds,
+            ).worldLabel
+          } · ${boss.hp}/${boss.maxHp} HP`
         : "区域首领：无 · 课程探索区";
       const button = document.createElement("button");
       button.type = "button";
@@ -2282,6 +2299,7 @@ export class AppShell {
     }
     this.narrativeCodex.render({
       floor: snapshot.floor,
+      discoveredMonsterIds: snapshot.profile.discoveredMonsterIds,
       seenBeatIds: progress.seenBeatIds,
       seenMomentIds: progress.seenMomentIds,
       discoveredEvidenceIds: progress.discoveredEvidenceIds,
@@ -2295,9 +2313,13 @@ export class AppShell {
     const latestBeat = progress.latestBeat ?? narrativeFloorFor(snapshot.floor).beats[0];
     const latestRecord = progress.latestMoment ?? latestBeat;
     requiredElement(this.root, "#story-thread-title").textContent =
-      latestRecord?.title ?? "记录尚未恢复";
+      latestRecord
+        ? redactSnapshotMonsterIdentity(latestRecord.title, snapshot)
+        : "记录尚未恢复";
     requiredElement(this.root, "#story-thread-line").textContent =
-      latestRecord?.lines[0] ?? "继续探索，寻找这一层留下的记录。";
+      latestRecord?.lines[0]
+        ? redactSnapshotMonsterIdentity(latestRecord.lines[0], snapshot)
+        : "继续探索，寻找这一层留下的记录。";
 
     if (
       shouldDismissTransientCard(
@@ -2314,7 +2336,7 @@ export class AppShell {
     const nextMoment = this.narrativeMomentQueue.takeNext();
     if (nextMoment) {
       if (progress.latestBeat) this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeMomentCard(nextMoment, snapshot.totalMoves);
+      this.showNarrativeMomentCard(nextMoment, snapshot);
       return;
     }
 
@@ -2323,7 +2345,7 @@ export class AppShell {
       progress.latestBeat.id !== this.lastNarrativeBeatId
     ) {
       this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeBeatCard(progress.latestBeat, snapshot.totalMoves);
+      this.showNarrativeBeatCard(progress.latestBeat, snapshot);
     }
   }
 
@@ -2348,7 +2370,7 @@ export class AppShell {
     );
   }
 
-  private showNarrativeBeatCard(beat: NarrativeBeat, totalMoves: number): void {
+  private showNarrativeBeatCard(beat: NarrativeBeat, snapshot: GameSnapshot): void {
     const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
     const kindLabel: Readonly<Record<NarrativeBeat["kind"], string>> = {
       "floor-entry": "LOST NAME / 入层",
@@ -2358,37 +2380,39 @@ export class AppShell {
       "floor-end": "ASCENT / 层末",
     };
     requiredElement(card, "#narrative-beat-kind").textContent = kindLabel[beat.kind];
-    requiredElement(card, "#narrative-beat-title").textContent = beat.title;
+    requiredElement(card, "#narrative-beat-title").textContent =
+      redactSnapshotMonsterIdentity(beat.title, snapshot);
     const lines = requiredElement(card, "#narrative-beat-lines");
     lines.replaceChildren(...beat.lines.map((line) => {
       const paragraph = document.createElement("p");
-      paragraph.textContent = line;
+      paragraph.textContent = redactSnapshotMonsterIdentity(line, snapshot);
       return paragraph;
     }));
-    this.narrativeBeatShownAtMove = totalMoves;
+    this.narrativeBeatShownAtMove = snapshot.totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
   }
 
   private showNarrativeMomentCard(
     moment: FloorStoryMoment,
-    totalMoves: number,
+    snapshot: GameSnapshot,
   ): void {
     this.executeStoryMomentActions(moment);
     if (narrativeMomentUsesRecordOverlay(moment.kind, moment.query !== null)) {
-      this.openStoryMoment(moment);
+      this.openStoryMoment(moment, snapshot);
       return;
     }
     const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
     requiredElement(card, "#narrative-beat-kind").textContent = moment.kicker;
-    requiredElement(card, "#narrative-beat-title").textContent = moment.title;
+    requiredElement(card, "#narrative-beat-title").textContent =
+      redactSnapshotMonsterIdentity(moment.title, snapshot);
     const lines = requiredElement(card, "#narrative-beat-lines");
     lines.replaceChildren(...moment.lines.map((line) => {
       const paragraph = document.createElement("p");
-      paragraph.textContent = line;
+      paragraph.textContent = redactSnapshotMonsterIdentity(line, snapshot);
       return paragraph;
     }));
-    this.narrativeBeatShownAtMove = totalMoves;
+    this.narrativeBeatShownAtMove = snapshot.totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
   }
@@ -2431,7 +2455,9 @@ export class AppShell {
   }
 
   private openInspection(message: string): void {
-    const copy = inspectionDialogCopy(message);
+    const copy = inspectionDialogCopy(
+      redactSnapshotMonsterIdentity(message, this.lastSnapshot),
+    );
     this.openRecordOverlay({
       kicker: "FIELD NOTE / 现场记录",
       title: copy.title,
@@ -2441,11 +2467,14 @@ export class AppShell {
     });
   }
 
-  private openStoryMoment(moment: FloorStoryMoment): void {
+  private openStoryMoment(
+    moment: FloorStoryMoment,
+    snapshot: GameSnapshot,
+  ): void {
     this.openRecordOverlay({
       kicker: moment.kicker,
-      title: moment.title,
-      body: storyMomentRecordBody(moment),
+      title: redactSnapshotMonsterIdentity(moment.title, snapshot),
+      body: redactSnapshotMonsterIdentity(storyMomentRecordBody(moment), snapshot),
       closeLabel: "E · 继续探索",
       kind: "story",
     });
@@ -3829,13 +3858,13 @@ export class AppShell {
     disclosure: QueryResultDisclosure = "shape-only",
   ): void {
     const snapshot = this.session.snapshot();
-    const visibleResult = disclosure === "safe-values"
-      ? redactUndiscoveredQueryIdentities(
+    const visibleResult = disclosure === "shape-only"
+      ? result
+      : redactUndiscoveredQueryIdentities(
           result,
           snapshot.monsters,
           snapshot.profile.discoveredMonsterIds,
-        )
-      : result;
+        );
     resultRoot.replaceChildren();
     resultRoot.className = "table-wrap";
     if (disclosure === "shape-only") {

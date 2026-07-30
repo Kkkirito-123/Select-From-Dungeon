@@ -281,7 +281,7 @@ export function optionalRecoveryProbability(
 ): number {
   if (role === "mini-elite") return 0.05;
   if (role === "area-boss") return 0.1;
-  if (role === "floor-boss") return 0;
+  if (role === "curriculum" || role === "floor-boss") return 0;
   return 0.02;
 }
 

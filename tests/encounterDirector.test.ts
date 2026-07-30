@@ -6,7 +6,12 @@ import {
   POST_BATTLE_SAFE_STEPS,
   advanceEncounterMeter,
   recordSafeZoneMovement,
+  suppressThirdConsecutiveEncounter,
 } from "../src/domain/encounterDirector";
+
+function candidates(...monsterIds: number[]) {
+  return monsterIds.map((monsterId) => ({ monsterId, weight: 1 }));
+}
 
 describe("seeded ambush meter", () => {
   it("基础遭遇率为 2%，开局 5 步安全且第 30 个可遭遇步强制触发", () => {
@@ -22,12 +27,12 @@ describe("seeded ambush meter", () => {
     };
     let targetId: number | null = null;
     for (let step = 0; step < INITIAL_SAFE_STEPS; step += 1) {
-      const advance = advanceEncounterMeter(meter, "safe-seed", [111]);
+      const advance = advanceEncounterMeter(meter, "safe-seed", candidates(111));
       meter = advance.meter;
       expect(advance.targetId).toBeNull();
     }
     for (let step = 0; step < AMBUSH_GUARANTEE_AT; step += 1) {
-      const advance = advanceEncounterMeter(meter, "safe-seed", [111]);
+      const advance = advanceEncounterMeter(meter, "safe-seed", candidates(111));
       meter = advance.meter;
       if (advance.targetId !== null) {
         targetId = advance.targetId;
@@ -46,7 +51,7 @@ describe("seeded ambush meter", () => {
         safeStepsRemaining: 0,
       },
       "guaranteed-ambush",
-      [301, 101, 201],
+      candidates(301, 101, 201),
     );
 
     expect(advance.targetId).not.toBeNull();
@@ -64,12 +69,12 @@ describe("seeded ambush meter", () => {
       stepsSinceEncounter: 10,
       safeStepsRemaining: 0,
     };
-    expect(advanceEncounterMeter(beforeHit, "chance-3", [201]).targetId).toBeNull();
+    expect(advanceEncounterMeter(beforeHit, "chance-3", candidates(201)).targetId).toBeNull();
 
     const hit = advanceEncounterMeter(
       { ...beforeHit, totalMoves: 17 },
       "chance-3",
-      [201],
+      candidates(201),
     );
     expect(hit).toEqual({
       meter: {
@@ -83,10 +88,28 @@ describe("seeded ambush meter", () => {
 
   it("同一 Seed、移动计数和候选牌得到相同结果，且没有候选时不触发", () => {
     const meter = { totalMoves: 42, stepsSinceEncounter: 13, safeStepsRemaining: 0 };
-    expect(advanceEncounterMeter(meter, "repeatable", [311, 111, 211])).toEqual(
-      advanceEncounterMeter(meter, "repeatable", [211, 311, 111]),
+    expect(advanceEncounterMeter(meter, "repeatable", candidates(311, 111, 211))).toEqual(
+      advanceEncounterMeter(meter, "repeatable", candidates(211, 311, 111)),
     );
     expect(advanceEncounterMeter(meter, "repeatable", []).targetId).toBeNull();
+  });
+
+  it("连续两场相同 ID 时排除第三场；没有替代目标时回退原池", () => {
+    expect(suppressThirdConsecutiveEncounter(
+      [
+        { monsterId: 17, weight: 93 },
+        { monsterId: 18, weight: 7 },
+      ],
+      [18, 18],
+    )).toEqual([{ monsterId: 17, weight: 93 }]);
+    expect(suppressThirdConsecutiveEncounter(
+      [{ monsterId: 18, weight: 7 }],
+      [18, 18],
+    )).toEqual([{ monsterId: 18, weight: 7 }]);
+    expect(suppressThirdConsecutiveEncounter(
+      candidates(17, 18),
+      [18, 17],
+    )).toEqual(candidates(17, 18));
   });
 
   it("安全区移动只累计成功移动总数，不消耗安全步也不推进保底计数", () => {
