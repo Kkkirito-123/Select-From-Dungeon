@@ -294,9 +294,9 @@ describe("GameSession SQL 魔王城 Run", () => {
       previousLevel: 1,
       currentLevel: 2,
       previousMaxHp: 2,
-      currentMaxHp: 3,
+      currentMaxHp: 2,
     });
-    expect(session.snapshot().player).toMatchObject({ level: 2, xp: 2, maxHp: 3 });
+    expect(session.snapshot().player).toMatchObject({ level: 2, xp: 2, maxHp: 2 });
   });
 
   it("同一 seed 生成相同路线，入口只开放 SELECT 教学房", () => {

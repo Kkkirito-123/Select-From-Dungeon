@@ -201,7 +201,7 @@ export const INITIAL_MONSTERS: readonly Monster[] = [
     hp: 24,
     maxHp: 24,
     armor: 0,
-    damage: 1,
+    damage: 2,
     attackName: "档案封存",
     status: "registering",
     weakness: "having",

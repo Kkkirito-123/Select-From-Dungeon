@@ -63,7 +63,7 @@ describe("课程文案", () => {
       ...LESSONS.flatMap((lesson) => lesson.stages),
       ...BIOME_ENCOUNTERS.flatMap((encounter) => encounter.stages),
     ];
-    expect(stages).toHaveLength(118);
+    expect(stages).toHaveLength(121);
     stages.forEach((stage) => {
       expect(stage.answerSql).toMatch(/^(?:SELECT|WITH|INSERT|UPDATE|DELETE|BEGIN)\b/i);
       expect(stage.answerSql.endsWith(";")).toBe(true);
@@ -81,7 +81,7 @@ describe("课程文案", () => {
       3: "毒史莱姆",
       8: "灰史莱姆",
       4: "铁史莱姆",
-      9: "铁泥怪",
+      9: "宝箱怪",
       5: "登记官",
       10: "猎犬",
       15: "水怪",

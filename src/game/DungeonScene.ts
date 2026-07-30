@@ -21,6 +21,10 @@ import {
   floorOneAreaAt,
   floorOneCurrentSightCellKeys,
 } from "../domain/floorOneLabyrinth";
+import {
+  floorOneChestKind,
+  isFloorOneChestItem,
+} from "../domain/floorOneTreasure";
 import { biomeRegionAt } from "../domain/biome";
 import { GameSession } from "../domain/GameSession";
 import type {
@@ -1323,8 +1327,8 @@ export class DungeonScene extends Phaser.Scene {
       const hub = this.add.circle(0, 0, 4, 0xc75850, 1)
         .setStrokeStyle(1, 0xf1d28b, 0.9);
       rotor.add([horizontal, vertical, hub]);
-      const label = this.add.text(0, -24, "危险 · 直接扣血", {
-        color: "#ff978e",
+      const label = this.add.text(0, -24, "档案切纸轮", {
+        color: "#f1d28b",
         fontFamily: "monospace",
         fontSize: "7px",
         backgroundColor: "#08090cdd",
@@ -1588,7 +1592,7 @@ export class DungeonScene extends Phaser.Scene {
         this.tweens.killTweensOf(view.rotor);
         view.rotor.setAngle(45);
       }
-      view.label.setText(triggered ? "已停转" : "危险 · 直接扣血");
+      view.label.setText(triggered ? "已停转" : "档案切纸轮");
       view.label.setVisible(
         visible && isNearPlayer(this.snapshot.player, hazard, INTERACTION_LABEL_DISTANCE),
       );
@@ -1720,7 +1724,9 @@ export class DungeonScene extends Phaser.Scene {
         const sourceRoom = this.snapshot.roomGraph.nodes.find(
           (room) => room.id === item.sourceRoomId,
         );
+        const floorOneChest = isFloorOneChestItem(item) ? floorOneChestKind(item.id) : null;
         const isChest = item.collection === "interact" && (
+          floorOneChest !== null ||
           item.id.startsWith("lesson-drop:") ||
           (item.id.startsWith("room-reward:") && Boolean(sourceRoom?.lessonId)) ||
           item.id.startsWith("guided-cache:") ||
@@ -1731,14 +1737,37 @@ export class DungeonScene extends Phaser.Scene {
         if (isPortal) {
           parts.push(...this.createRouteTransitParts(routeTransit, true));
         } else if (isChest) {
-          parts.push(
-            this.add.rectangle(0, 3, 24, 14, 0x8f6338)
-              .setStrokeStyle(2, COLORS.gold),
-            this.add.rectangle(0, -6, 24, 8, 0xb88745)
-              .setStrokeStyle(2, COLORS.paper),
-            this.add.rectangle(0, 1, 5, 7, COLORS.gold)
-              .setStrokeStyle(1, COLORS.paper),
-          );
+          if (floorOneChest === "mimic") {
+            parts.push(
+              this.add.rectangle(0, 3, 26, 15, 0x5f463c)
+                .setStrokeStyle(2, COLORS.plum),
+              this.add.rectangle(0, -6, 26, 8, 0x9a694c)
+                .setStrokeStyle(2, COLORS.paper),
+              this.add.rectangle(-6, -1, 3, 3, COLORS.paper),
+              this.add.rectangle(6, -1, 3, 3, COLORS.paper),
+              this.add.triangle(0, 7, -7, 0, 7, 0, 0, 7, COLORS.ember),
+            );
+          } else if (floorOneChest === "warp") {
+            parts.push(
+              this.add.ellipse(0, 8, 30, 10, 0x2d6070, 0.64)
+                .setStrokeStyle(2, COLORS.query),
+              this.add.rectangle(0, 2, 24, 12, 0x7d5b43)
+                .setStrokeStyle(2, COLORS.gold),
+              this.add.rectangle(0, -6, 24, 7, 0xb88745)
+                .setStrokeStyle(2, COLORS.paper),
+              this.add.rectangle(0, 1, 5, 6, COLORS.query)
+                .setStrokeStyle(1, COLORS.paper),
+            );
+          } else {
+            parts.push(
+              this.add.rectangle(0, 3, 24, 14, 0x8f6338)
+                .setStrokeStyle(2, COLORS.gold),
+              this.add.rectangle(0, -6, 24, 8, 0xb88745)
+                .setStrokeStyle(2, COLORS.paper),
+              this.add.rectangle(0, 1, 5, 7, COLORS.gold)
+                .setStrokeStyle(1, COLORS.paper),
+            );
+          }
         } else {
           const color = item.kind === "weapon"
             ? COLORS.gold
@@ -1760,7 +1789,7 @@ export class DungeonScene extends Phaser.Scene {
           isPortal
             ? `E · ${regionTransitLabel}`
             : isChest
-              ? "E · 战利品宝箱"
+              ? `E · ${item.name}`
               : item.name,
           {
             color: "#f1d28b",

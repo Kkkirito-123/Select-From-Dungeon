@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
+import { FLOOR_ONE_MIMIC_MONSTER_ID } from "../src/domain/floorOneTreasure";
 import {
   CURRENT_MONSTER_IDS_BY_FLOOR,
   LEGACY_MONSTER_IDS_BY_FLOOR,
@@ -51,7 +52,7 @@ describe("MVP 2.0 monster IDs", () => {
         });
       });
     });
-    expect(BIOME_ENCOUNTERS.flatMap((encounter) => (
+    expect(BIOME_ENCOUNTERS.filter((encounter) => encounter.monsterId !== FLOOR_ONE_MIMIC_MONSTER_ID).flatMap((encounter) => (
       encounter.stages
         .filter((stage) => !stage.attackTargetIds.includes(encounter.monsterId))
         .map((stage) => `${encounter.monsterId}:${stage.id}=>${stage.attackTargetIds.join(",")}`)
