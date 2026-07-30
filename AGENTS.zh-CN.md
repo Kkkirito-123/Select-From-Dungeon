@@ -314,7 +314,7 @@ python3 scripts/validate-rules.py
   唤醒。未变化的重型 HUD 列表会复用，不在每个快照上重复创建 DOM。
 - 生产构建将 Phaser、`sql.js` 与 SQLite WASM 保持为独立可缓存资源；`sqlite-runtime` 不得重新
   合入应用入口，WASM 继续作为外部文件获取，不允许内联。
-- `.github/workflows/deploy-pages.yml` 只在 `GITHUB_PAGES_ENABLED=true` 时受验部署 `dist`。
+- `.github/workflows/deploy-pages.yml` 只在 `PAGES_ENABLED=true` 时受验部署 `dist`。
   如果私有仓库套餐拒绝 Pages，保持仓库私有和变量 false/未设置，记录 `provider-blocked`；无新授权不购买、公开或换托管商。
   当前拆包保持为 MVP 2.0 基线，包体/运行时优化延后到独立 MVP 2.1。
 - 像素角色、地砖、房间装饰、音乐与音效均由项目代码生成。增加第三方图片、字体、音频或复制
