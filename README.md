@@ -41,6 +41,18 @@ complete SQLite query, and turn the correct result into an animated attack.
   gates; defeating the middle area Boss automatically transfers the player
   into the rear main path. Floor one stays continuous and uses water-state
   changes plus its guaranteed physical shortcut instead of generic portals.
+- Every floor now resolves its own labyrinth contract instead of inheriting a
+  first-floor maze rule. The first step from an authored safe room opens a
+  floor-named `E` confirmation; the player can decline or return by the same
+  route. Entry/rest safe rooms and the two campfire rings reveal their full safe
+  area and reject ambushes, patrols, curriculum monsters, area Bosses, and
+  traps. Beyond them, actors and traps are visible only inside that floor's
+  local sight radius. Each Seed places a small, floor-specific set of physical
+  one-use traps outside rooms, gates, landmarks, travel points, and safe cells;
+  contact applies its armor-first damage without opening SQL combat, then leaves
+  the trap visibly inert. Floors two through eight also enforce the living
+  middle area Boss as a real rear-region movement boundary, not just portal
+  copy.
 - The same seed deterministically rebuilds course-route beacons, two
   middle/rear campfires, the entrance safe anchor, dead-end caches, and one
   two-way shortcut.
@@ -323,9 +335,10 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ CampaignDomain ── ordered eight-floor slots and transition invariants
   ├─ RunGraph ── curriculum dependencies and point-of-interest gates
   ├─ FloorMapBlueprints ── eight authored macro layouts and transit identities
+  ├─ FloorLabyrinthContent/Domain ── F1-F8 thresholds, safe areas, sight, hazards
   ├─ MazeGenerator/MazeFloor ── seeded 48x36 generator-v5 physical map
   ├─ MazeValidation ── topology, reachability, and save invariants
-  ├─ CampfireDomain ── seeded checkpoints and shared visible safe-cell masks
+  ├─ CampfireDomain ── two seeded fires, entrance checkpoint, visible safe masks
   ├─ GuidedMap ── route beacons, dead-end caches, guaranteed key, shortcut
   ├─ BiomeDomain ── derived regions, static features, safe area-Boss anchors
   ├─ EncounterDirector ── deterministic safe windows and step-based ambushes
@@ -362,6 +375,11 @@ fixed maze, curriculum graph, and campfires, so decoration density cannot move
 courses, keys, or shortcuts. Actors and fixed curriculum room chests derive from
 course anchors, while biome loot uses independent stable hashes. The biome plan
 is rebuilt from maze, campfires, guided map, and seed instead of being stored.
+The eight-floor labyrinth content similarly stores only stable intent; its safe
+cells, current sight, and hazard coordinates are resolved from the existing
+maze and Seed. Triggered traps reuse `openedGateIds`, and threshold confirmation
+is restored from position, discovered cells, and visited rooms, so this feature
+adds no save field and keeps the Run format at `v11`.
 An independent content-version field is still outside this MVP.
 
 On floors one through five and seven through eight, the terminal accepts one
@@ -411,6 +429,18 @@ python3 scripts/validate-rules.py
 The build also copies the authoritative root `LICENSE` and `ATTRIBUTIONS.md`
 into `dist/`; do not maintain separate hand-written copies. Deploy that directory
 to a static host that serves WASM with the correct MIME type.
+
+The current eight-floor labyrinth pass has automated evidence plus targeted browser QA.
+Content tests cross-check all eight contracts against map blueprints, curriculum
+Boss gates, authored landmarks, shortcuts, and hidden rooms. Physical acceptance
+then covers F1-F8 across six Seeds each: ordered required anchors, unskippable
+floor and area-Boss boundaries, reachable shortcut keys and hidden entrances,
+safe zones without curriculum monsters/area Bosses/traps, distinct floor
+topologies, and Seed-dependent non-critical variation. Browser QA additionally
+previewed F2, F4, and F8, dismissed their story cards, confirmed distinct floor and
+hazard silhouettes, and found no console warnings or errors. Every threshold dialog,
+live patrol disappearance outside sight, Reduced Motion, and a complete eight-floor
+Run still require a longer human pass; automated rules and a successful build do not replace it.
 
 Fresh browser evidence is intentionally narrower than the feature list. This
 revision verified the first-floor challenge prompt, safe exit, one-heart failure,

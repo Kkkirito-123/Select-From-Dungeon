@@ -37,6 +37,7 @@ import {
   floorExperience,
   hasFloorExperience,
 } from "../content/floorExperience";
+import { floorLabyrinth } from "../content/floorLabyrinth";
 import {
   cloneMazeFloor,
   generateMazeFloor,
@@ -76,12 +77,13 @@ import {
   safeZoneCellKeys,
 } from "./campfire";
 import {
-  crossesIntoFloorOneLabyrinth,
-  floorOneAreaAt,
-  floorOneSafeAreaCellKeys,
-  generateFloorOneHazards,
+  crossesIntoFloorLabyrinth,
+  floorLabyrinthAreaAt,
+  floorSafeAreaCellKeysAt,
+  generateFloorHazards,
+  hasDiscoveredLabyrinthCell,
   type FloorHazard,
-} from "./floorOneLabyrinth";
+} from "./floorLabyrinth";
 import {
   FLOOR_ONE_MIMIC_MONSTER_ID,
   floorOneChestKind,
@@ -111,6 +113,7 @@ import {
 } from "./guidedMap";
 import { rollLootItems } from "./lootDirector";
 import {
+  biomeGuardianIdForStep,
   biomeRegionAt,
   cloneBiomePlan,
   generateBiomePlan,
@@ -576,7 +579,7 @@ export class GameSession {
   private adminIdentityMonsterIds = new Set<number>();
   private regionTransferSequence = 0;
   private regionTransfer: GameSnapshot["regionTransfer"] = null;
-  private floorOneLabyrinthEntryConfirmed = false;
+  private labyrinthEntryConfirmed = false;
   private profile: ProfileProgress;
   private readonly listeners = new Set<SessionListener>();
 
@@ -726,8 +729,19 @@ export class GameSession {
       this.reviewBattleId = savedRun.reviewBattleId;
       this.banner = restoredWorldBanner(savedRun.banner);
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
-      this.floorOneLabyrinthEntryConfirmed = this.floorNumber !== 1 ||
-        floorOneAreaAt(this.mazeFloor, this.player) === "labyrinth" ||
+      this.labyrinthEntryConfirmed =
+        floorLabyrinthAreaAt(
+          this.floorNumber,
+          this.mazeFloor,
+          this.campfires,
+          this.player,
+        ) === "labyrinth" ||
+        hasDiscoveredLabyrinthCell(
+          this.floorNumber,
+          this.mazeFloor,
+          this.campfires,
+          this.discoveredCells,
+        ) ||
         this.visitedRoomIds.size > 1;
       this.revealAt(this.player);
     }
@@ -1010,12 +1024,18 @@ export class GameSession {
     }
 
     if (
-      this.floorNumber === 1 &&
       !this.adminMode &&
-      !this.floorOneLabyrinthEntryConfirmed &&
-      crossesIntoFloorOneLabyrinth(this.mazeFloor, from, to)
+      !this.labyrinthEntryConfirmed &&
+      crossesIntoFloorLabyrinth(
+        this.floorNumber,
+        this.mazeFloor,
+        this.campfires,
+        from,
+        to,
+      )
     ) {
-      const message = "失名迷宫内视野会缩小，怪物与档案切纸轮只在其中活动。进入后仍可原路返回安全区。";
+      const contract = floorLabyrinth(this.floorNumber);
+      const message = `${contract.entryPrompt} 迷宫中会出现「${contract.hazardName}」，进入后仍可原路返回安全区。`;
       this.banner = message;
       this.emit();
       return this.moveFailure(from, to, "threshold", message);
@@ -1077,7 +1097,8 @@ export class GameSession {
       const damageMessage = damage.armorDamage > 0
         ? `护甲吸收 ${damage.armorDamage} 点${damage.playerDamage > 0 ? `，生命损失 ${damage.playerDamage} 点` : ""}`
         : `生命损失 ${damage.playerDamage} 点`;
-      this.banner = `${hazard.name}突然旋转：${damageMessage}。这类机关不会进入 SQL 战斗。`;
+      const trigger = floorLabyrinth(this.floorNumber).hazardTrigger;
+      this.banner = `${hazard.name}${trigger}：${damageMessage}。这类机关不会进入 SQL 战斗。`;
       if (this.player.hp <= 0) this.enterDefeat("hazard");
     }
     const encounterId = this.mode === "explore" && hazardResolution === null
@@ -1106,10 +1127,15 @@ export class GameSession {
     };
   }
 
-  confirmFloorOneLabyrinthEntry(): boolean {
-    if (this.floorNumber !== 1 || this.mode !== "explore") return false;
-    this.floorOneLabyrinthEntryConfirmed = true;
+  confirmLabyrinthEntry(): boolean {
+    if (this.mode !== "explore") return false;
+    this.labyrinthEntryConfirmed = true;
     return true;
+  }
+
+  /** @deprecated Kept for the shipped F1 UI/test contract. */
+  confirmFloorOneLabyrinthEntry(): boolean {
+    return this.confirmLabyrinthEntry();
   }
 
   setPlayerPosition(x: number, y: number): boolean {
@@ -1405,6 +1431,15 @@ export class GameSession {
         return { ok: true, kind: "shortcut", message: this.banner };
       }
       const destination = shortcutDestination(shortcut, side);
+      const regionGuardianMessage = this.regionGuardianAccessMessage(
+        this.player,
+        destination,
+      );
+      if (regionGuardianMessage) {
+        return this.interactionFailure(
+          `${shortcut.name}的远端仍被区域首领封锁。${regionGuardianMessage}`,
+        );
+      }
       this.player.x = destination.x;
       this.player.y = destination.y;
       this.revealAt(destination);
@@ -2199,7 +2234,7 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.regionTransfer = null;
-    this.floorOneLabyrinthEntryConfirmed = false;
+    this.labyrinthEntryConfirmed = false;
     const floorNames: Record<FloorNumber, string> = {
       1: "余烬地窖",
       2: "潮汐群岛",
@@ -2292,7 +2327,7 @@ export class GameSession {
     this.battleSequence = 0;
     this.reviewBattleId = null;
     this.regionTransfer = null;
-    this.floorOneLabyrinthEntryConfirmed = false;
+    this.labyrinthEntryConfirmed = false;
     this.banner = "新迷宫已生成。沿青色箭头触碰 ID #001 开始 SELECT；永久怪物图鉴保持不变。";
     this.revealAt(this.player);
     this.emit();
@@ -2956,7 +2991,7 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.regionTransfer = null;
-    this.floorOneLabyrinthEntryConfirmed = floor !== 1;
+    this.labyrinthEntryConfirmed = true;
     this.revealAt(this.player);
     this.banner = `管理员预览：第 ${floor} 层全图已载入。刷新页面可回到最后一次正式存档。`;
     this.emit();
@@ -3904,24 +3939,10 @@ export class GameSession {
     from: Position,
     to: Position,
   ): string | null {
-    if (!regionPortalsEnabledForFloor(this.floorNumber)) return null;
-    const rearPortal = this.biomePlan.portals.find(
-      (portal) => portal.id === `biome-portal:${this.floorNumber}:middle-rear`,
-    );
-    if (rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined) {
-      return null;
-    }
-    const fromRegion = biomeRegionAt(this.biomePlan, from);
-    const toRegion = biomeRegionAt(this.biomePlan, to);
-    if (
-      fromRegion.id === toRegion.id ||
-      toRegion.id !== rearPortal.toRegionId ||
-      fromRegion.id === rearPortal.toRegionId
-    ) {
-      return null;
-    }
+    const guardianId = biomeGuardianIdForStep(this.biomePlan, from, to);
+    if (guardianId === null) return null;
     const guardian = this.monsters.find(
-      (monster) => monster.id === rearPortal.requiredBossId && monster.hp > 0,
+      (monster) => monster.id === guardianId && monster.hp > 0,
     );
     if (!guardian) return null;
     const transit = floorTransitPresentation(
@@ -3973,25 +3994,38 @@ export class GameSession {
   }
 
   private revealAt(position: Position): void {
-    const floorOneArea = this.floorNumber === 1
-      ? floorOneAreaAt(this.mazeFloor, position)
-      : "labyrinth";
-    if (floorOneArea !== "labyrinth") {
-      floorOneSafeAreaCellKeys(this.mazeFloor, floorOneArea).forEach(
+    if (
+      floorLabyrinthAreaAt(
+        this.floorNumber,
+        this.mazeFloor,
+        this.campfires,
+        position,
+      ) === "safe"
+    ) {
+      floorSafeAreaCellKeysAt(
+        this.floorNumber,
+        this.mazeFloor,
+        this.campfires,
+        position,
+      ).forEach(
         (cell) => this.discoveredCells.add(cell),
       );
       return;
     }
-    const radius = this.floorNumber === 1 ? 4 : 5;
+    const radius = floorLabyrinth(this.floorNumber).sightRadius + 1;
     revealAround(this.mazeFloor, position, radius).forEach(
       (cell) => this.discoveredCells.add(cell),
     );
   }
 
   private floorHazards(): FloorHazard[] {
-    return this.floorNumber === 1
-      ? generateFloorOneHazards(this.mazeFloor, this.campfires, this.guidedMap)
-      : [];
+    return generateFloorHazards(
+      this.floorNumber,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+      this.biomePlan,
+    );
   }
 
   private campfirePhaseName(campfire: Campfire): string {

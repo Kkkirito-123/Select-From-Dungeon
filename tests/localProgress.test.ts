@@ -400,6 +400,25 @@ describe("localProgress", () => {
     expect(new GameSession(loaded).snapshot().guidedMap.deadEndCaches).toContainEqual(cache);
   });
 
+  it("v11 只接受当前楼层与 Seed 实际生成的陷阱触发标记", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "floor-hazard-roundtrip");
+    session.enableAdminMode();
+    expect(session.adminLoadFloor(8).ok).toBe(true);
+    const hazard = session.snapshot().hazards[0];
+    if (!hazard) throw new Error("第八层测试迷宫缺少实体陷阱");
+    const saved = session.toSavedRun();
+    saved.openedGateIds.push(hazard.id);
+
+    expect(isSavedRun(saved)).toBe(true);
+    saveRun(storage, saved);
+    expect(loadRun(storage)?.openedGateIds).toContain(hazard.id);
+
+    const forged = structuredClone(saved);
+    forged.openedGateIds[forged.openedGateIds.length - 1] = "hazard:f8:999";
+    expect(isSavedRun(forged)).toBe(false);
+  });
+
   it("恢复旧存档时使用当前内容中的简短怪物名", () => {
     const saved = freshRun("canonical-monster-names");
     const slime = saved.monsters.find((monster) => monster.id === 1);

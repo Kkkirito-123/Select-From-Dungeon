@@ -14,6 +14,8 @@ import {
   floorExperience,
   hasFloorExperience,
 } from "../content/floorExperience";
+import { floorLabyrinth } from "../content/floorLabyrinth";
+import { floorCurrentSightCellKeys } from "../domain/floorLabyrinth";
 import type { OnboardingMilestone } from "../content/onboarding";
 import {
   INITIAL_MONSTERS,
@@ -481,9 +483,10 @@ export class AppShell {
       typeof detail.dy !== "number"
     ) return;
     this.pendingLabyrinthMove = { x: detail.dx, y: detail.dy };
+    const contract = floorLabyrinth(this.lastSnapshot.floor);
     this.openRecordOverlay({
       kicker: "THRESHOLD / 安全区边界",
-      title: "是否进入失名迷宫？",
+      title: `是否进入${contract.mazeName}？`,
       body: detail.message ?? "迷宫内视野降低，怪物和伤害机关会开始活动。",
       closeLabel: "ESC · 暂不进入",
       kind: "labyrinth",
@@ -662,6 +665,7 @@ export class AppShell {
     const markers = this.root.querySelectorAll<SVGRectElement>(
       "#castle-map .minimap-monster[data-monster-id]",
     );
+    const currentSight = this.minimapCurrentSight(this.lastSnapshot);
     moves.forEach((move) => {
       const marker = Array.from(markers).find(
         (entry) => entry.dataset.monsterId === String(move.monsterId),
@@ -671,7 +675,7 @@ export class AppShell {
       marker.setAttribute("y", String(move.to.y + 0.12));
       marker.setAttribute(
         "visibility",
-        this.lastSnapshot.discoveredCells.includes(`${move.to.x}:${move.to.y}`)
+        currentSight.has(`${move.to.x}:${move.to.y}`)
           ? "visible"
           : "hidden",
       );
@@ -2488,7 +2492,7 @@ export class AppShell {
   private confirmLabyrinthEntry(): void {
     const direction = this.pendingLabyrinthMove;
     if (!direction) return;
-    if (!this.session.confirmFloorOneLabyrinthEntry()) {
+    if (!this.session.confirmLabyrinthEntry()) {
       this.closeInspection();
       return;
     }
@@ -3595,6 +3599,7 @@ export class AppShell {
     root.replaceChildren();
     const floor = snapshot.mazeFloor;
     const discovered = new Set(snapshot.discoveredCells);
+    const currentSight = this.minimapCurrentSight(snapshot);
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("viewBox", `0 0 ${floor.width} ${floor.height}`);
     svg.setAttribute("role", "img");
@@ -3708,7 +3713,7 @@ export class AppShell {
       marker.setAttribute("height", "0.76");
       marker.setAttribute(
         "visibility",
-        discovered.has(`${actor.x}:${actor.y}`) ? "visible" : "hidden",
+        currentSight.has(`${actor.x}:${actor.y}`) ? "visible" : "hidden",
       );
       svg.append(marker);
     });
@@ -3770,6 +3775,17 @@ export class AppShell {
     player.setAttribute("r", "0.62");
     svg.append(player);
     root.append(svg);
+  }
+
+  private minimapCurrentSight(snapshot: GameSnapshot): Set<string> {
+    return snapshot.adminMode
+      ? new Set(snapshot.discoveredCells)
+      : floorCurrentSightCellKeys(
+          snapshot.floor,
+          snapshot.mazeFloor,
+          snapshot.campfires,
+          snapshot.player,
+        );
   }
 
   private renderMastery(snapshot: GameSnapshot): void {

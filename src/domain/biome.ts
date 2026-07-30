@@ -2,7 +2,10 @@ import {
   BIOME_ENCOUNTERS,
   type BiomeKind,
 } from "../content/biomeContent";
-import { floorMapBlueprint } from "../content/floorMapBlueprints";
+import {
+  floorMapBlueprint,
+  regionPortalsEnabledForFloor,
+} from "../content/floorMapBlueprints";
 import type { Campfire, Position } from "./types";
 import type { GuidedMapPlan } from "./guidedMap";
 import {
@@ -479,6 +482,37 @@ export function biomeRegionAt(
   position: Position,
 ): BiomeRegion {
   return nearestRegion(plan.regions, position);
+}
+
+/**
+ * Returns the living area guardian that blocks this exact cross-region step.
+ *
+ * The generated maze remains a single walkable graph. This pure rule is the
+ * authoritative boundary shared by runtime movement and reachability tests, so
+ * a middle-area boss cannot be bypassed by walking around its portal artwork.
+ */
+export function biomeGuardianIdForStep(
+  plan: BiomePlan,
+  from: Position,
+  to: Position,
+): number | null {
+  if (!regionPortalsEnabledForFloor(plan.floor)) return null;
+  const rearPortal = plan.portals.find(
+    (portal) => portal.id === `biome-portal:${plan.floor}:middle-rear`,
+  );
+  if (rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined) {
+    return null;
+  }
+  const fromRegion = biomeRegionAt(plan, from);
+  const toRegion = biomeRegionAt(plan, to);
+  if (
+    fromRegion.id === toRegion.id ||
+    toRegion.id !== rearPortal.toRegionId ||
+    fromRegion.id === rearPortal.toRegionId
+  ) {
+    return null;
+  }
+  return rearPortal.requiredBossId;
 }
 
 export function validateBiomePlan(

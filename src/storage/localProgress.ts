@@ -25,6 +25,7 @@ import {
   generateBiomePlan,
   type BiomePlan,
 } from "../domain/biome";
+import { generateFloorHazards } from "../domain/floorLabyrinth";
 import { isFloorOneChestMarker } from "../domain/floorOneTreasure";
 import {
   advanceCampaignProgress,
@@ -1258,6 +1259,15 @@ function isSavedRunVersion(
   const biomePlan = version >= 7 && campfires && guidedMap
     ? generateBiomePlan(graph, mazeFloor, campfires, guidedMap)
     : null;
+  const floorHazardIds = biomePlan && campfires && guidedMap
+    ? new Set(generateFloorHazards(
+        graph.floor,
+        mazeFloor,
+        campfires,
+        guidedMap,
+        biomePlan,
+      ).map((hazard) => hazard.id))
+    : new Set<string>();
   if (
     version >= 7 &&
     guidedMap &&
@@ -1286,6 +1296,7 @@ function isSavedRunVersion(
       hiddenAreaGateIds.includes(id) ||
       guidedMap?.shortcuts.some((shortcut) => shortcut.id === id) ||
       guidedMap?.deadEndCaches.some((cache) => cache.id === id) ||
+      floorHazardIds.has(id) ||
       (run.floor === 1 && isFloorOneChestMarker(id))
     )) ||
     !hasUniqueValues(openedGateIds) ||
