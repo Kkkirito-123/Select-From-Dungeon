@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ vars.GITHUB_PAGES_ENABLED == 'true' }}
+    if: ${{ vars.PAGES_ENABLED == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment:

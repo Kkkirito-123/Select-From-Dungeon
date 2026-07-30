@@ -445,7 +445,7 @@ into `dist/`; do not maintain separate hand-written copies. Deploy that director
 to a static host that serves WASM with the correct MIME type.
 
 GitHub Pages is deliberately opt-in. `.github/workflows/deploy-pages.yml` runs
-only when the repository variable `GITHUB_PAGES_ENABLED=true`; it validates the
+only when the repository variable `PAGES_ENABLED=true`; it validates the
 rules, tests, and production build before publishing `dist`, and keeps Vite
 `base: "./"`. The current repository remains private. If its provider/plan does
 not allow a workflow-backed Pages site, publication is recorded as

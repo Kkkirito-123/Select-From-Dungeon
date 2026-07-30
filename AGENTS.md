@@ -494,7 +494,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   cacheable assets. `sqlite-runtime` must remain outside the application entry;
   the WASM file remains an external fetched asset and is not inlined.
 - `.github/workflows/deploy-pages.yml` is opt-in through
-  `GITHUB_PAGES_ENABLED=true` and must validate rules, tests, and `dist` before
+  `PAGES_ENABLED=true` and must validate rules, tests, and `dist` before
   deployment. If private-repository Pages is rejected by the provider/plan,
   keep the repository private and the variable false/unset, record
   `provider-blocked`, and do not buy, publish, or switch hosts without authority.

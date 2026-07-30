@@ -326,7 +326,7 @@ python3 scripts/validate-rules.py
 提供 WASM MIME 类型的静态托管即可。
 
 GitHub Pages 默认不部署：`.github/workflows/deploy-pages.yml` 只在仓库变量
-`GITHUB_PAGES_ENABLED=true` 时执行，上传 `dist` 前必须通过规则、单测和生产构建，并保持 Vite
+`PAGES_ENABLED=true` 时执行，上传 `dist` 前必须通过规则、单测和生产构建，并保持 Vite
 `base: "./"`。当前仓库保持私有；如果 Provider/套餐不允许 workflow-backed Pages，发布状态记为
 `provider-blocked`，变量保持 false 或未设置，没有单独授权不改公开、不换托管商。
 
