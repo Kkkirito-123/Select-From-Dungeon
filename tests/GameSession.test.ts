@@ -4,6 +4,8 @@ import { ARMORS } from "../src/content/inventoryCatalog";
 import { biomeRegionAt } from "../src/domain/biome";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { safeZoneCellKeys } from "../src/domain/campfire";
+import { advanceCampaignProgress } from "../src/domain/campaign";
+import { migrationStepMarkerIds } from "../src/domain/finalMigration";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
 import { isSavedRun } from "../src/storage/localProgress";
@@ -461,6 +463,42 @@ describe("GameSession SQL 魔王城 Run", () => {
       "story:evidence:lost-name:f1:current-record",
     );
     expect(session.toSavedRun().version).toBe(11);
+  });
+
+  it("MIGRATE 只在第八层 victory 按七步顺序写入兼容 marker", () => {
+    const firstFloor = new GameSession(null, null, "migration-wrong-floor");
+    expect(firstFloor.recordMigrationStep("snapshot")).toBe(false);
+
+    const floorEightRun = freshFloorEightRun("migration-ordered-steps");
+    const exploring = new GameSession(floorEightRun);
+    expect(exploring.recordMigrationStep("snapshot")).toBe(false);
+
+    const completion = advanceCampaignProgress(floorEightRun.campaign);
+    if (!completion.ok || !completion.completed) {
+      throw new Error("第八层测试 Campaign 无法进入 victory");
+    }
+    floorEightRun.mode = "victory";
+    floorEightRun.campaign = completion.progress;
+    const victory = new GameSession(floorEightRun);
+
+    expect(victory.recordMigrationStep("audit")).toBe(false);
+    expect(victory.recordMigrationStep("snapshot")).toBe(true);
+    expect(victory.recordMigrationStep("snapshot")).toBe(false);
+    expect(victory.recordMigrationStep("preserve-history")).toBe(false);
+    expect(victory.snapshot().openedGateIds).toContain(
+      "story:migrate:snapshot",
+    );
+
+    for (const markerId of migrationStepMarkerIds().slice(1)) {
+      const stepId = markerId.replace("story:migrate:", "") as Parameters<
+        GameSession["recordMigrationStep"]
+      >[0];
+      expect(victory.recordMigrationStep(stepId)).toBe(true);
+    }
+    expect(victory.snapshot().openedGateIds.filter((id) =>
+      id.startsWith("story:migrate:")
+    )).toEqual(migrationStepMarkerIds());
+    expect(victory.toSavedRun().version).toBe(11);
   });
 
   it("第一、二层隐藏区域需要完成前置课程并开启实体暗门，发现状态可随 Run 恢复", () => {
@@ -1369,9 +1407,16 @@ describe("GameSession SQL 魔王城 Run", () => {
       "inner-join",
     ]));
     expect(floorTwoLowTide.monsters.find((monster) => monster.id === 21)?.hp).toBe(0);
+    expect(floorTwoLowTide.monsters.find((monster) => monster.id === 22)?.hp)
+      .toBeGreaterThan(0);
     expect(floorTwoLowTide.profile.discoveredMonsterIds).toContain(21);
     expect(floorTwoLowTide.openedGateIds).toContain("shortcut:2:return");
     expect(session.toProfile()).toEqual(formalProfile);
+
+    expect(session.adminApplyPreset("f2-admin-frog-court"))
+      .toMatchObject({ ok: true });
+    expect(session.snapshot().monsters.find((monster) => monster.id === 22)?.hp)
+      .toBe(0);
 
     expect(session.adminLoadFloor(4)).toMatchObject({ ok: true });
     expect(session.adminApplyPreset("f4-admin-echo")).toMatchObject({ ok: true });
@@ -1476,6 +1521,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f5-admin-roster",
         hiddenBundle: "hidden-reward:f5-hidden-silent-roster",
         armorId: "iron-armor",
+        areaPreset: "f5-admin-barracks",
+        areaBossId: 55,
       },
       {
         floor: 6,
@@ -1487,6 +1534,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f6-admin-rookery",
         hiddenBundle: "hidden-reward:f6-hidden-uncommitted-rookery",
         armorId: "dragon-armor",
+        areaPreset: "f6-admin-crystal-cavern",
+        areaBossId: 66,
       },
       {
         floor: 7,
@@ -1498,6 +1547,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f7-admin-garden",
         hiddenBundle: "hidden-reward:f7-hidden-blind-garden",
         armorId: "crystal-armor",
+        areaPreset: "f7-admin-root-cloister",
+        areaBossId: 77,
       },
       {
         floor: 8,
@@ -1509,6 +1560,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f8-admin-chapel",
         hiddenBundle: "hidden-reward:f8-hidden-zero-row-chapel",
         armorId: "royal-armor",
+        areaPreset: "f8-admin-void-court",
+        areaBossId: 89,
       },
     ] as const;
 
@@ -1524,6 +1577,11 @@ describe("GameSession SQL 魔王城 Run", () => {
 
       expect(session.adminApplyPreset(entry.cipherPreset)).toMatchObject({ ok: true });
       expect(session.snapshot().openedGateIds).toContain(entry.cipherGate);
+
+      expect(session.adminApplyPreset(entry.areaPreset)).toMatchObject({ ok: true });
+      expect(session.snapshot().monsters.find(
+        (monster) => monster.id === entry.areaBossId,
+      )?.hp).toBe(0);
 
       expect(session.adminApplyPreset(entry.hiddenPreset)).toMatchObject({ ok: true });
       const reward = session.snapshot().lootBundles.find(

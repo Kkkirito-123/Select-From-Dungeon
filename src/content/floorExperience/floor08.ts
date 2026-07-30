@@ -249,6 +249,20 @@ export const FLOOR_EIGHT_EXPERIENCE: FloorExperienceDefinition = {
       completionFact: "story:f8:chapel",
     },
     {
+      id: "f8-story-void-court-open",
+      title: "王兽封锁解除",
+      trigger: "monster:89:defeated",
+      repeat: "once",
+      priority: 95,
+      actions: [
+        { type: "camera-focus", landmarkId: "f8-incident-wings" },
+        { type: "world-effect", effect: "f8-void-court-open" },
+        { type: "banner", text: "王兽封锁解除 · 迁移王座轴开放" },
+        { type: "dialogue", speaker: "抄写员", lines: ["保留事故，不等于永远拒绝修复。", "证据翼继续亮着；现在可以带着它们走向王座。"] },
+      ],
+      completionFact: "story:f8:void-court-open",
+    },
+    {
       id: "f8-story-cipher",
       title: "王令校验密文被解开",
       trigger: "gate:floor-8-lesson-7:opened",
@@ -270,7 +284,7 @@ export const FLOOR_EIGHT_EXPERIENCE: FloorExperienceDefinition = {
       actions: [
         { type: "camera-focus", landmarkId: "f8-archivist-throne" },
         { type: "evidence", evidenceId: "lost-name:f8:archivist-verdict" },
-        { type: "dialogue", speaker: "最后的档案官", lines: ["我保住了回滚，却让整个王国停在回滚之前。", "如果你要接管写权限，就证明你能让历史和明天同时存在。"] },
+        { type: "dialogue", speaker: "最后的档案官", lines: ["你没有删除旧库，也没有让王国永远停在 OPEN。", "写权限交给你；回滚路径仍在。"] },
       ],
       completionFact: "story:f8:completed",
     },
@@ -288,6 +302,7 @@ export const FLOOR_EIGHT_EXPERIENCE: FloorExperienceDefinition = {
     { id: "f8-admin-entry", label: "F8 版本长厅", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f8-version-gallery" },
     { id: "f8-admin-chapel", label: "F8 零行礼拜堂", completedLessonIds: ["f8-mvcc", "f8-lock", "f8-isolation", "f8-modeling"], defeatedMonsterIds: [78, 79, 80, 81], openedGateIds: ["gate:floor-8-treasure"], collectedKeyItems: [], focusLandmarkId: "f8-zero-row-chapel" },
     { id: "f8-admin-cipher", label: "F8 王令校验密文", completedLessonIds: ["f8-mvcc", "f8-lock", "f8-isolation", "f8-modeling", "f8-replication", "f8-sharding"], defeatedMonsterIds: [78, 79, 80, 81, 82, 83], openedGateIds: ["gate:floor-8-lesson-7"], collectedKeyItems: [], focusLandmarkId: "f8-sql-seal" },
-    { id: "f8-admin-complete", label: "F8 MIGRATE 完成态", completedLessonIds: ["f8-mvcc", "f8-lock", "f8-isolation", "f8-modeling", "f8-replication", "f8-sharding", "f8-security"], defeatedMonsterIds: [78, 79, 80, 81, 82, 83, 84], openedGateIds: [], collectedKeyItems: ["floor-key:8"], focusLandmarkId: "f8-archivist-throne" },
+    { id: "f8-admin-void-court", label: "F8 虚空王庭", completedLessonIds: ["f8-mvcc", "f8-lock", "f8-isolation", "f8-modeling", "f8-replication", "f8-sharding"], defeatedMonsterIds: [78, 79, 80, 81, 82, 83, 89], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f8-incident-wings" },
+    { id: "f8-admin-complete", label: "F8 MIGRATE 完成态", completedLessonIds: ["f8-mvcc", "f8-lock", "f8-isolation", "f8-modeling", "f8-replication", "f8-sharding", "f8-security"], defeatedMonsterIds: [78, 79, 80, 81, 82, 83, 84, 89], openedGateIds: [], collectedKeyItems: ["floor-key:8"], focusLandmarkId: "f8-archivist-throne" },
   ],
 };

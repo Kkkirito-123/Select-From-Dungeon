@@ -338,6 +338,20 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       completionFact: "story:f2:low-tide",
     },
     {
+      id: "f2-story-frog-court",
+      title: "泥冠硬门解除",
+      trigger: "monster:22:defeated",
+      repeat: "once",
+      priority: 95,
+      actions: [
+        { type: "camera-focus", landmarkId: "f2-frog-court" },
+        { type: "world-effect", effect: "f2-frog-court-open" },
+        { type: "banner", text: "泥冠硬门解除 · 灯塔后区开放" },
+        { type: "dialogue", speaker: "抄写员", lines: ["未匹配，不等于不存在。", "这一次，沼泽不能再替王城把他们留下。"] },
+      ],
+      completionFact: "story:f2:frog-court",
+    },
+    {
       id: "f2-story-seven-reflections",
       title: "七个倒影",
       trigger: "gate:shortcut:2:return:opened",
@@ -392,6 +406,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
     { id: "f2-admin-village", label: "F2 沉水村落", completedLessonIds: ["order-by", "distinct"], defeatedMonsterIds: [10, 11], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f2-drowned-village" },
     { id: "f2-admin-hidden", label: "F2 沉船记录舱", completedLessonIds: ["order-by", "distinct"], defeatedMonsterIds: [10, 11], openedGateIds: ["gate:floor-2-treasure"], collectedKeyItems: [], focusLandmarkId: "f2-wreck-ledger" },
     { id: "f2-admin-low-tide", label: "F2 退潮与船闸", completedLessonIds: ["order-by", "distinct", "inner-join"], defeatedMonsterIds: [10, 11, 12, 21], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["shortcut-key:2"], focusLandmarkId: "f2-ship-lock" },
-    { id: "f2-admin-complete", label: "F2 通关", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join", "join-boss"], defeatedMonsterIds: [10, 11, 12, 13, 14, 21], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["floor-key:2"], focusLandmarkId: "f2-north-ferry" },
+    { id: "f2-admin-frog-court", label: "F2 泥冠硬门", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join"], defeatedMonsterIds: [10, 11, 12, 13, 22], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f2-frog-court" },
+    { id: "f2-admin-complete", label: "F2 通关", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join", "join-boss"], defeatedMonsterIds: [10, 11, 12, 13, 14, 21, 22], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["floor-key:2"], focusLandmarkId: "f2-north-ferry" },
   ],
 };

@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { COMPLETE_SCHEMA_LINES } from "../src/content/sqlSchema";
 import { GameSession } from "../src/domain/GameSession";
+import { migrationStepMarkerIds } from "../src/domain/finalMigration";
 import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/types";
 import { answerReviewSummary } from "../src/ui/AnswerReviewView";
 import {
   canPresentQueuedNarrativeMoment,
+  canPresentFinalMigrationStoryMoment,
   canOpenCombatTerminal,
   combatSettlementCopy,
+  finalMigrationArgumentCopy,
+  finalMigrationRecordCopy,
+  finalVictoryPortalReady,
   inspectionDialogCopy,
+  inspectionEscapeCanClose,
   isInspectionPrimaryKey,
   narrativeProgressForSnapshot,
   narrativeMomentUsesRecordOverlay,
@@ -37,6 +43,12 @@ describe("主框确认键", () => {
     expect(isInspectionPrimaryKey({ code: "Enter", key: "Enter", repeat: false })).toBe(true);
     expect(isInspectionPrimaryKey({ code: "KeyE", key: "e", repeat: true })).toBe(false);
     expect(isInspectionPrimaryKey({ code: "Escape", key: "Escape", repeat: false })).toBe(false);
+  });
+
+  it("ESC 不能确认 MIGRATE 页或其他 blocking 剧情", () => {
+    expect(inspectionEscapeCanClose("migration", "blocking")).toBe(false);
+    expect(inspectionEscapeCanClose("story", "blocking")).toBe(false);
+    expect(inspectionEscapeCanClose("inspection", "inspect")).toBe(true);
   });
 });
 
@@ -186,6 +198,88 @@ describe("narrativeProgressForSnapshot", () => {
     expect(progress.latestMoment?.kind).toBe("ascent");
     expect(progress.completedAscentIds).toEqual(["ascent:f1:f2"]);
     expect(progress.completedMigrationStepIds).toEqual([]);
+  });
+
+  it("第八层 victory 从 Run marker 推导 MIGRATE 进度而不再自动全完成", () => {
+    const snapshot = new GameSession(null, null, "migration-marker-progress").snapshot();
+    const progress = narrativeProgressForSnapshot({
+      ...snapshot,
+      floor: 8,
+      mode: "victory",
+      openedGateIds: migrationStepMarkerIds().slice(0, 2),
+    });
+    expect(progress.completedMigrationStepIds).toEqual(["snapshot", "audit"]);
+  });
+});
+
+describe("MIGRATE 七页主框", () => {
+  const migrationMoment = {
+    floor: 8 as const,
+    sourceId: "f8-story-migrate",
+  };
+
+  it("档案王击败后仍等待第八层 victory，不能在探索态提前展示", () => {
+    expect(canPresentFinalMigrationStoryMoment(
+      migrationMoment,
+      { floor: 8, mode: "explore" },
+    )).toBe(false);
+    expect(canPresentFinalMigrationStoryMoment(
+      migrationMoment,
+      { floor: 8, mode: "victory" },
+    )).toBe(true);
+  });
+
+  it("刷新后从首个未完成页继续，七步完成后不再生成主框页", () => {
+    const first = finalMigrationRecordCopy([]);
+    expect(first).toMatchObject({
+      title: "1 / 7 · 保存只读快照",
+      stepIndex: 0,
+      stepTotal: 7,
+    });
+    expect(first?.body).not.toContain("众名第一次共同拥有了明天");
+
+    const resumed = finalMigrationRecordCopy(
+      migrationStepMarkerIds().slice(0, 3),
+    );
+    expect(resumed).toMatchObject({
+      title: "4 / 7 · 隔离构建新结构",
+      stepIndex: 3,
+      stepTotal: 7,
+    });
+    expect(finalMigrationRecordCopy(migrationStepMarkerIds())).toBeNull();
+  });
+
+  it("第七步落盘前最终 portal 始终不可用", () => {
+    const markers = migrationStepMarkerIds();
+    expect(finalVictoryPortalReady({
+      floor: 8,
+      mode: "victory",
+      openedGateIds: markers.slice(0, 6),
+    })).toBe(false);
+    expect(finalVictoryPortalReady({
+      floor: 8,
+      mode: "victory",
+      openedGateIds: markers,
+    })).toBe(true);
+  });
+
+  it("只在 #084 的 f8-security 五阶段显示论点、证据与玩家结论", () => {
+    const hiddenIdentityArgument = finalMigrationArgumentCopy({
+      lessonId: "f8-security",
+      lessonStageId: "f8-final-snapshot",
+      combat: { targetId: 84 },
+    });
+    expect(hiddenIdentityArgument).toMatchObject({
+      argument: expect.stringContaining("ID #084："),
+      evidence: expect.stringContaining("恢复权限"),
+      conclusion: expect.stringContaining("玩家结论："),
+    });
+    expect(hiddenIdentityArgument?.argument).not.toContain("档案王");
+    expect(finalMigrationArgumentCopy({
+      lessonId: "f8-security",
+      lessonStageId: "f8-final-snapshot",
+      combat: { targetId: 83 },
+    })).toBeNull();
   });
 });
 

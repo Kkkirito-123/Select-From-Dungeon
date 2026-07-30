@@ -5,6 +5,7 @@ import {
   type NarrativeBeat,
   type NarrativeEndingStep,
 } from "../content/narrativeContent";
+import { finalMigrationStageNarrative } from "../content/finalMigrationSequence";
 import {
   floorMapBlueprint,
   floorTransitPresentation,
@@ -38,11 +39,15 @@ import {
 import {
   FloorStoryMomentQueue,
   floorStoryInspectMomentForLandmark,
+  floorStoryMoments,
   floorStoryProgress,
   storyEvidenceIdFromMarker,
   type FloorStoryMoment,
   type FloorStoryPresentation,
 } from "../domain/floorStory";
+import {
+  finalMigrationProgress,
+} from "../domain/finalMigration";
 import {
   monsterIdLabel,
   monsterIdentityPresentation,
@@ -139,6 +144,13 @@ export function isInspectionPrimaryKey(
     event.key === "Enter";
 }
 
+export function inspectionEscapeCanClose(
+  recordKind: string | undefined,
+  activePresentation: FloorStoryPresentation | null | undefined,
+): boolean {
+  return recordKind !== "migration" && activePresentation !== "blocking";
+}
+
 export function shouldDismissTransientCard(
   shownAtMove: number | null,
   currentTotalMoves: number,
@@ -150,6 +162,104 @@ export function narrativeMomentUsesRecordOverlay(
   presentation: FloorStoryPresentation,
 ): boolean {
   return presentation === "blocking" || presentation === "inspect";
+}
+
+const FINAL_MIGRATION_STORY_SOURCE_ID = "f8-story-migrate";
+const NARRATIVE_EVIDENCE_TITLES = new Map(
+  NARRATIVE_FLOORS.flatMap((floor) =>
+    floor.lostNameEvidence.map((evidence) => [evidence.id, evidence.title] as const)
+  ),
+);
+
+export function isFinalMigrationStoryMoment(
+  moment: Pick<FloorStoryMoment, "floor" | "sourceId">,
+): boolean {
+  return moment.floor === 8 && moment.sourceId === FINAL_MIGRATION_STORY_SOURCE_ID;
+}
+
+export function canPresentFinalMigrationStoryMoment(
+  moment: Pick<FloorStoryMoment, "floor" | "sourceId">,
+  snapshot: Pick<GameSnapshot, "floor" | "mode">,
+): boolean {
+  if (!isFinalMigrationStoryMoment(moment)) return true;
+  return snapshot.floor === 8 && snapshot.mode === "victory";
+}
+
+export interface FinalMigrationRecordCopy {
+  kicker: string;
+  title: string;
+  body: string;
+  closeLabel: string;
+  stepIndex: number;
+  stepTotal: number;
+}
+
+export function finalMigrationRecordCopy(
+  markerIds: readonly string[],
+): FinalMigrationRecordCopy | null {
+  const ending = NARRATIVE_ENDINGS[0];
+  const progress = finalMigrationProgress(markerIds);
+  if (!progress.nextStep) return null;
+  const stepIndex = progress.completedStepIds.length;
+  const stepTotal = ending.steps.length;
+  return {
+    kicker: `MIGRATE / STEP ${String(stepIndex + 1).padStart(2, "0")} OF ${String(stepTotal).padStart(2, "0")}`,
+    title: `${stepIndex + 1} / ${stepTotal} · ${progress.nextStep.title}`,
+    body: [
+      ending.summary,
+      "",
+      progress.nextStep.description,
+      "",
+      `当前进度 · ${stepIndex} / ${stepTotal} 步已写入本地 Run。`,
+    ].join("\n"),
+    closeLabel: stepIndex + 1 === stepTotal
+      ? "E · 执行最后一步"
+      : `E · 执行并进入 ${stepIndex + 2} / ${stepTotal}`,
+    stepIndex,
+    stepTotal,
+  };
+}
+
+export interface FinalMigrationArgumentCopy {
+  argument: string;
+  evidence: string;
+  conclusion: string;
+}
+
+export function finalMigrationArgumentCopy(
+  snapshot: {
+    lessonId: GameSnapshot["lessonId"];
+    lessonStageId: GameSnapshot["lessonStageId"];
+    combat: { targetId: number } | null;
+  },
+): FinalMigrationArgumentCopy | null {
+  const narrative = (
+    snapshot.lessonId === "f8-security" &&
+    snapshot.combat?.targetId === 84
+  )
+    ? finalMigrationStageNarrative(snapshot.lessonStageId)
+    : null;
+  if (!narrative) return null;
+  const evidenceTitles = narrative.evidenceIds.map((evidenceId) =>
+    NARRATIVE_EVIDENCE_TITLES.get(evidenceId) ?? evidenceId
+  );
+  return {
+    argument: `ID #084：${narrative.archivistArgument}`,
+    evidence: `调用证据：${evidenceTitles.join("、")}`,
+    conclusion: `玩家结论：${narrative.playerConclusion}`,
+  };
+}
+
+export function finalVictoryPortalReady(
+  snapshot: {
+    floor: GameSnapshot["floor"];
+    mode: GameSnapshot["mode"];
+    openedGateIds: readonly string[];
+  },
+): boolean {
+  if (snapshot.mode !== "victory") return false;
+  return snapshot.floor !== 8 ||
+    finalMigrationProgress(snapshot.openedGateIds).complete;
 }
 
 export function storyMomentRecordBody(moment: FloorStoryMoment): string {
@@ -363,11 +473,8 @@ export function narrativeProgressForSnapshot(
     ) return [entry.ascent.id];
     return [];
   });
-  const completedMigrationStepIds = (
-    snapshot.floor === 8 &&
-    snapshot.mode === "victory"
-  )
-    ? NARRATIVE_ENDINGS[0].steps.map((step) => step.id)
+  const completedMigrationStepIds = snapshot.floor === 8
+    ? finalMigrationProgress(snapshot.openedGateIds).completedStepIds
     : [];
   const explicitlyDiscoveredEvidenceIds = snapshot.openedGateIds
     .map(storyEvidenceIdFromMarker)
@@ -541,6 +648,8 @@ export class AppShell {
         event.stopImmediatePropagation();
         if (this.inspectionOverlay.dataset.recordKind === "labyrinth") {
           this.confirmLabyrinthEntry();
+        } else if (this.inspectionOverlay.dataset.recordKind === "migration") {
+          this.advanceFinalMigration();
         } else {
           this.closeInspection();
         }
@@ -548,7 +657,11 @@ export class AppShell {
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        if (this.activeNarrativeMoment?.presentation === "blocking") return;
+        event.stopImmediatePropagation();
+        if (!inspectionEscapeCanClose(
+          this.inspectionOverlay.dataset.recordKind,
+          this.activeNarrativeMoment?.presentation,
+        )) return;
         this.closeInspection(true, false);
         return;
       }
@@ -934,6 +1047,11 @@ export class AppShell {
                   <section class="terminal-brief">
                     <div class="card-heading"><span>本回合任务</span><span id="query-counter">查询 0 次</span></div>
                     <p id="terminal-objective"></p>
+                    <blockquote id="final-migration-argument" class="scribe-recap" hidden>
+                      <strong id="final-migration-argument-title">ID #084 的论点</strong>
+                      <p id="final-migration-argument-evidence"></p>
+                      <p id="final-migration-argument-conclusion"></p>
+                    </blockquote>
                     <div id="lock-list" class="lock-list"></div>
                     <div id="schema-list" class="schema-list"></div>
                     <details class="terminal-schema-reference">
@@ -1226,7 +1344,9 @@ export class AppShell {
     );
     requiredElement(this.root, "#close-inspection").addEventListener(
       "click",
-      () => this.closeInspection(),
+      () => this.inspectionOverlay.dataset.recordKind === "migration"
+        ? this.advanceFinalMigration()
+        : this.closeInspection(),
       listenerOptions,
     );
     requiredElement(this.root, "#confirm-labyrinth-entry").addEventListener(
@@ -1371,7 +1491,11 @@ export class AppShell {
     );
     requiredElement(this.root, "#interact").addEventListener(
       "click",
-      () => this.isInspectionOpen() ? this.closeInspection() : dispatchInteract(),
+      () => this.isInspectionOpen()
+        ? this.inspectionOverlay.dataset.recordKind === "migration"
+          ? this.advanceFinalMigration()
+          : this.closeInspection()
+        : dispatchInteract(),
       listenerOptions,
     );
     this.sqlButton.addEventListener("click", () => this.openTerminal(), listenerOptions);
@@ -2333,7 +2457,26 @@ export class AppShell {
       this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
     } else {
       if (this.narrativeBootstrapMode === "restored") {
-        this.narrativeMomentQueue.primeExisting(progress.unlockedMoments);
+        const migration = finalMigrationProgress(snapshot.openedGateIds);
+        const resumableMigrationMoment = (
+          snapshot.floor === 8 &&
+          snapshot.mode === "victory" &&
+          !migration.complete
+        )
+          ? progress.unlockedMoments.find(isFinalMigrationStoryMoment) ??
+            floorStoryMoments(8).find(isFinalMigrationStoryMoment) ??
+            null
+          : null;
+        this.narrativeMomentQueue.primeExisting(
+          resumableMigrationMoment
+            ? progress.unlockedMoments.filter(
+                (moment) => moment.id !== resumableMigrationMoment.id,
+              )
+            : progress.unlockedMoments,
+        );
+        if (resumableMigrationMoment) {
+          this.narrativeMomentQueue.enqueue([resumableMigrationMoment]);
+        }
       } else {
         this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
       }
@@ -2391,6 +2534,7 @@ export class AppShell {
       nextMoment = this.narrativeMomentQueue.peekNext();
     }
     if (nextMoment) {
+      if (!canPresentFinalMigrationStoryMoment(nextMoment, snapshot)) return;
       this.showNarrativeMomentCard(nextMoment, snapshot);
     }
   }
@@ -2509,6 +2653,10 @@ export class AppShell {
     snapshot: GameSnapshot,
     inspectionMessage?: string,
   ): void {
+    if (isFinalMigrationStoryMoment(moment)) {
+      this.openFinalMigrationMoment(snapshot);
+      return;
+    }
     const recordBody = storyMomentRecordBody(moment);
     this.openRecordOverlay({
       kicker: moment.kicker,
@@ -2524,12 +2672,24 @@ export class AppShell {
     });
   }
 
+  private openFinalMigrationMoment(snapshot: GameSnapshot): void {
+    const copy = finalMigrationRecordCopy(snapshot.openedGateIds);
+    if (!copy) return;
+    this.openRecordOverlay({
+      kicker: copy.kicker,
+      title: copy.title,
+      body: copy.body,
+      closeLabel: copy.closeLabel,
+      kind: "migration",
+    });
+  }
+
   private openRecordOverlay(copy: {
     kicker: string;
     title: string;
     body: string;
     closeLabel: string;
-    kind: "inspection" | "story" | "labyrinth";
+    kind: "inspection" | "story" | "labyrinth" | "migration";
   }): void {
     if (!this.isInspectionOpen()) {
       this.focusBeforeInspection = document.activeElement instanceof HTMLElement
@@ -2593,6 +2753,13 @@ export class AppShell {
     confirmStory = true,
   ): void {
     if (!this.isInspectionOpen()) return;
+    if (
+      confirmStory &&
+      this.inspectionOverlay.dataset.recordKind === "migration"
+    ) {
+      this.advanceFinalMigration();
+      return;
+    }
     const confirmedMoment = confirmStory &&
         this.inspectionOverlay.dataset.recordKind === "story"
       ? this.activeNarrativeMoment
@@ -2634,6 +2801,56 @@ export class AppShell {
         this.renderFloorTransition(this.lastSnapshot);
       });
     }
+  }
+
+  private advanceFinalMigration(): void {
+    if (
+      !this.isInspectionOpen() ||
+      this.inspectionOverlay.dataset.recordKind !== "migration" ||
+      !this.activeNarrativeMoment ||
+      !isFinalMigrationStoryMoment(this.activeNarrativeMoment)
+    ) return;
+    const before = finalMigrationProgress(this.lastSnapshot.openedGateIds);
+    const step = before.nextStep;
+    if (!step) return;
+    if (!this.session.recordMigrationStep(step.id)) {
+      const current = finalMigrationRecordCopy(this.session.snapshot().openedGateIds);
+      if (current) {
+        this.openRecordOverlay({
+          kicker: current.kicker,
+          title: current.title,
+          body: current.body,
+          closeLabel: current.closeLabel,
+          kind: "migration",
+        });
+      }
+      return;
+    }
+
+    const afterSnapshot = this.session.snapshot();
+    const after = finalMigrationProgress(afterSnapshot.openedGateIds);
+    if (!after.complete) {
+      this.openFinalMigrationMoment(afterSnapshot);
+      return;
+    }
+
+    const completedMoment = this.activeNarrativeMoment;
+    this.narrativeMomentQueue.ackPresented(completedMoment.id);
+    const finalAscent = this.narrativeMomentQueue.peekNext();
+    if (finalAscent?.floor === 8 && finalAscent.kind === "ascent") {
+      this.narrativeMomentQueue.ackPresented(finalAscent.id);
+    }
+    this.narrativeActionInFlight = true;
+    try {
+      this.executeStoryMomentActions(completedMoment, true);
+    } finally {
+      this.narrativeActionInFlight = false;
+    }
+    this.closeInspection(false, false);
+    queueMicrotask(() => {
+      this.renderNarrativeProgress(this.lastSnapshot);
+      this.renderFloorTransition(this.lastSnapshot);
+    });
   }
 
   private isInspectionOpen(): boolean {
@@ -3038,7 +3255,8 @@ export class AppShell {
     if (
       snapshot.mode !== "explore" &&
       this.isInspectionOpen() &&
-      this.inspectionOverlay.dataset.recordKind !== "story"
+      this.inspectionOverlay.dataset.recordKind !== "story" &&
+      this.inspectionOverlay.dataset.recordKind !== "migration"
     ) {
       this.closeInspection(false);
     }
@@ -3145,6 +3363,7 @@ export class AppShell {
     requiredElement(this.root, "#query-counter").textContent = `查询 ${snapshot.queryCount} 次`;
     requiredElement(this.root, "#terminal-title").textContent = `${snapshot.lessonId.toUpperCase()} · 阶段 ${snapshot.lessonStageIndex + 1} · 回合 ${snapshot.combat?.round ?? 1}`;
     requiredElement(this.root, "#terminal-objective").textContent = snapshot.missionBody;
+    this.renderFinalMigrationArgument(snapshot);
     requiredElement(this.root, "#victory-count").textContent = `通关 ${snapshot.profile.victories}`;
     requiredElement(this.root, ".game-stage").classList.toggle("is-combat", snapshot.mode === "combat");
     this.sqlButton.disabled = snapshot.mode !== "combat" || this.busy;
@@ -3238,6 +3457,22 @@ export class AppShell {
 
     this.lastStageId = snapshot.lessonStageId;
     this.lastMode = snapshot.mode;
+  }
+
+  private renderFinalMigrationArgument(snapshot: GameSnapshot): void {
+    const root = requiredElement<HTMLElement>(
+      this.root,
+      "#final-migration-argument",
+    );
+    const copy = finalMigrationArgumentCopy(snapshot);
+    root.hidden = copy === null;
+    if (!copy) return;
+    requiredElement(root, "#final-migration-argument-title").textContent =
+      copy.argument;
+    requiredElement(root, "#final-migration-argument-evidence").textContent =
+      copy.evidence;
+    requiredElement(root, "#final-migration-argument-conclusion").textContent =
+      copy.conclusion;
   }
 
   private guidedPickupBetween(
@@ -3334,7 +3569,7 @@ export class AppShell {
       "#floor-victory-actions",
     );
     const transitioning = snapshot.mode === "transition" && snapshot.floor < 8;
-    const dungeonCleared = snapshot.mode === "victory";
+    const finalVictoryReady = finalVictoryPortalReady(snapshot);
     const narrativePending = this.activeNarrativeMoment !== null ||
       this.narrativeMomentQueue.pendingIds.length > 0;
     const presentationBlocked = this.busy ||
@@ -3343,7 +3578,7 @@ export class AppShell {
       this.isInspectionOpen() ||
       narrativePending;
     const transitionVisible = transitioning && !presentationBlocked;
-    const victoryVisible = dungeonCleared && !presentationBlocked;
+    const victoryVisible = finalVictoryReady && !presentationBlocked;
     portal.hidden = !transitionVisible && !victoryVisible;
     portal.inert = !transitionVisible && !victoryVisible;
     portal.setAttribute("aria-hidden", String(!transitionVisible && !victoryVisible));
@@ -3378,7 +3613,7 @@ export class AppShell {
       requiredElement(portal, "#floor-ascent-destination").textContent = "IDENTITY";
       requiredElement(portal, "#floor-clear-title").textContent = "DUNGEON CLEARED";
       requiredElement(portal, "#floor-clear-copy").textContent =
-        "CONGRATULATIONS!! · MIGRATE 验证完成，等待最终切换";
+        NARRATIVE_ENDINGS[0].finalLine;
       this.hidePickupCard();
       if (!victoryWasVisible) {
         queueMicrotask(() => {

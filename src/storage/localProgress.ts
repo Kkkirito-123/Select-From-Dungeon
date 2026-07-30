@@ -29,6 +29,10 @@ import { generateFloorHazards } from "../domain/floorLabyrinth";
 import { isFloorOneChestMarker } from "../domain/floorOneTreasure";
 import { storyEvidenceMarkerIdsForFloor } from "../domain/floorStory";
 import {
+  migrationMarkersFormPrefix,
+  migrationStepMarkerIds,
+} from "../domain/finalMigration";
+import {
   advanceCampaignProgress,
   createCampaignProgress,
   isCampaignProgress,
@@ -1296,6 +1300,7 @@ function isSavedRunVersion(
   const storyEvidenceMarkerIds = new Set(
     storyEvidenceMarkerIdsForFloor(run.floor),
   );
+  const finalMigrationMarkerIds = new Set(migrationStepMarkerIds());
   if (
     version >= 7 &&
     guidedMap &&
@@ -1326,8 +1331,14 @@ function isSavedRunVersion(
       guidedMap?.deadEndCaches.some((cache) => cache.id === id) ||
       floorHazardIds.has(id) ||
       storyEvidenceMarkerIds.has(id) ||
+      (
+        run.floor === 8 &&
+        run.mode === "victory" &&
+        finalMigrationMarkerIds.has(id)
+      ) ||
       (run.floor === 1 && isFloorOneChestMarker(id))
     )) ||
+    !migrationMarkersFormPrefix(openedGateIds) ||
     !hasUniqueValues(openedGateIds) ||
     !(activeGateChallengeId === null || (
       typeof activeGateChallengeId === "string" &&

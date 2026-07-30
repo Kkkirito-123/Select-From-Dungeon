@@ -126,6 +126,47 @@ describe("eight-floor experience contracts", () => {
     )?.interaction).toBe("主线硬门 ID #022 · 击败后开放灯塔道路");
   });
 
+  it("第二至八层的区域首领均有唯一剧情事件、可直达管理员预设与完整通关记录", () => {
+    const contracts = [
+      { floor: 2, monsterId: 22, eventId: "f2-story-frog-court", presetId: "f2-admin-frog-court" },
+      { floor: 3, monsterId: 33, eventId: "f3-story-grave-lord", presetId: "f3-admin-grave-lord" },
+      { floor: 4, monsterId: 44, eventId: "f4-story-forge-lord", presetId: "f4-admin-echo" },
+      { floor: 5, monsterId: 55, eventId: "f5-story-barracks-open", presetId: "f5-admin-barracks" },
+      { floor: 6, monsterId: 66, eventId: "f6-story-crystal-cavern-open", presetId: "f6-admin-crystal-cavern" },
+      { floor: 7, monsterId: 77, eventId: "f7-story-root-cloister-open", presetId: "f7-admin-root-cloister" },
+      { floor: 8, monsterId: 89, eventId: "f8-story-void-court-open", presetId: "f8-admin-void-court" },
+    ] as const;
+
+    contracts.forEach(({ floor, monsterId, eventId, presetId }) => {
+      const experience = floorExperience(floor);
+      expect(experience.storyEvents.filter(
+        (event) => event.trigger === `monster:${monsterId}:defeated`,
+      )).toEqual([
+        expect.objectContaining({
+          id: eventId,
+          repeat: "once",
+          completionFact: expect.stringContaining("story:"),
+        }),
+      ]);
+      expect(experience.adminPresets.find((preset) => preset.id === presetId))
+        .toMatchObject({
+          defeatedMonsterIds: expect.arrayContaining([monsterId]),
+        });
+      expect(experience.adminPresets.find(
+        (preset) => preset.id.endsWith("-admin-complete"),
+      )).toMatchObject({
+        defeatedMonsterIds: expect.arrayContaining([monsterId]),
+      });
+    });
+
+    expect(floorExperience(2).adminPresets.find(
+      (preset) => preset.id === "f2-admin-low-tide",
+    )?.defeatedMonsterIds).toContain(21);
+    expect(floorExperience(2).adminPresets.find(
+      (preset) => preset.id === "f2-admin-low-tide",
+    )?.defeatedMonsterIds).not.toContain(22);
+  });
+
   it("places the only floor-one scribe in the opening safe room, away from the ember", () => {
     const experience = floorExperience(1);
     const scribe = experience.npcPlacements[0];

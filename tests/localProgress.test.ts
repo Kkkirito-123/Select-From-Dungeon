@@ -7,6 +7,7 @@ import {
   createCampaignProgress,
 } from "../src/domain/campaign";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
+import { migrationStepMarkerIds } from "../src/domain/finalMigration";
 import type { SavedRun, SqlQueryResult } from "../src/domain/types";
 import {
   PROFILE_SAVE_KEY,
@@ -419,6 +420,44 @@ describe("localProgress", () => {
     const forged = session.toSavedRun();
     forged.openedGateIds.push("story:evidence:lost-name:f8:identity-set");
     expect(isSavedRun(forged)).toBe(false);
+  });
+
+  it("v11 只在第八层 victory 恢复有序 MIGRATE 前缀", () => {
+    const storage = new MemoryStorage();
+    const run = freshFloorEightRun("migration-progress-roundtrip");
+    const completion = advanceCampaignProgress(run.campaign);
+    if (!completion.ok || !completion.completed) {
+      throw new Error("第八层测试 Campaign 无法进入 victory");
+    }
+    run.mode = "victory";
+    run.campaign = completion.progress;
+    run.openedGateIds.push(...migrationStepMarkerIds().slice(0, 3));
+
+    expect(isSavedRun(run)).toBe(true);
+    saveRun(storage, run);
+    expect(loadRun(storage)?.openedGateIds).toEqual(expect.arrayContaining([
+      "story:migrate:snapshot",
+      "story:migrate:audit",
+      "story:migrate:preserve-history",
+    ]));
+
+    const skipped = structuredClone(run);
+    skipped.openedGateIds = [
+      ...skipped.openedGateIds.filter((id) => !id.startsWith("story:migrate:")),
+      "story:migrate:snapshot",
+      "story:migrate:preserve-history",
+    ];
+    expect(isSavedRun(skipped)).toBe(false);
+
+    const exploring = structuredClone(run);
+    exploring.mode = "explore";
+    exploring.campaign = createCampaignProgress(exploring.campaign.baseSeed, 8);
+    expect(isSavedRun(exploring)).toBe(false);
+
+    const unknown = structuredClone(run);
+    unknown.openedGateIds[unknown.openedGateIds.length - 1] =
+      "story:migrate:drop-history";
+    expect(isSavedRun(unknown)).toBe(false);
   });
 
   it("v11 只接受当前楼层与 Seed 实际生成的陷阱触发标记", () => {

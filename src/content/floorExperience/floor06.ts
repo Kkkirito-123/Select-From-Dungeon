@@ -261,6 +261,20 @@ export const FLOOR_SIX_EXPERIENCE: FloorExperienceDefinition = {
       completionFact: "story:f6:rookery",
     },
     {
+      id: "f6-story-crystal-cavern-open",
+      title: "晶洞守卫解除",
+      trigger: "monster:66:defeated",
+      repeat: "once",
+      priority: 95,
+      actions: [
+        { type: "camera-focus", landmarkId: "f6-constraint-door" },
+        { type: "world-effect", effect: "f6-crystal-cavern-open" },
+        { type: "banner", text: "晶洞守卫解除 · 保存点后区开放" },
+        { type: "dialogue", speaker: "抄写员", lines: ["一条候选被拒绝，不等于所有修改都该回滚。", "约束守住边界，通往保存点的路已经开放。"] },
+      ],
+      completionFact: "story:f6:crystal-cavern-open",
+    },
+    {
       id: "f6-story-cipher",
       title: "逆鳞密文被只读预演解开",
       trigger: "gate:floor-6-lesson-6:opened",
@@ -299,6 +313,7 @@ export const FLOOR_SIX_EXPERIENCE: FloorExperienceDefinition = {
     { id: "f6-admin-entry", label: "F6 孵化副本", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f6-sandbox-incubator" },
     { id: "f6-admin-rookery", label: "F6 未提交育龙室", completedLessonIds: ["f6-insert", "f6-update", "f6-delete"], defeatedMonsterIds: [56, 57, 58], openedGateIds: ["gate:floor-6-treasure"], collectedKeyItems: [], focusLandmarkId: "f6-uncommitted-rookery" },
     { id: "f6-admin-cipher", label: "F6 逆鳞密文门", completedLessonIds: ["f6-insert", "f6-update", "f6-delete", "f6-constraint"], defeatedMonsterIds: [56, 57, 58, 59], openedGateIds: ["gate:floor-6-lesson-6"], collectedKeyItems: [], focusLandmarkId: "f6-sql-seal" },
-    { id: "f6-admin-complete", label: "F6 事务提交巢", completedLessonIds: ["f6-insert", "f6-update", "f6-delete", "f6-constraint", "f6-transaction", "f6-savepoint"], defeatedMonsterIds: [56, 57, 58, 59, 60, 61], openedGateIds: ["shortcut:6:return"], collectedKeyItems: ["floor-key:6"], focusLandmarkId: "f6-dragon-throne" },
+    { id: "f6-admin-crystal-cavern", label: "F6 龙晶修复洞", completedLessonIds: ["f6-insert", "f6-update", "f6-delete", "f6-constraint"], defeatedMonsterIds: [56, 57, 58, 59, 66], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f6-constraint-door" },
+    { id: "f6-admin-complete", label: "F6 事务提交巢", completedLessonIds: ["f6-insert", "f6-update", "f6-delete", "f6-constraint", "f6-transaction", "f6-savepoint"], defeatedMonsterIds: [56, 57, 58, 59, 60, 61, 66], openedGateIds: ["shortcut:6:return"], collectedKeyItems: ["floor-key:6"], focusLandmarkId: "f6-dragon-throne" },
   ],
 };

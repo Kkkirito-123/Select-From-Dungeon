@@ -105,6 +105,11 @@ import {
   storyEvidenceMarkerIdsForFloor,
 } from "./floorStory";
 import {
+  finalMigrationProgress,
+  migrationStepMarkerId,
+  type MigrationStepId,
+} from "./finalMigration";
+import {
   monsterIdLabel,
   monsterIntentName,
   monsterNameForProfile,
@@ -1055,6 +1060,21 @@ export class GameSession {
     }
     if (this.openedGateIds.has(markerId)) return false;
     this.openedGateIds.add(markerId);
+    this.emit();
+    return true;
+  }
+
+  /**
+   * 在第八层胜利态按固定顺序提交一项 MIGRATE 步骤。
+   *
+   * 进度复用 openedGateIds，保持 SavedRun v11；非终局、跳步或重复确认
+   * 均不写入，也不会触发额外快照。
+   */
+  recordMigrationStep(stepId: MigrationStepId): boolean {
+    if (this.floorNumber !== 8 || this.mode !== "victory") return false;
+    const progress = finalMigrationProgress([...this.openedGateIds]);
+    if (progress.nextStep?.id !== stepId) return false;
+    this.openedGateIds.add(migrationStepMarkerId(stepId));
     this.emit();
     return true;
   }

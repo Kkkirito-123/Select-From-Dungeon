@@ -351,6 +351,11 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
       presentation: "ambient",
     },
     {
+      source: { type: "event", id: "f2-story-frog-court" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
       source: { type: "event", id: "f2-story-low-tide" },
       kind: "world-change",
       presentation: "ambient",
@@ -527,19 +532,24 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
       queryId: "f5-ties-preserved",
     },
     {
+      source: { type: "rule", id: "f5-patrol-linked" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f5-story-barracks-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
       source: { type: "event", id: "f5-story-silent-roster" },
       kind: "secret",
       presentation: "inspect",
       inspectLandmarkId: "f5-silent-roster",
     },
     {
-      source: { type: "rule", id: "f5-patrol-linked" },
-      kind: "world-change",
-      presentation: "ambient",
-    },
-    {
-      source: { type: "rule", id: "f5-alert-framed" },
-      kind: "evidence",
+      source: { type: "event", id: "f5-story-silence-is-order" },
+      kind: "scribe",
       presentation: "ambient",
     },
     {
@@ -581,15 +591,20 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
       queryId: "f6-duplicate-candidates",
     },
     {
+      source: { type: "rule", id: "f6-constraint-protected" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f6-story-crystal-cavern-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
       source: { type: "event", id: "f6-story-rookery" },
       kind: "secret",
       presentation: "inspect",
       inspectLandmarkId: "f6-uncommitted-rookery",
-    },
-    {
-      source: { type: "rule", id: "f6-constraint-protected" },
-      kind: "evidence",
-      presentation: "ambient",
     },
     {
       source: { type: "rule", id: "f6-transaction-rolled-back" },
@@ -641,15 +656,20 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
       presentation: "ambient",
     },
     {
+      source: { type: "rule", id: "f7-range-root-open" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f7-story-root-cloister-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
       source: { type: "event", id: "f7-story-blind-garden" },
       kind: "secret",
       presentation: "inspect",
       inspectLandmarkId: "f7-blind-garden",
-    },
-    {
-      source: { type: "rule", id: "f7-range-root-open" },
-      kind: "world-change",
-      presentation: "ambient",
     },
     {
       source: { type: "rule", id: "f7-plan-explained" },
@@ -697,12 +717,6 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
       presentation: "ambient",
     },
     {
-      source: { type: "event", id: "f8-story-zero-row-chapel" },
-      kind: "secret",
-      presentation: "inspect",
-      inspectLandmarkId: "f8-zero-row-chapel",
-    },
-    {
       source: { type: "rule", id: "f8-model-wing" },
       kind: "world-change",
       presentation: "ambient",
@@ -718,6 +732,17 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
       presentation: "ambient",
     },
     {
+      source: { type: "event", id: "f8-story-void-court-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "event", id: "f8-story-zero-row-chapel" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f8-zero-row-chapel",
+    },
+    {
       source: { type: "event", id: "f8-story-cipher" },
       kind: "secret",
       presentation: "ambient",
@@ -730,9 +755,22 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
     {
       source: { type: "floor-end" },
       kind: "ascent",
-      presentation: "blocking",
+      presentation: "ambient",
     },
   ],
+};
+
+const AREA_BOSS_STORY_MONSTER_IDS: Readonly<
+  Record<StoryFloor, number | null>
+> = {
+  1: null,
+  2: 22,
+  3: 33,
+  4: 44,
+  5: 55,
+  6: 66,
+  7: 77,
+  8: 89,
 };
 
 function parseCanonicalTrigger(trigger: string): FloorStoryUnlock {
@@ -1006,13 +1044,42 @@ export function validateFloorStoryContent(
     if (floorMoments[0]?.presentation !== "blocking") {
       errors.push(`第 ${floor} 层入层剧情必须使用阻断主框。`);
     }
-    if (floorMoments.at(-1)?.presentation !== "blocking") {
-      errors.push(`第 ${floor} 层离层剧情必须使用阻断主框。`);
+    const expectedFloorEndPresentation = floor === 8 ? "ambient" : "blocking";
+    if (floorMoments.at(-1)?.presentation !== expectedFloorEndPresentation) {
+      errors.push(
+        `第 ${floor} 层离层剧情必须使用 ${expectedFloorEndPresentation} 展示。`,
+      );
+    }
+    if (
+      floor === 8 &&
+      floorMoments.filter((entry) => entry.presentation === "blocking")
+        .at(-1)?.sourceId !== "f8-story-migrate"
+    ) {
+      errors.push("第 8 层最后一个阻断剧情必须是 f8-story-migrate。");
     }
     if (blockingCount > blockingLimit) {
       errors.push(
         `第 ${floor} 层自动阻断剧情 ${blockingCount} 次，超过 ${blockingLimit} 次上限。`,
       );
+    }
+    const areaBossId = AREA_BOSS_STORY_MONSTER_IDS[floor];
+    if (areaBossId !== null) {
+      const areaBossMoments = floorMoments.filter((entry) => (
+        entry.unlock.type === "monster-defeated" &&
+        entry.unlock.monsterId === areaBossId
+      ));
+      if (areaBossMoments.length !== 1) {
+        errors.push(
+          `第 ${floor} 层区域首领 ID #${String(areaBossId).padStart(3, "0")} 必须且只能解锁一个现场剧情节点。`,
+        );
+      } else if (
+        areaBossMoments[0]?.kind !== "boss" ||
+        areaBossMoments[0]?.presentation !== "blocking"
+      ) {
+        errors.push(
+          `第 ${floor} 层区域首领 ID #${String(areaBossId).padStart(3, "0")} 必须使用阻断 Boss 剧情。`,
+        );
+      }
     }
     const queryEvidenceCount = [...mappedEvidenceIds].filter((evidenceId) =>
       evidenceId.startsWith(`lost-name:f${floor}:`)
