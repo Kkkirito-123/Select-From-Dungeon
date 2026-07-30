@@ -112,4 +112,38 @@ describe("complete SQL schema catalog", () => {
       ],
     });
   });
+
+  it("生态怪物的 room_id 与 SQLite 房间 sector 保持一致", async () => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    const result = engine.executeSelect(
+      "SELECT m.id, m.room_id, r.sector FROM monsters m " +
+      "INNER JOIN rooms r ON m.room_id = r.id " +
+      "WHERE m.id IN (6, 7, 8, 9, 33, 44, 55, 63, 64, 66, 74, 75, 76, 77, 86, 88, 89) " +
+      "ORDER BY m.id",
+    );
+
+    expect(result.rows).toEqual([
+      { id: 6, room_id: 11, sector: "drainage" },
+      { id: 7, room_id: 12, sector: "slime-pool" },
+      { id: 8, room_id: 13, sector: "ember-cellar" },
+      { id: 9, room_id: 14, sector: "drainage" },
+      { id: 33, room_id: 50, sector: "grave-mire" },
+      { id: 44, room_id: 60, sector: "frost-vault" },
+      { id: 55, room_id: 70, sector: "barracks" },
+      { id: 63, room_id: 79, sector: "dragon-throne" },
+      { id: 64, room_id: 79, sector: "dragon-throne" },
+      { id: 66, room_id: 80, sector: "crystal-cavern" },
+      { id: 74, room_id: 88, sector: "root-maze" },
+      { id: 75, room_id: 87, sector: "crystal-grove" },
+      { id: 76, room_id: 89, sector: "index-heart" },
+      { id: 77, room_id: 90, sector: "root-maze" },
+      { id: 86, room_id: 99, sector: "void-court" },
+      { id: 88, room_id: 100, sector: "data-throne" },
+      { id: 89, room_id: 101, sector: "void-court" },
+    ]);
+  });
 });

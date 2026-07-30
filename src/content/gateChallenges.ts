@@ -180,8 +180,8 @@ const FLOOR_FIVE_CHALLENGE: GateChallengeDefinition = {
   expectedColumns: ["sector", "id", "power", "rn"],
   expectedRows: [
     { sector: "core", id: 50, power: 28, rn: 1 },
-    { sector: "citadel-boss", id: 55, power: 26, rn: 1 },
-    { sector: "barracks", id: 53, power: 24, rn: 1 },
+    { sector: "barracks", id: 55, power: 26, rn: 1 },
+    { sector: "wall", id: 49, power: 24, rn: 1 },
   ],
 };
 

@@ -34,12 +34,13 @@ describe("第一层迷宫宝箱", () => {
     });
   });
 
-  it("按 E 打开普通箱立即反馈；沉默木箱会进入五阶段基础 SQL 战斗", () => {
+  it("普通箱立即反馈；沉默木箱在三项前置课后进入两阶段基础战斗", () => {
     const session = new GameSession(null, null, "f1-chest-interaction");
     const normal = session.snapshot().groundItems.find((item) => item.id === "chest:f1:normal-a");
     const mimic = session.snapshot().groundItems.find((item) => item.id === "chest:f1:mimic");
     expect(normal).toBeDefined();
     expect(mimic).toBeDefined();
+    expect(JSON.stringify(mimic)).not.toContain("宝箱怪");
 
     expect(session.setPlayerPosition(normal!.x, normal!.y)).toBe(true);
     expect(session.interact()).toMatchObject({ ok: true, kind: "reward" });
@@ -47,9 +48,22 @@ describe("第一层迷宫宝箱", () => {
     expect(session.snapshot().openedGateIds).toContain(normal!.id);
 
     expect(session.setPlayerPosition(mimic!.x, mimic!.y)).toBe(true);
+    expect(session.interact()).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("SELECT、WHERE 与 IS NULL"),
+    });
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminApplyPreset("f1-admin-dormitory")).toMatchObject({ ok: true });
+    const unlockedMimic = session.snapshot().groundItems.find(
+      (item) => item.id === "chest:f1:mimic",
+    );
+    expect(unlockedMimic).toBeDefined();
+    expect(session.setPlayerPosition(unlockedMimic!.x, unlockedMimic!.y)).toBe(true);
     expect(session.interact()).toMatchObject({ ok: true, kind: "combat" });
     expect(session.snapshot().mode).toBe("combat");
     expect(session.snapshot().combat?.targetId).toBe(FLOOR_ONE_MIMIC_MONSTER_ID);
+    expect(session.snapshot().banner).toContain("2 道第一层基础题");
+    expect(session.snapshot().banner).not.toContain("宝箱怪");
     expect(floorOneChestKind(mimic!.id)).toBe("mimic");
   });
 

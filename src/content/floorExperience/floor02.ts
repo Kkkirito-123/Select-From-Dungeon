@@ -50,6 +50,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f2-coast",
+      navigationRegion: "front",
       name: "潮汐码头与白沙浅滩",
       purpose: "用排序点亮航线，并提供可反复返回的中央枢纽",
       lessonIds: ["order-by"],
@@ -59,8 +60,9 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f2-lake",
+      navigationRegion: "front",
       name: "月影湖与沉水村落",
-      purpose: "把 DISTINCT、退潮和可选区域 Boss 变成可见地形变化",
+      purpose: "以 DISTINCT 识别七处水纹；湖兽是前区可选挑战，退潮只开放额外探索",
       lessonIds: ["distinct"],
       material: "深蓝湖水、屋顶、旧钟架和芦苇",
       ambience: "低频水流、远钟与缓慢木管",
@@ -68,8 +70,9 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f2-forest-swamp",
+      navigationRegion: "middle",
       name: "古树桥与芦苇沼泽",
-      purpose: "通过根系连接和缺失装备记录教授 INNER / LEFT JOIN",
+      purpose: "通过根系连接和缺失装备记录教授 INNER / LEFT JOIN；蛙王是通往后区灯塔的主线硬门",
       lessonIds: ["inner-join", "left-join"],
       material: "粗大树根、青苔石、浅泥与芦苇",
       ambience: "温暖中提琴、湿地昆虫与不尖锐的鼓点",
@@ -77,6 +80,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f2-lighthouse",
+      navigationRegion: "rear",
       name: "灯塔岛",
       purpose: "用综合 JOIN 推翻只保留多数记录的规则",
       lessonIds: ["join-boss"],
@@ -165,7 +169,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       anchor: anchor("floor-2-treasure", 0.5, 0.5, "north", 7, 7),
       assetKey: "f02-cc0-scallywag-water",
       fallback: "deep-water-ring",
-      interaction: "可选挑战 ID #021",
+      interaction: "前区可选挑战 ID #021",
       stateKeys: ["high-tide", "defeated"],
       minimapIcon: "area-boss",
     }),
@@ -177,7 +181,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       anchor: anchor("floor-2-event", 0.5, 0.5, "west", 5, 5),
       assetKey: "f02-cc0-scallywag-water",
       fallback: "timber-lock",
-      interaction: "从深潭一侧开启",
+      interaction: "退潮后开启额外探索捷径",
       stateKeys: ["closed", "open"],
       minimapIcon: "shortcut",
     }),
@@ -213,7 +217,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       anchor: anchor("floor-2-join-elite", 0.34, 0.62, "north", 6, 6),
       assetKey: "f02-cc0-puny-overworld",
       fallback: "reed-throne",
-      interaction: "可选挑战 ID #022",
+      interaction: "主线硬门 ID #022 · 击败后开放灯塔道路",
       stateKeys: ["hidden", "available", "defeated"],
       minimapIcon: "area-boss",
     }),
@@ -334,6 +338,20 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       completionFact: "story:f2:low-tide",
     },
     {
+      id: "f2-story-frog-court",
+      title: "泥冠硬门解除",
+      trigger: "monster:22:defeated",
+      repeat: "once",
+      priority: 95,
+      actions: [
+        { type: "camera-focus", landmarkId: "f2-frog-court" },
+        { type: "world-effect", effect: "f2-frog-court-open" },
+        { type: "banner", text: "泥冠硬门解除 · 灯塔后区开放" },
+        { type: "dialogue", speaker: "抄写员", lines: ["未匹配，不等于不存在。", "这一次，沼泽不能再替王城把他们留下。"] },
+      ],
+      completionFact: "story:f2:frog-court",
+    },
+    {
       id: "f2-story-seven-reflections",
       title: "七个倒影",
       trigger: "gate:shortcut:2:return:opened",
@@ -367,7 +385,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       priority: 100,
       actions: [
         { type: "world-effect", effect: "f2-lighthouse-preserving" },
-        { type: "evidence", evidenceId: "lost-name:f2:seven-sources" },
+        { type: "evidence", evidenceId: "lost-name:f2:shared-trace" },
         { type: "dialogue", speaker: "抄写员", lines: ["我给它们编了七个页码。", "没有一个被写成你的真名。"] },
       ],
       completionFact: "story:f2:completed",
@@ -388,6 +406,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
     { id: "f2-admin-village", label: "F2 沉水村落", completedLessonIds: ["order-by", "distinct"], defeatedMonsterIds: [10, 11], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f2-drowned-village" },
     { id: "f2-admin-hidden", label: "F2 沉船记录舱", completedLessonIds: ["order-by", "distinct"], defeatedMonsterIds: [10, 11], openedGateIds: ["gate:floor-2-treasure"], collectedKeyItems: [], focusLandmarkId: "f2-wreck-ledger" },
     { id: "f2-admin-low-tide", label: "F2 退潮与船闸", completedLessonIds: ["order-by", "distinct", "inner-join"], defeatedMonsterIds: [10, 11, 12, 21], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["shortcut-key:2"], focusLandmarkId: "f2-ship-lock" },
-    { id: "f2-admin-complete", label: "F2 通关", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join", "join-boss"], defeatedMonsterIds: [10, 11, 12, 13, 14, 21], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["floor-key:2"], focusLandmarkId: "f2-north-ferry" },
+    { id: "f2-admin-frog-court", label: "F2 泥冠硬门", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join"], defeatedMonsterIds: [10, 11, 12, 13, 22], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f2-frog-court" },
+    { id: "f2-admin-complete", label: "F2 通关", completedLessonIds: ["order-by", "distinct", "inner-join", "left-join", "join-boss"], defeatedMonsterIds: [10, 11, 12, 13, 14, 21, 22], openedGateIds: ["shortcut:2:return"], collectedKeyItems: ["floor-key:2"], focusLandmarkId: "f2-north-ferry" },
   ],
 };

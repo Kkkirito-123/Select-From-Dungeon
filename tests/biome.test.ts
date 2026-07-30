@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BIOME_ENCOUNTERS,
-  weightedBiomeEncounterIds,
+  weightedBiomeEncounterCandidates,
   type BiomeKind,
 } from "../src/content/biomeContent";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
@@ -159,8 +159,9 @@ describe("biome encounter pools", () => {
   it("随机池只使用当前层、当前生态且排除区域首领", () => {
     const unlocked = new Set(lessonsForFloor(2));
     for (const biome of ["lake", "swamp", "forest"] as const satisfies readonly BiomeKind[]) {
-      const ids = weightedBiomeEncounterIds(2, biome, unlocked);
-      expect(ids.length).toBeGreaterThan(0);
+      const candidates = weightedBiomeEncounterCandidates(2, biome, unlocked);
+      const ids = candidates.map((candidate) => candidate.monsterId);
+      expect(candidates.length).toBeGreaterThan(0);
       expect(new Set(ids)).toEqual(new Set(
         BIOME_ENCOUNTERS
           .filter((entry) => (
@@ -176,32 +177,38 @@ describe("biome encounter pools", () => {
   });
 
   it("随机小型精英只在有基础怪物的生态内保持权重；宝箱怪只由宝箱触发", () => {
-    const floorOne = weightedBiomeEncounterIds(
+    const floorOne = weightedBiomeEncounterCandidates(
       1,
       "ember-cellar",
       new Set(lessonsForFloor(1)),
     );
-    const floorTwo = weightedBiomeEncounterIds(
+    const floorTwo = weightedBiomeEncounterCandidates(
       2,
       "swamp",
       new Set(lessonsForFloor(2)),
     );
-    const floorThree = weightedBiomeEncounterIds(
+    const floorThree = weightedBiomeEncounterCandidates(
       3,
       "spirit-crypt",
       new Set(lessonsForFloor(3)),
     );
-    const floorFour = weightedBiomeEncounterIds(
+    const floorFour = weightedBiomeEncounterCandidates(
       4,
       "storm-core",
       new Set(lessonsForFloor(4)),
     );
-    expect(floorOne).not.toContain(9);
-    expect(floorTwo.filter((id) => id === 18).length / floorTwo.length)
-      .toBeCloseTo(0.07, 2);
-    expect(floorThree.filter((id) => id === 31).length / floorThree.length)
-      .toBeCloseTo(0.09, 2);
-    expect(floorFour.filter((id) => id === 42).length / floorFour.length)
-      .toBeCloseTo(0.11, 2);
+    expect(floorOne.map((entry) => entry.monsterId)).not.toContain(9);
+    const weightShare = (
+      candidates: readonly { monsterId: number; weight: number }[],
+      monsterId: number,
+    ) => (candidates.find((entry) => entry.monsterId === monsterId)?.weight ?? 0) /
+      candidates.reduce((total, entry) => total + entry.weight, 0);
+    expect(weightShare(floorTwo, 18)).toBeCloseTo(0.07, 5);
+    expect(weightShare(floorThree, 31)).toBeCloseTo(0.09, 5);
+    expect(weightShare(floorFour, 42)).toBeCloseTo(0.11, 5);
+    expect(floorTwo).toEqual([
+      { monsterId: 17, weight: 93 },
+      { monsterId: 18, weight: 7 },
+    ]);
   });
 });

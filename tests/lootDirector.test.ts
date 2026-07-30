@@ -4,6 +4,7 @@ import {
   CONSUMABLES,
   lootCandidatesForBiome,
   lootCandidatesForFloor,
+  optionalRecoveryProbability,
   type LootCandidate,
 } from "../src/content/inventoryCatalog";
 import { FILTER_BOW } from "../src/content/mvpLevel";
@@ -90,6 +91,16 @@ describe("rollLootItems", () => {
     expect(lootCandidatesForBiome(2, "forest", "normal").every(
       (entry) => entry.item.kind === "consumable",
     )).toBe(true);
+  });
+
+  it("必修怪、固定精英、层主与宝箱怪不参加随机掉落", () => {
+    expect(optionalRecoveryProbability("curriculum")).toBe(0);
+    expect(optionalRecoveryProbability("floor-boss")).toBe(0);
+    expect(optionalRecoveryProbability("normal")).toBe(0.02);
+    expect(optionalRecoveryProbability("mini-elite")).toBe(0.05);
+    expect(optionalRecoveryProbability("area-boss")).toBe(0.1);
+    expect(lootCandidatesForBiome(1, "drainage", "curriculum")[0]?.probability)
+      .toBe(0);
   });
 
   it("八层旧楼层入口也只返回当前生态恢复品", () => {

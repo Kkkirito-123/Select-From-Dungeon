@@ -28,6 +28,15 @@ describe("MVP 2.0 monster IDs", () => {
     }
   });
 
+  it("同一楼层的 canonical 显示名称保持唯一", () => {
+    for (let floor = 1; floor <= 8; floor += 1) {
+      const names = INITIAL_MONSTERS
+        .filter((monster) => monster.floor === floor)
+        .map((monster) => monster.name);
+      expect(new Set(names).size).toBe(names.length);
+    }
+  });
+
   it("课程目标、生态遭遇和 master_id 都指向真实怪物主键", () => {
     const monstersById = new Map(
       INITIAL_MONSTERS.map((monster) => [monster.id, monster]),

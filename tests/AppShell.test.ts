@@ -1,22 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { COMPLETE_SCHEMA_LINES } from "../src/content/sqlSchema";
 import { GameSession } from "../src/domain/GameSession";
+import { migrationStepMarkerIds } from "../src/domain/finalMigration";
 import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/types";
 import { answerReviewSummary } from "../src/ui/AnswerReviewView";
 import {
   canPresentQueuedNarrativeMoment,
+  canPresentFinalMigrationStoryMoment,
   canOpenCombatTerminal,
   combatSettlementCopy,
+  finalMigrationArgumentCopy,
+  finalMigrationRecordCopy,
+  finalVictoryPortalReady,
   inspectionDialogCopy,
+  inspectionEscapeCanClose,
   isInspectionPrimaryKey,
   narrativeProgressForSnapshot,
   narrativeMomentUsesRecordOverlay,
+  redactSnapshotMonsterIdentity,
   storyMomentRecordBody,
   schemaRenderSignature,
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+
+describe("玩家可见文本身份边界", () => {
+  it("剧情、调查与管理员文本在击杀前只显示稳定 ID", () => {
+    const snapshot = new GameSession(null, null, "app-shell-identity-boundary").snapshot();
+    expect(redactSnapshotMonsterIdentity(
+      "史莱姆发动数据喷射，内部类型 projection_slime。",
+      snapshot,
+    )).toBe("ID #001发动数据喷射，内部类型 未识别类型。");
+  });
+});
 
 describe("主框确认键", () => {
   it("E、不同键盘布局的 e/E 与 Enter 都能确认，长按不会重复触发", () => {
@@ -26,6 +43,12 @@ describe("主框确认键", () => {
     expect(isInspectionPrimaryKey({ code: "Enter", key: "Enter", repeat: false })).toBe(true);
     expect(isInspectionPrimaryKey({ code: "KeyE", key: "e", repeat: true })).toBe(false);
     expect(isInspectionPrimaryKey({ code: "Escape", key: "Escape", repeat: false })).toBe(false);
+  });
+
+  it("ESC 不能确认 MIGRATE 页或其他 blocking 剧情", () => {
+    expect(inspectionEscapeCanClose("migration", "blocking")).toBe(false);
+    expect(inspectionEscapeCanClose("story", "blocking")).toBe(false);
+    expect(inspectionEscapeCanClose("inspection", "inspect")).toBe(true);
   });
 });
 
@@ -100,7 +123,16 @@ describe("narrativeProgressForSnapshot", () => {
       "narrative:f1:midpoint-evidence",
       "narrative:f1:campfire",
     ]);
-    expect(midpoint.discoveredEvidenceIds).toContain(
+    expect(midpoint.discoveredEvidenceIds).not.toContain(
+      "lost-name:f1:current-record",
+    );
+    const inspectedMidpoint = narrativeProgressForSnapshot({
+      ...snapshot,
+      completedLessons: ["select", "where", "is-null"],
+      openedGateIds: ["story:evidence:lost-name:f1:current-record"],
+      respawnCampfireId: snapshot.campfires[0]?.id ?? null,
+    });
+    expect(inspectedMidpoint.discoveredEvidenceIds).toContain(
       "lost-name:f1:current-record",
     );
     expect(midpoint.seenMomentIds).toEqual(expect.arrayContaining([
@@ -122,7 +154,7 @@ describe("narrativeProgressForSnapshot", () => {
       completedLessons: ["select", "where", "is-null", "group-by"],
     });
     expect(bossReached.latestBeat?.kind).toBe("boss");
-    expect(bossReached.discoveredEvidenceIds).toContain(
+    expect(bossReached.discoveredEvidenceIds).not.toContain(
       "lost-name:f1:restore-permission",
     );
   });
@@ -167,16 +199,95 @@ describe("narrativeProgressForSnapshot", () => {
     expect(progress.completedAscentIds).toEqual(["ascent:f1:f2"]);
     expect(progress.completedMigrationStepIds).toEqual([]);
   });
+
+  it("第八层 victory 从 Run marker 推导 MIGRATE 进度而不再自动全完成", () => {
+    const snapshot = new GameSession(null, null, "migration-marker-progress").snapshot();
+    const progress = narrativeProgressForSnapshot({
+      ...snapshot,
+      floor: 8,
+      mode: "victory",
+      openedGateIds: migrationStepMarkerIds().slice(0, 2),
+    });
+    expect(progress.completedMigrationStepIds).toEqual(["snapshot", "audit"]);
+  });
+});
+
+describe("MIGRATE 七页主框", () => {
+  const migrationMoment = {
+    floor: 8 as const,
+    sourceId: "f8-story-migrate",
+  };
+
+  it("档案王击败后仍等待第八层 victory，不能在探索态提前展示", () => {
+    expect(canPresentFinalMigrationStoryMoment(
+      migrationMoment,
+      { floor: 8, mode: "explore" },
+    )).toBe(false);
+    expect(canPresentFinalMigrationStoryMoment(
+      migrationMoment,
+      { floor: 8, mode: "victory" },
+    )).toBe(true);
+  });
+
+  it("刷新后从首个未完成页继续，七步完成后不再生成主框页", () => {
+    const first = finalMigrationRecordCopy([]);
+    expect(first).toMatchObject({
+      title: "1 / 7 · 保存只读快照",
+      stepIndex: 0,
+      stepTotal: 7,
+    });
+    expect(first?.body).not.toContain("众名第一次共同拥有了明天");
+
+    const resumed = finalMigrationRecordCopy(
+      migrationStepMarkerIds().slice(0, 3),
+    );
+    expect(resumed).toMatchObject({
+      title: "4 / 7 · 隔离构建新结构",
+      stepIndex: 3,
+      stepTotal: 7,
+    });
+    expect(finalMigrationRecordCopy(migrationStepMarkerIds())).toBeNull();
+  });
+
+  it("第七步落盘前最终 portal 始终不可用", () => {
+    const markers = migrationStepMarkerIds();
+    expect(finalVictoryPortalReady({
+      floor: 8,
+      mode: "victory",
+      openedGateIds: markers.slice(0, 6),
+    })).toBe(false);
+    expect(finalVictoryPortalReady({
+      floor: 8,
+      mode: "victory",
+      openedGateIds: markers,
+    })).toBe(true);
+  });
+
+  it("只在 #084 的 f8-security 五阶段显示论点、证据与玩家结论", () => {
+    const hiddenIdentityArgument = finalMigrationArgumentCopy({
+      lessonId: "f8-security",
+      lessonStageId: "f8-final-snapshot",
+      combat: { targetId: 84 },
+    });
+    expect(hiddenIdentityArgument).toMatchObject({
+      argument: expect.stringContaining("ID #084："),
+      evidence: expect.stringContaining("恢复权限"),
+      conclusion: expect.stringContaining("玩家结论："),
+    });
+    expect(hiddenIdentityArgument?.argument).not.toContain("档案王");
+    expect(finalMigrationArgumentCopy({
+      lessonId: "f8-security",
+      lessonStageId: "f8-final-snapshot",
+      combat: { targetId: 83 },
+    })).toBeNull();
+  });
 });
 
 describe("剧情节点呈现层级", () => {
   it("关键剧情占据主画面，机关变化继续使用三步短反馈", () => {
-    expect(narrativeMomentUsesRecordOverlay("entry")).toBe(true);
-    expect(narrativeMomentUsesRecordOverlay("secret")).toBe(true);
-    expect(narrativeMomentUsesRecordOverlay("boss")).toBe(true);
-    expect(narrativeMomentUsesRecordOverlay("world-change")).toBe(false);
-    expect(narrativeMomentUsesRecordOverlay("evidence")).toBe(false);
-    expect(narrativeMomentUsesRecordOverlay("evidence", true)).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("blocking")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("inspect")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("ambient")).toBe(false);
   });
 });
 
@@ -208,6 +319,10 @@ describe("canPresentQueuedNarrativeMoment", () => {
     expect(canPresentQueuedNarrativeMoment("explore", true, false, false))
       .toBe(false);
     expect(canPresentQueuedNarrativeMoment("transition", false, false, false))
+      .toBe(true);
+    expect(canPresentQueuedNarrativeMoment("victory", false, false, false))
+      .toBe(true);
+    expect(canPresentQueuedNarrativeMoment("defeat", false, false, false))
       .toBe(false);
   });
 });

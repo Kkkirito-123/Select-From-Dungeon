@@ -37,6 +37,7 @@ export const FLOOR_THREE_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f3-bone-yard",
+      navigationRegion: "front",
       name: "遗骨荒地",
       purpose: "用明确的两端关系搭起第一座骨桥",
       lessonIds: ["f3-inner", "f3-left"],
@@ -46,6 +47,7 @@ export const FLOOR_THREE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f3-grave-mire",
+      navigationRegion: "middle",
       name: "腐土墓园",
       purpose: "让同表别名和三表关系成为看得见的墓志连接",
       lessonIds: ["f3-self", "f3-chain"],
@@ -55,6 +57,7 @@ export const FLOOR_THREE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f3-spirit-crypt",
+      navigationRegion: "rear",
       name: "幽火地宫",
       purpose: "用 UNION 保留多处证词，并审计唯一继承人的错误规则",
       lessonIds: ["f3-union", "f3-audit"],
@@ -241,6 +244,7 @@ export const FLOOR_THREE_EXPERIENCE: FloorExperienceDefinition = {
       actions: [
         { type: "camera-focus", landmarkId: "f3-reliquary" },
         { type: "world-effect", effect: "f3-reliquary-open" },
+        { type: "evidence", evidenceId: "lost-name:f3:current-owner" },
         { type: "dialogue", speaker: "抄写员", lines: ["CURRENT OWNER 已确认是 NULL。", "它没有现在的主人，却留下了过去的连接。"] },
       ],
       completionFact: "story:f3:reliquary",

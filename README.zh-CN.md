@@ -214,6 +214,16 @@ pnpm dev
 打开 Vite 输出的地址，通常是 `http://localhost:5173/`。不要通过 `file://` 直接打开
 `index.html`，SQLite WASM 必须通过 HTTP 加载。
 
+需要按生产方式本地验收时，构建并通过 HTTP 预览 `dist/`：
+
+```bash
+pnpm build
+pnpm preview
+```
+
+顶栏 `⌘ 管理员` 可载入任意楼层、区域和入层/区域首领/隐藏区/Boss 预设，包含剧透。
+预览只存在内存中，不覆盖正式 Run 或永久怪物档案；刷新页面即退出预览并回到最后一次正式存档。
+
 第一只怪物的两次攻击是：
 
 ```sql
@@ -314,6 +324,14 @@ python3 scripts/validate-rules.py
 `pnpm build` 会先执行 TypeScript 检查，再把静态网站输出到 `dist/`，并把根目录权威
 `LICENSE` 与 `ATTRIBUTIONS.md` 自动复制进去；不要另外手工维护副本。把该目录部署到能正确
 提供 WASM MIME 类型的静态托管即可。
+
+GitHub Pages 默认不部署：`.github/workflows/deploy-pages.yml` 只在仓库变量
+`GITHUB_PAGES_ENABLED=true` 时执行，上传 `dist` 前必须通过规则、单测和生产构建，并保持 Vite
+`base: "./"`。当前仓库保持私有；如果 Provider/套餐不允许 workflow-backed Pages，发布状态记为
+`provider-blocked`，变量保持 false 或未设置，没有单独授权不改公开、不换托管商。
+
+MVP 2.0 保留当前 Phaser、SQLite WASM、world-rules 和应用 Chunk 拆分；包体与首帧性能优化
+延后到独立的 MVP 2.1 专项，本内容版不为此改引擎、依赖、Schema 或存档版本。
 
 当前八层迷宫迭代拥有自动化证据和定向浏览器验收。内容测试会把八份迷宫契约与地图
 蓝图、课程 Boss 门、手工地标、捷径和隐藏房交叉核对；物理验收再以 F1–F8 每层 6 个 Seed

@@ -14,10 +14,13 @@ import {
   floorStoryMoments,
   type FloorStoryMomentKind,
 } from "../domain/floorStory";
+import { INITIAL_MONSTERS } from "../content/mvpLevel";
+import { redactUndiscoveredMonsterIdentityText } from "../domain/monsterIdentity";
 import type { FloorNumber } from "../domain/runGraph";
 
 export interface NarrativeCodexRenderState {
   floor: FloorNumber;
+  discoveredMonsterIds?: readonly number[];
   seenBeatIds?: readonly string[];
   seenMomentIds?: readonly string[];
   discoveredEvidenceIds?: readonly string[];
@@ -127,6 +130,16 @@ export function buildNarrativeCodexModel(
   state: NarrativeCodexRenderState,
 ): NarrativeCodexModel {
   const floor = narrativeFloorFor(state.floor);
+  const floorMonsters = INITIAL_MONSTERS.filter(
+    (monster) => monster.floor === state.floor,
+  );
+  const redactIdentity = (value: string): string => (
+    redactUndiscoveredMonsterIdentityText(
+      value,
+      floorMonsters,
+      state.discoveredMonsterIds ?? [],
+    )
+  );
   const seenBeatIds = setFrom(state.seenBeatIds);
   const seenMomentIds = setFrom(state.seenMomentIds);
   const completedAscentIds = setFrom(state.completedAscentIds);
@@ -138,8 +151,8 @@ export function buildNarrativeCodexModel(
       id: entry.id,
       kind: entry.kind,
       label: BEAT_LABEL[entry.kind],
-      title: complete ? entry.title : "尚未抵达",
-      lines: complete ? entry.lines : [],
+      title: complete ? redactIdentity(entry.title) : "尚未抵达",
+      lines: complete ? entry.lines.map(redactIdentity) : [],
       complete,
     };
   });
@@ -147,9 +160,9 @@ export function buildNarrativeCodexModel(
     const complete = seenMomentIds.has(entry.id);
     const query = complete && entry.query
       ? {
-          title: entry.query.title,
-          sql: entry.query.sql,
-          purpose: entry.query.purpose,
+          title: redactIdentity(entry.query.title),
+          sql: redactIdentity(entry.query.sql),
+          purpose: redactIdentity(entry.query.purpose),
           resultShape: entry.query.expectedRowCount === 0
             ? "真实结果：0 行"
             : `真实结果：${entry.query.expectedRowCount} 行 · 字段 ${
@@ -160,10 +173,10 @@ export function buildNarrativeCodexModel(
     return {
       id: entry.id,
       kind: entry.kind,
-      kicker: complete ? entry.kicker : "现场记录",
-      title: complete ? entry.title : "尚未抵达",
-      lines: complete ? entry.lines : [],
-      archiveLine: complete ? entry.archiveLine : null,
+      kicker: complete ? redactIdentity(entry.kicker) : "现场记录",
+      title: complete ? redactIdentity(entry.title) : "尚未抵达",
+      lines: complete ? entry.lines.map(redactIdentity) : [],
+      archiveLine: complete ? redactIdentity(entry.archiveLine) : null,
       complete,
       query,
     };
@@ -173,11 +186,11 @@ export function buildNarrativeCodexModel(
     state.discoveredEvidenceIds,
   ).map((entry) => ({
     id: entry.id,
-    title: entry.title,
-    fieldLabel: entry.fieldLabel,
+    title: redactIdentity(entry.title),
+    fieldLabel: redactIdentity(entry.fieldLabel),
     state: entry.state,
-    displayValue: entry.displayValue,
-    finding: entry.finding,
+    displayValue: redactIdentity(entry.displayValue),
+    finding: entry.finding === null ? null : redactIdentity(entry.finding),
   }));
 
   const ascents = NARRATIVE_FLOORS.flatMap((entry) => {

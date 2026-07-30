@@ -40,12 +40,13 @@ show only a stable `ID #NNN` until defeated; the finishing blow recovers the
 plain display name into the permanent Monster Codex. Moving into a living
 curriculum monster or passing an encounter check starts a separate
 single-target battle where the player writes complete read-only SQL. The Run
-starts at two hearts, uses deterministic one-damage counters with armor-first
+starts at two hearts, uses deterministic floor-and-role counters with armor-first
 absorption, awards rank-based XP with a visible post-battle settlement, and
 unlocks each deterministic curriculum reward in its room's
 `E`-opened chest, explains acquired loot, automatically
 opens a short non-interactive portal after each of the first seven floor Bosses,
-and ends at an eighth-floor five-stage database-incident Boss. Step-meter ambushes award XP and
+and ends at an eighth-floor five-stage database-incident Boss followed by the
+seven-page `MIGRATE` procedure. Step-meter ambushes award XP and
 may produce only optional low-probability loot. Outside safe zones, each
 eligible successful step has a 2% base ambush chance and the meter guarantees an
 encounter after 30 eligible quiet steps; reloads do not reroll the result.
@@ -255,7 +256,8 @@ is not serialized.
 `MazeFloor`, campfires, guided plan, and biome plan. It must not persist derived
 safe-cell, sight, hazard-position, or threshold-confirmation duplicates.
 `src/content/floorContracts.ts` owns campaign curriculum metadata and its
-serializable schema; while registered drift `AUTH-003` remains open, it is not
+serializable schema. Registered drift `AUTH-003` is closed by cross-authority
+tests, but this file is still not
 the player-facing authority for floor names, biomes, or exact monster rosters.
 Executable monster truth lives in the per-floor level files and
 `biomeContent.ts`; player-facing places and events live in Floor Experience;
@@ -265,11 +267,27 @@ reject skipped, duplicated, or rerolled transitions. This campaign must never
 route a floor through another floor's content. The authority register is
 `docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`.
 
-The V2 eight-floor narrative and monster-distribution documents are
-design-locked implementation targets, not runtime claims. Their renamed
-monsters, stage curves, region mappings, and expanded story beats remain
-pending until code, automated evidence, and human QA advance each item
-independently.
+The V2 eight-floor narrative and monster-distribution contracts now have a
+runtime and automated-test baseline; complete human playthrough, copy/audio
+review, and final visual polish remain separate evidence. Preserve these durable
+boundaries:
+
+- Player-facing subregions map explicitly to the only physical navigation
+  regions, `front`, `middle`, and `rear`; F2 may expose four display regions.
+- Monster IDs `1–89`, lesson/result, equipment, story/evidence, and `MIGRATE`
+  IDs plus Run v11/Profile v3 are compatibility keys and must not be renamed.
+- Before the finishing blow, every player-visible monster reference goes
+  through `monsterIdentityPresentation` or `monsterIntentName`; admin reveal is
+  memory-only and never updates the profile.
+- Story uses `blocking`, `ambient`, and `inspect`: blocking requires explicit
+  confirmation, ambient expires after three successful moves, and inspect
+  opens/closes with `E`. Restored Runs archive seen moments without replaying.
+- `counterDamageForEncounter` is the combat authority: F1–2 all roles deal 1;
+  F3–4 normal/elite deal 1 and Boss roles 2; F5–6 normal deals 1 and other roles
+  2; F7–8 floor Bosses deal 3 and other roles 2. Errors share this rule and
+  armor absorbs first; traps and SQL ciphers remain separate one-damage systems.
+- The four teaching-table DDLs, monster primary/detail-key meanings, and stable
+  save versions do not change for narrative work.
 `src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
 complete canonical schema, current task context, and MVP SQL vocabulary. It may
 replace only the active token after explicit keyboard or pointer acceptance; it
@@ -379,9 +397,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   Randomness must never block curriculum progress. Combat damage is
   deterministic so SQL targeting remains inspectable.
 - A new Run starts at two hearts. Normal, elite, and Boss victories award 1, 3,
-  and 5 XP; cumulative level thresholds are 2, 4, 6, 8, then continue in
-  four-XP steps through 24. Level-ups add one maximum heart and restore one
-  heart per level gained.
+  and 5 XP; area Bosses also award 3 XP. Cumulative level thresholds are
+  `0, 2, 4, 6, 8, 14, 22, 32, 44, 58, 74, 92, 112`, and base maximum health is
+  `2 + floor((level - 1) / 2)`.
 - One SQL submission is one combat turn, with no timer while thinking or typing.
   Correct results only trigger the player attack; wrong results and syntax
   errors trigger the telegraphed enemy counter. Empty input consumes no turn.
@@ -454,12 +472,11 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   entrance with full HP, while mastery, XP, gear, doors, defeated enemies, and
   the surviving enemy's current HP remain intact. The automatically opened
   review is scoped to the battle that caused death.
-- First- through fourth-floor entry, hidden-room discovery, Scribe, Boss, and ascent
-  story nodes use a dedicated main-stage record dialog; first-floor Scribe,
-  archive-wheel, nameless-dormitory, and authored second-floor landmark
-  investigations use the same dialog instead of overwriting the persistent
-  right-rail banner. The dialog pauses held movement and monster patrols while
-  open; `E`, `Escape`, or its visible close action returns focus to exploration.
+- All eight floors route entry, Boss settlement, ascent, world changes, Scribe,
+  landmarks, and hidden evidence through the three story presentations.
+  Blocking records pause movement/patrols and cannot be confirmed with
+  `Escape`; inspect records may close with `E`, `Escape`, or their close action.
+  Identity/XP/loot settlement completes before queued story and world changes.
 - Web Audio music and event cues are authored in project code. All eight floors
   electronically re-synthesize identified public-domain classical themes with
   region variations and separate exploration, combat, and Boss movements.
@@ -476,6 +493,12 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - The production build keeps Phaser, `sql.js`, and SQLite WASM in separate
   cacheable assets. `sqlite-runtime` must remain outside the application entry;
   the WASM file remains an external fetched asset and is not inlined.
+- `.github/workflows/deploy-pages.yml` is opt-in through
+  `GITHUB_PAGES_ENABLED=true` and must validate rules, tests, and `dist` before
+  deployment. If private-repository Pages is rejected by the provider/plan,
+  keep the repository private and the variable false/unset, record
+  `provider-blocked`, and do not buy, publish, or switch hosts without authority.
+  Bundle/runtime optimization remains a separate MVP 2.1 change.
 - Characters and UI effects remain generated from project code. The first two
   floor slices may also load the audited CC0 tile/prop packs declared in their
   runtime manifests; source archives, hashes, licenses, and transformed outputs

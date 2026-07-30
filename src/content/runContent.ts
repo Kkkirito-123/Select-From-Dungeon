@@ -127,7 +127,7 @@ export const ROOM_TEMPLATES: Record<RoomType, RoomTemplate> = {
     accentColor: 0xd7ad55,
   },
   boss: {
-    label: "魔王核心",
+    label: "层主核心",
     rows: THRONE_ROWS,
     floorColor: 0x2b1c22,
     accentColor: 0xc75248,
@@ -312,7 +312,7 @@ export function roomFlavor(type: RoomType, floor = 1): string {
       treasure: "黑曜宝库只提供构筑奖励，不改变事故证据。",
       event: "事故碑廊解释边界：这里训练推理，不模拟生产分布式数据库。",
       elite: "巨兽桥要求先验证路由和副本状态，再作取舍。",
-      boss: "魔王拥有五阶段事故链；每一击都必须给出可复现结果。",
+      boss: "ID #084 拥有五阶段事故链；每一击都必须给出可复现结果。",
     };
     return floorEightCopy[type];
   }

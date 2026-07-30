@@ -46,6 +46,17 @@ const UNREVEALED_IDENTITY_MESSAGE =
   "身份字段仍被封存。本回合只允许使用题目要求的非身份字段。";
 
 type IdentityColumn = "name" | "species";
+type SealedLabelColumn = "name" | "gear_name";
+
+interface SealedLabelRule {
+  table: "rooms" | "monster_gear";
+  column: SealedLabelColumn;
+}
+
+const SEALED_LABEL_RULES: readonly SealedLabelRule[] = [
+  { table: "rooms", column: "name" },
+  { table: "monster_gear", column: "gear_name" },
+] as const;
 
 function normalizeIdentitySql(sql: string): string {
   return stripComments(sql)
@@ -69,6 +80,188 @@ function monsterAliasesForSql(sql: string): Set<string> | null {
     if (alias && !SQL_ALIAS_STOP_WORDS.has(alias)) aliases.add(alias);
   }
   return aliases;
+}
+
+function tableAliasesForSql(sql: string, table: string): Set<string> | null {
+  const tablePattern = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const reference = new RegExp(
+    `\\b(?:from|join)\\s+(?:(?:[a-z_]\\w*)\\s*\\.\\s*)?${tablePattern}\\b`,
+    "i",
+  );
+  if (!reference.test(sql)) return null;
+  const aliases = new Set([table.toLowerCase()]);
+  const declarations = new RegExp(
+    `\\b(?:from|join)\\s+(?:(?:[a-z_]\\w*)\\s*\\.\\s*)?${tablePattern}\\b(?:\\s+(?:as\\s+)?([a-z_]\\w*))?`,
+    "gi",
+  );
+  for (const match of sql.matchAll(declarations)) {
+    const alias = match[1]?.toLowerCase();
+    if (alias && !SQL_ALIAS_STOP_WORDS.has(alias)) aliases.add(alias);
+  }
+  return aliases;
+}
+
+function topLevelProjectionRanges(sql: string): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  let depth = 0;
+  let selectStart: number | null = null;
+  const isWord = (value: string | undefined): boolean => /[a-z0-9_]/i.test(value ?? "");
+  const keywordAt = (index: number, keyword: string): boolean => (
+    sql.slice(index, index + keyword.length).toLowerCase() === keyword &&
+    !isWord(sql[index - 1]) &&
+    !isWord(sql[index + keyword.length])
+  );
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const character = sql[index];
+    if (character === "(") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (depth !== 0) continue;
+    if (keywordAt(index, "select")) {
+      selectStart = index + "select".length;
+      index += "select".length - 1;
+      continue;
+    }
+    if (selectStart !== null && keywordAt(index, "from")) {
+      ranges.push({ start: selectStart, end: index });
+      selectStart = null;
+      index += "from".length - 1;
+    }
+  }
+  return ranges;
+}
+
+function projectionRangesAtAnyDepth(sql: string): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  const selectStartByDepth = new Map<number, number>();
+  let depth = 0;
+  const isWord = (value: string | undefined): boolean => /[a-z0-9_]/i.test(value ?? "");
+  const keywordAt = (index: number, keyword: string): boolean => (
+    sql.slice(index, index + keyword.length).toLowerCase() === keyword &&
+    !isWord(sql[index - 1]) &&
+    !isWord(sql[index + keyword.length])
+  );
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const character = sql[index];
+    if (character === "(") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")") {
+      selectStartByDepth.delete(depth);
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (keywordAt(index, "select")) {
+      selectStartByDepth.set(depth, index + "select".length);
+      index += "select".length - 1;
+      continue;
+    }
+    const selectStart = selectStartByDepth.get(depth);
+    if (selectStart !== undefined && keywordAt(index, "from")) {
+      ranges.push({ start: selectStart, end: index });
+      selectStartByDepth.delete(depth);
+      index += "from".length - 1;
+    }
+  }
+  return ranges;
+}
+
+function hasSealedSourceWildcardProjection(sql: string): boolean {
+  const normalized = normalizeIdentitySql(sql);
+  const aliases = [
+    monsterAliasesForSql(normalized),
+    tableAliasesForSql(normalized, "rooms"),
+    tableAliasesForSql(normalized, "monster_gear"),
+  ].filter((entry): entry is Set<string> => entry !== null);
+  if (aliases.length === 0) return false;
+  const sealedAliases = new Set(aliases.flatMap((entry) => [...entry]));
+
+  return projectionRangesAtAnyDepth(normalized).some((range) => (
+    splitProjection(normalized.slice(range.start, range.end)).some((expression) => {
+      const wildcard = expression.trim().match(
+        /^(?:distinct\s+)?(?:([a-z_]\w*)\s*\.\s*)?\*$/i,
+      );
+      if (!wildcard) return false;
+      const qualifier = wildcard[1]?.toLowerCase();
+      return qualifier === undefined || sealedAliases.has(qualifier);
+    })
+  ));
+}
+
+function sealedLabelColumnsInFragment(
+  fragment: string,
+  aliases: ReadonlySet<string>,
+  column: SealedLabelColumn,
+): boolean {
+  const qualifiedPattern = new RegExp(
+    `\\b([a-z_]\\w*)\\s*\\.\\s*\\b${column}\\b`,
+    "gi",
+  );
+  let qualified = false;
+  const unqualified = fragment.replace(
+    qualifiedPattern,
+    (_reference, qualifier: string) => {
+      if (aliases.has(qualifier.toLowerCase())) qualified = true;
+      return " ";
+    },
+  ).replace(new RegExp(`\\bas\\s+${column}\\b`, "gi"), " ");
+  return qualified || new RegExp(`\\b${column}\\b`, "i").test(unqualified);
+}
+
+function isDirectSealedLabelProjection(
+  expression: string,
+  aliases: ReadonlySet<string>,
+  column: SealedLabelColumn,
+): boolean {
+  const match = expression.trim().match(
+    new RegExp(
+      `^(?:distinct\\s+)?(?:([a-z_]\\w*)\\s*\\.\\s*)?${column}(?:\\s+(?:as\\s+)?[a-z_]\\w*)?$`,
+      "i",
+    ),
+  );
+  if (!match) return false;
+  const qualifier = match[1]?.toLowerCase();
+  return !qualifier || aliases.has(qualifier);
+}
+
+function hasSealedLabelPredicateUse(sql: string): boolean {
+  const normalized = normalizeIdentitySql(sql);
+  const projectionRanges = topLevelProjectionRanges(normalized);
+
+  for (const rule of SEALED_LABEL_RULES) {
+    const aliases = tableAliasesForSql(normalized, rule.table);
+    if (!aliases) continue;
+    for (const range of projectionRanges) {
+      const projection = normalized.slice(range.start, range.end);
+      for (const expression of splitProjection(projection)) {
+        if (!sealedLabelColumnsInFragment(expression, aliases, rule.column)) continue;
+        if (!isDirectSealedLabelProjection(expression, aliases, rule.column)) {
+          return true;
+        }
+      }
+    }
+
+    const withoutTopLevelProjections = projectionRanges.reduceRight(
+      (value, range) => (
+        `${value.slice(0, range.start)}${" ".repeat(range.end - range.start)}${value.slice(range.end)}`
+      ),
+      normalized,
+    );
+    if (sealedLabelColumnsInFragment(
+      withoutTopLevelProjections,
+      aliases,
+      rule.column,
+    )) return true;
+  }
+  return false;
 }
 
 function identityColumnsInFragment(
@@ -182,7 +375,11 @@ export function unrevealedIdentityQueryMessage(
   identityRevealed: boolean,
 ): string | null {
   if (floor < 1 || floor > 8 || identityRevealed) return null;
-  return hasSealedIdentityUse(sql, new Set())
+  return (
+    hasSealedIdentityUse(sql, new Set()) ||
+    hasSealedLabelPredicateUse(sql) ||
+    hasSealedSourceWildcardProjection(sql)
+  )
     ? UNREVEALED_IDENTITY_MESSAGE
     : null;
 }
@@ -866,10 +1063,8 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         hasSingleValue(result, "id", 31)
       );
     case "grave-boss-scan":
-      return hasExactOrderedRows(result, ["id"], [
-        [31],
-        [32],
-        [33],
+      return hasExactOrderedRows(result, ["id", "room_name", "power"], [
+        [33, "墓主祭坛", 22],
       ]);
     case "grave-boss-core":
       return (
@@ -905,7 +1100,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-fire":
       return hasSingleValue(result, "id", 40);
     case "practice-ice":
-      return hasExactOrderedRows(result, ["id"], [[41]]);
+      return hasExactOrderedRows(result, ["id"], [[41], [44]]);
     case "practice-storm":
       return columnEqualsNumber(whereClause, "id", 42) &&
         hasSingleValue(result, "id", 42);
@@ -999,13 +1194,20 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         [54, 84],
       ]);
     case "iron-boss-scan":
-      return hasExactOrderedRows(result, ["id", "power"], [[53, 24]]);
+      return hasExactOrderedRows(result, ["id", "rank_no"], [
+        [51, 5],
+        [52, 4],
+        [53, 2],
+        [54, 3],
+        [55, 1],
+      ]);
     case "iron-boss-core":
-      return hasExactOrderedRows(result, ["id", "prev_power"], [
-        [51, null],
-        [52, 18],
-        [53, 20],
-        [54, 24],
+      return hasExactOrderedRows(result, ["id", "prev_power", "next_power"], [
+        [51, null, 20],
+        [52, 18, 24],
+        [53, 20, 22],
+        [54, 24, 26],
+        [55, 22, null],
       ]);
     case "f6-insert-row":
       return hasSandboxRows(result, [
@@ -1026,7 +1228,6 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-crystal-drake":
       return hasSandboxRows(result, SANDBOX_BASE_ROWS);
     case "f6-savepoint-rollback":
-    case "dragon-boss-scan":
       return hasSandboxRows(result, [
         SANDBOX_BASE_ROWS[0],
         [2, "scale", 1, "fixed"],
@@ -1048,8 +1249,10 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
         [1, "ore", 3, "ready"],
         ...SANDBOX_BASE_ROWS.slice(1),
       ]);
-    case "dragon-boss-core":
+    case "dragon-boss-scan":
       return hasSandboxRows(result, SANDBOX_BASE_ROWS.filter((row) => row[0] !== 4));
+    case "dragon-boss-core":
+      return hasSandboxRows(result, SANDBOX_BASE_ROWS);
     case "f7-btree-search":
       return hasExactOrderedRows(result, ["code", "score"], [["CRY-103", 72]]) &&
         planContains(result, "SEARCH", "INTEGER PRIMARY KEY");
@@ -1160,9 +1363,17 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
     case "practice-golem":
       return hasExactOrderedRows(result, ["model", "score"], [["normalized", 95]]);
     case "throne-boss-scan":
-      return hasExactOrderedRows(result, ["account_id", "shard_id"], [[107, 9]]);
+      return hasExactOrderedRows(
+        result,
+        ["waiter_tx", "blocker_tx", "resource"],
+        [["T3", "T2", "log:2"]],
+      );
     case "throne-boss-core":
-      return hasExactOrderedRows(result, ["method"], [["prepared-select"]]);
+      return hasExactOrderedRows(
+        result,
+        ["phenomenon", "first_count", "second_count", "prevented_by"],
+        [["phantom_read", 2, 4, "SERIALIZABLE"]],
+      );
   }
 }
 
@@ -1213,7 +1424,7 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-spirit": "没有用自连接返回 ID #031 与其 master_id。",
   "practice-spirit-core": "没有按 id 与 haunting 状态返回 ID #031。",
   "practice-wraith": "没有用自连接返回 ID #032 与其 master_id。",
-  "grave-boss-scan": "UNION 结果应依次为 ID #031、#032 与 #033。",
+  "grave-boss-scan": "三表连接应返回 ID #033、墓主祭坛与 power = 22。",
   "grave-boss-core": "没有用自连接返回 ID #033 与其 master_id。",
   "f4-scalar-first": "标量子查询没有返回 51 号房间中 id 最小的 ID #034。",
   "f4-in-frost": "IN 子查询没有返回第四层 frost 房间中的 ID #035。",
@@ -1223,11 +1434,11 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "f4-recursive-rooms": "递归房间序列应依次返回火室、冰库、雷池。",
   "f4-recursive-core": "递归关系应依次返回 ID #034、#037 与 #039。",
   "practice-fire": "标量子查询没有返回 ID #040。",
-  "practice-ice": "IN 子查询没有返回 ID #041。",
+  "practice-ice": "IN 子查询应按 id 返回 frost-vault 中的 ID #041 与 #044。",
   "practice-storm": "EXISTS 没有验证 ID #042 的装备记录。",
   "practice-storm-core": "没有按 id 与 charged 状态返回 ID #042。",
   "practice-spark": "EXISTS 没有验证 ID #043 的装备记录。",
-  "forge-boss-scan": "CTE 没有返回拥有高 power 装备的 ID #044。",
+  "forge-boss-scan": "IN 子查询没有返回拥有 power >= 22 装备的 ID #044。",
   "forge-boss-core": "EXISTS 没有验证 ID #044 的装备记录。",
   "f5-over-count": "分区计数应保留 ID #045、#046、#047 三行，并让 guard_total 均为 3。",
   "f5-row-number-order": "区域编号顺序不正确；检查 sector 分区、power DESC 和 id 稳定排序。",
@@ -1240,8 +1451,8 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-orc": "ROW_NUMBER 应先返回 ID #052，再返回 ID #051。",
   "practice-knight": "排名结果应为 ID #053 第一、ID #052 第二。",
   "practice-troll": "累计结果应依次为 18、38、62、84。",
-  "iron-boss-scan": "CTE 没有找出 power = 24 的 ID #053。",
-  "iron-boss-core": "LAG 结果没有按 id 返回正确的上一行 power。",
+  "iron-boss-scan": "RANK 结果没有按装备 power 给 ID #051–#055 正确排名。",
+  "iron-boss-core": "LAG / LEAD 没有按 id 返回正确的前后 power。",
   "f6-insert-row": "沙箱最终状态缺少 id = 6 的 claw 记录，或修改了其他行。",
   "f6-update-target": "只应把 id = 2 的 status 改为 fixed。",
   "f6-delete-duplicate": "只应删除 id = 4，id = 3 的重复证据必须保留。",
@@ -1253,8 +1464,8 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-wyvern": "只应把 id = 1 的 quantity 更新为 3。",
   "practice-thunder-drake": "ROLLBACK 后沙箱必须恢复原始五行。",
   "practice-crystal-drake": "无效 quantity 不应写入沙箱。",
-  "dragon-boss-scan": "保存点局部回滚后，修复必须保留且被删行必须恢复。",
-  "dragon-boss-core": "提交后只应删除 id = 4。",
+  "dragon-boss-scan": "DELETE 只能移除 repair_queue 的 id = 4。",
+  "dragon-boss-core": "CHECK 约束应拒绝 quantity = -2，沙箱必须保持不变。",
   "f7-btree-search": "结果或计划不正确：应返回 CRY-103、72，并通过主键 SEARCH 点查。",
   "f7-composite-prefix": "应按 95、88、84、82 返回 crystal 高分记录，并命中 realm/score 联合索引。",
   "f7-covering-read": "应只返回 guard 的 category、code，并在计划中出现覆盖索引。",
@@ -1283,8 +1494,8 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
   "practice-dark-knight": "T3 正被 T2 在 log:2 上阻塞。",
   "practice-lich": "phantom_read 的两次计数应为 2、4。",
   "practice-golem": "零重复组中评分最高的模型应为 normalized、95。",
-  "throne-boss-scan": "无效路由应为 account 107、shard 9。",
-  "throne-boss-core": "参数化且最小权限的方法应只返回 prepared-select。",
+  "throne-boss-scan": "锁等待链应返回 T3 等待 T2 的 log:2。",
+  "throne-boss-core": "隔离异常应返回 phantom_read、2 → 4 与 SERIALIZABLE。",
 };
 
 function wrongResultMessage(

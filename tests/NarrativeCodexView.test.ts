@@ -323,6 +323,18 @@ describe("buildNarrativeCodexModel", () => {
       entry.arrival === "未知区域"
     ))).toBe(true);
   });
+
+  it("已解锁剧情在怪物身份恢复前仍不泄露 canonical 名称", () => {
+    const floorEight = NARRATIVE_FLOORS[7];
+    const model = buildNarrativeCodexModel({
+      floor: 8,
+      seenBeatIds: floorEight.beats.map((beat) => beat.id),
+      discoveredMonsterIds: [],
+    });
+    const visible = JSON.stringify(model.beats);
+    expect(visible).not.toContain("档案王");
+    expect(visible).toContain("ID #084");
+  });
 });
 
 describe("NarrativeCodexView", () => {

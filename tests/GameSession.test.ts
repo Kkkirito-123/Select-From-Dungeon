@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/floorExperience";
+import { ARMORS } from "../src/content/inventoryCatalog";
 import { biomeRegionAt } from "../src/domain/biome";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { safeZoneCellKeys } from "../src/domain/campfire";
+import { advanceCampaignProgress } from "../src/domain/campaign";
+import { migrationStepMarkerIds } from "../src/domain/finalMigration";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
 import { isSavedRun } from "../src/storage/localProgress";
@@ -322,6 +325,18 @@ describe("GameSession SQL 魔王城 Run", () => {
   it("身份只在致命一击结算，并能从 Run 中的已击败记录恢复", () => {
     const session = new GameSession(null, null, "identity-recovery");
     enterLesson(session, "select");
+    const hidden = session.snapshot();
+    const hiddenCopy = [
+      hidden.missionTitle,
+      hidden.missionBody,
+      hidden.lessonIntro,
+      hidden.banner,
+      hidden.interactionPrompt,
+      ...hidden.hints,
+    ].join("\n");
+    expect(hiddenCopy).not.toContain("史莱姆");
+    expect(hiddenCopy).not.toContain("projection_slime");
+    expect(hidden.combat?.intent.name).toBe("攻击正在蓄力");
     const first = session.resolveQuery(SELECT_WEAKNESS);
     expect(first.events.some((event) => event.type === "identity-recovered")).toBe(false);
     expect(session.snapshot().profile.discoveredMonsterIds).toEqual([]);
@@ -409,6 +424,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.interact()).toMatchObject({
       ok: true,
       kind: "inspection",
+      landmarkId: "npc-scribe-f1",
       message: expect.stringContaining("ID #001"),
     });
     expect(session.snapshot().banner).toBe(bannerBeforeInspection);
@@ -418,6 +434,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.interact()).toMatchObject({
       ok: true,
       kind: "inspection",
+      landmarkId: "f1-water-wheel",
       message: expect.stringContaining("完成 SELECT / FROM"),
     });
     expect(session.snapshot().banner).toBe(bannerBeforeWaterWheel);
@@ -435,6 +452,53 @@ describe("GameSession SQL 魔王城 Run", () => {
     legacySave.banner = "抄写员：这是旧版留在右栏的调查说明。";
     const restored = new GameSession(legacySave, session.toProfile());
     expect(restored.snapshot().banner).not.toContain("抄写员：");
+  });
+
+  it("现场证据只接受当前层 canonical ID，并写入兼容的 Run 标记", () => {
+    const session = new GameSession(null, null, "story-evidence-marker");
+    expect(session.recordStoryEvidence("lost-name:f1:current-record")).toBe(true);
+    expect(session.recordStoryEvidence("lost-name:f1:current-record")).toBe(false);
+    expect(session.recordStoryEvidence("lost-name:f2:identity-count")).toBe(false);
+    expect(session.snapshot().openedGateIds).toContain(
+      "story:evidence:lost-name:f1:current-record",
+    );
+    expect(session.toSavedRun().version).toBe(11);
+  });
+
+  it("MIGRATE 只在第八层 victory 按七步顺序写入兼容 marker", () => {
+    const firstFloor = new GameSession(null, null, "migration-wrong-floor");
+    expect(firstFloor.recordMigrationStep("snapshot")).toBe(false);
+
+    const floorEightRun = freshFloorEightRun("migration-ordered-steps");
+    const exploring = new GameSession(floorEightRun);
+    expect(exploring.recordMigrationStep("snapshot")).toBe(false);
+
+    const completion = advanceCampaignProgress(floorEightRun.campaign);
+    if (!completion.ok || !completion.completed) {
+      throw new Error("第八层测试 Campaign 无法进入 victory");
+    }
+    floorEightRun.mode = "victory";
+    floorEightRun.campaign = completion.progress;
+    const victory = new GameSession(floorEightRun);
+
+    expect(victory.recordMigrationStep("audit")).toBe(false);
+    expect(victory.recordMigrationStep("snapshot")).toBe(true);
+    expect(victory.recordMigrationStep("snapshot")).toBe(false);
+    expect(victory.recordMigrationStep("preserve-history")).toBe(false);
+    expect(victory.snapshot().openedGateIds).toContain(
+      "story:migrate:snapshot",
+    );
+
+    for (const markerId of migrationStepMarkerIds().slice(1)) {
+      const stepId = markerId.replace("story:migrate:", "") as Parameters<
+        GameSession["recordMigrationStep"]
+      >[0];
+      expect(victory.recordMigrationStep(stepId)).toBe(true);
+    }
+    expect(victory.snapshot().openedGateIds.filter((id) =>
+      id.startsWith("story:migrate:")
+    )).toEqual(migrationStepMarkerIds());
+    expect(victory.toSavedRun().version).toBe(11);
   });
 
   it("第一、二层隐藏区域需要完成前置课程并开启实体暗门，发现状态可随 Run 恢复", () => {
@@ -535,6 +599,39 @@ describe("GameSession SQL 魔王城 Run", () => {
         toName: targetRegion.name,
       },
     });
+  });
+
+  it("八层地图房名与生态区在身份恢复前不泄露怪物姓名", () => {
+    const session = new GameSession(null, null, "identity-safe-map-labels");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+
+    for (let floor = 1; floor <= 8; floor += 1) {
+      expect(session.adminLoadFloor(floor as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8))
+        .toMatchObject({ ok: true });
+      const snapshot = session.snapshot();
+      const serializedMapLabels = JSON.stringify({
+        rooms: snapshot.roomGraph.nodes.map((room) => room.title),
+        regions: snapshot.biomePlan.regions.map((region) => region.name),
+        portals: snapshot.biomePlan.portals.map((portal) => portal.name),
+        transfer: snapshot.regionTransfer,
+      });
+      snapshot.monsters.forEach((monster) => {
+        expect(serializedMapLabels).not.toContain(monster.name);
+        expect(serializedMapLabels).not.toContain(monster.species);
+      });
+    }
+  });
+
+  it("地图房名会在对应怪物身份恢复后显示 canonical 姓名", () => {
+    const profile = new GameSession(null, null, "identity-map-profile").toProfile();
+    profile.discoveredMonsterIds = [28];
+    const session = new GameSession(null, profile, "identity-map-recovered");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminLoadFloor(3)).toMatchObject({ ok: true });
+
+    expect(session.snapshot().roomGraph.nodes.some((room) => (
+      room.title.includes("死灵王")
+    ))).toBe(true);
   });
 
   it("第八层钥匙无论来自战利品包还是地面物品都会原子提交 Campaign", () => {
@@ -675,7 +772,12 @@ describe("GameSession SQL 魔王城 Run", () => {
     session.interact();
 
     enterLesson(session, "group-by");
-    expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
+    expect(session.resolveQuery(GROUP_RESULT)).toMatchObject({
+      accepted: true,
+      stageAdvanced: true,
+      lessonCompleted: null,
+    });
+    expect(session.resolveQuery(NULL_NAME).lessonCompleted).toBe("group-by");
     expect(session.snapshot().mode).toBe("explore");
     expect(session.snapshot().lootBundles).toEqual([]);
     collectLessonChest(session, "group-by");
@@ -835,6 +937,103 @@ describe("GameSession SQL 魔王城 Run", () => {
     );
   });
 
+  it("高层旧战斗会按 canonical 阶段、锁与同一伤害函数恢复", () => {
+    const saved = freshFloorEightRun("canonical-combat-restore");
+    const target = saved.monsters.find((monster) => monster.id === 84);
+    const actor = saved.worldActors.find((entry) => entry.monsterId === 84);
+    if (!target || !actor) throw new Error("第八层缺少 ID #084 战斗锚点");
+    saved.mode = "combat";
+    saved.currentRoomId = actor.roomNodeId;
+    saved.player = {
+      ...saved.player,
+      x: actor.x,
+      y: actor.y,
+      hp: 10,
+      maxHp: 10,
+      armor: { ...ARMORS["bone-armor"] },
+      armorHp: 2,
+    };
+    saved.combat = {
+      targetId: 84,
+      kind: "curriculum",
+      round: 7,
+      successStep: 999,
+      intent: {
+        name: "旧版攻击",
+        damage: 99,
+        locks: ["旧版锁"],
+      },
+    };
+
+    const session = new GameSession(saved);
+    expect(session.snapshot()).toMatchObject({
+      lessonStageIndex: 4,
+      monsters: expect.arrayContaining([
+        expect.objectContaining({ id: 84, damage: 3 }),
+      ]),
+      combat: {
+        targetId: 84,
+        successStep: 4,
+        intent: {
+          damage: 3,
+        },
+      },
+    });
+
+    const wrong = session.resolveQuery(result("SELECT 1", ["1"], [{ "1": 1 }]));
+    expect(wrong).toMatchObject({
+      accepted: false,
+      playerDamage: 1,
+      armorDamage: 2,
+      events: expect.arrayContaining([
+        expect.objectContaining({ type: "enemy-hit", amount: 3 }),
+      ]),
+    });
+    expect(session.registerQueryError("near SELECT：语法错误", "SELEC 1"))
+      .toMatchObject({
+        playerDamage: 3,
+        armorDamage: 0,
+        events: expect.arrayContaining([
+          expect.objectContaining({ type: "enemy-hit", amount: 3 }),
+        ]),
+      });
+  });
+
+  it("高伤武器也不能跳过第八层 Boss 的剩余阶段", () => {
+    const saved = freshFloorEightRun("boss-stage-floor");
+    const target = saved.monsters.find((monster) => monster.id === 84);
+    const actor = saved.worldActors.find((entry) => entry.monsterId === 84);
+    if (!target || !actor) throw new Error("第八层缺少 ID #084 战斗锚点");
+    target.hp = 1;
+    saved.mode = "combat";
+    saved.currentRoomId = actor.roomNodeId;
+    saved.player.x = actor.x;
+    saved.player.y = actor.y;
+    saved.combat = {
+      targetId: 84,
+      kind: "curriculum",
+      round: 1,
+      successStep: 0,
+      intent: { name: "旧版攻击", damage: 99, locks: ["旧版锁"] },
+    };
+
+    const session = new GameSession(saved);
+    const firstStage = session.resolveQuery(result(
+      "SELECT value FROM tx_versions WHERE row_id = 2 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12)",
+      ["value"],
+      [{ value: "locked" }],
+    ));
+
+    expect(firstStage).toMatchObject({
+      accepted: true,
+      stageAdvanced: true,
+      lessonCompleted: null,
+    });
+    expect(session.snapshot().monsters.find((monster) => monster.id === 84)?.hp).toBe(1);
+    expect(session.snapshot().combat?.successStep).toBe(1);
+    expect(session.snapshot().profile.discoveredMonsterIds).not.toContain(84);
+  });
+
   it("相邻 E 打开篝火菜单，只有休息才回满生命并替换复活点", () => {
     const session = new GameSession(null, null, "campfire-rest");
     enterLesson(session, "select");
@@ -890,7 +1089,12 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.travelToRoom(hammerRoom.id).ok).toBe(true);
     expect(session.interact().ok).toBe(true);
     enterLesson(session, "group-by");
-    expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
+    expect(session.resolveQuery(GROUP_RESULT)).toMatchObject({
+      accepted: true,
+      stageAdvanced: true,
+      lessonCompleted: null,
+    });
+    expect(session.resolveQuery(NULL_NAME).lessonCompleted).toBe("group-by");
 
     expect(session.setPlayerPosition(middle.restPosition.x, middle.restPosition.y)).toBe(true);
     expect(session.interact().ok).toBe(true);
@@ -1203,9 +1407,16 @@ describe("GameSession SQL 魔王城 Run", () => {
       "inner-join",
     ]));
     expect(floorTwoLowTide.monsters.find((monster) => monster.id === 21)?.hp).toBe(0);
+    expect(floorTwoLowTide.monsters.find((monster) => monster.id === 22)?.hp)
+      .toBeGreaterThan(0);
     expect(floorTwoLowTide.profile.discoveredMonsterIds).toContain(21);
     expect(floorTwoLowTide.openedGateIds).toContain("shortcut:2:return");
     expect(session.toProfile()).toEqual(formalProfile);
+
+    expect(session.adminApplyPreset("f2-admin-frog-court"))
+      .toMatchObject({ ok: true });
+    expect(session.snapshot().monsters.find((monster) => monster.id === 22)?.hp)
+      .toBe(0);
 
     expect(session.adminLoadFloor(4)).toMatchObject({ ok: true });
     expect(session.adminApplyPreset("f4-admin-echo")).toMatchObject({ ok: true });
@@ -1310,6 +1521,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f5-admin-roster",
         hiddenBundle: "hidden-reward:f5-hidden-silent-roster",
         armorId: "iron-armor",
+        areaPreset: "f5-admin-barracks",
+        areaBossId: 55,
       },
       {
         floor: 6,
@@ -1321,6 +1534,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f6-admin-rookery",
         hiddenBundle: "hidden-reward:f6-hidden-uncommitted-rookery",
         armorId: "dragon-armor",
+        areaPreset: "f6-admin-crystal-cavern",
+        areaBossId: 66,
       },
       {
         floor: 7,
@@ -1332,6 +1547,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f7-admin-garden",
         hiddenBundle: "hidden-reward:f7-hidden-blind-garden",
         armorId: "crystal-armor",
+        areaPreset: "f7-admin-root-cloister",
+        areaBossId: 77,
       },
       {
         floor: 8,
@@ -1343,6 +1560,8 @@ describe("GameSession SQL 魔王城 Run", () => {
         hiddenPreset: "f8-admin-chapel",
         hiddenBundle: "hidden-reward:f8-hidden-zero-row-chapel",
         armorId: "royal-armor",
+        areaPreset: "f8-admin-void-court",
+        areaBossId: 89,
       },
     ] as const;
 
@@ -1359,6 +1578,11 @@ describe("GameSession SQL 魔王城 Run", () => {
       expect(session.adminApplyPreset(entry.cipherPreset)).toMatchObject({ ok: true });
       expect(session.snapshot().openedGateIds).toContain(entry.cipherGate);
 
+      expect(session.adminApplyPreset(entry.areaPreset)).toMatchObject({ ok: true });
+      expect(session.snapshot().monsters.find(
+        (monster) => monster.id === entry.areaBossId,
+      )?.hp).toBe(0);
+
       expect(session.adminApplyPreset(entry.hiddenPreset)).toMatchObject({ ok: true });
       const reward = session.snapshot().lootBundles.find(
         (bundle) => bundle.id === entry.hiddenBundle,
@@ -1368,6 +1592,9 @@ describe("GameSession SQL 魔王城 Run", () => {
         kind: "armor",
         guaranteed: true,
       });
+      if (entry.floor === 6) {
+        expect(JSON.stringify(reward)).not.toContain("巨龙");
+      }
     });
   });
 });

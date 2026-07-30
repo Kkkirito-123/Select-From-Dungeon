@@ -180,7 +180,7 @@ export const FLOOR_MAP_BLUEPRINTS = {
   5: {
     floor: 5,
     layoutName: "黑铁城墙双环",
-    regionNames: ["黑铁外城", "兽人兵营", "要塞内城"],
+    regionNames: ["黑铁外城", "黑铁兵营", "要塞内城"],
     routeTransit: "drawbridge",
     ascentTransit: "black-iron-bridge",
     mainRoadWidth: 4,
@@ -200,7 +200,7 @@ export const FLOOR_MAP_BLUEPRINTS = {
   6: {
     floor: 6,
     layoutName: "龙脊工坊折线",
-    regionNames: ["岩浆孵化场", "龙晶洞窟", "古龙王巢"],
+    regionNames: ["岩浆孵化场", "龙晶洞窟", "提交王巢"],
     routeTransit: "minecart",
     ascentTransit: "royal-lift",
     mainRoadWidth: 3,

@@ -26,7 +26,7 @@ import {
 } from "../content/inventoryCatalog";
 import {
   biomeEncounterFor,
-  weightedBiomeEncounterIds,
+  weightedBiomeEncounterCandidates,
 } from "../content/biomeContent";
 import {
   floorMapBlueprint,
@@ -59,6 +59,7 @@ import {
   advanceEncounterMeter,
   recordSafeZoneMovement,
   resetEncounterMeterAfterBattle,
+  suppressThirdConsecutiveEncounter,
   type EncounterMeter,
 } from "./encounterDirector";
 import {
@@ -97,11 +98,22 @@ import {
   evaluateUnrevealedIdentityQuery,
   unrevealedIdentityQueryMessage,
 } from "./lessonEvaluator";
-import { floorStoryEvidenceQueryForLandmark } from "./floorStory";
+import {
+  floorStoryEvidenceIdForLandmark,
+  floorStoryEvidenceQueryForLandmark,
+  storyEvidenceMarkerId,
+  storyEvidenceMarkerIdsForFloor,
+} from "./floorStory";
+import {
+  finalMigrationProgress,
+  migrationStepMarkerId,
+  type MigrationStepId,
+} from "./finalMigration";
 import {
   monsterIdLabel,
   monsterIntentName,
   monsterNameForProfile,
+  redactUndiscoveredMonsterIdentityText,
   recoverMonsterIdentity,
 } from "./monsterIdentity";
 import {
@@ -126,6 +138,10 @@ import {
   createCampaignProgress,
   type CampaignProgress,
 } from "./campaign";
+import {
+  counterDamageForMonster,
+  stagesForEncounter,
+} from "./combatBalance";
 import { MAX_ANSWER_HISTORY } from "./types";
 import type {
   AnswerAttemptRecord,
@@ -414,7 +430,11 @@ function rewardItemKind(reward: ClaimableReward): GroundItem["kind"] {
 }
 
 function monstersForFloor(floor: FloorNumber): Monster[] {
-  return cloneMonsters(INITIAL_MONSTERS.filter((monster) => monster.floor === floor));
+  return cloneMonsters(INITIAL_MONSTERS.filter((monster) => monster.floor === floor))
+    .map((monster) => ({
+      ...monster,
+      damage: counterDamageForMonster(monster),
+    }));
 }
 
 function restoredMonstersForFloor(
@@ -728,6 +748,7 @@ export class GameSession {
       this.battleSequence = savedRun.battleSequence;
       this.reviewBattleId = savedRun.reviewBattleId;
       this.banner = restoredWorldBanner(savedRun.banner);
+      this.restoreCanonicalCombatState();
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
       this.labyrinthEntryConfirmed =
         floorLabyrinthAreaAt(
@@ -772,6 +793,34 @@ export class GameSession {
     const activeGateChallenge = this.activeGateChallengeId
       ? gateChallengeForFloor(this.floorNumber, this.challengeGateId())
       : null;
+    const visibleProfile = cloneProfile(this.profile);
+    if (this.adminMode && this.adminIdentityMonsterIds.size > 0) {
+      visibleProfile.discoveredMonsterIds = [...new Set([
+        ...visibleProfile.discoveredMonsterIds,
+        ...this.adminIdentityMonsterIds,
+      ])].sort((left, right) => left - right);
+    }
+    const redactIdentity = (value: string): string => (
+      redactUndiscoveredMonsterIdentityText(
+        value,
+        this.monsters,
+        visibleProfile.discoveredMonsterIds,
+      )
+    );
+    const visibleRoomGraph = cloneGraph(this.graph);
+    visibleRoomGraph.nodes = visibleRoomGraph.nodes.map((node) => ({
+      ...node,
+      title: redactIdentity(node.title),
+    }));
+    const visibleBiomePlan = cloneBiomePlan(this.biomePlan);
+    visibleBiomePlan.regions = visibleBiomePlan.regions.map((region) => ({
+      ...region,
+      name: redactIdentity(region.name),
+    }));
+    visibleBiomePlan.portals = visibleBiomePlan.portals.map((portal) => ({
+      ...portal,
+      name: redactIdentity(portal.name),
+    }));
     const missionTitle = this.mode === "victory"
       ? "八层贯通 · RUN COMMITTED"
       : this.mode === "transition"
@@ -820,21 +869,46 @@ export class GameSession {
               : room.lessonId && roomTarget && roomTarget.hp > 0
               ? stage.objective
               : roomFlavor(room.type, this.floorNumber);
-    const visibleProfile = cloneProfile(this.profile);
-    if (this.adminMode && this.adminIdentityMonsterIds.size > 0) {
-      visibleProfile.discoveredMonsterIds = [...new Set([
-        ...visibleProfile.discoveredMonsterIds,
-        ...this.adminIdentityMonsterIds,
-      ])].sort((left, right) => left - right);
+    const visibleCombat = cloneCombat(this.combat);
+    if (visibleCombat && target) {
+      visibleCombat.intent.name = monsterIntentName(
+        target,
+        visibleProfile.discoveredMonsterIds,
+      );
     }
+    const visibleAnswerHistory = (records: readonly AnswerAttemptRecord[]) => (
+      cloneAnswerHistory(records).map((record) => {
+        const monster = INITIAL_MONSTERS.find((entry) => entry.id === record.monsterId);
+        const redactRecordIdentity = (value: string): string => (
+          redactUndiscoveredMonsterIdentityText(
+            value,
+            INITIAL_MONSTERS.filter((entry) => entry.floor === record.floor),
+            visibleProfile.discoveredMonsterIds,
+          )
+        );
+        return {
+          ...record,
+          answerSql: redactRecordIdentity(record.answerSql),
+          monsterName: monster
+            ? monsterNameForProfile(monster, visibleProfile)
+            : redactRecordIdentity(record.monsterName),
+          stageObjective: redactRecordIdentity(record.stageObjective),
+          feedback: redactRecordIdentity(record.feedback),
+        };
+      })
+    );
 
     return {
       mode: this.mode,
       adminMode: this.adminMode,
       adminPanelOpen: this.adminPanelOpen,
-      regionTransfer: this.regionTransfer ? { ...this.regionTransfer } : null,
+      regionTransfer: this.regionTransfer ? {
+        ...this.regionTransfer,
+        fromName: redactIdentity(this.regionTransfer.fromName),
+        toName: redactIdentity(this.regionTransfer.toName),
+      } : null,
       campaign: cloneCampaignProgress(this.campaign),
-      biomePlan: cloneBiomePlan(this.biomePlan),
+      biomePlan: visibleBiomePlan,
       currentBiome: biomeRegionAt(this.biomePlan, this.player).kind,
       lessonId: lesson.id,
       lessonStageId: stage.id,
@@ -845,9 +919,9 @@ export class GameSession {
         armor: this.player.armor ? { ...this.player.armor } : null,
       },
       monsters: cloneMonsters(this.monsters),
-      combat: cloneCombat(this.combat),
+      combat: visibleCombat,
       focusMonsterId: this.combat?.targetId ?? this.selectedMonsterId ?? target?.id ?? null,
-      roomGraph: cloneGraph(this.graph),
+      roomGraph: visibleRoomGraph,
       mazeFloor: cloneMazeFloor(this.mazeFloor),
       guidedMap: cloneGuidedMapPlan(this.guidedMap),
       campfires: this.campfires.map((campfire) => ({
@@ -870,7 +944,7 @@ export class GameSession {
         ? allMapCellKeys(this.mazeFloor)
         : [...this.discoveredCells],
       currentRoomId: this.currentRoomId,
-      currentRoomTitle: room.title,
+      currentRoomTitle: redactIdentity(room.title),
       currentRoomType: room.type,
       visitedRoomIds: [...this.visitedRoomIds],
       completedRoomIds: [...this.completedRoomIds],
@@ -878,7 +952,12 @@ export class GameSession {
       completedLessons: [...this.completedLessons],
       challengeGateId: this.challengeGateId(),
       openedGateIds: [...this.openedGateIds],
-      activeGateChallenge,
+      activeGateChallenge: activeGateChallenge ? {
+        ...activeGateChallenge,
+        objective: redactIdentity(activeGateChallenge.objective),
+        schema: activeGateChallenge.schema.map(redactIdentity),
+        hints: activeGateChallenge.hints.map(redactIdentity),
+      } : null,
       relics: this.relics.map((relic) => ({ ...relic })),
       profile: visibleProfile,
       availableLoot: looseWeapon,
@@ -890,27 +969,27 @@ export class GameSession {
       stepsSinceEncounter: this.encounterMeter.stepsSinceEncounter,
       safeStepsRemaining: this.encounterMeter.safeStepsRemaining,
       hintLevel: this.hintLevel,
-      battleReview: cloneAnswerHistory(this.answerHistory.filter(
+      battleReview: visibleAnswerHistory(this.answerHistory.filter(
         (record) => record.battleId === this.reviewBattleId,
       )),
-      floorReview: cloneAnswerHistory(this.answerHistory.filter(
+      floorReview: visibleAnswerHistory(this.answerHistory.filter(
         (record) => record.floor === this.floorNumber,
       )),
-      missionTitle,
-      missionBody,
+      missionTitle: redactIdentity(missionTitle),
+      missionBody: redactIdentity(missionBody),
       lessonIntro: activeGateChallenge
         ? "可选越级机关：破解只打开当前物理门，不授予课程掌握、经验或战利品。"
-        : this.combat || room.lessonId ? lesson.intro : "",
+        : this.combat || room.lessonId ? redactIdentity(lesson.intro) : "",
       schema: activeGateChallenge
         ? [...activeGateChallenge.schema]
         : this.combat || room.lessonId
         ? [...lesson.schema]
         : ["当前区域没有强制查询。继续探索迷宫或调查发光核心。"],
-      queryTemplate: stage.queryTemplate,
-      hints: stage.hints.slice(0, this.hintLevel),
+      queryTemplate: redactIdentity(stage.queryTemplate),
+      hints: stage.hints.slice(0, this.hintLevel).map(redactIdentity),
       locks: [...stage.locks],
-      banner: this.banner,
-      interactionPrompt: this.interactionPrompt(),
+      banner: redactIdentity(this.banner),
+      interactionPrompt: redactIdentity(this.interactionPrompt()),
     };
   }
 
@@ -968,6 +1047,36 @@ export class GameSession {
 
   toProfile(): ProfileProgress {
     return cloneProfile(this.profile);
+  }
+
+  /**
+   * 将玩家实际取得的现场证据写入本 Run，复用 openedGateIds 以保持
+   * SavedRun v11 兼容；这里只接受当前楼层内容真源中声明过的证据。
+   */
+  recordStoryEvidence(evidenceId: string): boolean {
+    const markerId = storyEvidenceMarkerId(evidenceId);
+    if (!storyEvidenceMarkerIdsForFloor(this.floorNumber).includes(markerId)) {
+      return false;
+    }
+    if (this.openedGateIds.has(markerId)) return false;
+    this.openedGateIds.add(markerId);
+    this.emit();
+    return true;
+  }
+
+  /**
+   * 在第八层胜利态按固定顺序提交一项 MIGRATE 步骤。
+   *
+   * 进度复用 openedGateIds，保持 SavedRun v11；非终局、跳步或重复确认
+   * 均不写入，也不会触发额外快照。
+   */
+  recordMigrationStep(stepId: MigrationStepId): boolean {
+    if (this.floorNumber !== 8 || this.mode !== "victory") return false;
+    const progress = finalMigrationProgress([...this.openedGateIds]);
+    if (progress.nextStep?.id !== stepId) return false;
+    this.openedGateIds.add(migrationStepMarkerId(stepId));
+    this.emit();
+    return true;
   }
 
   attemptPlayerMove(dx: number, dy: number): MoveResolution {
@@ -1920,12 +2029,11 @@ export class GameSession {
 
   validateCombatQuery(sql: string): { ok: true } | { ok: false; message: string } {
     if (this.mode !== "combat" || !this.combat) return { ok: true };
-    const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
     const evaluation = evaluateUnrevealedIdentityQuery(
       this.floorNumber,
       this.currentStage(),
       sql,
-      target ? this.profile.discoveredMonsterIds.includes(target.id) : false,
+      this.areCurrentFloorMonsterIdentitiesDiscovered(),
     );
     return evaluation
       ? { ok: false, message: evaluation.message }
@@ -1963,9 +2071,7 @@ export class GameSession {
       this.floorNumber,
       stage,
       result.sql,
-      reviewTarget
-        ? this.profile.discoveredMonsterIds.includes(reviewTarget.id)
-        : false,
+      this.areCurrentFloorMonsterIdentitiesDiscovered(),
     );
     const evaluation = identityEvaluation ?? evaluateStage(stage, result);
     const events: CombatEvent[] = [{ type: "query-cast", targetId: this.combat.targetId }];
@@ -2022,10 +2128,11 @@ export class GameSession {
       }
     } else {
       const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
-      const damage = this.applyPlayerDamage(1);
+      const incomingDamage = target ? counterDamageForMonster(target) : 1;
+      const damage = this.applyPlayerDamage(incomingDamage);
       playerDamage = damage.playerDamage;
       armorDamage = damage.armorDamage;
-      events.push({ type: "enemy-hit", sourceId: target?.id, amount: 1 });
+      events.push({ type: "enemy-hit", sourceId: target?.id, amount: incomingDamage });
       const damageMessage = armorDamage > 0
         ? `护甲吸收 ${armorDamage} 点${playerDamage > 0 ? `，生命损失 ${playerDamage} 点` : ""}`
         : `生命损失 ${playerDamage} 点`;
@@ -2103,7 +2210,8 @@ export class GameSession {
     this.profile.attempts[lesson.id] += 1;
     this.player.heat = Math.min(99, this.player.heat + 1);
     const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
-    const damage = this.applyPlayerDamage(1);
+    const incomingDamage = target ? counterDamageForMonster(target) : 1;
+    const damage = this.applyPlayerDamage(incomingDamage);
     const playerDamage = damage.playerDamage;
     const armorDamage = damage.armorDamage;
     const playerDefeated = this.player.hp === 0;
@@ -2119,7 +2227,7 @@ export class GameSession {
       this.combat.round += 1;
     }
     const events: CombatEvent[] = [
-      { type: "enemy-hit", sourceId: target?.id, amount: playerDamage },
+      { type: "enemy-hit", sourceId: target?.id, amount: incomingDamage },
     ];
     if (reviewTarget) {
       this.appendAnswerRecord({
@@ -2357,11 +2465,49 @@ export class GameSession {
   }
 
   private currentCombatStages(): readonly LessonStageDefinition[] {
-    if (this.combat?.kind === "ambush") {
-      const practice = practiceStagesFor(this.combat.targetId);
-      if (practice.length > 0) return practice;
+    const targetId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id;
+    const monster = targetId === undefined
+      ? undefined
+      : this.monsters.find((entry) => entry.id === targetId);
+    return monster ? this.combatStagesForMonster(monster) : this.currentLesson().stages;
+  }
+
+  private combatStagesForMonster(monster: Monster): readonly LessonStageDefinition[] {
+    const authored = monster.encounterType === "ambush"
+      ? practiceStagesFor(monster.id)
+      : lessonById(monster.lessonId).stages;
+    const floorLessons = lessonsForFloor(monster.floor);
+    const lessonIndex = floorLessons.indexOf(monster.lessonId);
+    const reviewStages = floorLessons
+      .slice(0, Math.max(0, lessonIndex))
+      .flatMap((lessonId) => lessonById(lessonId).stages);
+    return stagesForEncounter(monster, authored, reviewStages);
+  }
+
+  private restoreCanonicalCombatState(): void {
+    if (!this.combat) return;
+    const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
+    if (!target) {
+      this.combat = null;
+      if (this.mode === "combat") this.mode = "explore";
+      return;
     }
-    return this.currentLesson().stages;
+    const stages = this.combatStagesForMonster(target);
+    if (stages.length === 0) {
+      this.combat = null;
+      if (this.mode === "combat") this.mode = "explore";
+      return;
+    }
+    this.combat.successStep = Math.min(
+      Math.max(0, this.combat.successStep),
+      stages.length - 1,
+    );
+    const stage = stages[this.combat.successStep];
+    this.combat.intent = {
+      name: target.attackName,
+      damage: counterDamageForMonster(target),
+      locks: [...stage.locks],
+    };
   }
 
   private monsterForCurrentRoom(): Monster | undefined {
@@ -2441,11 +2587,8 @@ export class GameSession {
     if (accessMessage && encounter?.role !== "area-boss") {
       return this.interactionFailure(accessMessage);
     }
-    const lesson = lessonById(room.lessonId);
     const combatKind = monster.encounterType;
-    const stages = combatKind === "ambush"
-      ? practiceStagesFor(monster.id)
-      : lesson.stages;
+    const stages = this.combatStagesForMonster(monster);
     const stage = stages[0];
     if (!stage) return this.interactionFailure("这只怪物尚未配置可执行的 SQL 题。");
     this.currentRoomId = room.id;
@@ -2459,7 +2602,7 @@ export class GameSession {
       successStep: 0,
       intent: {
         name: monster.attackName,
-        damage: monster.damage,
+        damage: counterDamageForMonster(monster),
         locks: [...stage.locks],
       },
     };
@@ -2484,7 +2627,7 @@ export class GameSession {
         .map((room) => room.lessonId as LessonId),
     );
     const currentBiome = biomeRegionAt(this.biomePlan, this.player).kind;
-    const weightedIds = weightedBiomeEncounterIds(
+    const weightedCandidates = weightedBiomeEncounterCandidates(
       this.floorNumber,
       currentBiome,
       unlockedLessons,
@@ -2494,14 +2637,18 @@ export class GameSession {
         .filter((monster) => monster.encounterType === "ambush" && monster.hp > 0)
         .map((monster) => monster.id),
     );
-    const candidateIds = allowEncounter
-      ? weightedIds.filter((id) => livingIds.has(id))
+    const livingCandidates = allowEncounter
+      ? weightedCandidates.filter((candidate) => livingIds.has(candidate.monsterId))
       : [];
-    const advance = advanceEncounterMeter(this.encounterMeter, this.graph.seed, candidateIds);
+    const candidates = suppressThirdConsecutiveEncounter(
+      livingCandidates,
+      this.recentEncounterMonsterIds(2),
+    );
+    const advance = advanceEncounterMeter(this.encounterMeter, this.graph.seed, candidates);
     this.encounterMeter = advance.meter;
     if (advance.targetId === null) return null;
     const monster = this.monsters.find((entry) => entry.id === advance.targetId);
-    const stages = monster ? practiceStagesFor(monster.id) : [];
+    const stages = monster ? this.combatStagesForMonster(monster) : [];
     const stage = stages[0];
     if (!monster || !stage) return null;
 
@@ -2514,7 +2661,7 @@ export class GameSession {
       successStep: 0,
       intent: {
         name: monster.attackName,
-        damage: 1,
+        damage: counterDamageForMonster(monster),
         locks: [...stage.locks],
       },
     };
@@ -2526,6 +2673,28 @@ export class GameSession {
       stages.length
     } 道 ${lessonById(monster.lessonId).concept} 练习即可脱身。`;
     return monster.id;
+  }
+
+  private recentEncounterMonsterIds(limit: number): number[] {
+    const battleIds = new Set<number>();
+    const monsterIds: number[] = [];
+    for (let index = this.answerHistory.length - 1; index >= 0; index -= 1) {
+      const record = this.answerHistory[index];
+      if (!record || battleIds.has(record.battleId)) continue;
+      battleIds.add(record.battleId);
+      monsterIds.push(record.monsterId);
+      if (monsterIds.length >= limit) break;
+    }
+    return monsterIds;
+  }
+
+  /**
+   * 查询可以命中当前层任意记录，因此不能只按当前战斗目标判断身份是否解封。
+   * 只有本层全部姓名均已恢复后，name / species 才能参与玩家查询。
+   */
+  private areCurrentFloorMonsterIdentitiesDiscovered(): boolean {
+    const discovered = new Set(this.profile.discoveredMonsterIds);
+    return this.monsters.every((monster) => discovered.has(monster.id));
   }
 
   private beginBattleReview(): void {
@@ -3157,7 +3326,9 @@ export class GameSession {
   ): LootSpawnResolution {
     const biome = biomeRegionAt(this.biomePlan, position).kind;
     const encounter = biomeEncounterFor(monster.id);
-    const role = encounter?.role ?? (
+    const role = monster.id === FLOOR_ONE_MIMIC_MONSTER_ID
+      ? "curriculum" as const
+      : encounter?.role ?? (
       monster.isBoss ? "floor-boss" as const : "curriculum"
     );
     const items = rollLootItems({
@@ -3176,8 +3347,10 @@ export class GameSession {
       const previousHp = this.player.hp;
       const previousArmor = this.player.armorHp;
       this.applyConsumable(item.consumable);
-      const effect = `生命 ${previousHp}→${this.player.hp}，护甲 ${previousArmor}→${this.player.armorHp}`;
-      recoveryNames.push(`${item.name}（${effect}）`);
+      const changed = previousHp !== this.player.hp || previousArmor !== this.player.armorHp;
+      recoveryNames.push(changed
+        ? `${item.name}（生命 ${previousHp}→${this.player.hp}，护甲 ${previousArmor}→${this.player.armorHp}）`
+        : `${item.name}（恢复品未产生效果）`);
       return false;
     });
     if (bundleItems.length === 0) {
@@ -3255,10 +3428,19 @@ export class GameSession {
 
   private engageMimicChest(): InteractionResolution {
     if (this.mode !== "explore") {
-      return this.interactionFailure("当前不能打开宝箱怪。 ");
+      return this.interactionFailure("当前不能打开沉默木箱。 ");
+    }
+    const requiredLessons: readonly LessonId[] = ["select", "where", "is-null"];
+    const missingLesson = requiredLessons.find(
+      (lessonId) => !this.completedLessons.has(lessonId),
+    );
+    if (missingLesson) {
+      return this.interactionFailure(
+        "沉默木箱尚未响应：先完成 SELECT、WHERE 与 IS NULL 三项基础课程。",
+      );
     }
     const monster = this.monsters.find((entry) => entry.id === FLOOR_ONE_MIMIC_MONSTER_ID);
-    const stages = monster ? practiceStagesFor(monster.id) : [];
+    const stages = monster ? this.combatStagesForMonster(monster) : [];
     if (!monster || monster.hp <= 0 || stages.length === 0) {
       return this.interactionFailure("箱盖已经安静下来。 ");
     }
@@ -3271,13 +3453,13 @@ export class GameSession {
       successStep: 0,
       intent: {
         name: monster.attackName,
-        damage: monster.damage,
+        damage: counterDamageForMonster(monster),
         locks: [...stages[0].locks],
       },
     };
     this.selectedMonsterId = monster.id;
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
-    this.banner = `沉默木箱突然合拢：ID #${String(monster.id).padStart(3, "0")} 宝箱怪苏醒。完成 ${stages.length} 道第一层基础题，才能打开箱腹。`;
+    this.banner = `沉默木箱突然合拢：ID #${String(monster.id).padStart(3, "0")} 苏醒。完成 ${stages.length} 道第一层基础题，才能打开箱腹。`;
     this.emit();
     return { ok: true, kind: "combat", message: this.banner };
   }
@@ -3684,7 +3866,7 @@ export class GameSession {
     } else if (landmarkId === "f4-forge-lord") {
       const defeated = this.monsters.some((monster) => monster.id === 44 && monster.hp <= 0);
       message = defeated
-        ? "炉主已经倒下。它身后的回燃门开始显形，保存着第一层登记厅的一段残响。"
+        ? "霜炉主已经倒下。它身后的回燃门开始显形，保存着第一层登记厅的一段残响。"
         : "中层首领 ID #044 截断了火炉与雷晶核心之间的依赖链。击败它，才能让回燃门出现。";
     } else if (landmarkId === "f4-dependency-spine") {
       message = this.completedLessons.has("f4-recursive")
@@ -3878,8 +4060,10 @@ export class GameSession {
         `真实结果：${evidence.expectedRowCount} 行 · ${fields}`,
         evidence.purpose,
       ].join("\n");
+      const evidenceId = floorStoryEvidenceIdForLandmark(landmarkId);
+      if (evidenceId) this.recordStoryEvidence(evidenceId);
     }
-    return { ok: true, kind: "inspection", message };
+    return { ok: true, kind: "inspection", message, landmarkId };
   }
 
   private travelThroughRegionPortal(

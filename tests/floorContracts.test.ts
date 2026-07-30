@@ -5,6 +5,13 @@ import {
   validateFloorContracts,
   type FloorContentContract,
 } from "../src/content/floorContracts";
+import { FLOOR_EXPERIENCES } from "../src/content/floorExperience";
+import { floorLabyrinth } from "../src/content/floorLabyrinth";
+import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+import {
+  lessonsForFloor,
+  type RunLessonId,
+} from "../src/domain/runGraph";
 
 function mutableContracts(): FloorContentContract[] {
   return structuredClone(FLOOR_CONTRACTS) as FloorContentContract[];
@@ -31,6 +38,37 @@ describe("eight-floor content contracts", () => {
     });
   });
 
+  it("契约只镜像运行时真源，不覆盖课程、标题、怪物或拓扑", () => {
+    FLOOR_CONTRACTS.forEach((contract) => {
+      const experience = FLOOR_EXPERIENCES.find(
+        (entry) => entry.floor === contract.floor,
+      );
+      expect(experience).toBeDefined();
+      expect(contract.name).toBe(experience?.title);
+      expect(contract.lessons.map((lesson) => lesson.id)).toEqual(
+        lessonsForFloor(contract.floor),
+      );
+      expect(floorLabyrinth(contract.floor).topologySignature).toMatch(
+        new RegExp(`^${contract.theme.topology}:`),
+      );
+      expect([...new Set(contract.monsterPool)].sort()).toEqual(
+        [...new Set(
+          INITIAL_MONSTERS
+            .filter((monster) => monster.floor === contract.floor)
+            .map((monster) => monster.name),
+        )].sort(),
+      );
+    });
+
+    expect(floorContractFor(1).encounters.some(
+      (encounter) => encounter.role === "area-boss",
+    )).toBe(false);
+    expect(floorContractFor(2).encounters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: "area-boss", name: "湖兽", required: false }),
+      expect.objectContaining({ role: "fixed-elite", name: "蛙王", required: true }),
+    ]));
+  });
+
   it("缺课程或错误先修关系会被拒绝", () => {
     const missing = mutableContracts();
     missing[2].lessons = missing[2].lessons.slice(1);
@@ -39,7 +77,9 @@ describe("eight-floor content contracts", () => {
     ]));
 
     const brokenPrerequisite = mutableContracts();
-    brokenPrerequisite[0].lessons[0].prerequisites = ["future-lesson"];
+    brokenPrerequisite[0].lessons[0].prerequisites = [
+      "future-lesson" as RunLessonId,
+    ];
     expect(validateFloorContracts(brokenPrerequisite).errors).toEqual(expect.arrayContaining([
       expect.stringContaining("尚未出现的前置课程"),
     ]));

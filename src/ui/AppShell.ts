@@ -5,6 +5,7 @@ import {
   type NarrativeBeat,
   type NarrativeEndingStep,
 } from "../content/narrativeContent";
+import { finalMigrationStageNarrative } from "../content/finalMigrationSequence";
 import {
   floorMapBlueprint,
   floorTransitPresentation,
@@ -37,13 +38,21 @@ import {
 } from "../domain/narrative";
 import {
   FloorStoryMomentQueue,
+  floorStoryInspectMomentForLandmark,
+  floorStoryMoments,
   floorStoryProgress,
+  storyEvidenceIdFromMarker,
   type FloorStoryMoment,
+  type FloorStoryPresentation,
 } from "../domain/floorStory";
+import {
+  finalMigrationProgress,
+} from "../domain/finalMigration";
 import {
   monsterIdLabel,
   monsterIdentityPresentation,
   monsterIntentName,
+  redactUndiscoveredMonsterIdentityText,
 } from "../domain/monsterIdentity";
 import { redactUndiscoveredQueryIdentities } from "../domain/queryDisclosure";
 import type { FloorNumber } from "../domain/runGraph";
@@ -109,6 +118,17 @@ export function inspectionDialogCopy(message: string): {
   return { title: "现场调查", body: message };
 }
 
+export function redactSnapshotMonsterIdentity(
+  value: string,
+  snapshot: Pick<GameSnapshot, "monsters" | "profile">,
+): string {
+  return redactUndiscoveredMonsterIdentityText(
+    value,
+    snapshot.monsters,
+    snapshot.profile.discoveredMonsterIds,
+  );
+}
+
 export function canOpenCombatTerminal(
   mode: GameSnapshot["mode"] | null | undefined,
   busy: boolean,
@@ -124,6 +144,13 @@ export function isInspectionPrimaryKey(
     event.key === "Enter";
 }
 
+export function inspectionEscapeCanClose(
+  recordKind: string | undefined,
+  activePresentation: FloorStoryPresentation | null | undefined,
+): boolean {
+  return recordKind !== "migration" && activePresentation !== "blocking";
+}
+
 export function shouldDismissTransientCard(
   shownAtMove: number | null,
   currentTotalMoves: number,
@@ -132,11 +159,107 @@ export function shouldDismissTransientCard(
 }
 
 export function narrativeMomentUsesRecordOverlay(
-  kind: FloorStoryMoment["kind"],
-  hasQuery = false,
+  presentation: FloorStoryPresentation,
 ): boolean {
-  return hasQuery ||
-    ["entry", "secret", "scribe", "boss", "ascent"].includes(kind);
+  return presentation === "blocking" || presentation === "inspect";
+}
+
+const FINAL_MIGRATION_STORY_SOURCE_ID = "f8-story-migrate";
+const NARRATIVE_EVIDENCE_TITLES = new Map(
+  NARRATIVE_FLOORS.flatMap((floor) =>
+    floor.lostNameEvidence.map((evidence) => [evidence.id, evidence.title] as const)
+  ),
+);
+
+export function isFinalMigrationStoryMoment(
+  moment: Pick<FloorStoryMoment, "floor" | "sourceId">,
+): boolean {
+  return moment.floor === 8 && moment.sourceId === FINAL_MIGRATION_STORY_SOURCE_ID;
+}
+
+export function canPresentFinalMigrationStoryMoment(
+  moment: Pick<FloorStoryMoment, "floor" | "sourceId">,
+  snapshot: Pick<GameSnapshot, "floor" | "mode">,
+): boolean {
+  if (!isFinalMigrationStoryMoment(moment)) return true;
+  return snapshot.floor === 8 && snapshot.mode === "victory";
+}
+
+export interface FinalMigrationRecordCopy {
+  kicker: string;
+  title: string;
+  body: string;
+  closeLabel: string;
+  stepIndex: number;
+  stepTotal: number;
+}
+
+export function finalMigrationRecordCopy(
+  markerIds: readonly string[],
+): FinalMigrationRecordCopy | null {
+  const ending = NARRATIVE_ENDINGS[0];
+  const progress = finalMigrationProgress(markerIds);
+  if (!progress.nextStep) return null;
+  const stepIndex = progress.completedStepIds.length;
+  const stepTotal = ending.steps.length;
+  return {
+    kicker: `MIGRATE / STEP ${String(stepIndex + 1).padStart(2, "0")} OF ${String(stepTotal).padStart(2, "0")}`,
+    title: `${stepIndex + 1} / ${stepTotal} · ${progress.nextStep.title}`,
+    body: [
+      ending.summary,
+      "",
+      progress.nextStep.description,
+      "",
+      `当前进度 · ${stepIndex} / ${stepTotal} 步已写入本地 Run。`,
+    ].join("\n"),
+    closeLabel: stepIndex + 1 === stepTotal
+      ? "E · 执行最后一步"
+      : `E · 执行并进入 ${stepIndex + 2} / ${stepTotal}`,
+    stepIndex,
+    stepTotal,
+  };
+}
+
+export interface FinalMigrationArgumentCopy {
+  argument: string;
+  evidence: string;
+  conclusion: string;
+}
+
+export function finalMigrationArgumentCopy(
+  snapshot: {
+    lessonId: GameSnapshot["lessonId"];
+    lessonStageId: GameSnapshot["lessonStageId"];
+    combat: { targetId: number } | null;
+  },
+): FinalMigrationArgumentCopy | null {
+  const narrative = (
+    snapshot.lessonId === "f8-security" &&
+    snapshot.combat?.targetId === 84
+  )
+    ? finalMigrationStageNarrative(snapshot.lessonStageId)
+    : null;
+  if (!narrative) return null;
+  const evidenceTitles = narrative.evidenceIds.map((evidenceId) =>
+    NARRATIVE_EVIDENCE_TITLES.get(evidenceId) ?? evidenceId
+  );
+  return {
+    argument: `ID #084：${narrative.archivistArgument}`,
+    evidence: `调用证据：${evidenceTitles.join("、")}`,
+    conclusion: `玩家结论：${narrative.playerConclusion}`,
+  };
+}
+
+export function finalVictoryPortalReady(
+  snapshot: {
+    floor: GameSnapshot["floor"];
+    mode: GameSnapshot["mode"];
+    openedGateIds: readonly string[];
+  },
+): boolean {
+  if (snapshot.mode !== "victory") return false;
+  return snapshot.floor !== 8 ||
+    finalMigrationProgress(snapshot.openedGateIds).complete;
 }
 
 export function storyMomentRecordBody(moment: FloorStoryMoment): string {
@@ -161,10 +284,7 @@ export function canPresentQueuedNarrativeMoment(
   blockingOverlayOpen: boolean,
 ): boolean {
   if (busy || combatSettlementVisible || blockingOverlayOpen) return false;
-  return mode !== "transition" &&
-    mode !== "victory" &&
-    mode !== "defeat" &&
-    mode !== "death-review";
+  return mode === "explore" || mode === "transition" || mode === "victory";
 }
 
 export function shapeOnlyQueryResultCopy(result: SqlQueryResult): {
@@ -353,23 +473,29 @@ export function narrativeProgressForSnapshot(
     ) return [entry.ascent.id];
     return [];
   });
-  const completedMigrationStepIds = (
-    snapshot.floor === 8 &&
-    snapshot.mode === "victory"
-  )
-    ? NARRATIVE_ENDINGS[0].steps.map((step) => step.id)
+  const completedMigrationStepIds = snapshot.floor === 8
+    ? finalMigrationProgress(snapshot.openedGateIds).completedStepIds
     : [];
+  const explicitlyDiscoveredEvidenceIds = snapshot.openedGateIds
+    .map(storyEvidenceIdFromMarker)
+    .filter((id): id is string => id !== null);
+  const hiddenAreaEvidenceIds = story.unlocked.flatMap((moment) => (
+    moment.unlock.type === "gate-opened" &&
+    snapshot.openedGateIds.includes(moment.unlock.gateId)
+      ? moment.actions.flatMap((action) => (
+          action.type === "evidence" ? [action.evidenceId] : []
+        ))
+      : []
+  ));
 
   return {
     seenBeatIds: seenBeats.map((beat) => beat.id),
     seenMomentIds: story.unlockedIds,
     unlockedMoments: story.unlocked,
-    discoveredEvidenceIds: [
-      ...seenBeats.flatMap((beat) => beat.evidenceIds),
-      ...story.unlocked.flatMap((moment) => moment.actions.flatMap((action) => (
-        action.type === "evidence" ? [action.evidenceId] : []
-      ))),
-    ],
+    discoveredEvidenceIds: [...new Set([
+      ...explicitlyDiscoveredEvidenceIds,
+      ...hiddenAreaEvidenceIds,
+    ])],
     completedAscentIds,
     completedMigrationStepIds,
     latestBeat: seenBeats.at(-1) ?? null,
@@ -447,10 +573,13 @@ export class AppShell {
   private terminalFocusTimer: number | null = null;
   private pickupShownAtMove: number | null = null;
   private settlementShownAtMove: number | null = null;
+  private settlementAutoCloseTimer: number | null = null;
   private narrativeBeatShownAtMove: number | null = null;
-  private lastNarrativeBeatId: string | null = null;
   private readonly narrativeMomentQueue = new FloorStoryMomentQueue();
   private narrativeMomentQueuePrimed = false;
+  private narrativeBootstrapMode: "new" | "restored";
+  private activeNarrativeMoment: FloorStoryMoment | null = null;
+  private narrativeActionInFlight = false;
   private floorTransitionTimer: number | null = null;
   private defeatRespawnTimer: number | null = null;
   private regionTransitionTimer: number | null = null;
@@ -467,8 +596,28 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly inspectionHandler = (event: Event): void => {
-    const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+    const detail = (event as CustomEvent<{
+      message?: string;
+      landmarkId?: string;
+    }>).detail;
+    const message = detail?.message;
     if (typeof message === "string" && message.trim() !== "") {
+      if (typeof detail.landmarkId === "string") {
+        const inspectMoment = floorStoryInspectMomentForLandmark({
+          floor: this.lastSnapshot.floor,
+          mode: this.lastSnapshot.mode,
+          completedLessons: this.lastSnapshot.completedLessons,
+          defeatedMonsterIds: this.lastSnapshot.monsters
+            .filter((monster) => monster.hp <= 0)
+            .map((monster) => monster.id),
+          openedGateIds: this.lastSnapshot.openedGateIds,
+        }, detail.landmarkId);
+        if (inspectMoment) {
+          this.activeNarrativeMoment = inspectMoment;
+          this.openStoryMoment(inspectMoment, this.lastSnapshot, message);
+          return;
+        }
+      }
       this.openInspection(message);
     }
   };
@@ -499,6 +648,8 @@ export class AppShell {
         event.stopImmediatePropagation();
         if (this.inspectionOverlay.dataset.recordKind === "labyrinth") {
           this.confirmLabyrinthEntry();
+        } else if (this.inspectionOverlay.dataset.recordKind === "migration") {
+          this.advanceFinalMigration();
         } else {
           this.closeInspection();
         }
@@ -506,7 +657,12 @@ export class AppShell {
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        this.closeInspection();
+        event.stopImmediatePropagation();
+        if (!inspectionEscapeCanClose(
+          this.inspectionOverlay.dataset.recordKind,
+          this.activeNarrativeMoment?.presentation,
+        )) return;
+        this.closeInspection(true, false);
         return;
       }
       if (event.key === "Tab") {
@@ -690,7 +846,10 @@ export class AppShell {
     private readonly feedback: FeedbackDirector,
     private readonly onboarding: OnboardingController,
     private readonly getBattleScene: () => BattleScene | null,
-  ) {}
+    initialRunSource: "new" | "restored" = "new",
+  ) {
+    this.narrativeBootstrapMode = initialRunSource;
+  }
 
   mount(): void {
     const schemaFieldCount = SQL_TABLES.reduce(
@@ -888,6 +1047,11 @@ export class AppShell {
                   <section class="terminal-brief">
                     <div class="card-heading"><span>本回合任务</span><span id="query-counter">查询 0 次</span></div>
                     <p id="terminal-objective"></p>
+                    <blockquote id="final-migration-argument" class="scribe-recap" hidden>
+                      <strong id="final-migration-argument-title">ID #084 的论点</strong>
+                      <p id="final-migration-argument-evidence"></p>
+                      <p id="final-migration-argument-conclusion"></p>
+                    </blockquote>
                     <div id="lock-list" class="lock-list"></div>
                     <div id="schema-list" class="schema-list"></div>
                     <details class="terminal-schema-reference">
@@ -1180,7 +1344,9 @@ export class AppShell {
     );
     requiredElement(this.root, "#close-inspection").addEventListener(
       "click",
-      () => this.closeInspection(),
+      () => this.inspectionOverlay.dataset.recordKind === "migration"
+        ? this.advanceFinalMigration()
+        : this.closeInspection(),
       listenerOptions,
     );
     requiredElement(this.root, "#confirm-labyrinth-entry").addEventListener(
@@ -1325,7 +1491,11 @@ export class AppShell {
     );
     requiredElement(this.root, "#interact").addEventListener(
       "click",
-      () => this.isInspectionOpen() ? this.closeInspection() : dispatchInteract(),
+      () => this.isInspectionOpen()
+        ? this.inspectionOverlay.dataset.recordKind === "migration"
+          ? this.advanceFinalMigration()
+          : this.closeInspection()
+        : dispatchInteract(),
       listenerOptions,
     );
     this.sqlButton.addEventListener("click", () => this.openTerminal(), listenerOptions);
@@ -1424,8 +1594,12 @@ export class AppShell {
     this.terminalFocusTimer = null;
     this.pickupShownAtMove = null;
     this.settlementShownAtMove = null;
+    if (this.settlementAutoCloseTimer !== null) {
+      window.clearTimeout(this.settlementAutoCloseTimer);
+    }
+    this.settlementAutoCloseTimer = null;
     this.narrativeBeatShownAtMove = null;
-    this.lastNarrativeBeatId = null;
+    this.activeNarrativeMoment = null;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
@@ -1826,12 +2000,12 @@ export class AppShell {
     const presetId = button?.dataset.adminPreset;
     if (!presetId) return;
     const resolution = this.session.adminApplyPreset(presetId);
+    const snapshot = this.session.snapshot();
     this.showFeedbackNotice({
-      message: resolution.message,
+      message: redactSnapshotMonsterIdentity(resolution.message, snapshot),
       tone: resolution.ok ? "success" : "info",
     });
     if (!resolution.ok) return;
-    const snapshot = this.session.snapshot();
     this.sql.reset(snapshot.monsters);
     this.getBattleScene()?.abortEncounter();
     this.clearQueryArtifacts();
@@ -1865,7 +2039,7 @@ export class AppShell {
         const button = document.createElement("button");
         button.type = "button";
         button.dataset.adminPreset = preset.id;
-        button.textContent = preset.label;
+        button.textContent = redactSnapshotMonsterIdentity(preset.label, snapshot);
         presets.append(button);
       }
     } else {
@@ -1884,7 +2058,12 @@ export class AppShell {
       heading.textContent = `${index + 1}. ${region.name}`;
       const detail = document.createElement("p");
       detail.textContent = boss
-        ? `区域首领：${boss.name} · ID #${boss.id} · ${boss.hp}/${boss.maxHp} HP`
+        ? `区域首领：${
+            monsterIdentityPresentation(
+              boss,
+              snapshot.profile.discoveredMonsterIds,
+            ).worldLabel
+          } · ${boss.hp}/${boss.maxHp} HP`
         : "区域首领：无 · 课程探索区";
       const button = document.createElement("button");
       button.type = "button";
@@ -2277,11 +2456,36 @@ export class AppShell {
     if (this.narrativeMomentQueuePrimed) {
       this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
     } else {
-      this.narrativeMomentQueue.prime(progress.unlockedMoments);
+      if (this.narrativeBootstrapMode === "restored") {
+        const migration = finalMigrationProgress(snapshot.openedGateIds);
+        const resumableMigrationMoment = (
+          snapshot.floor === 8 &&
+          snapshot.mode === "victory" &&
+          !migration.complete
+        )
+          ? progress.unlockedMoments.find(isFinalMigrationStoryMoment) ??
+            floorStoryMoments(8).find(isFinalMigrationStoryMoment) ??
+            null
+          : null;
+        this.narrativeMomentQueue.primeExisting(
+          resumableMigrationMoment
+            ? progress.unlockedMoments.filter(
+                (moment) => moment.id !== resumableMigrationMoment.id,
+              )
+            : progress.unlockedMoments,
+        );
+        if (resumableMigrationMoment) {
+          this.narrativeMomentQueue.enqueue([resumableMigrationMoment]);
+        }
+      } else {
+        this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
+      }
       this.narrativeMomentQueuePrimed = true;
+      this.narrativeBootstrapMode = "restored";
     }
     this.narrativeCodex.render({
       floor: snapshot.floor,
+      discoveredMonsterIds: snapshot.profile.discoveredMonsterIds,
       seenBeatIds: progress.seenBeatIds,
       seenMomentIds: progress.seenMomentIds,
       discoveredEvidenceIds: progress.discoveredEvidenceIds,
@@ -2295,11 +2499,20 @@ export class AppShell {
     const latestBeat = progress.latestBeat ?? narrativeFloorFor(snapshot.floor).beats[0];
     const latestRecord = progress.latestMoment ?? latestBeat;
     requiredElement(this.root, "#story-thread-title").textContent =
-      latestRecord?.title ?? "记录尚未恢复";
+      latestRecord
+        ? redactSnapshotMonsterIdentity(latestRecord.title, snapshot)
+        : "记录尚未恢复";
     requiredElement(this.root, "#story-thread-line").textContent =
-      latestRecord?.lines[0] ?? "继续探索，寻找这一层留下的记录。";
+      latestRecord?.lines[0]
+        ? redactSnapshotMonsterIdentity(latestRecord.lines[0], snapshot)
+        : "继续探索，寻找这一层留下的记录。";
 
     if (
+      (snapshot.mode === "transition" || snapshot.mode === "victory") &&
+      this.narrativeBeatShownAtMove !== null
+    ) {
+      this.hideNarrativeBeatCard();
+    } else if (
       shouldDismissTransientCard(
         this.narrativeBeatShownAtMove,
         snapshot.totalMoves,
@@ -2311,19 +2524,18 @@ export class AppShell {
     if (this.narrativeBeatShownAtMove !== null) return;
     if (!this.canPresentNarrativeCard(snapshot)) return;
 
-    const nextMoment = this.narrativeMomentQueue.takeNext();
-    if (nextMoment) {
-      if (progress.latestBeat) this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeMomentCard(nextMoment, snapshot.totalMoves);
-      return;
-    }
-
-    if (
-      progress.latestBeat &&
-      progress.latestBeat.id !== this.lastNarrativeBeatId
+    let nextMoment = this.narrativeMomentQueue.peekNext();
+    while (
+      nextMoment?.presentation === "ambient" &&
+      (snapshot.mode === "transition" || snapshot.mode === "victory")
     ) {
-      this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeBeatCard(progress.latestBeat, snapshot.totalMoves);
+      this.executeStoryMomentActions(nextMoment, false);
+      this.narrativeMomentQueue.ackPresented(nextMoment.id);
+      nextMoment = this.narrativeMomentQueue.peekNext();
+    }
+    if (nextMoment) {
+      if (!canPresentFinalMigrationStoryMoment(nextMoment, snapshot)) return;
+      this.showNarrativeMomentCard(nextMoment, snapshot);
     }
   }
 
@@ -2342,58 +2554,42 @@ export class AppShell {
     );
     return canPresentQueuedNarrativeMoment(
       snapshot.mode,
-      this.busy,
+      this.busy || this.narrativeActionInFlight,
       this.isCombatSettlementVisible(),
       blockingOverlayOpen,
     );
   }
 
-  private showNarrativeBeatCard(beat: NarrativeBeat, totalMoves: number): void {
-    const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
-    const kindLabel: Readonly<Record<NarrativeBeat["kind"], string>> = {
-      "floor-entry": "LOST NAME / 入层",
-      "midpoint-evidence": "LOST NAME / 证据",
-      campfire: "SCRIBE / 篝火复盘",
-      boss: "ARCHIVE / 层主",
-      "floor-end": "ASCENT / 层末",
-    };
-    requiredElement(card, "#narrative-beat-kind").textContent = kindLabel[beat.kind];
-    requiredElement(card, "#narrative-beat-title").textContent = beat.title;
-    const lines = requiredElement(card, "#narrative-beat-lines");
-    lines.replaceChildren(...beat.lines.map((line) => {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = line;
-      return paragraph;
-    }));
-    this.narrativeBeatShownAtMove = totalMoves;
-    card.hidden = false;
-    card.classList.add("is-visible");
-  }
-
   private showNarrativeMomentCard(
     moment: FloorStoryMoment,
-    totalMoves: number,
+    snapshot: GameSnapshot,
   ): void {
-    this.executeStoryMomentActions(moment);
-    if (narrativeMomentUsesRecordOverlay(moment.kind, moment.query !== null)) {
-      this.openStoryMoment(moment);
+    if (narrativeMomentUsesRecordOverlay(moment.presentation)) {
+      this.activeNarrativeMoment = moment;
+      this.openStoryMoment(moment, snapshot);
       return;
     }
+    this.executeStoryMomentActions(moment, false);
+    this.narrativeMomentQueue.ackPresented(moment.id);
     const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
     requiredElement(card, "#narrative-beat-kind").textContent = moment.kicker;
-    requiredElement(card, "#narrative-beat-title").textContent = moment.title;
+    requiredElement(card, "#narrative-beat-title").textContent =
+      redactSnapshotMonsterIdentity(moment.title, snapshot);
     const lines = requiredElement(card, "#narrative-beat-lines");
     lines.replaceChildren(...moment.lines.map((line) => {
       const paragraph = document.createElement("p");
-      paragraph.textContent = line;
+      paragraph.textContent = redactSnapshotMonsterIdentity(line, snapshot);
       return paragraph;
     }));
-    this.narrativeBeatShownAtMove = totalMoves;
+    this.narrativeBeatShownAtMove = snapshot.totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
   }
 
-  private executeStoryMomentActions(moment: FloorStoryMoment): void {
+  private executeStoryMomentActions(
+    moment: FloorStoryMoment,
+    recordEvidence: boolean,
+  ): void {
     const musicState = moment.actions.find(
       (action) => action.type === "music-state",
     );
@@ -2407,6 +2603,13 @@ export class AppShell {
     }
     if (worldEffect?.type === "world-effect") {
       this.root.dataset.storyWorldEffect = worldEffect.effect;
+    }
+    if (recordEvidence) {
+      moment.actions.forEach((action) => {
+        if (action.type === "evidence") {
+          this.session.recordStoryEvidence(action.evidenceId);
+        }
+      });
     }
     window.dispatchEvent(new CustomEvent("dungeon:story-actions", {
       detail: {
@@ -2425,13 +2628,17 @@ export class AppShell {
 
   private resetAdminNarrativePresentation(): void {
     this.hideNarrativeBeatCard();
+    this.activeNarrativeMoment = null;
+    this.narrativeActionInFlight = false;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
-    this.lastNarrativeBeatId = null;
+    this.narrativeBootstrapMode = "new";
   }
 
   private openInspection(message: string): void {
-    const copy = inspectionDialogCopy(message);
+    const copy = inspectionDialogCopy(
+      redactSnapshotMonsterIdentity(message, this.lastSnapshot),
+    );
     this.openRecordOverlay({
       kicker: "FIELD NOTE / 现场记录",
       title: copy.title,
@@ -2441,13 +2648,39 @@ export class AppShell {
     });
   }
 
-  private openStoryMoment(moment: FloorStoryMoment): void {
+  private openStoryMoment(
+    moment: FloorStoryMoment,
+    snapshot: GameSnapshot,
+    inspectionMessage?: string,
+  ): void {
+    if (isFinalMigrationStoryMoment(moment)) {
+      this.openFinalMigrationMoment(snapshot);
+      return;
+    }
+    const recordBody = storyMomentRecordBody(moment);
     this.openRecordOverlay({
       kicker: moment.kicker,
-      title: moment.title,
-      body: storyMomentRecordBody(moment),
+      title: redactSnapshotMonsterIdentity(moment.title, snapshot),
+      body: redactSnapshotMonsterIdentity(
+        inspectionMessage
+          ? `${recordBody}\n\n现场调查\n${inspectionMessage}`
+          : recordBody,
+        snapshot,
+      ),
       closeLabel: "E · 继续探索",
       kind: "story",
+    });
+  }
+
+  private openFinalMigrationMoment(snapshot: GameSnapshot): void {
+    const copy = finalMigrationRecordCopy(snapshot.openedGateIds);
+    if (!copy) return;
+    this.openRecordOverlay({
+      kicker: copy.kicker,
+      title: copy.title,
+      body: copy.body,
+      closeLabel: copy.closeLabel,
+      kind: "migration",
     });
   }
 
@@ -2456,7 +2689,7 @@ export class AppShell {
     title: string;
     body: string;
     closeLabel: string;
-    kind: "inspection" | "story" | "labyrinth";
+    kind: "inspection" | "story" | "labyrinth" | "migration";
   }): void {
     if (!this.isInspectionOpen()) {
       this.focusBeforeInspection = document.activeElement instanceof HTMLElement
@@ -2515,29 +2748,109 @@ export class AppShell {
     });
   }
 
-  private closeInspection(returnFocus = true): void {
+  private closeInspection(
+    returnFocus = true,
+    confirmStory = true,
+  ): void {
     if (!this.isInspectionOpen()) return;
+    if (
+      confirmStory &&
+      this.inspectionOverlay.dataset.recordKind === "migration"
+    ) {
+      this.advanceFinalMigration();
+      return;
+    }
+    const confirmedMoment = confirmStory &&
+        this.inspectionOverlay.dataset.recordKind === "story"
+      ? this.activeNarrativeMoment
+      : null;
     this.inspectionOverlay.hidden = true;
     this.inspectionOverlay.inert = true;
     this.inspectionOverlay.setAttribute("aria-hidden", "true");
     delete this.inspectionOverlay.dataset.recordKind;
     this.pendingLabyrinthMove = null;
+    this.activeNarrativeMoment = null;
     this.root.classList.remove("inspection-active");
     if (!returnFocus) {
       this.focusBeforeInspection = null;
+    } else {
+      const focusTarget = this.focusBeforeInspection;
+      this.focusBeforeInspection = null;
+      if (
+        focusTarget?.isConnected &&
+        !focusTarget.matches(":disabled") &&
+        !this.inspectionOverlay.contains(focusTarget)
+      ) {
+        focusTarget.focus({ preventScroll: true });
+      } else {
+        requiredElement<HTMLElement>(this.root, "#game-root").focus({
+          preventScroll: true,
+        });
+      }
+    }
+    if (confirmedMoment) {
+      this.narrativeMomentQueue.ackPresented(confirmedMoment.id);
+      this.narrativeActionInFlight = true;
+      try {
+        this.executeStoryMomentActions(confirmedMoment, true);
+      } finally {
+        this.narrativeActionInFlight = false;
+      }
+      queueMicrotask(() => {
+        this.renderNarrativeProgress(this.lastSnapshot);
+        this.renderFloorTransition(this.lastSnapshot);
+      });
+    }
+  }
+
+  private advanceFinalMigration(): void {
+    if (
+      !this.isInspectionOpen() ||
+      this.inspectionOverlay.dataset.recordKind !== "migration" ||
+      !this.activeNarrativeMoment ||
+      !isFinalMigrationStoryMoment(this.activeNarrativeMoment)
+    ) return;
+    const before = finalMigrationProgress(this.lastSnapshot.openedGateIds);
+    const step = before.nextStep;
+    if (!step) return;
+    if (!this.session.recordMigrationStep(step.id)) {
+      const current = finalMigrationRecordCopy(this.session.snapshot().openedGateIds);
+      if (current) {
+        this.openRecordOverlay({
+          kicker: current.kicker,
+          title: current.title,
+          body: current.body,
+          closeLabel: current.closeLabel,
+          kind: "migration",
+        });
+      }
       return;
     }
-    const focusTarget = this.focusBeforeInspection;
-    this.focusBeforeInspection = null;
-    if (
-      focusTarget?.isConnected &&
-      !focusTarget.matches(":disabled") &&
-      !this.inspectionOverlay.contains(focusTarget)
-    ) {
-      focusTarget.focus({ preventScroll: true });
-    } else {
-      requiredElement<HTMLElement>(this.root, "#game-root").focus({ preventScroll: true });
+
+    const afterSnapshot = this.session.snapshot();
+    const after = finalMigrationProgress(afterSnapshot.openedGateIds);
+    if (!after.complete) {
+      this.openFinalMigrationMoment(afterSnapshot);
+      return;
     }
+
+    const completedMoment = this.activeNarrativeMoment;
+    this.narrativeMomentQueue.ackPresented(completedMoment.id);
+    const finalAscent = this.narrativeMomentQueue.peekNext();
+    if (finalAscent?.floor === 8 && finalAscent.kind === "ascent") {
+      this.narrativeMomentQueue.ackPresented(finalAscent.id);
+    }
+    this.narrativeActionInFlight = true;
+    try {
+      this.executeStoryMomentActions(completedMoment, true);
+    } finally {
+      this.narrativeActionInFlight = false;
+    }
+    this.closeInspection(false, false);
+    queueMicrotask(() => {
+      this.renderNarrativeProgress(this.lastSnapshot);
+      this.renderFloorTransition(this.lastSnapshot);
+    });
   }
 
   private isInspectionOpen(): boolean {
@@ -2793,6 +3106,20 @@ export class AppShell {
     this.settlementShownAtMove = this.lastSnapshot.totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
+    if (this.settlementAutoCloseTimer !== null) {
+      window.clearTimeout(this.settlementAutoCloseTimer);
+    }
+    if (resolution.mode === "transition" || resolution.mode === "victory") {
+      const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? 900
+        : 1_800;
+      this.settlementAutoCloseTimer = window.setTimeout(() => {
+        this.settlementAutoCloseTimer = null;
+        this.hideCombatSettlement();
+        this.renderNarrativeProgress(this.lastSnapshot);
+        this.renderFloorTransition(this.lastSnapshot);
+      }, delay);
+    }
   }
 
   private hidePickupCard(): void {
@@ -2806,6 +3133,10 @@ export class AppShell {
   private hideCombatSettlement(): void {
     const card = this.root.querySelector<HTMLElement>("#combat-result-card");
     if (!card) return;
+    if (this.settlementAutoCloseTimer !== null) {
+      window.clearTimeout(this.settlementAutoCloseTimer);
+      this.settlementAutoCloseTimer = null;
+    }
     this.settlementShownAtMove = null;
     card.classList.remove("is-visible");
     card.hidden = true;
@@ -2878,9 +3209,10 @@ export class AppShell {
     this.hidePickupCard();
     this.hideCombatSettlement();
     this.hideNarrativeBeatCard();
-    this.lastNarrativeBeatId = null;
+    this.activeNarrativeMoment = null;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
+    this.narrativeBootstrapMode = "new";
     if (this.defeatRespawnTimer !== null) {
       window.clearTimeout(this.defeatRespawnTimer);
       this.defeatRespawnTimer = null;
@@ -2910,7 +3242,22 @@ export class AppShell {
   }
 
   private render(snapshot: GameSnapshot): void {
-    if (snapshot.mode !== "explore" && this.isInspectionOpen()) {
+    const floorChanged = Boolean(
+      this.lastSnapshot && this.lastSnapshot.floor !== snapshot.floor,
+    );
+    if (floorChanged) {
+      this.hideNarrativeBeatCard();
+      this.activeNarrativeMoment = null;
+      this.narrativeMomentQueue.clear();
+      this.narrativeMomentQueuePrimed = false;
+      this.narrativeBootstrapMode = "new";
+    }
+    if (
+      snapshot.mode !== "explore" &&
+      this.isInspectionOpen() &&
+      this.inspectionOverlay.dataset.recordKind !== "story" &&
+      this.inspectionOverlay.dataset.recordKind !== "migration"
+    ) {
       this.closeInspection(false);
     }
     const pickedItems = this.lastSnapshot
@@ -3016,6 +3363,7 @@ export class AppShell {
     requiredElement(this.root, "#query-counter").textContent = `查询 ${snapshot.queryCount} 次`;
     requiredElement(this.root, "#terminal-title").textContent = `${snapshot.lessonId.toUpperCase()} · 阶段 ${snapshot.lessonStageIndex + 1} · 回合 ${snapshot.combat?.round ?? 1}`;
     requiredElement(this.root, "#terminal-objective").textContent = snapshot.missionBody;
+    this.renderFinalMigrationArgument(snapshot);
     requiredElement(this.root, "#victory-count").textContent = `通关 ${snapshot.profile.victories}`;
     requiredElement(this.root, ".game-stage").classList.toggle("is-combat", snapshot.mode === "combat");
     this.sqlButton.disabled = snapshot.mode !== "combat" || this.busy;
@@ -3029,13 +3377,13 @@ export class AppShell {
       snapshot.mode === "transition" ||
       snapshot.mode === "defeat" ||
       snapshot.mode === "death-review";
-    this.renderFloorTransition(snapshot);
     this.renderRegionTransition(snapshot);
     this.renderDefeatTransition(snapshot, enteredDefeat);
     this.renderCampfireMenu(snapshot, enteredCampfire);
     this.renderInventoryMenu(snapshot, enteredInventory);
     this.renderLootMenu(snapshot, enteredLoot);
     this.renderNarrativeProgress(snapshot);
+    this.renderFloorTransition(snapshot);
     this.renderMonsterCodex(snapshot);
 
     this.renderTarget(target, snapshot);
@@ -3109,6 +3457,22 @@ export class AppShell {
 
     this.lastStageId = snapshot.lessonStageId;
     this.lastMode = snapshot.mode;
+  }
+
+  private renderFinalMigrationArgument(snapshot: GameSnapshot): void {
+    const root = requiredElement<HTMLElement>(
+      this.root,
+      "#final-migration-argument",
+    );
+    const copy = finalMigrationArgumentCopy(snapshot);
+    root.hidden = copy === null;
+    if (!copy) return;
+    requiredElement(root, "#final-migration-argument-title").textContent =
+      copy.argument;
+    requiredElement(root, "#final-migration-argument-evidence").textContent =
+      copy.evidence;
+    requiredElement(root, "#final-migration-argument-conclusion").textContent =
+      copy.conclusion;
   }
 
   private guidedPickupBetween(
@@ -3199,19 +3563,28 @@ export class AppShell {
 
   private renderFloorTransition(snapshot: GameSnapshot): void {
     const portal = requiredElement<HTMLElement>(this.root, "#floor-portal");
+    const victoryWasVisible = !portal.hidden && portal.dataset.state === "victory";
     const victoryActions = requiredElement<HTMLElement>(
       portal,
       "#floor-victory-actions",
     );
     const transitioning = snapshot.mode === "transition" && snapshot.floor < 8;
-    const dungeonCleared = snapshot.mode === "victory";
-    const enteredVictory = dungeonCleared && this.lastMode !== "victory";
-    portal.hidden = !transitioning && !dungeonCleared;
-    portal.inert = !transitioning && !dungeonCleared;
-    portal.setAttribute("aria-hidden", String(!transitioning && !dungeonCleared));
-    victoryActions.hidden = !dungeonCleared;
-    this.root.classList.toggle("victory-active", dungeonCleared);
-    if (transitioning) {
+    const finalVictoryReady = finalVictoryPortalReady(snapshot);
+    const narrativePending = this.activeNarrativeMoment !== null ||
+      this.narrativeMomentQueue.pendingIds.length > 0;
+    const presentationBlocked = this.busy ||
+      this.isCombatSettlementVisible() ||
+      this.isLootMenuOpen() ||
+      this.isInspectionOpen() ||
+      narrativePending;
+    const transitionVisible = transitioning && !presentationBlocked;
+    const victoryVisible = finalVictoryReady && !presentationBlocked;
+    portal.hidden = !transitionVisible && !victoryVisible;
+    portal.inert = !transitionVisible && !victoryVisible;
+    portal.setAttribute("aria-hidden", String(!transitionVisible && !victoryVisible));
+    victoryActions.hidden = !victoryVisible;
+    this.root.classList.toggle("victory-active", victoryVisible);
+    if (transitionVisible) {
       portal.dataset.state = "transition";
       portal.removeAttribute("role");
       portal.removeAttribute("aria-modal");
@@ -3230,8 +3603,7 @@ export class AppShell {
       requiredElement(portal, "#floor-clear-copy").textContent =
         `CONGRATULATIONS!! · ${transit.action}${transit.label} · 前往${arrival}`;
       this.hidePickupCard();
-      this.hideCombatSettlement();
-    } else if (dungeonCleared) {
+    } else if (victoryVisible) {
       portal.dataset.state = "victory";
       portal.setAttribute("role", "dialog");
       portal.setAttribute("aria-modal", "true");
@@ -3241,10 +3613,9 @@ export class AppShell {
       requiredElement(portal, "#floor-ascent-destination").textContent = "IDENTITY";
       requiredElement(portal, "#floor-clear-title").textContent = "DUNGEON CLEARED";
       requiredElement(portal, "#floor-clear-copy").textContent =
-        "CONGRATULATIONS!! · MIGRATE 已完成";
+        NARRATIVE_ENDINGS[0].finalLine;
       this.hidePickupCard();
-      this.hideCombatSettlement();
-      if (enteredVictory) {
+      if (!victoryWasVisible) {
         queueMicrotask(() => {
           if (!this.isVictoryPortalOpen()) return;
           requiredElement<HTMLButtonElement>(
@@ -3259,7 +3630,7 @@ export class AppShell {
       portal.removeAttribute("aria-modal");
       portal.removeAttribute("aria-labelledby");
     }
-    if (!transitioning) {
+    if (!transitionVisible) {
       if (this.floorTransitionTimer !== null) {
         window.clearTimeout(this.floorTransitionTimer);
         this.floorTransitionTimer = null;
@@ -3829,13 +4200,13 @@ export class AppShell {
     disclosure: QueryResultDisclosure = "shape-only",
   ): void {
     const snapshot = this.session.snapshot();
-    const visibleResult = disclosure === "safe-values"
-      ? redactUndiscoveredQueryIdentities(
+    const visibleResult = disclosure === "shape-only"
+      ? result
+      : redactUndiscoveredQueryIdentities(
           result,
           snapshot.monsters,
           snapshot.profile.discoveredMonsterIds,
-        )
-      : result;
+        );
     resultRoot.replaceChildren();
     resultRoot.className = "table-wrap";
     if (disclosure === "shape-only") {

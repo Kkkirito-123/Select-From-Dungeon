@@ -27,7 +27,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
   title: "三相升炉",
   subtitle: "火、冰与雷，都是同一次未完成命令的余波",
   version: 1,
-  signature: "三种元素沿依赖管线汇入中央炉心，炉主倒下后回燃门显出第一层残响",
+  signature: "三种元素沿依赖管线汇入中央炉心，中层首领倒下后回燃门显出第一层残响",
   assetPack: {
     id: "floor-04-elemental-furnace-assets",
     version: 1,
@@ -37,6 +37,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f4-fire-forge",
+      navigationRegion: "front",
       name: "烈焰熔炉",
       purpose: "以标量子查询和 CTE 追到命令源头",
       lessonIds: ["f4-scalar", "f4-cte"],
@@ -46,8 +47,9 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f4-frost-vault",
+      navigationRegion: "middle",
       name: "寒霜冰库",
-      purpose: "用 IN 与相关子查询辨认一组依赖记录，并挑战中层炉主",
+      purpose: "用 IN 与相关子查询辨认一组依赖记录，并挑战中层首领 ID #044",
       lessonIds: ["f4-in", "f4-correlated"],
       material: "蓝白冰槽、冻结铜管与镜面石板",
       ambience: "大提琴泛音、低木管与克制的冰裂声",
@@ -55,6 +57,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f4-storm-core",
+      navigationRegion: "rear",
       name: "雷晶核心",
       purpose: "用 EXISTS、CTE 与递归依赖链证明三处事故来自同一命令",
       lessonIds: ["f4-exists", "f4-cte", "f4-recursive"],
@@ -273,7 +276,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
     requiredMonsterIds: [44],
     rewardArmorId: "ember-echo-robe",
     sealedPrompt: "E  调查没有温度的余烬轮廓",
-    sealedMessage: "门内重复着第一层的火光，但依赖链仍被炉主截断。完成前三种子查询并击败 ID #044。",
+    sealedMessage: "门内重复着第一层的火光，但依赖链仍被 ID #044 截断。完成前三种子查询并击败它。",
     openPrompt: "E  进入回燃残响",
     openedMessage: "回燃门展开。门后不是完整的第一层，而是一间被升炉保存下来的余烬登记厅残响。",
     discoveryEventId: "f4-story-ember-echo",
@@ -294,7 +297,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f4-story-forge-lord",
-      title: "炉主倒下",
+      title: "霜炉主倒下",
       trigger: "monster:44:defeated",
       repeat: "once",
       priority: 95,
@@ -314,7 +317,6 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
       actions: [
         { type: "camera-focus", landmarkId: "f4-echo-gate" },
         { type: "world-effect", effect: "f4-echo-room-open" },
-        { type: "evidence", evidenceId: "lost-name:f4:recovery-permission" },
         { type: "dialogue", speaker: "抄写员", lines: ["这里复制了第一层的墙和火，却没有复制那时的你。", "只有恢复权限穿过四层，仍然有效。"] },
       ],
       completionFact: "story:f4:ember-echo",
@@ -356,7 +358,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
   ],
   adminPresets: [
     { id: "f4-admin-entry", label: "F4 葬火接收炉", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f4-source-core" },
-    { id: "f4-admin-forge-lord", label: "F4 中层炉主", completedLessonIds: ["f4-scalar", "f4-in", "f4-exists"], defeatedMonsterIds: [34, 35, 36], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f4-forge-lord" },
+    { id: "f4-admin-forge-lord", label: "F4 中层首领 ID #044", completedLessonIds: ["f4-scalar", "f4-in", "f4-exists"], defeatedMonsterIds: [34, 35, 36], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f4-forge-lord" },
     { id: "f4-admin-echo", label: "F4 回燃残响", completedLessonIds: ["f4-scalar", "f4-in", "f4-exists"], defeatedMonsterIds: [34, 35, 36, 44], openedGateIds: ["gate:floor-4-treasure"], collectedKeyItems: [], focusLandmarkId: "f4-echo-gate" },
     { id: "f4-admin-core", label: "F4 三相依赖脊柱", completedLessonIds: ["f4-scalar", "f4-in", "f4-exists", "f4-correlated", "f4-cte"], defeatedMonsterIds: [34, 35, 36, 37, 38, 44], openedGateIds: ["shortcut:4:return"], collectedKeyItems: ["shortcut-key:4"], focusLandmarkId: "f4-dependency-spine" },
     { id: "f4-admin-complete", label: "F4 垂直升炉", completedLessonIds: ["f4-scalar", "f4-in", "f4-exists", "f4-correlated", "f4-cte", "f4-recursive"], defeatedMonsterIds: [34, 35, 36, 37, 38, 39, 44], openedGateIds: ["shortcut:4:return"], collectedKeyItems: ["floor-key:4"], focusLandmarkId: "f4-ascent" },

@@ -5,7 +5,8 @@ import { FLOOR_FIVE_LESSON_DEFINITIONS } from "../src/content/floor5Level";
 import { FLOOR_SIX_LESSON_DEFINITIONS } from "../src/content/floor6Level";
 import { FLOOR_SEVEN_LESSON_DEFINITIONS } from "../src/content/floor7Level";
 import { FLOOR_EIGHT_LESSON_DEFINITIONS } from "../src/content/floor8Level";
-import { evaluateLesson } from "../src/domain/lessonEvaluator";
+import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
+import { evaluateLesson, evaluateStage } from "../src/domain/lessonEvaluator";
 import type { FloorNumber } from "../src/domain/runGraph";
 import { SqlEngine } from "../src/sql/SqlEngine";
 
@@ -183,5 +184,30 @@ describe("SqlEngine floor-two schema", () => {
       (lesson) => lesson.id === "f8-security",
     );
     expect(finalBoss?.stages).toHaveLength(5);
+  });
+
+  it("生态怪与八个区域首领的标准答案均通过真实 SQLite 语义判定", async () => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+
+    for (const floor of [1, 2, 3, 4, 5, 6, 7, 8] as const) {
+      const engine = await SqlEngine.create(
+        INITIAL_MONSTERS.filter((monster) => monster.floor === floor),
+        wasmLocation,
+      );
+      const encounters = BIOME_ENCOUNTERS.filter((entry) => entry.floor === floor);
+      for (const encounter of encounters) {
+        for (const stage of encounter.stages) {
+          const result = engine.execute(stage.answerSql, floor);
+          const evaluation = evaluateStage(stage, result);
+          expect(
+            evaluation.accepted,
+            `F${floor} ID #${encounter.monsterId}/${stage.id}: ${evaluation.message}; ${JSON.stringify(result.rows)}; ${result.plan.join(" | ")}`,
+          ).toBe(true);
+        }
+      }
+    }
   });
 });

@@ -4,6 +4,7 @@ import {
   monsterIdLabel,
   monsterIdentityPresentation,
   monsterIntentName,
+  redactUndiscoveredMonsterIdentityText,
   recoverMonsterIdentity,
 } from "../src/domain/monsterIdentity";
 import { createEmptyProfile } from "../src/storage/localProgress";
@@ -40,6 +41,16 @@ describe("monster identity archive", () => {
     expect(profile.discoveredMonsterIds).toEqual([1, 3]);
   });
 
+  it("自由文本在身份恢复前把 canonical 名称与 species 收敛为稳定 ID", () => {
+    const monster = INITIAL_MONSTERS.find((entry) => entry.id === 84);
+    if (!monster) throw new Error("缺少 ID #084 测试怪物");
+    const text = `目标是${monster.name}，内部类型 ${monster.species}。`;
+    expect(redactUndiscoveredMonsterIdentityText(text, [monster], []))
+      .toBe("目标是ID #084，内部类型 未识别类型。");
+    expect(redactUndiscoveredMonsterIdentityText(text, [monster], [84]))
+      .toBe(text);
+  });
+
   it("图鉴不会从未击败条目泄露名字、物种或课程概念", () => {
     const model = buildMonsterCodexModel({
       floor: 1,
@@ -71,5 +82,20 @@ describe("monster identity archive", () => {
     expect(unknown?.lore).not.toContain(INITIAL_MONSTERS.find(
       (entry) => entry.id === 2,
     )?.name ?? "水史莱姆");
+  });
+
+  it("未发现的 89 个图鉴条目均不泄露 canonical 名称或 species", () => {
+    for (let floor = 1; floor <= 8; floor += 1) {
+      const model = buildMonsterCodexModel({
+        floor: floor as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+        discoveredMonsterIds: [],
+      });
+      model.entries.forEach((entry) => {
+        const monster = INITIAL_MONSTERS.find((candidate) => candidate.id === entry.id);
+        if (!monster) throw new Error(`缺少 ID #${entry.id} 测试怪物`);
+        expect(JSON.stringify(entry)).not.toContain(monster.name);
+        expect(JSON.stringify(entry)).not.toContain(monster.species);
+      });
+    }
   });
 });

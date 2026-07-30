@@ -37,6 +37,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f7-crystal-grove",
+      navigationRegion: "front",
       name: "水晶枝径",
       purpose: "让主键点查与联合索引成为两条可比较的实体道路",
       lessonIds: ["f7-btree", "f7-composite"],
@@ -46,6 +47,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f7-root-cloister",
+      navigationRegion: "middle",
       name: "盘根回廊",
       purpose: "用覆盖索引与范围改写区分必要回表和可以避免的绕行",
       lessonIds: ["f7-covering", "f7-invalid"],
@@ -55,6 +57,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f7-index-heart",
+      navigationRegion: "rear",
       name: "索引树心",
       purpose: "把 EXPLAIN QUERY PLAN 的节点沿树根点亮，再证明路径不能改写事实",
       lessonIds: ["f7-plan", "f7-optimize"],
@@ -241,7 +244,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
       actions: [
         { type: "music-state", state: "f7-sunset-cello-horn" },
         { type: "camera-focus", landmarkId: "f7-scan-road" },
-        { type: "dialogue", speaker: "抄写员", lines: ["这条长路很慢，却能看见每一页。", "那条晶枝很快，也决定了哪些记录永远不会被经过。"] },
+        { type: "dialogue", speaker: "抄写员", lines: ["我曾帮王城决定谁更容易被找到。", "长路会经过每一页；索引短路只是路径，不是事实。"] },
       ],
       completionFact: "story:f7:entry-seen",
     },
@@ -253,9 +256,23 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
       priority: 94,
       actions: [
         { type: "camera-focus", landmarkId: "f7-blind-garden" },
-        { type: "dialogue", speaker: "抄写员", lines: ["第四层那段签名来自最后的档案官。", "我保存了它，却把通向它的路径藏了起来。"] },
+        { type: "dialogue", speaker: "抄写员", lines: ["被藏起的路径让第四层签名迟了数百年才被看见。", "未命中的记录仍在；花园只保存这件事造成的后果。"] },
       ],
       completionFact: "story:f7:blind-garden",
+    },
+    {
+      id: "f7-story-root-cloister-open",
+      title: "错误前缀解除",
+      trigger: "monster:77:defeated",
+      repeat: "once",
+      priority: 95,
+      actions: [
+        { type: "camera-focus", landmarkId: "f7-broken-root" },
+        { type: "world-effect", effect: "f7-root-cloister-open" },
+        { type: "banner", text: "错误前缀解除 · 索引树心可达" },
+        { type: "dialogue", speaker: "抄写员", lines: ["最左前缀是一份路径契约，不是真相裁决。", "错误的根已经退开，完整扫描仍会与我们同行。"] },
+      ],
+      completionFact: "story:f7:root-cloister-open",
     },
     {
       id: "f7-story-cipher",
@@ -296,6 +313,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
     { id: "f7-admin-entry", label: "F7 扫描与索引双路", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f7-scan-road" },
     { id: "f7-admin-garden", label: "F7 盲索引花园", completedLessonIds: ["f7-btree", "f7-composite", "f7-covering"], defeatedMonsterIds: [67, 68, 69], openedGateIds: ["gate:floor-7-treasure"], collectedKeyItems: [], focusLandmarkId: "f7-blind-garden" },
     { id: "f7-admin-cipher", label: "F7 最优叶密文门", completedLessonIds: ["f7-btree", "f7-composite", "f7-covering", "f7-invalid"], defeatedMonsterIds: [67, 68, 69, 70], openedGateIds: ["gate:floor-7-lesson-6"], collectedKeyItems: [], focusLandmarkId: "f7-sql-seal" },
-    { id: "f7-admin-complete", label: "F7 残照树心", completedLessonIds: ["f7-btree", "f7-composite", "f7-covering", "f7-invalid", "f7-plan", "f7-optimize"], defeatedMonsterIds: [67, 68, 69, 70, 71, 72], openedGateIds: ["shortcut:7:return"], collectedKeyItems: ["floor-key:7"], focusLandmarkId: "f7-index-throne" },
+    { id: "f7-admin-root-cloister", label: "F7 根系回廊", completedLessonIds: ["f7-btree", "f7-composite", "f7-covering", "f7-invalid"], defeatedMonsterIds: [67, 68, 69, 70, 77], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f7-broken-root" },
+    { id: "f7-admin-complete", label: "F7 残照树心", completedLessonIds: ["f7-btree", "f7-composite", "f7-covering", "f7-invalid", "f7-plan", "f7-optimize"], defeatedMonsterIds: [67, 68, 69, 70, 71, 72, 77], openedGateIds: ["shortcut:7:return"], collectedKeyItems: ["floor-key:7"], focusLandmarkId: "f7-index-throne" },
   ],
 };

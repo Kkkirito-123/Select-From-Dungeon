@@ -64,7 +64,7 @@ function chestLabel(kind: FloorOneChestKind, index: number): {
   if (kind === "mimic") {
     return {
       name: "沉默木箱",
-      description: "箱盖里藏着一段未归档的基础 SQL 记录。按 E 会唤醒宝箱怪。",
+      description: "箱盖里藏着一段未归档的基础 SQL 记录。按 E 会唤醒箱中的守卫。",
     };
   }
   if (kind === "warp") {

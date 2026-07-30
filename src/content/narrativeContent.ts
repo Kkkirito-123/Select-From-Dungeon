@@ -344,7 +344,7 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
       ]),
       beat(4, "midpoint-evidence", 3, "嵌套的源头", [
         "标量、IN 与 EXISTS 分别确认单值、集合和存在关系。",
-        "中层炉主倒下后，依赖链露出一扇指向第一层登记厅残响的回燃门。",
+        "中层首领 ID #044 倒下后，依赖链露出一扇指向第一层登记厅残响的回燃门。",
       ], ["lost-name:f4:command-batch"]),
       beat(4, "campfire", 3, "升炉旁的复盘", [
         "事实：恢复权限从第一层穿过四层，仍能打开回燃门。",
@@ -567,7 +567,7 @@ export const NARRATIVE_FLOORS: readonly FloorNarrative[] = [
         "疑点：取得写权限之后，怎样避免再次替所有人作出不可逆决定？",
       ]),
       beat(8, "boss", 6, "最后的档案官", [
-        "魔王就是拒绝最终提交、并与王座守护系统融合的档案官。",
+        "ID #084 是拒绝最终提交、并与王座守护系统融合的档案官。",
         "她保存了可恢复的历史，也让整个王国停滞了数百年。",
         "她要求玩家证明自己会验证、回滚，而不只是写入。",
       ], ["lost-name:f8:archivist-verdict"]),

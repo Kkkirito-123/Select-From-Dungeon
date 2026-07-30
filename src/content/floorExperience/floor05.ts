@@ -37,6 +37,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f5-outer-watch",
+      navigationRegion: "front",
       name: "黑铁外城",
       purpose: "用 OVER 与 ROW_NUMBER 看见分区、岗次和仍被保留的每一行",
       lessonIds: ["f5-over", "f5-row-number"],
@@ -46,6 +47,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f5-barracks-ring",
+      navigationRegion: "middle",
       name: "轮值兵营",
       purpose: "用排名和前后行读取并列岗位与巡逻空档",
       lessonIds: ["f5-rank", "f5-lag-lead"],
@@ -55,6 +57,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f5-inner-clock",
+      navigationRegion: "rear",
       name: "内城军钟",
       purpose: "用窗口范围和分组 Top-N 证明警戒并非不可改变的命运",
       lessonIds: ["f5-frame", "f5-top-n"],
@@ -241,9 +244,35 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
       priority: 92,
       actions: [
         { type: "camera-focus", landmarkId: "f5-silent-roster" },
-        { type: "dialogue", speaker: "抄写员", lines: ["我在第四层认出了档案官的签名。", "我没有立刻告诉你，因为公开顺序也会伤人。"] },
+        { type: "dialogue", speaker: "抄写员", lines: ["名册没有删除标记，只有一串被延迟公开的岗次。", "它是那次沉默留下的旁证，不是唯一证词。"] },
       ],
       completionFact: "story:f5:silent-roster",
+    },
+    {
+      id: "f5-story-barracks-open",
+      title: "轮值兵营失守",
+      trigger: "monster:55:defeated",
+      repeat: "once",
+      priority: 95,
+      actions: [
+        { type: "camera-focus", landmarkId: "f5-patrol-chain" },
+        { type: "world-effect", effect: "f5-barracks-ring-open" },
+        { type: "banner", text: "轮值兵营失守 · 后区内环开放" },
+        { type: "dialogue", speaker: "抄写员", lines: ["一条队列不能代表所有居民。", "前后岗次都被保留，内城不能再把空档当作服从。"] },
+      ],
+      completionFact: "story:f5:barracks-open",
+    },
+    {
+      id: "f5-story-silence-is-order",
+      title: "沉默也是排序",
+      trigger: "lesson:f5-frame:completed",
+      repeat: "once",
+      priority: 93,
+      actions: [
+        { type: "camera-focus", landmarkId: "f5-alert-wall" },
+        { type: "dialogue", speaker: "抄写员", lines: ["我以保护为名延迟了那份证据。", "有人因此先被处理；沉默也是一种排序。"] },
+      ],
+      completionFact: "story:f5:silence-is-order",
     },
     {
       id: "f5-story-cipher",
@@ -284,6 +313,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
     { id: "f5-admin-entry", label: "F5 外城轮值表", completedLessonIds: [], defeatedMonsterIds: [], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f5-muster-board" },
     { id: "f5-admin-roster", label: "F5 静默名册室", completedLessonIds: ["f5-over", "f5-row-number", "f5-rank"], defeatedMonsterIds: [45, 46, 47], openedGateIds: ["gate:floor-5-treasure"], collectedKeyItems: [], focusLandmarkId: "f5-silent-roster" },
     { id: "f5-admin-cipher", label: "F5 轮值密文门", completedLessonIds: ["f5-over", "f5-row-number", "f5-rank"], defeatedMonsterIds: [45, 46, 47], openedGateIds: ["gate:floor-5-lesson-6"], collectedKeyItems: [], focusLandmarkId: "f5-sql-seal" },
-    { id: "f5-admin-complete", label: "F5 黑铁军钟", completedLessonIds: ["f5-over", "f5-row-number", "f5-rank", "f5-lag-lead", "f5-frame", "f5-top-n"], defeatedMonsterIds: [45, 46, 47, 48, 49, 50], openedGateIds: ["shortcut:5:return"], collectedKeyItems: ["floor-key:5"], focusLandmarkId: "f5-command-clock" },
+    { id: "f5-admin-barracks", label: "F5 轮值兵营", completedLessonIds: ["f5-over", "f5-row-number", "f5-rank", "f5-lag-lead"], defeatedMonsterIds: [45, 46, 47, 48, 55], openedGateIds: [], collectedKeyItems: [], focusLandmarkId: "f5-patrol-chain" },
+    { id: "f5-admin-complete", label: "F5 黑铁军钟", completedLessonIds: ["f5-over", "f5-row-number", "f5-rank", "f5-lag-lead", "f5-frame", "f5-top-n"], defeatedMonsterIds: [45, 46, 47, 48, 49, 50, 55], openedGateIds: ["shortcut:5:return"], collectedKeyItems: ["floor-key:5"], focusLandmarkId: "f5-command-clock" },
   ],
 };

@@ -21,6 +21,8 @@ export type FloorStoryMomentKind =
   | "boss"
   | "ascent";
 
+export type FloorStoryPresentation = "blocking" | "ambient" | "inspect";
+
 type StoryFloor = FloorNumber;
 
 export type FloorStoryUnlock =
@@ -35,6 +37,7 @@ export interface FloorStoryMoment {
   id: string;
   floor: StoryFloor;
   kind: FloorStoryMomentKind;
+  presentation: FloorStoryPresentation;
   kicker: string;
   title: string;
   lines: readonly string[];
@@ -42,6 +45,7 @@ export interface FloorStoryMoment {
   actions: readonly StoryAction[];
   unlock: FloorStoryUnlock;
   sourceId: string;
+  inspectLandmarkId: string | null;
   query: StoryQueryDefinition | null;
 }
 
@@ -62,6 +66,7 @@ export interface FloorStoryProgress {
 
 interface LandmarkStoryEvidenceRoute {
   queryId: StoryQueryId;
+  evidenceId?: string;
   lessonId?: RunLessonId;
   gateId?: string;
 }
@@ -69,12 +74,18 @@ interface LandmarkStoryEvidenceRoute {
 const LANDMARK_STORY_EVIDENCE: Readonly<
   Record<string, LandmarkStoryEvidenceRoute>
 > = {
-  "f1-water-wheel": { queryId: "f1-current-resident" },
+  "f1-water-wheel": {
+    queryId: "f1-current-resident",
+    evidenceId: "lost-name:f1:current-record",
+  },
   "f1-sealed-vault": {
     queryId: "f1-restore-contradiction",
     gateId: "gate:floor-1-treasure",
   },
-  "f2-ranked-beacons": { queryId: "f2-seven-source-pages" },
+  "f2-ranked-beacons": {
+    queryId: "f2-seven-source-pages",
+    evidenceId: "lost-name:f2:identity-count",
+  },
   "f2-wreck-ledger": {
     queryId: "f2-seven-source-summary",
     gateId: "gate:floor-2-treasure",
@@ -85,10 +96,12 @@ const LANDMARK_STORY_EVIDENCE: Readonly<
   },
   "f3-relic-chain": {
     queryId: "f3-room-relic-chain",
+    evidenceId: "lost-name:f3:relic-links",
     lessonId: "f3-chain",
   },
   "f4-source-core": {
     queryId: "f4-three-incident-fronts",
+    evidenceId: "lost-name:f4:command-batch",
     lessonId: "f4-scalar",
   },
   "f4-dependency-spine": {
@@ -97,6 +110,7 @@ const LANDMARK_STORY_EVIDENCE: Readonly<
   },
   "f5-muster-board": {
     queryId: "f5-stable-duty-order",
+    evidenceId: "lost-name:f5:history-positions",
     lessonId: "f5-row-number",
   },
   "f5-rank-standards": {
@@ -109,10 +123,12 @@ const LANDMARK_STORY_EVIDENCE: Readonly<
   },
   "f6-state-bridge": {
     queryId: "f6-baseline-restored",
+    evidenceId: "lost-name:f6:undo-origin",
     lessonId: "f6-transaction",
   },
   "f7-index-road": {
     queryId: "f7-all-realms-present",
+    evidenceId: "lost-name:f7:hidden-history",
     lessonId: "f7-composite",
   },
   "f7-plan-tree": {
@@ -121,6 +137,7 @@ const LANDMARK_STORY_EVIDENCE: Readonly<
   },
   "f8-version-gallery": {
     queryId: "f8-visible-snapshot",
+    evidenceId: "lost-name:f8:identity-set",
     lessonId: "f8-mvcc",
   },
   "f8-deadlock-gate": {
@@ -128,6 +145,32 @@ const LANDMARK_STORY_EVIDENCE: Readonly<
     lessonId: "f8-lock",
   },
 };
+
+const STORY_EVIDENCE_MARKER_PREFIX = "story:evidence:";
+
+export function floorStoryEvidenceIdForLandmark(
+  landmarkId: string,
+): string | null {
+  return LANDMARK_STORY_EVIDENCE[landmarkId]?.evidenceId ?? null;
+}
+
+export function storyEvidenceMarkerId(evidenceId: string): string {
+  return `${STORY_EVIDENCE_MARKER_PREFIX}${evidenceId}`;
+}
+
+export function storyEvidenceIdFromMarker(markerId: string): string | null {
+  if (!markerId.startsWith(STORY_EVIDENCE_MARKER_PREFIX)) return null;
+  const evidenceId = markerId.slice(STORY_EVIDENCE_MARKER_PREFIX.length);
+  return evidenceId.length > 0 ? evidenceId : null;
+}
+
+export function storyEvidenceMarkerIdsForFloor(
+  floor: FloorNumber,
+): readonly string[] {
+  return narrativeFloorFor(floor).lostNameEvidence.map((evidence) =>
+    storyEvidenceMarkerId(evidence.id)
+  );
+}
 
 export function floorStoryEvidenceQueryForLandmark(
   landmarkId: string,
@@ -153,23 +196,45 @@ export class FloorStoryMomentQueue {
   private readonly recordedIds = new Set<string>();
   private readonly pending: FloorStoryMoment[] = [];
 
+  primeExisting(moments: readonly FloorStoryMoment[]): void {
+    moments.forEach((moment) => this.recordedIds.add(moment.id));
+  }
+
+  /**
+   * @deprecated Use primeExisting when hydrating an existing Run. Kept as a
+   * temporary compatibility alias while presentation callers migrate.
+   */
   prime(moments: readonly FloorStoryMoment[]): void {
-    const unseen = moments.filter((moment) => !this.recordedIds.has(moment.id));
-    unseen.forEach((moment) => this.recordedIds.add(moment.id));
-    const latest = unseen.at(-1);
-    if (latest) this.pending.push(latest);
+    this.primeExisting(moments);
   }
 
   enqueue(moments: readonly FloorStoryMoment[]): void {
     moments.forEach((moment) => {
       if (this.recordedIds.has(moment.id)) return;
       this.recordedIds.add(moment.id);
+      if (moment.presentation === "inspect") return;
       this.pending.push(moment);
     });
   }
 
-  takeNext(): FloorStoryMoment | null {
+  peekNext(): FloorStoryMoment | null {
+    return this.pending[0] ?? null;
+  }
+
+  ackPresented(momentId?: string): FloorStoryMoment | null {
+    const next = this.peekNext();
+    if (!next || (momentId !== undefined && next.id !== momentId)) return null;
     return this.pending.shift() ?? null;
+  }
+
+  /**
+   * @deprecated Use peekNext followed by ackPresented after presentation has
+   * actually started, so a temporarily blocked UI cannot lose the moment.
+   */
+  takeNext(): FloorStoryMoment | null {
+    const next = this.peekNext();
+    if (!next) return null;
+    return this.ackPresented(next.id);
   }
 
   get pendingIds(): readonly string[] {
@@ -190,6 +255,8 @@ type CanonicalStorySource =
 interface FloorStoryRoute {
   source: CanonicalStorySource;
   kind: FloorStoryMomentKind;
+  presentation: FloorStoryPresentation;
+  inspectLandmarkId?: string;
   queryId?: StoryQueryId;
 }
 
@@ -198,207 +265,512 @@ const FLOOR_STORY_ROUTES: Readonly<Record<StoryFloor, readonly FloorStoryRoute[]
     {
       source: { type: "event", id: "f1-story-fire-remembers" },
       kind: "entry",
+      presentation: "blocking",
       queryId: "f1-current-resident",
     },
     {
       source: { type: "rule", id: "f1-wheel-turning" },
       kind: "world-change",
+      presentation: "ambient",
     },
     {
       source: { type: "rule", id: "f1-water-low" },
       kind: "world-change",
+      presentation: "ambient",
     },
     {
       source: { type: "rule", id: "f1-beds-revealed" },
       kind: "evidence",
+      presentation: "ambient",
     },
     {
       source: { type: "event", id: "f1-story-sealed-vault" },
       kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f1-sealed-vault",
     },
     {
       source: { type: "event", id: "f1-story-shortcut-return" },
       kind: "scribe",
+      presentation: "inspect",
+      inspectLandmarkId: "npc-scribe-f1",
     },
     {
       source: { type: "rule", id: "f1-receipts-grouped" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f1-restore-contradiction",
     },
-    { source: { type: "event", id: "f1-story-cipher" }, kind: "secret" },
+    {
+      source: { type: "event", id: "f1-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
     {
       source: { type: "event", id: "f1-story-first-page" },
       kind: "boss",
+      presentation: "blocking",
     },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   2: [
     {
       source: { type: "event", id: "f2-story-seven-wet-pages" },
       kind: "entry",
+      presentation: "blocking",
       queryId: "f2-seven-source-pages",
     },
     {
       source: { type: "rule", id: "f2-beacons-ranked" },
       kind: "world-change",
+      presentation: "ambient",
     },
     {
       source: { type: "rule", id: "f2-channels-distinct" },
       kind: "evidence",
+      presentation: "ambient",
     },
     {
       source: { type: "event", id: "f2-story-wreck-ledger" },
       kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f2-wreck-ledger",
     },
     {
       source: { type: "rule", id: "f2-root-linked" },
       kind: "world-change",
+      presentation: "ambient",
     },
     {
       source: { type: "rule", id: "f2-missing-gear" },
       kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f2-story-frog-court" },
+      kind: "boss",
+      presentation: "blocking",
     },
     {
       source: { type: "event", id: "f2-story-low-tide" },
       kind: "world-change",
+      presentation: "ambient",
     },
     {
       source: { type: "event", id: "f2-story-seven-reflections" },
       kind: "scribe",
+      presentation: "inspect",
+      inspectLandmarkId: "npc-scribe-f2",
     },
-    { source: { type: "event", id: "f2-story-cipher" }, kind: "secret" },
+    {
+      source: { type: "event", id: "f2-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
     {
       source: { type: "event", id: "f2-story-seven-pages" },
       kind: "boss",
+      presentation: "blocking",
       queryId: "f2-seven-source-summary",
     },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   3: [
-    { source: { type: "event", id: "f3-story-no-owner" }, kind: "entry" },
-    { source: { type: "rule", id: "f3-bone-linked" }, kind: "world-change" },
+    {
+      source: { type: "event", id: "f3-story-no-owner" },
+      kind: "entry",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "rule", id: "f3-bone-linked" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
     {
       source: { type: "rule", id: "f3-unarmed-kept" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f3-unarmed-record-preserved",
     },
-    { source: { type: "rule", id: "f3-steles-aliased" }, kind: "evidence" },
-    { source: { type: "event", id: "f3-story-reliquary" }, kind: "secret" },
+    {
+      source: { type: "rule", id: "f3-steles-aliased" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f3-story-reliquary" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f3-reliquary",
+    },
     {
       source: { type: "rule", id: "f3-relic-chain" },
       kind: "world-change",
+      presentation: "ambient",
       queryId: "f3-room-relic-chain",
     },
-    { source: { type: "event", id: "f3-story-grave-lord" }, kind: "boss" },
-    { source: { type: "rule", id: "f3-witnesses-united" }, kind: "evidence" },
-    { source: { type: "event", id: "f3-story-cipher" }, kind: "secret" },
-    { source: { type: "event", id: "f3-story-audit-complete" }, kind: "boss" },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "event", id: "f3-story-grave-lord" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "rule", id: "f3-witnesses-united" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f3-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f3-story-audit-complete" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   4: [
-    { source: { type: "event", id: "f4-story-one-command" }, kind: "entry" },
+    {
+      source: { type: "event", id: "f4-story-one-command" },
+      kind: "entry",
+      presentation: "blocking",
+    },
     {
       source: { type: "rule", id: "f4-source-identified" },
       kind: "world-change",
+      presentation: "ambient",
       queryId: "f4-three-incident-fronts",
     },
-    { source: { type: "rule", id: "f4-frost-selected" }, kind: "evidence" },
-    { source: { type: "rule", id: "f4-existence-proved" }, kind: "evidence" },
-    { source: { type: "event", id: "f4-story-forge-lord" }, kind: "boss" },
-    { source: { type: "event", id: "f4-story-ember-echo" }, kind: "secret" },
-    { source: { type: "rule", id: "f4-correlations-linked" }, kind: "world-change" },
-    { source: { type: "rule", id: "f4-cte-named" }, kind: "world-change" },
+    {
+      source: { type: "rule", id: "f4-frost-selected" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f4-existence-proved" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f4-story-forge-lord" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "event", id: "f4-story-ember-echo" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f4-echo-gate",
+    },
+    {
+      source: { type: "rule", id: "f4-correlations-linked" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f4-cte-named" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
     {
       source: { type: "rule", id: "f4-recursive-traced" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f4-dependency-lineage",
     },
-    { source: { type: "event", id: "f4-story-cipher" }, kind: "secret" },
-    { source: { type: "event", id: "f4-story-open-transaction" }, kind: "boss" },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "event", id: "f4-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f4-story-open-transaction" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   5: [
-    { source: { type: "event", id: "f5-story-ordered-people" }, kind: "entry" },
-    { source: { type: "rule", id: "f5-partitions-visible" }, kind: "world-change" },
+    {
+      source: { type: "event", id: "f5-story-ordered-people" },
+      kind: "entry",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "rule", id: "f5-partitions-visible" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
     {
       source: { type: "rule", id: "f5-positions-numbered" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f5-stable-duty-order",
     },
     {
       source: { type: "rule", id: "f5-ties-visible" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f5-ties-preserved",
     },
-    { source: { type: "event", id: "f5-story-silent-roster" }, kind: "secret" },
-    { source: { type: "rule", id: "f5-patrol-linked" }, kind: "world-change" },
-    { source: { type: "rule", id: "f5-alert-framed" }, kind: "evidence" },
-    { source: { type: "event", id: "f5-story-cipher" }, kind: "secret" },
-    { source: { type: "event", id: "f5-story-clock-reordered" }, kind: "boss" },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "rule", id: "f5-patrol-linked" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f5-story-barracks-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "event", id: "f5-story-silent-roster" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f5-silent-roster",
+    },
+    {
+      source: { type: "event", id: "f5-story-silence-is-order" },
+      kind: "scribe",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f5-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f5-story-clock-reordered" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   6: [
-    { source: { type: "event", id: "f6-story-change-can-return" }, kind: "entry" },
-    { source: { type: "rule", id: "f6-row-inserted" }, kind: "world-change" },
-    { source: { type: "rule", id: "f6-row-updated" }, kind: "world-change" },
+    {
+      source: { type: "event", id: "f6-story-change-can-return" },
+      kind: "entry",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "rule", id: "f6-row-inserted" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f6-row-updated" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
     {
       source: { type: "rule", id: "f6-duplicate-targeted" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f6-duplicate-candidates",
     },
-    { source: { type: "event", id: "f6-story-rookery" }, kind: "secret" },
-    { source: { type: "rule", id: "f6-constraint-protected" }, kind: "evidence" },
+    {
+      source: { type: "rule", id: "f6-constraint-protected" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f6-story-crystal-cavern-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "event", id: "f6-story-rookery" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f6-uncommitted-rookery",
+    },
     {
       source: { type: "rule", id: "f6-transaction-rolled-back" },
       kind: "world-change",
+      presentation: "ambient",
       queryId: "f6-baseline-restored",
     },
-    { source: { type: "event", id: "f6-story-cipher" }, kind: "secret" },
-    { source: { type: "rule", id: "f6-savepoint-validated" }, kind: "evidence" },
-    { source: { type: "event", id: "f6-story-safe-change" }, kind: "boss" },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "event", id: "f6-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f6-savepoint-validated" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f6-story-safe-change" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   7: [
-    { source: { type: "event", id: "f7-story-unreached" }, kind: "entry" },
-    { source: { type: "rule", id: "f7-point-search-lit" }, kind: "world-change" },
+    {
+      source: { type: "event", id: "f7-story-unreached" },
+      kind: "entry",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "rule", id: "f7-point-search-lit" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
     {
       source: { type: "rule", id: "f7-composite-lit" },
       kind: "world-change",
+      presentation: "ambient",
       queryId: "f7-all-realms-present",
     },
-    { source: { type: "rule", id: "f7-covering-reflection" }, kind: "evidence" },
-    { source: { type: "event", id: "f7-story-blind-garden" }, kind: "secret" },
-    { source: { type: "rule", id: "f7-range-root-open" }, kind: "world-change" },
+    {
+      source: { type: "rule", id: "f7-covering-reflection" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f7-range-root-open" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f7-story-root-cloister-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "event", id: "f7-story-blind-garden" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f7-blind-garden",
+    },
     {
       source: { type: "rule", id: "f7-plan-explained" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f7-crystal-plan-candidates",
     },
-    { source: { type: "event", id: "f7-story-cipher" }, kind: "secret" },
-    { source: { type: "event", id: "f7-story-paths-compared" }, kind: "boss" },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "event", id: "f7-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f7-story-paths-compared" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "blocking",
+    },
   ],
   8: [
-    { source: { type: "event", id: "f8-story-unfinished-kingdom" }, kind: "entry" },
+    {
+      source: { type: "event", id: "f8-story-unfinished-kingdom" },
+      kind: "entry",
+      presentation: "blocking",
+    },
     {
       source: { type: "rule", id: "f8-snapshot-visible" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f8-visible-snapshot",
     },
     {
       source: { type: "rule", id: "f8-cycle-exposed" },
       kind: "evidence",
+      presentation: "ambient",
       queryId: "f8-deadlock-cycle",
     },
-    { source: { type: "rule", id: "f8-isolation-wing" }, kind: "world-change" },
-    { source: { type: "event", id: "f8-story-zero-row-chapel" }, kind: "secret" },
-    { source: { type: "rule", id: "f8-model-wing" }, kind: "world-change" },
-    { source: { type: "rule", id: "f8-replica-wing" }, kind: "world-change" },
-    { source: { type: "rule", id: "f8-shard-ready" }, kind: "evidence" },
-    { source: { type: "event", id: "f8-story-cipher" }, kind: "secret" },
-    { source: { type: "event", id: "f8-story-migrate" }, kind: "boss" },
-    { source: { type: "floor-end" }, kind: "ascent" },
+    {
+      source: { type: "rule", id: "f8-isolation-wing" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f8-model-wing" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f8-replica-wing" },
+      kind: "world-change",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "rule", id: "f8-shard-ready" },
+      kind: "evidence",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f8-story-void-court-open" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "event", id: "f8-story-zero-row-chapel" },
+      kind: "secret",
+      presentation: "inspect",
+      inspectLandmarkId: "f8-zero-row-chapel",
+    },
+    {
+      source: { type: "event", id: "f8-story-cipher" },
+      kind: "secret",
+      presentation: "ambient",
+    },
+    {
+      source: { type: "event", id: "f8-story-migrate" },
+      kind: "boss",
+      presentation: "blocking",
+    },
+    {
+      source: { type: "floor-end" },
+      kind: "ascent",
+      presentation: "ambient",
+    },
   ],
+};
+
+const AREA_BOSS_STORY_MONSTER_IDS: Readonly<
+  Record<StoryFloor, number | null>
+> = {
+  1: null,
+  2: 22,
+  3: 33,
+  4: 44,
+  5: 55,
+  6: 66,
+  7: 77,
+  8: 89,
 };
 
 function parseCanonicalTrigger(trigger: string): FloorStoryUnlock {
@@ -449,6 +821,7 @@ function momentFromEvent(
     id: `story:${event.id}`,
     floor,
     kind: route.kind,
+    presentation: route.presentation,
     kicker: `${route.kind === "entry" ? "DISCOVERY" : "STORY"} / ${event.title}`,
     title: event.title,
     lines: lines.slice(0, 2),
@@ -456,6 +829,7 @@ function momentFromEvent(
     actions: [...event.actions],
     unlock: parseCanonicalTrigger(event.trigger),
     sourceId: event.id,
+    inspectLandmarkId: route.inspectLandmarkId ?? null,
     query,
   };
 }
@@ -481,6 +855,7 @@ function momentFromRule(
     id: `story:${rule.id}`,
     floor,
     kind: route.kind,
+    presentation: route.presentation,
     kicker: `WORLD CHANGE / ${lessonId.toUpperCase()}`,
     title: rule.visibleResult,
     lines: [
@@ -491,6 +866,7 @@ function momentFromRule(
     actions: [],
     unlock: { type: "lesson-completed", lessonId },
     sourceId: rule.id,
+    inspectLandmarkId: route.inspectLandmarkId ?? null,
     query,
   };
 }
@@ -507,6 +883,7 @@ function momentFromFloorEnd(
     id: `story:${beat.id}`,
     floor,
     kind: route.kind,
+    presentation: route.presentation,
     kicker: "ASCENT / 本层结论",
     title: beat.title,
     lines: beat.lines.slice(0, 2),
@@ -514,6 +891,7 @@ function momentFromFloorEnd(
     actions: [],
     unlock: { type: "floor-completed" },
     sourceId: beat.id,
+    inspectLandmarkId: route.inspectLandmarkId ?? null,
     query: null,
   };
 }
@@ -590,6 +968,21 @@ export function floorStoryProgress(
   };
 }
 
+/**
+ * 将一次真实的 E 地标调查解析为已经满足解锁条件的 inspect 剧情。
+ * inspect 节点不会进入自动队列；它们只能通过显式绑定的地标或 NPC
+ * 主动读取，并允许玩家之后重复查看。
+ */
+export function floorStoryInspectMomentForLandmark(
+  state: FloorStoryState,
+  landmarkId: string,
+): FloorStoryMoment | null {
+  return floorStoryProgress(state).unlocked.find((moment) => (
+    moment.presentation === "inspect" &&
+    moment.inspectLandmarkId === landmarkId
+  )) ?? null;
+}
+
 export function validateFloorStoryContent(
   moments: readonly FloorStoryMoment[] = [
     ...floorStoryMoments(1),
@@ -604,9 +997,41 @@ export function validateFloorStoryContent(
 ): string[] {
   const errors: string[] = [];
   const ids = new Set<string>();
+  const canonicalEvidenceIds = new Set(
+    ([1, 2, 3, 4, 5, 6, 7, 8] as const).flatMap((floor) =>
+      narrativeFloorFor(floor).lostNameEvidence.map((evidence) => evidence.id)
+    ),
+  );
+  const mappedEvidenceIds = new Set<string>();
+  const sourcedEvidenceIds = new Set<string>();
+
+  Object.entries(LANDMARK_STORY_EVIDENCE).forEach(([landmarkId, route]) => {
+    if (!route.evidenceId) return;
+    if (!canonicalEvidenceIds.has(route.evidenceId)) {
+      errors.push(
+        `剧情地标 ${landmarkId} 引用了不存在的失名证据 ${route.evidenceId}。`,
+      );
+    }
+    if (mappedEvidenceIds.has(route.evidenceId)) {
+      errors.push(`失名证据 ${route.evidenceId} 被多个查询地标重复绑定。`);
+    }
+    mappedEvidenceIds.add(route.evidenceId);
+    sourcedEvidenceIds.add(route.evidenceId);
+    const landmarkFloor = landmarkId.match(/^f([1-8])-/)?.[1];
+    const evidenceFloor = route.evidenceId.match(/^lost-name:f([1-8]):/)?.[1];
+    if (landmarkFloor !== evidenceFloor) {
+      errors.push(
+        `剧情地标 ${landmarkId} 与失名证据 ${route.evidenceId} 不在同一层。`,
+      );
+    }
+  });
 
   ([1, 2, 3, 4, 5, 6, 7, 8] as const).forEach((floor) => {
     const floorMoments = moments.filter((entry) => entry.floor === floor);
+    const blockingLimit = floor === 1 ? 3 : 4;
+    const blockingCount = floorMoments.filter(
+      (entry) => entry.presentation === "blocking",
+    ).length;
     if (floorMoments.length < 8) {
       errors.push(`第 ${floor} 层至少需要八个可见现场剧情节点。`);
     }
@@ -615,6 +1040,54 @@ export function validateFloorStoryContent(
     }
     if (floorMoments.at(-1)?.unlock.type !== "floor-completed") {
       errors.push(`第 ${floor} 层最后一个现场剧情节点必须在层完成时解锁。`);
+    }
+    if (floorMoments[0]?.presentation !== "blocking") {
+      errors.push(`第 ${floor} 层入层剧情必须使用阻断主框。`);
+    }
+    const expectedFloorEndPresentation = floor === 8 ? "ambient" : "blocking";
+    if (floorMoments.at(-1)?.presentation !== expectedFloorEndPresentation) {
+      errors.push(
+        `第 ${floor} 层离层剧情必须使用 ${expectedFloorEndPresentation} 展示。`,
+      );
+    }
+    if (
+      floor === 8 &&
+      floorMoments.filter((entry) => entry.presentation === "blocking")
+        .at(-1)?.sourceId !== "f8-story-migrate"
+    ) {
+      errors.push("第 8 层最后一个阻断剧情必须是 f8-story-migrate。");
+    }
+    if (blockingCount > blockingLimit) {
+      errors.push(
+        `第 ${floor} 层自动阻断剧情 ${blockingCount} 次，超过 ${blockingLimit} 次上限。`,
+      );
+    }
+    const areaBossId = AREA_BOSS_STORY_MONSTER_IDS[floor];
+    if (areaBossId !== null) {
+      const areaBossMoments = floorMoments.filter((entry) => (
+        entry.unlock.type === "monster-defeated" &&
+        entry.unlock.monsterId === areaBossId
+      ));
+      if (areaBossMoments.length !== 1) {
+        errors.push(
+          `第 ${floor} 层区域首领 ID #${String(areaBossId).padStart(3, "0")} 必须且只能解锁一个现场剧情节点。`,
+        );
+      } else if (
+        areaBossMoments[0]?.kind !== "boss" ||
+        areaBossMoments[0]?.presentation !== "blocking"
+      ) {
+        errors.push(
+          `第 ${floor} 层区域首领 ID #${String(areaBossId).padStart(3, "0")} 必须使用阻断 Boss 剧情。`,
+        );
+      }
+    }
+    const queryEvidenceCount = [...mappedEvidenceIds].filter((evidenceId) =>
+      evidenceId.startsWith(`lost-name:f${floor}:`)
+    ).length;
+    if (queryEvidenceCount !== 1) {
+      errors.push(
+        `第 ${floor} 层必须且只能有一份由 Story Query 地标恢复的失名证据。`,
+      );
     }
   });
 
@@ -628,6 +1101,45 @@ export function validateFloorStoryContent(
         .some((entry) => entry.trim().length === 0)
     ) {
       errors.push(`现场剧情节点 ${moment.id} 缺少文本或超出两行预算。`);
+    }
+    if (
+      moment.presentation === "inspect" &&
+      ["floor-entered", "lesson-completed", "monster-defeated", "floor-completed"]
+        .includes(moment.unlock.type)
+    ) {
+      errors.push(`主动调查节点 ${moment.id} 不得由自动进度事实直接展示。`);
+    }
+    if (moment.presentation === "inspect") {
+      const experience = floorExperience(moment.floor);
+      const inspectTargetExists = moment.inspectLandmarkId !== null && (
+        experience.landmarks.some((entry) => entry.id === moment.inspectLandmarkId) ||
+        experience.npcPlacements.some((entry) => entry.id === moment.inspectLandmarkId)
+      );
+      if (!inspectTargetExists) {
+        errors.push(`主动调查节点 ${moment.id} 缺少可按 E 读取的地标绑定。`);
+      }
+    } else if (moment.inspectLandmarkId !== null) {
+      errors.push(`非主动调查节点 ${moment.id} 不得绑定调查地标。`);
+    }
+    moment.actions.forEach((action) => {
+      if (action.type !== "evidence") return;
+      sourcedEvidenceIds.add(action.evidenceId);
+      if (!canonicalEvidenceIds.has(action.evidenceId)) {
+        errors.push(
+          `现场剧情节点 ${moment.id} 引用了不存在的失名证据 ${action.evidenceId}。`,
+        );
+      }
+      if (!action.evidenceId.startsWith(`lost-name:f${moment.floor}:`)) {
+        errors.push(
+          `现场剧情节点 ${moment.id} 的证据 ${action.evidenceId} 不属于本层。`,
+        );
+      }
+    });
+  });
+
+  canonicalEvidenceIds.forEach((evidenceId) => {
+    if (!sourcedEvidenceIds.has(evidenceId)) {
+      errors.push(`失名证据 ${evidenceId} 没有 Story Query、隐藏门或 Boss 来源。`);
     }
   });
 
