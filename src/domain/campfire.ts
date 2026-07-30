@@ -1,4 +1,5 @@
 import { findGridPath } from "./pathfinding";
+import { floorLabyrinth } from "../content/floorLabyrinth";
 import { mazeTileAt, mazeZoneAt, type MazeFloor, type MazeZone } from "./mazeGenerator";
 import { stableStringHash, type RoomGraph } from "./runGraph";
 import type { Campfire, CampfirePhase, Position } from "./types";
@@ -182,8 +183,11 @@ export function safeZoneCellKeys(
     ...spawnSafeCellKeys(floor),
     ...campfireSafeCellKeys(floor, campfires),
   ]);
-  if (campfires.some((campfire) => campfire.id.startsWith("campfire:1:"))) {
-    const safeRoomIds = new Set(["floor-1-entry", "floor-1-rest"]);
+  const floorNumber = Number(floor.zones[0]?.roomNodeId.match(/^floor-(\d+)-/)?.[1]);
+  if (Number.isInteger(floorNumber) && floorNumber >= 1 && floorNumber <= 8) {
+    const safeRoomIds = new Set(
+      floorLabyrinth(floorNumber as RoomGraph["floor"]).safeRoomIds,
+    );
     floor.zones
       .filter((zone) => safeRoomIds.has(zone.roomNodeId))
       .forEach((zone) => {

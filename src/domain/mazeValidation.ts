@@ -34,6 +34,7 @@ export function reachableMazeCells(
   floor: MazeFloor,
   completedLessons: ReadonlySet<LessonId>,
   openedGateIds: ReadonlySet<string> = new Set<string>(),
+  canTraverseStep: (from: Position, to: Position) => boolean = () => true,
 ): Set<string> {
   if (!isMazeWalkable(
     floor,
@@ -52,6 +53,7 @@ export function reachableMazeCells(
       const nextKey = key(next);
       if (
         !visited.has(nextKey) &&
+        canTraverseStep(current, next) &&
         isMazeWalkable(floor, next.x, next.y, completedLessons, openedGateIds)
       ) {
         visited.add(nextKey);

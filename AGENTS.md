@@ -128,6 +128,21 @@ explicit exception: it remains one continuous authored route and uses water
 state plus the guaranteed physical shortcut instead of generic region portals.
 These actors never enter entrance or campfire safe zones and do not gate
 curriculum completion.
+Each floor also has one validated labyrinth contract that binds its unique maze
+name and topology signature to stable entry, exit, Boss-gate, return-shortcut,
+hidden-room, safe-room, sight-radius, and physical-hazard intent. The first move
+from an authored safe room into the hostile maze opens that floor's threshold
+confirmation; confirming it does not lock the return route. Authored entry/rest
+rooms and seeded campfire rings reveal their complete safe area and reject
+ambushes, patrols, curriculum actors, area Bosses, and hazards. Outside them,
+current actor visibility uses the floor-specific local radius. Each floor's
+seed deterministically places its own visible, one-use physical hazards away
+from rooms, anchors, gates, transport, guided-map interests, and safe cells;
+triggering one applies its authored armor-first damage without starting SQL
+combat, then records the stable hazard ID in `openedGateIds` as inert. Floors
+two through eight additionally enforce the living middle area Boss as a hard
+movement boundary into the rear region; the portal requirement is not merely
+presentation metadata.
 Floors one through eight have authored runtime experience definitions:
 stable landmarks, physical hidden-room entrances, derived world-state changes,
 one physical SQL cipher, story triggers, Scribe placement, and admin presets.
@@ -165,11 +180,13 @@ index.html -> src/main.ts
   -> CampaignDomain (ordered eight-floor slots and transition invariants)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> FloorMapBlueprints (eight authored macro layouts and transit identities)
+  -> FloorLabyrinthContent (stable F1-F8 navigation, safe-room, sight, and hazard contracts)
   -> FloorExperience (authored F1-F8 landmarks, hidden rooms, SQL ciphers, story, world states)
   -> MazeGenerator/MazeValidation (deterministic 48x36 generator-v5 world)
   -> CampfireDomain (two seeded checkpoints, entrance anchor, safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
   -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
+  -> FloorLabyrinthDomain (thresholds, local sight, safe-area resolution, seeded hazards)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates and same-battle deduplication)
@@ -233,6 +250,10 @@ pools and optional multi-stage exercises. `src/domain/biome.ts` derives region
 ownership, static features, area-Boss positions, and two region portals from
 the maze, campfires, guided map, and seed; this plan is rebuilt during load and
 is not serialized.
+`src/content/floorLabyrinth.ts` owns the stable eight-floor navigation contract;
+`src/domain/floorLabyrinth.ts` resolves that intent against the current saved
+`MazeFloor`, campfires, guided plan, and biome plan. It must not persist derived
+safe-cell, sight, hazard-position, or threshold-confirmation duplicates.
 `src/content/floorContracts.ts` is the canonical eight-floor content schema.
 `src/domain/campaign.ts` owns its serializable ordered floor slots and
 must reject skipped, duplicated, or rerolled transitions. This campaign
@@ -336,6 +357,11 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   coalesces non-critical movement/patrol snapshots while flushing query, loot,
   inventory, mode, and topology changes immediately; changing a shape requires
   a version or recovery decision.
+- The labyrinth contract adds no save field and does not change
+  `select-from-dungeon:run:v11`. Generated hazard coordinates, safe-cell masks,
+  and visibility are rebuilt from existing floor data; triggered hazard IDs
+  reuse `openedGateIds`, while entry confirmation is reconstructed from the
+  player's position, discovered cells, and visited rooms.
 - Core learning drops and keys are deterministic. Runtime optional candidates
   are immediate recovery items only, with no rank-based minimum or loot bundle.
   Randomness must never block curriculum progress. Combat damage is
@@ -370,6 +396,15 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   campfire safe zones never advance this encounter risk, never spawn enemies,
   and reject patrol entry. Ordinary world monsters patrol slowly; the Boss
   remains anchored.
+- All eight floors resolve their independent labyrinth contract at runtime.
+  Crossing from an authored safe room into the maze requires one explicit
+  threshold confirmation for the current floor. Safe rooms and campfire rings
+  expose their whole safe area; the hostile maze exposes only the current
+  floor's local sight radius. Seeded physical hazards are visible only when both
+  discovered and currently in sight, apply their configured one-time
+  armor-first damage without opening combat, and then become inert. F2-F8 rear
+  regions also reject every normal walking step while the bound middle area
+  Boss is alive; F1 remains the continuous no-region-portal exception.
 - `GuidedMap` is derived deterministically from the curriculum graph, saved
   `MazeFloor`, and two campfires rather than duplicated in save data. Route
   beacons appear about every 14 steps with no gap above 18, and every remaining

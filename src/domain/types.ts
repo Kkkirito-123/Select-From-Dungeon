@@ -13,7 +13,7 @@ import type {
   BiomeKind,
 } from "../content/biomeContent";
 import type { BiomePlan } from "./biome";
-import type { FloorHazard } from "./floorOneLabyrinth";
+import type { FloorHazard } from "./floorLabyrinth";
 
 export type LessonId = RunLessonId;
 

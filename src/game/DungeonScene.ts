@@ -19,8 +19,8 @@ import {
 import { safeZoneCellKeys } from "../domain/campfire";
 import {
   floorOneAreaAt,
-  floorOneCurrentSightCellKeys,
 } from "../domain/floorOneLabyrinth";
+import { floorCurrentSightCellKeys } from "../domain/floorLabyrinth";
 import {
   floorOneChestKind,
   isFloorOneChestItem,
@@ -92,7 +92,7 @@ interface CampfireView {
 
 interface HazardView {
   container: Phaser.GameObjects.Container;
-  rotor: Phaser.GameObjects.Container;
+  motion: Phaser.GameObjects.Container;
   label: Phaser.GameObjects.Text;
 }
 
@@ -115,6 +115,20 @@ const COLORS = {
   plum: 0x7f5a87,
   fog: 0x030407,
 } as const;
+
+const HAZARD_STYLES = {
+  "archive-cutter": { base: 0x2a3137, accent: 0xc75850, blade: 0xd9c9ad, motion: "spin", duration: 1_500 },
+  "tidal-current": { base: 0x163a63, accent: 0x66e3ff, blade: 0x9fe8f2, motion: "spin", duration: 2_100 },
+  "frost-crack": { base: 0x273143, accent: 0x9ad9ef, blade: 0xd9f4ff, motion: "pulse", duration: 2_600 },
+  "elemental-vent": { base: 0x3c2431, accent: 0xf0a64d, blade: 0xd9c6ff, motion: "pulse", duration: 1_300 },
+  "alarm-wire": { base: 0x322a25, accent: 0xd7ad55, blade: 0xa9a39a, motion: "sway", duration: 1_100 },
+  "magma-fissure": { base: 0x421d18, accent: 0xff765a, blade: 0xffc06a, motion: "pulse", duration: 1_700 },
+  "root-snare": { base: 0x203427, accent: 0xa6cf79, blade: 0x78c9b8, motion: "sway", duration: 2_300 },
+  "migration-rift": { base: 0x17131f, accent: 0xd2b36b, blade: 0xa58ad8, motion: "spin", duration: 1_900 },
+} as const;
+
+type HazardKind = keyof typeof HAZARD_STYLES;
+type HazardStyle = (typeof HAZARD_STYLES)[HazardKind];
 
 const ZONE_COLORS: Record<MazeZone["type"], number> = {
   entry: 0x25231d,
@@ -1316,37 +1330,155 @@ export class DungeonScene extends Phaser.Scene {
 
   private createHazardViews(): void {
     this.snapshot.hazards.forEach((hazard) => {
+      const style = HAZARD_STYLES[hazard.kind];
       const pixel = gridToPixels(hazard);
       const container = this.add.container(pixel.x, pixel.y).setDepth(22);
       const shadow = this.add.ellipse(0, 7, 27, 10, 0x020305, 0.55);
-      const base = this.add.circle(0, 1, 10, 0x2a3137, 1)
-        .setStrokeStyle(2, 0xc75850, 0.95);
-      const rotor = this.add.container(0, 1);
-      const horizontal = this.add.rectangle(0, 0, 26, 4, 0xd9c9ad, 0.9);
-      const vertical = this.add.rectangle(0, 0, 4, 26, 0xd9c9ad, 0.9);
-      const hub = this.add.circle(0, 0, 4, 0xc75850, 1)
-        .setStrokeStyle(1, 0xf1d28b, 0.9);
-      rotor.add([horizontal, vertical, hub]);
-      const label = this.add.text(0, -24, "档案切纸轮", {
+      const motion = this.createHazardSymbol(hazard.kind, style);
+      const label = this.add.text(0, -24, hazard.name, {
         color: "#f1d28b",
         fontFamily: "monospace",
         fontSize: "7px",
         backgroundColor: "#08090cdd",
         padding: { x: 3, y: 2 },
       }).setOrigin(0.5);
-      container.add([shadow, base, rotor, label]);
+      container.add([shadow, motion, label]);
       this.entityLayer.add(container);
       if (!this.reducedMotion) {
-        this.tweens.add({
-          targets: rotor,
-          angle: 360,
-          duration: 1_500,
-          repeat: -1,
-          ease: "Linear",
-        });
+        if (style.motion === "spin") {
+          this.tweens.add({
+            targets: motion,
+            angle: 360,
+            duration: style.duration,
+            repeat: -1,
+            ease: "Linear",
+          });
+        } else if (style.motion === "pulse") {
+          this.tweens.add({
+            targets: motion,
+            scaleX: 1.12,
+            scaleY: 1.12,
+            alpha: 0.72,
+            duration: style.duration,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.InOut",
+          });
+        } else {
+          this.tweens.add({
+            targets: motion,
+            angle: { from: -5, to: 5 },
+            duration: style.duration,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.InOut",
+          });
+        }
       }
-      this.hazardViews.set(hazard.id, { container, rotor, label });
+      this.hazardViews.set(hazard.id, { container, motion, label });
     });
+  }
+
+  private createHazardSymbol(
+    kind: HazardKind,
+    style: HazardStyle,
+  ): Phaser.GameObjects.Container {
+    const symbol = this.add.container(0, 1);
+    const circleBase = () => this.add.circle(0, 0, 10, style.base, 1)
+      .setStrokeStyle(2, style.accent, 0.95);
+
+    if (kind === "archive-cutter") {
+      symbol.add([
+        circleBase(),
+        this.add.rectangle(0, 0, 26, 4, style.blade, 0.9),
+        this.add.rectangle(0, 0, 4, 26, style.blade, 0.9),
+        this.add.circle(0, 0, 4, style.accent, 1)
+          .setStrokeStyle(1, 0xf1d28b, 0.9),
+      ]);
+      return symbol;
+    }
+
+    if (kind === "tidal-current") {
+      symbol.add([
+        this.add.ellipse(0, 0, 27, 15, style.base, 1)
+          .setStrokeStyle(2, style.accent, 0.95),
+        this.add.ellipse(0, 0, 18, 8, style.base, 0)
+          .setStrokeStyle(2, style.blade, 0.9),
+        this.add.circle(-9, -5, 2, style.blade, 0.9),
+        this.add.circle(8, 5, 2, style.accent, 0.95),
+      ]);
+      return symbol;
+    }
+
+    if (kind === "frost-crack") {
+      symbol.add([
+        this.add.rectangle(0, 0, 18, 18, style.base, 1)
+          .setAngle(45)
+          .setStrokeStyle(2, style.accent, 0.95),
+        this.add.rectangle(-3, -4, 3, 12, style.blade, 0.95).setAngle(-28),
+        this.add.rectangle(3, 4, 3, 12, style.blade, 0.95).setAngle(28),
+        this.add.rectangle(4, -5, 2, 7, style.accent, 0.95).setAngle(62),
+      ]);
+      return symbol;
+    }
+
+    if (kind === "elemental-vent") {
+      symbol.add([
+        circleBase(),
+        this.add.circle(0, -7, 4, style.blade, 0.95),
+        this.add.circle(-7, 5, 4, style.accent, 0.95),
+        this.add.circle(7, 5, 4, 0x78c9b8, 0.95),
+        this.add.circle(0, 0, 3, style.base, 1),
+      ]);
+      return symbol;
+    }
+
+    if (kind === "alarm-wire") {
+      symbol.add([
+        this.add.rectangle(0, 2, 28, 10, style.base, 1)
+          .setStrokeStyle(2, style.accent, 0.95),
+        this.add.rectangle(-11, -2, 3, 22, style.blade, 0.95),
+        this.add.rectangle(11, -2, 3, 22, style.blade, 0.95),
+        this.add.rectangle(0, -5, 21, 2, style.accent, 1),
+        this.add.circle(0, 1, 5, style.accent, 1)
+          .setStrokeStyle(1, style.blade, 0.95),
+        this.add.circle(0, 7, 2, style.blade, 1),
+      ]);
+      return symbol;
+    }
+
+    if (kind === "magma-fissure") {
+      symbol.add([
+        this.add.ellipse(0, 2, 28, 14, style.base, 1)
+          .setStrokeStyle(2, style.accent, 0.95),
+        this.add.rectangle(-6, -3, 4, 11, style.blade, 0.95).setAngle(34),
+        this.add.rectangle(0, 2, 4, 12, style.accent, 1).setAngle(-28),
+        this.add.rectangle(6, 6, 4, 10, style.blade, 0.95).setAngle(38),
+      ]);
+      return symbol;
+    }
+
+    if (kind === "root-snare") {
+      symbol.add([
+        this.add.ellipse(0, 2, 27, 14, style.base, 1)
+          .setStrokeStyle(2, style.accent, 0.95),
+        this.add.ellipse(-6, -2, 5, 24, style.blade, 0.85).setAngle(-28),
+        this.add.ellipse(6, -2, 5, 24, style.accent, 0.9).setAngle(28),
+        this.add.ellipse(0, 3, 5, 20, style.blade, 0.85),
+      ]);
+      return symbol;
+    }
+
+    symbol.add([
+      this.add.rectangle(0, 0, 20, 20, style.base, 1)
+        .setAngle(45)
+        .setStrokeStyle(2, style.accent, 0.95),
+      this.add.rectangle(0, 0, 12, 12, style.base, 0)
+        .setAngle(45)
+        .setStrokeStyle(2, style.blade, 0.95),
+      this.add.rectangle(0, 0, 3, 16, style.accent, 1),
+    ]);
+    return symbol;
   }
 
   private syncCampfireViews(): void {
@@ -1498,9 +1630,14 @@ export class DungeonScene extends Phaser.Scene {
       this.playerView.setPosition(pixel.x, pixel.y);
     }
     const discovered = new Set(this.snapshot.discoveredCells);
-    const currentSight = this.snapshot.floor === 1 && !this.snapshot.adminMode
-      ? floorOneCurrentSightCellKeys(this.snapshot.mazeFloor, this.snapshot.player)
-      : discovered;
+    const currentSight = this.snapshot.adminMode
+      ? discovered
+      : floorCurrentSightCellKeys(
+          this.snapshot.floor,
+          this.snapshot.mazeFloor,
+          this.snapshot.campfires,
+          this.snapshot.player,
+        );
     this.syncObjectiveBeacon();
     this.monsterViews.forEach((view, monsterId) => {
       const actor = this.snapshot.worldActors.find((entry) => entry.monsterId === monsterId);
@@ -1578,9 +1715,14 @@ export class DungeonScene extends Phaser.Scene {
 
   private syncHazardViews(): void {
     const discovered = new Set(this.snapshot.discoveredCells);
-    const sight = this.snapshot.floor === 1 && !this.snapshot.adminMode
-      ? floorOneCurrentSightCellKeys(this.snapshot.mazeFloor, this.snapshot.player)
-      : discovered;
+    const sight = this.snapshot.adminMode
+      ? discovered
+      : floorCurrentSightCellKeys(
+          this.snapshot.floor,
+          this.snapshot.mazeFloor,
+          this.snapshot.campfires,
+          this.snapshot.player,
+        );
     this.snapshot.hazards.forEach((hazard) => {
       const view = this.hazardViews.get(hazard.id);
       if (!view) return;
@@ -1589,10 +1731,10 @@ export class DungeonScene extends Phaser.Scene {
       view.container.setVisible(visible);
       view.container.setAlpha(triggered ? 0.34 : 1);
       if (triggered) {
-        this.tweens.killTweensOf(view.rotor);
-        view.rotor.setAngle(45);
+        this.tweens.killTweensOf(view.motion);
+        view.motion.setAngle(0).setScale(1).setAlpha(1);
       }
-      view.label.setText(triggered ? "已停转" : "档案切纸轮");
+      view.label.setText(triggered ? "已失效" : hazard.name);
       view.label.setVisible(
         visible && isNearPlayer(this.snapshot.player, hazard, INTERACTION_LABEL_DISTANCE),
       );
@@ -1992,9 +2134,14 @@ export class DungeonScene extends Phaser.Scene {
     const discovered = new Set(this.snapshot.discoveredCells);
     const floor = this.snapshot.mazeFloor;
     const fogColor = colorsForFloor(this.snapshot.floor).fog;
-    const currentSight = this.snapshot.floor === 1 && !this.snapshot.adminMode
-      ? floorOneCurrentSightCellKeys(floor, this.snapshot.player)
-      : discovered;
+    const currentSight = this.snapshot.adminMode
+      ? discovered
+      : floorCurrentSightCellKeys(
+          this.snapshot.floor,
+          floor,
+          this.snapshot.campfires,
+          this.snapshot.player,
+        );
     for (let y = 0; y < floor.height; y += 1) {
       for (let x = 0; x < floor.width; x += 1) {
         const key = `${x}:${y}`;

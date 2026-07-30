@@ -5,6 +5,7 @@ import {
   type BiomeKind,
 } from "../src/content/biomeContent";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+import { regionPortalsEnabledForFloor } from "../src/content/floorMapBlueprints";
 import {
   biomeRegionAt,
   generateBiomePlan,
@@ -110,22 +111,17 @@ describe("seeded biome plan", () => {
     });
   });
 
-  it("第四层把炉主放在中段冰库，用它真实锁住后段区域交通", () => {
-    const current = fixture("floor-four-middle-boss", 4);
-    const middle = current.biome.regions[1];
-    const rearPortal = current.biome.portals.find(
-      (portal) => portal.id === "biome-portal:4:middle-rear",
-    );
-    expect(middle).toMatchObject({
-      kind: "frost-vault",
-      areaBossId: 44,
-    });
-    expect(rearPortal?.requiredBossId).toBe(44);
-  });
+  it("第一层保持连续地图，第二至八层的后段交通均由本层中段区域首领门控", () => {
+    expect(regionPortalsEnabledForFloor(1)).toBe(false);
+    const floorOne = fixture("floor-one-continuous-route", 1);
+    expect(floorOne.biome.portals.find(
+      (portal) => portal.id === "biome-portal:1:middle-rear",
+    )?.requiredBossId).toBeNull();
 
-  it("第三、五至八层都把区域首领放在中段并锁住后段交通", () => {
     const expectations = [
+      { floor: 2, kind: "swamp", bossId: 22 },
       { floor: 3, kind: "grave-mire", bossId: 33 },
+      { floor: 4, kind: "frost-vault", bossId: 44 },
       { floor: 5, kind: "barracks", bossId: 55 },
       { floor: 6, kind: "crystal-cavern", bossId: 66 },
       { floor: 7, kind: "root-maze", bossId: 77 },
@@ -136,6 +132,7 @@ describe("seeded biome plan", () => {
       for (let index = 0; index < 30; index += 1) {
         const current = fixture(`late-floor-middle-boss-${floor}-${index}`, floor);
         const middle = current.biome.regions[1];
+        const rear = current.biome.regions[2];
         const rearPortal = current.biome.portals.find(
           (portal) => portal.id === `biome-portal:${floor}:middle-rear`,
         );
@@ -144,7 +141,15 @@ describe("seeded biome plan", () => {
           areaBossId: bossId,
         });
         expect(middle.areaBossPosition).not.toBeNull();
-        expect(rearPortal?.requiredBossId).toBe(bossId);
+        if (!middle.areaBossPosition) return;
+        expect(biomeRegionAt(current.biome, middle.areaBossPosition).id).toBe(middle.id);
+        expect(rearPortal).toMatchObject({
+          fromRegionId: middle.id,
+          toRegionId: rear.id,
+          requiredBossId: bossId,
+        });
+        expect(BIOME_ENCOUNTERS.find((encounter) => encounter.monsterId === bossId))
+          .toMatchObject({ floor, biome: kind, role: "area-boss" });
       }
     });
   }, 30_000);
