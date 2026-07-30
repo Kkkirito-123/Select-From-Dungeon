@@ -37,6 +37,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f4-fire-forge",
+      navigationRegion: "front",
       name: "烈焰熔炉",
       purpose: "以标量子查询和 CTE 追到命令源头",
       lessonIds: ["f4-scalar", "f4-cte"],
@@ -46,6 +47,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f4-frost-vault",
+      navigationRegion: "middle",
       name: "寒霜冰库",
       purpose: "用 IN 与相关子查询辨认一组依赖记录，并挑战中层炉主",
       lessonIds: ["f4-in", "f4-correlated"],
@@ -55,6 +57,7 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f4-storm-core",
+      navigationRegion: "rear",
       name: "雷晶核心",
       purpose: "用 EXISTS、CTE 与递归依赖链证明三处事故来自同一命令",
       lessonIds: ["f4-exists", "f4-cte", "f4-recursive"],

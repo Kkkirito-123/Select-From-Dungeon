@@ -30,6 +30,102 @@ describe("eight-floor experience contracts", () => {
     });
   });
 
+  it("显式绑定展示区域与前中后三段导航区域", () => {
+    expect(FLOOR_EXPERIENCES.map((experience) => ({
+      floor: experience.floor,
+      regions: experience.regions.map(({ id, navigationRegion }) => ({
+        id,
+        navigationRegion,
+      })),
+    }))).toEqual([
+      {
+        floor: 1,
+        regions: [
+          { id: "f1-drainage", navigationRegion: "front" },
+          { id: "f1-dormitory", navigationRegion: "middle" },
+          { id: "f1-registry", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 2,
+        regions: [
+          { id: "f2-coast", navigationRegion: "front" },
+          { id: "f2-lake", navigationRegion: "front" },
+          { id: "f2-forest-swamp", navigationRegion: "middle" },
+          { id: "f2-lighthouse", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 3,
+        regions: [
+          { id: "f3-bone-yard", navigationRegion: "front" },
+          { id: "f3-grave-mire", navigationRegion: "middle" },
+          { id: "f3-spirit-crypt", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 4,
+        regions: [
+          { id: "f4-fire-forge", navigationRegion: "front" },
+          { id: "f4-frost-vault", navigationRegion: "middle" },
+          { id: "f4-storm-core", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 5,
+        regions: [
+          { id: "f5-outer-watch", navigationRegion: "front" },
+          { id: "f5-barracks-ring", navigationRegion: "middle" },
+          { id: "f5-inner-clock", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 6,
+        regions: [
+          { id: "f6-magma-workshop", navigationRegion: "front" },
+          { id: "f6-crystal-repair", navigationRegion: "middle" },
+          { id: "f6-rollback-summit", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 7,
+        regions: [
+          { id: "f7-crystal-grove", navigationRegion: "front" },
+          { id: "f7-root-cloister", navigationRegion: "middle" },
+          { id: "f7-index-heart", navigationRegion: "rear" },
+        ],
+      },
+      {
+        floor: 8,
+        regions: [
+          { id: "f8-obsidian-history", navigationRegion: "front" },
+          { id: "f8-void-court", navigationRegion: "middle" },
+          { id: "f8-data-throne", navigationRegion: "rear" },
+        ],
+      },
+    ]);
+  });
+
+  it("第二层区分前区可选湖兽与中区主线蛙王", () => {
+    const experience = floorExperience(2);
+    expect(experience.regions.find((region) => region.id === "f2-lake")).toMatchObject({
+      navigationRegion: "front",
+      purpose: expect.stringContaining("湖兽是前区可选挑战"),
+    });
+    expect(experience.regions.find(
+      (region) => region.id === "f2-forest-swamp",
+    )).toMatchObject({
+      navigationRegion: "middle",
+      purpose: expect.stringContaining("蛙王是通往后区灯塔的主线硬门"),
+    });
+    expect(experience.landmarks.find(
+      (landmark) => landmark.id === "f2-lake-beast",
+    )?.interaction).toBe("前区可选挑战 ID #021");
+    expect(experience.landmarks.find(
+      (landmark) => landmark.id === "f2-frog-court",
+    )?.interaction).toBe("主线硬门 ID #022 · 击败后开放灯塔道路");
+  });
+
   it("places the only floor-one scribe in the opening safe room, away from the ember", () => {
     const experience = floorExperience(1);
     const scribe = experience.npcPlacements[0];

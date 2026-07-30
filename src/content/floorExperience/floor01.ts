@@ -79,6 +79,7 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f1-drainage",
+      navigationRegion: "front",
       name: "青石排水渠",
       purpose: "建立移动、身份矛盾与 SELECT 的第一条可见因果链",
       lessonIds: ["select", "where"],
@@ -88,6 +89,7 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f1-dormitory",
+      navigationRegion: "middle",
       name: "无名宿舍",
       purpose: "用水位和空床牌解释 NULL 是已确认的缺失",
       lessonIds: ["is-null"],
@@ -97,6 +99,7 @@ export const FLOOR_ONE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f1-registry",
+      navigationRegion: "rear",
       name: "回燃登记厅",
       purpose: "把 GROUP BY、HAVING、抄写员与登记官汇聚到同一个回环终点",
       lessonIds: ["group-by", "having"],

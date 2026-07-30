@@ -1,3 +1,5 @@
+import type { RunLessonId } from "../domain/runGraph";
+
 export const CAMPAIGN_FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 export type CampaignFloorNumber = (typeof CAMPAIGN_FLOORS)[number];
@@ -25,10 +27,10 @@ export type TopologyStrategy =
   | "throne-ascent";
 
 export interface FloorLessonContract {
-  id: string;
+  id: RunLessonId;
   label: string;
   concepts: readonly string[];
-  prerequisites: readonly string[];
+  prerequisites: readonly RunLessonId[];
   tier: ExerciseTier;
   minimumCorrectAnswers: number;
   deterministicRewardId: string;
@@ -37,7 +39,7 @@ export interface FloorLessonContract {
 export interface EncounterContract {
   role: EncounterRole;
   name: string;
-  lessonIds: readonly string[];
+  lessonIds: readonly RunLessonId[];
   minimumCorrectAnswers: number;
   xp: 1 | 3 | 5;
   required: boolean;
@@ -75,10 +77,10 @@ export interface FloorContractValidation {
 }
 
 function defineLesson(
-  id: string,
+  id: RunLessonId,
   label: string,
   concepts: readonly string[],
-  prerequisites: readonly string[],
+  prerequisites: readonly RunLessonId[],
   tier: ExerciseTier,
   minimumCorrectAnswers = tier,
 ): FloorLessonContract {
@@ -94,12 +96,12 @@ function defineLesson(
 }
 
 function encounterSet(
-  names: readonly [string, string, string, string, string],
-  lessonIds: readonly string[],
+  names: readonly [string, string, string | null, string, string],
+  lessonIds: readonly RunLessonId[],
   floor: CampaignFloorNumber,
 ): readonly EncounterContract[] {
   const finalLessons = lessonIds.slice(-Math.min(3, lessonIds.length));
-  return [
+  const encounters: EncounterContract[] = [
     {
       role: "normal",
       name: names[0],
@@ -112,14 +114,6 @@ function encounterSet(
       role: "mini-elite",
       name: names[1],
       lessonIds: lessonIds.slice(0, 2),
-      minimumCorrectAnswers: 2,
-      xp: 3,
-      required: false,
-    },
-    {
-      role: "area-boss",
-      name: names[2],
-      lessonIds: lessonIds.slice(1, 3),
       minimumCorrectAnswers: 2,
       xp: 3,
       required: false,
@@ -141,11 +135,22 @@ function encounterSet(
       required: true,
     },
   ];
+  if (names[2] !== null) {
+    encounters.splice(2, 0, {
+      role: "area-boss",
+      name: names[2],
+      lessonIds: lessonIds.slice(1, 3),
+      minimumCorrectAnswers: 2,
+      xp: 3,
+      required: false,
+    });
+  }
+  return encounters;
 }
 
 function floorContract(
   input: Omit<FloorContentContract, "encounters"> & {
-    encounterNames: readonly [string, string, string, string, string];
+    encounterNames: readonly [string, string, string | null, string, string];
   },
 ): FloorContentContract {
   const { encounterNames, ...contract } = input;
@@ -160,37 +165,23 @@ function floorContract(
 }
 
 const FLOOR_ONE_LESSONS = [
-  defineLesson("f1-select", "选择字段", ["SELECT", "FROM", "AS"], [], 1),
-  defineLesson("f1-where", "条件过滤", ["WHERE", "比较运算"], ["f1-select"], 1),
-  defineLesson("f1-boolean", "组合条件", ["AND", "OR", "NOT"], ["f1-where"], 2),
-  defineLesson("f1-pattern", "集合与模式", ["IN", "BETWEEN", "LIKE"], ["f1-boolean"], 2),
-  defineLesson("f1-null", "空值判断", ["IS NULL", "IS NOT NULL"], ["f1-where"], 1),
-  defineLesson(
-    "f1-sort",
-    "去重排序",
-    ["DISTINCT", "ORDER BY", "LIMIT", "OFFSET"],
-    ["f1-pattern", "f1-null"],
-    3,
-  ),
+  defineLesson("select", "读取字段", ["SELECT", "FROM", "AS"], [], 1),
+  defineLesson("where", "条件过滤", ["WHERE", "AND"], ["select"], 1),
+  defineLesson("is-null", "空值判断", ["IS NULL"], ["select"], 1),
+  defineLesson("group-by", "分组统计", ["COUNT", "GROUP BY"], ["where", "is-null"], 2),
+  defineLesson("having", "过滤分组", ["GROUP BY", "HAVING"], ["group-by"], 3),
 ] as const;
 
 const FLOOR_TWO_LESSONS = [
-  defineLesson("f2-count", "计数", ["COUNT(*)", "COUNT(column)"], ["f1-sort"], 1),
-  defineLesson("f2-aggregate", "聚合函数", ["SUM", "AVG", "MIN", "MAX"], ["f2-count"], 1),
-  defineLesson("f2-group", "分组", ["GROUP BY"], ["f2-aggregate"], 2),
-  defineLesson("f2-having", "分组过滤", ["WHERE", "HAVING"], ["f2-group"], 2),
-  defineLesson("f2-case", "条件聚合", ["CASE WHEN"], ["f2-having"], 2),
-  defineLesson(
-    "f2-ranking",
-    "聚合榜单",
-    ["GROUP BY", "HAVING", "ORDER BY", "LIMIT"],
-    ["f2-case"],
-    3,
-  ),
+  defineLesson("order-by", "稳定排序", ["ORDER BY", "LIMIT"], ["having"], 1),
+  defineLesson("distinct", "去除重复显示", ["DISTINCT", "ORDER BY"], ["order-by"], 1),
+  defineLesson("inner-join", "匹配两表", ["INNER JOIN", "ON", "alias"], ["distinct"], 2),
+  defineLesson("left-join", "保留左表", ["LEFT JOIN", "IS NULL"], ["inner-join"], 2),
+  defineLesson("join-boss", "关系综合查询", ["JOIN", "GROUP BY", "HAVING", "ORDER BY"], ["left-join"], 3),
 ] as const;
 
 const FLOOR_THREE_LESSONS = [
-  defineLesson("f3-inner", "内连接", ["INNER JOIN", "ON"], ["f2-ranking"], 1),
+  defineLesson("f3-inner", "内连接", ["INNER JOIN", "ON"], ["join-boss"], 1),
   defineLesson("f3-left", "左连接", ["LEFT JOIN", "IS NULL"], ["f3-inner"], 2),
   defineLesson("f3-self", "自连接", ["SELF JOIN", "alias"], ["f3-inner"], 2),
   defineLesson("f3-chain", "多表连接", ["JOIN chain", "cardinality"], ["f3-left"], 2),
@@ -260,12 +251,12 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
   floorContract({
     floor: 1,
     id: "floor-1",
-    name: "余烬青石城",
-    learningGoal: "完成可靠的单表选择、过滤、空值处理和稳定排序。",
+    name: "地下余烬档案",
+    learningGoal: "从读取、过滤和空值判断出发，完成分组与分组过滤。",
     runtime: "sqlite-readonly",
     runtimeNotice: "题目在浏览器内真实执行只读 SQLite 查询。",
     lessons: FLOOR_ONE_LESSONS,
-    encounterNames: ["史莱姆", "铁史莱姆", "宝箱怪", "灰史莱姆", "登记官"],
+    encounterNames: ["小水怪", "灰史莱姆", null, "宝箱怪", "登记官"],
     monsterPool: ["史莱姆", "水史莱姆", "毒史莱姆", "铁史莱姆", "登记官", "小水怪", "小史莱姆", "灰史莱姆", "宝箱怪"],
     equipmentPool: ["short-blade", "slime-vest"],
     lootPool: ["slime-gel", "red-potion", "short-blade", "slime-vest"],
@@ -273,20 +264,20 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
     nextFloorKeyId: "floor-key:2",
     theme: {
       topology: "looped-keep",
-      worldElement: "余烬与火炬",
-      material: "青石与旧铁",
-      landmark: "Schema 档案厅",
-      bossArena: "半圆火盆审判厅",
+      worldElement: "余烬、退水与无名床牌",
+      material: "潮湿青石、旧铁与封存纸页",
+      landmark: "档案水轮",
+      bossArena: "回燃登记厅",
       palette: ["#111820", "#2c3744", "#d59b45", "#79d3c4"],
     },
   }),
   floorContract({
     floor: 2,
     id: "floor-2",
-    name: "蒸汽回执档案厅",
-    learningGoal: "把明细行转换为可信、稳定且可解释的分组统计。",
+    name: "月潮群岛",
+    learningGoal: "用排序、去重和连接保留记录来源并打开跨岛关系。",
     runtime: "sqlite-readonly",
-    runtimeNotice: "题目在浏览器内真实执行只读 SQLite 聚合查询。",
+    runtimeNotice: "题目在浏览器内真实执行只读 SQLite 排序与连接查询。",
     lessons: FLOOR_TWO_LESSONS,
     encounterNames: ["猎犬", "毒蛙", "湖兽", "蛙王", "灯塔守卫"],
     monsterPool: ["猎犬", "水蛇", "树妖", "毒蛙", "灯塔守卫", "水怪", "青蛙", "湖兽", "蛙王"],
@@ -296,69 +287,69 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
     nextFloorKeyId: "floor-key:3",
     theme: {
       topology: "aggregate-hub",
-      worldElement: "蒸汽与齿轮",
-      material: "黄铜与铆钉",
-      landmark: "中央聚合钟轴",
-      bossArena: "圆形钟面核心",
+      worldElement: "潮汐、航标与退潮村落",
+      material: "湿木、白沙、古根与风化白石",
+      landmark: "中央月潮船闸",
+      bossArena: "月潮灯塔",
       palette: ["#17171b", "#60452e", "#c69b4d", "#d8e2dc"],
     },
   }),
   floorContract({
     floor: 3,
     id: "floor-3",
-    name: "雷鸣关系桥城",
+    name: "白霜墓原",
     learningGoal: "根据真实键关系连接数据，并识别缺失匹配和连接放大。",
     runtime: "sqlite-readonly",
     runtimeNotice: "题目在浏览器内真实执行只读 SQLite 连接查询。",
     lessons: FLOOR_THREE_LESSONS,
-    encounterNames: ["骷髅", "铠骷髅", "墓主", "骷髅骑士", "死灵王"],
-    monsterPool: ["骷髅", "僵尸", "幽灵", "铠骷髅", "死灵王"],
+    encounterNames: ["骷髅", "铠骷髅", "墓主", "骨骑士", "死灵王"],
+    monsterPool: ["骷髅", "僵尸", "幽灵", "铠骷髅", "骨骑士", "死灵王", "碎骨", "腐尸", "鬼火", "游魂", "墓主"],
     equipmentPool: ["bone-blade", "bone-armor"],
     lootPool: ["holy-water", "bone-blade", "spirit-lamp", "bone-armor"],
     completionRewardId: "course-proof:floor-3",
     nextFloorKeyId: "floor-key:4",
     theme: {
       topology: "relational-islands",
-      worldElement: "雷电与风暴",
-      material: "悬浮石台与金属桥",
-      landmark: "三表关系桥",
-      bossArena: "三平台雷鸣主核",
+      worldElement: "白霜、墓碑与幽火",
+      material: "冻土、墓石与遗骨",
+      landmark: "断裂骨桥",
+      bossArena: "墓城王庭",
       palette: ["#0b1432", "#223f75", "#5ed4ff", "#9c6cff"],
     },
   }),
   floorContract({
     floor: 4,
     id: "floor-4",
-    name: "镜影子查询地窟",
+    name: "三相升炉",
     learningGoal: "用子查询、EXISTS 与 CTE 表达依赖另一结果集的问题。",
     runtime: "sqlite-readonly",
     runtimeNotice: "题目在浏览器内真实执行只读 SQLite 子查询和 CTE。",
     lessons: FLOOR_FOUR_LESSONS,
-    encounterNames: ["火灵", "雷灵", "炎王", "石巨人", "元素王"],
-    monsterPool: ["火灵", "冰灵", "雷灵", "石巨人", "元素王"],
+    encounterNames: ["火灵", "雷兽", "炉主", "炎王", "元素王"],
+    monsterPool: ["火灵", "冰灵", "雷灵", "石巨人", "炎王", "元素王", "火苗", "冰晶", "雷兽", "电球", "炉主"],
     equipmentPool: ["rune-staff", "rune-armor"],
     lootPool: ["fire-crystal", "ice-crystal", "rune-staff", "rune-armor"],
     completionRewardId: "course-proof:floor-4",
     nextFloorKeyId: "floor-key:5",
     theme: {
       topology: "nested-chambers",
-      worldElement: "镜影与幽火",
-      material: "黑石与碎镜",
-      landmark: "CTE 档案环",
-      bossArena: "同心镜室",
+      worldElement: "火、冰与雷的依赖链",
+      material: "熔岩砖、霜铁与雷晶",
+      landmark: "依赖脊柱",
+      bossArena: "元素王座",
       palette: ["#100e18", "#31204f", "#8b7ca8", "#62d5b2"],
     },
   }),
   floorContract({
     floor: 5,
     id: "floor-5",
-    name: "黑铁窗口要塞",
+    name: "黑铁轮值城",
     learningGoal: "在保留明细行的同时完成排名、相邻比较和累计统计。",
     runtime: "sqlite-readonly",
     runtimeNotice: "题目在浏览器内真实执行 SQLite 窗口查询。",
     lessons: FLOOR_FIVE_LESSONS,
-    encounterNames: ["哥布林", "兽人", "铁骑", "巨魔", "城主"],
-    monsterPool: ["哥布林", "兽人", "骑士", "铁骑", "巨魔", "城主"],
+    encounterNames: ["哥布林", "铁卫", "堡主", "铁骑", "城主"],
+    monsterPool: ["哥布林", "兽人", "骑士", "铁骑", "巨魔", "城主", "小妖", "战兽", "铁卫", "堡主"],
     equipmentPool: ["iron-axe", "iron-armor"],
     lootPool: ["repair-plate", "iron-axe", "knight-sword", "iron-armor"],
     completionRewardId: "course-proof:floor-5",
@@ -367,21 +358,21 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
       topology: "partition-rings",
       worldElement: "城墙、军阵与黑铁",
       material: "铆钉黑铁与旧石",
-      landmark: "分区军阵",
-      bossArena: "黑铁王厅",
+      landmark: "轮值军钟",
+      bossArena: "黑铁主厅",
       palette: ["#05080b", "#222b32", "#82d5c8", "#e0ae4b"],
     },
   }),
   floorContract({
     floor: 6,
     id: "floor-6",
-    name: "巨龙事务熔巢",
+    name: "龙脊回滚工坊",
     learningGoal: "在隔离副本中安全写入、验证约束并正确提交或回滚。",
     runtime: "sqlite-sandbox",
     runtimeNotice: "写操作只进入一次性 SQLite 沙箱，退出后不污染课程与永久档案。",
     lessons: FLOOR_SIX_LESSONS,
-    encounterNames: ["幼龙", "雷龙", "晶龙", "巨龙", "龙王"],
-    monsterPool: ["幼龙", "飞龙", "雷龙", "巨龙", "龙王"],
+    encounterNames: ["幼龙", "雷龙", "古龙", "巨龙", "龙王"],
+    monsterPool: ["幼龙", "飞龙", "雷龙", "晶龙", "巨龙", "龙王", "小龙", "翼龙", "古龙"],
     equipmentPool: ["dragon-spear", "dragon-armor"],
     lootPool: ["dragon-potion", "repair-plate", "dragon-spear", "dragon-armor"],
     completionRewardId: "course-proof:floor-6",
@@ -390,44 +381,44 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
       topology: "rollback-nest",
       worldElement: "熔岩、龙晶与古龙骨",
       material: "火山岩与龙晶",
-      landmark: "保存点龙巢",
-      bossArena: "古龙王座",
+      landmark: "保存点祭台",
+      bossArena: "王焰巢",
       palette: ["#0b0303", "#352421", "#f15a3f", "#6ce0d5"],
     },
   }),
   floorContract({
     floor: 7,
     id: "floor-7",
-    name: "翠晶索引森林",
+    name: "残照索引王苑",
     learningGoal: "根据查询模式选择索引，并用可重复的计划证据验证取舍。",
     runtime: "sqlite-plan",
     runtimeNotice: "只把 SQLite EXPLAIN QUERY PLAN 作为教学证据，不宣称等同 MySQL 执行计划。",
     lessons: FLOOR_SEVEN_LESSONS,
-    encounterNames: ["小恶魔", "眼魔", "深渊兽", "魔将", "魔龙"],
-    monsterPool: ["小恶魔", "魔犬", "眼魔", "魔将", "魔龙"],
+    encounterNames: ["枝妖", "晶灵", "林王", "眼魔", "古树"],
+    monsterPool: ["树卫", "根兽", "镜灵", "藤巫", "眼魔", "古树", "枝妖", "晶灵", "树魔", "林王"],
     equipmentPool: ["abyss-blade", "demon-armor"],
     lootPool: ["black-fruit", "black-potion", "abyss-blade", "demon-armor"],
     completionRewardId: "course-proof:floor-7",
     nextFloorKeyId: "floor-key:8",
     theme: {
       topology: "btree-branches",
-      worldElement: "树根与数据流",
-      material: "翠晶与黑木",
-      landmark: "B+ 树分支",
-      bossArena: "古树根系核心",
+      worldElement: "残照、树根与数据流",
+      material: "水晶枝、黑木与计划叶片",
+      landmark: "执行计划树",
+      bossArena: "索引树心",
       palette: ["#071a16", "#173d32", "#55bd7a", "#9ef0b2"],
     },
   }),
   floorContract({
     floor: 8,
     id: "floor-8",
-    name: "黑金数据王座",
+    name: "黑金迁移高堂",
     learningGoal: "把 SQL、索引、事务和数据库面试知识组成可解释的事故诊断。",
     runtime: "scenario-simulation",
     runtimeNotice: "查询可真实执行；MySQL 的 MVCC、锁、复制和分片使用可重复场景模拟，不冒充 SQLite 实证。",
     lessons: FLOOR_EIGHT_LESSONS,
-    encounterNames: ["魔兵", "魔骑士", "大魔将", "魔像", "魔王"],
-    monsterPool: ["魔兵", "魔像", "魔骑士", "大魔将", "魔王"],
+    encounterNames: ["魔兵", "魔将", "王兽", "巨兽", "魔王"],
+    monsterPool: ["幽魂", "锁骑", "巫妖", "魔像", "双子", "巨兽", "魔王", "魔兵", "黑骑", "魔将", "石像", "王兽"],
     equipmentPool: ["royal-sword", "royal-armor"],
     lootPool: ["full-potion", "royal-sword", "royal-staff", "royal-armor"],
     completionRewardId: "campaign-proof",
@@ -436,8 +427,8 @@ export const FLOOR_CONTRACTS: readonly FloorContentContract[] = [
       topology: "throne-ascent",
       worldElement: "王火与虚空",
       material: "黑曜石与黄金",
-      landmark: "七翼王门",
-      bossArena: "阶梯王座大厅",
+      landmark: "七层证据窗",
+      bossArena: "迁移王座",
       palette: ["#09090d", "#2b2232", "#c99b45", "#e5d39b"],
     },
   }),
@@ -451,8 +442,8 @@ const REQUIRED_ROLES: readonly EncounterRole[] = [
   "floor-boss",
 ];
 const EXPECTED_LESSON_COUNTS: Record<CampaignFloorNumber, number> = {
-  1: 6,
-  2: 6,
+  1: 5,
+  2: 5,
   3: 6,
   4: 6,
   5: 6,
@@ -526,8 +517,9 @@ export function validateFloorContracts(
 
     REQUIRED_ROLES.forEach((role) => {
       const matches = contract.encounters.filter((encounter) => encounter.role === role);
-      if (matches.length !== 1) {
-        errors.push(`第 ${contract.floor} 层必须恰好配置一个 ${role} 原型。`);
+      const expectedCount = contract.floor === 1 && role === "area-boss" ? 0 : 1;
+      if (matches.length !== expectedCount) {
+        errors.push(`第 ${contract.floor} 层必须恰好配置 ${expectedCount} 个 ${role} 原型。`);
       }
     });
     contract.encounters.forEach((encounter) => {

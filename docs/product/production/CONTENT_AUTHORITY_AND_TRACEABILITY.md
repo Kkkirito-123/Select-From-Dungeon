@@ -1,6 +1,6 @@
 # 八层内容权威与追踪矩阵
 
-> 文档版本：`0.2`
+> 文档版本：`0.3`
 >
 > 日期：`2026-07-30`
 >
@@ -69,13 +69,13 @@
 
 | 编号 | 状态 | 漂移 | 当前决策 | 后续关闭条件 |
 |---|---|---|---|---|
-| `AUTH-001` | `OPEN` | F2 Experience 有海岸、湖区、林沼、灯塔 4 个展示区，生成器只有 3 个物理区 | 两者都保留；展示子区映射到 `front/middle/rear`，`regionCount` 始终为 3 | 补充显式映射测试和管理员标签 |
-| `AUTH-002` | `OPEN` | F5–F8 Blueprint 区名与 Experience 区名不完全一致 | Experience 拥有玩家文案；Blueprint 拥有几何槽位；新稿同时记录二者 | 内容层增加统一映射表后关闭 |
-| `AUTH-003` | `OPEN` | `floorContracts.ts` 的部分楼层名、主题与 F7 怪物池仍是旧方向 | 不作为命名、剧情、怪物名单真源；只保留课程/Campaign 元数据职责 | 另立实现 PR 清理并补回归测试 |
+| `AUTH-001` | `CLOSED` | F2 Experience 有海岸、湖区、林沼、灯塔 4 个展示区，生成器只有 3 个物理区 | `FloorRegionDefinition.navigationRegion` 已把海岸/湖区映射到 `front`、林沼映射到 `middle`、灯塔映射到 `rear`，`regionCount` 保持 3 | 已由 Floor Experience 映射测试覆盖 |
+| `AUTH-002` | `CLOSED` | F5–F8 Blueprint 区名与 Experience 区名不完全一致 | Experience 继续拥有玩家文案，Blueprint 继续拥有几何槽位；所有展示区均通过 `navigationRegion` 显式落到三物理区 | 已由八层映射完整性测试覆盖 |
+| `AUTH-003` | `CLOSED` | `floorContracts.ts` 的部分楼层名、主题与 F7 怪物池仍是旧方向 | 合同已对齐真实课程 ID、Experience 标题、Labyrinth 拓扑和当前怪物集合；测试阻止它再次覆盖运行真源 | 已由跨真源合同测试覆盖 |
 | `AUTH-004` | `CLOSED` | 旧怪物规格写区域 Boss 5 XP、F1 ID #009 为旧怪物 | 当前运行时为区域 Boss 3 XP，ID #009 是宝箱怪；旧规格已标记为历史参考并指向本登记表 | 已完成：旧规格的运行时声明已撤销 |
 | `AUTH-005` | `OPEN` | 历史生态稿含 20% F8 精英与随机装备/保底掉落 | 当前小型精英 19%；随机掉落仅 2%/5%/10% 即时恢复，层主 0% | 历史稿加醒目标记，不改运行时 |
 | `AUTH-006` | `OPEN` | F1–F2 脚本远比 F5–F8 细，后期仅有短事件卡 | 本轮先统一设计节拍与交付模板，不直接扩写运行时代码 | 每层事件脚本达到同一字段完整度并经文字 QA |
-| `AUTH-007` | `OPEN` | 多个区域首领的 SQLite `room_id/sector` 与实际物理生态区不同 | 场景位置与查询证据必须描述同一地点；本轮只登记，不改 Schema 数据 | 修复夹具并增加地图—SQLite 对照测试 |
+| `AUTH-007` | `CLOSED` | 多个区域首领的 SQLite `room_id/sector` 与实际物理生态区不同 | 保持四表 DDL 不变，仅修正 rooms 初始化记录与怪物 `roomId/biome`，使地图生态和 SQLite 查询证据一致 | 已由怪物—房间—生态对照测试覆盖 |
 | `AUTH-008` | `OPEN` | 怪物 `hp/damage` 展示值与实际战斗轮数/扣血不一致 | 当前轮数由 Stage 数决定，错误查询固定扣 1 点；目标稿不用展示值推断难度 | 数值与战斗真源统一后关闭 |
 | `AUTH-009` | `MITIGATED` | 完成矩阵写“每层隐藏护甲”，实际只有 F4–F8 隐藏区配置 `rewardArmorId` | F1–F3 保持证据 / 探索奖励；完成矩阵已修订，不为表格对称强塞换装 | 增加奖励合同测试后关闭 |
 

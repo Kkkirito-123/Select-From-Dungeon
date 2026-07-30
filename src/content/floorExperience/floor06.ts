@@ -37,6 +37,7 @@ export const FLOOR_SIX_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f6-magma-workshop",
+      navigationRegion: "front",
       name: "岩浆孵化工坊",
       purpose: "在一次性副本里练习明确写入和定向更新",
       lessonIds: ["f6-insert", "f6-update"],
@@ -46,6 +47,7 @@ export const FLOOR_SIX_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f6-crystal-repair",
+      navigationRegion: "middle",
       name: "龙晶修复洞",
       purpose: "让删除、约束冲突和失败结果都在候选状态中可见",
       lessonIds: ["f6-delete", "f6-constraint"],
@@ -55,6 +57,7 @@ export const FLOOR_SIX_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f6-rollback-summit",
+      navigationRegion: "rear",
       name: "回滚山巅",
       purpose: "用事务、ROLLBACK 与 SAVEPOINT 证明安全改变不是提交或撤销的二选一",
       lessonIds: ["f6-transaction", "f6-savepoint"],

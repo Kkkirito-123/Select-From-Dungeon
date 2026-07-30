@@ -48,6 +48,7 @@ export interface FloorAnchorDefinition {
 
 export interface FloorRegionDefinition {
   id: string;
+  navigationRegion: "front" | "middle" | "rear";
   name: string;
   purpose: string;
   lessonIds: readonly RunLessonId[];

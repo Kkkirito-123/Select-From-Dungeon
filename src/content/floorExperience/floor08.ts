@@ -37,6 +37,7 @@ export const FLOOR_EIGHT_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f8-obsidian-history",
+      navigationRegion: "front",
       name: "黑曜版本长厅",
       purpose: "重建快照可见行和锁等待环，让旧版本按证据而不是传说出现",
       lessonIds: ["f8-mvcc", "f8-lock"],
@@ -46,6 +47,7 @@ export const FLOOR_EIGHT_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f8-void-court",
+      navigationRegion: "middle",
       name: "四事故证据王庭",
       purpose: "把隔离、建模、复制和分片变成可回访的四个证据翼",
       lessonIds: ["f8-isolation", "f8-modeling", "f8-replication", "f8-sharding"],
@@ -55,6 +57,7 @@ export const FLOOR_EIGHT_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f8-data-throne",
+      navigationRegion: "rear",
       name: "迁移王座",
       purpose: "汇总前七层证据与本层四类事故结论，完成可验证、可回滚的最终迁移",
       lessonIds: ["f8-security"],

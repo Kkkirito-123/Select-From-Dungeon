@@ -37,6 +37,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f7-crystal-grove",
+      navigationRegion: "front",
       name: "水晶枝径",
       purpose: "让主键点查与联合索引成为两条可比较的实体道路",
       lessonIds: ["f7-btree", "f7-composite"],
@@ -46,6 +47,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f7-root-cloister",
+      navigationRegion: "middle",
       name: "盘根回廊",
       purpose: "用覆盖索引与范围改写区分必要回表和可以避免的绕行",
       lessonIds: ["f7-covering", "f7-invalid"],
@@ -55,6 +57,7 @@ export const FLOOR_SEVEN_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f7-index-heart",
+      navigationRegion: "rear",
       name: "索引树心",
       purpose: "把 EXPLAIN QUERY PLAN 的节点沿树根点亮，再证明路径不能改写事实",
       lessonIds: ["f7-plan", "f7-optimize"],

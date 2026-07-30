@@ -37,6 +37,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
   regions: [
     {
       id: "f5-outer-watch",
+      navigationRegion: "front",
       name: "黑铁外城",
       purpose: "用 OVER 与 ROW_NUMBER 看见分区、岗次和仍被保留的每一行",
       lessonIds: ["f5-over", "f5-row-number"],
@@ -46,6 +47,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f5-barracks-ring",
+      navigationRegion: "middle",
       name: "轮值兵营",
       purpose: "用排名和前后行读取并列岗位与巡逻空档",
       lessonIds: ["f5-rank", "f5-lag-lead"],
@@ -55,6 +57,7 @@ export const FLOOR_FIVE_EXPERIENCE: FloorExperienceDefinition = {
     },
     {
       id: "f5-inner-clock",
+      navigationRegion: "rear",
       name: "内城军钟",
       purpose: "用窗口范围和分组 Top-N 证明警戒并非不可改变的命运",
       lessonIds: ["f5-frame", "f5-top-n"],
