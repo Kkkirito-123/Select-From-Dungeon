@@ -422,6 +422,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.interact()).toMatchObject({
       ok: true,
       kind: "inspection",
+      landmarkId: "npc-scribe-f1",
       message: expect.stringContaining("ID #001"),
     });
     expect(session.snapshot().banner).toBe(bannerBeforeInspection);
@@ -431,6 +432,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.interact()).toMatchObject({
       ok: true,
       kind: "inspection",
+      landmarkId: "f1-water-wheel",
       message: expect.stringContaining("完成 SELECT / FROM"),
     });
     expect(session.snapshot().banner).toBe(bannerBeforeWaterWheel);
@@ -448,6 +450,17 @@ describe("GameSession SQL 魔王城 Run", () => {
     legacySave.banner = "抄写员：这是旧版留在右栏的调查说明。";
     const restored = new GameSession(legacySave, session.toProfile());
     expect(restored.snapshot().banner).not.toContain("抄写员：");
+  });
+
+  it("现场证据只接受当前层 canonical ID，并写入兼容的 Run 标记", () => {
+    const session = new GameSession(null, null, "story-evidence-marker");
+    expect(session.recordStoryEvidence("lost-name:f1:current-record")).toBe(true);
+    expect(session.recordStoryEvidence("lost-name:f1:current-record")).toBe(false);
+    expect(session.recordStoryEvidence("lost-name:f2:identity-count")).toBe(false);
+    expect(session.snapshot().openedGateIds).toContain(
+      "story:evidence:lost-name:f1:current-record",
+    );
+    expect(session.toSavedRun().version).toBe(11);
   });
 
   it("第一、二层隐藏区域需要完成前置课程并开启实体暗门，发现状态可随 Run 恢复", () => {

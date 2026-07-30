@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   FloorStoryMomentQueue,
+  floorStoryEvidenceIdForLandmark,
   floorStoryEvidenceQueryForLandmark,
+  floorStoryInspectMomentForLandmark,
   floorStoryMoments,
   floorStoryProgress,
+  storyEvidenceIdFromMarker,
+  storyEvidenceMarkerId,
+  storyEvidenceMarkerIdsForFloor,
   validateFloorStoryContent,
 } from "../src/domain/floorStory";
 import { storyQuery } from "../src/sql/storyQueryCatalog";
@@ -33,6 +38,39 @@ describe("F1-F8 现场剧情展示适配器", () => {
       new Set(),
       new Set(["gate:floor-1-treasure"]),
     )).toEqual(storyQuery("f1-restore-contradiction"));
+  });
+
+  it("每层只有一处 Story Query 地标恢复身份证据，marker 可稳定往返", () => {
+    const queryEvidenceByLandmark = {
+      "f1-water-wheel": "lost-name:f1:current-record",
+      "f2-ranked-beacons": "lost-name:f2:identity-count",
+      "f3-relic-chain": "lost-name:f3:relic-links",
+      "f4-source-core": "lost-name:f4:command-batch",
+      "f5-muster-board": "lost-name:f5:history-positions",
+      "f6-state-bridge": "lost-name:f6:undo-origin",
+      "f7-index-road": "lost-name:f7:hidden-history",
+      "f8-version-gallery": "lost-name:f8:identity-set",
+    } as const;
+
+    Object.entries(queryEvidenceByLandmark).forEach(([landmarkId, evidenceId]) => {
+      expect(floorStoryEvidenceIdForLandmark(landmarkId)).toBe(evidenceId);
+      const markerId = storyEvidenceMarkerId(evidenceId);
+      expect(markerId).toBe(`story:evidence:${evidenceId}`);
+      expect(storyEvidenceIdFromMarker(markerId)).toBe(evidenceId);
+    });
+
+    expect(floorStoryEvidenceIdForLandmark("f3-master-steles")).toBeNull();
+    expect(floorStoryEvidenceIdForLandmark("f8-deadlock-gate")).toBeNull();
+    expect(storyEvidenceIdFromMarker("gate:floor-1-treasure")).toBeNull();
+    expect(storyEvidenceIdFromMarker("story:evidence:")).toBeNull();
+
+    ([1, 2, 3, 4, 5, 6, 7, 8] as const).forEach((floor) => {
+      const markers = storyEvidenceMarkerIdsForFloor(floor);
+      expect(markers).toHaveLength(2);
+      expect(markers.every((markerId) => (
+        storyEvidenceIdFromMarker(markerId)?.startsWith(`lost-name:f${floor}:`)
+      ))).toBe(true);
+    });
   });
 
   it("只从现有楼层事件、环境规则与故事查询目录组装可见节点", () => {
@@ -80,6 +118,54 @@ describe("F1-F8 现场剧情展示适配器", () => {
       "f8-visible-snapshot",
       "f8-deadlock-cycle",
     ]);
+  });
+
+  it("阻止现场事件引用不存在或跨层的失名证据", () => {
+    const allMoments = ([1, 2, 3, 4, 5, 6, 7, 8] as const)
+      .flatMap((floor) => floorStoryMoments(floor));
+    const forged = allMoments.map((moment) => (
+      moment.id === "story:f2-story-seven-pages"
+        ? {
+            ...moment,
+            actions: [{
+              type: "evidence" as const,
+              evidenceId: "lost-name:f4:not-real",
+            }],
+          }
+        : moment
+    ));
+
+    expect(validateFloorStoryContent(forged)).toEqual(expect.arrayContaining([
+      expect.stringContaining("不存在的失名证据"),
+      expect.stringContaining("不属于本层"),
+    ]));
+  });
+
+  it("每个现场节点显式声明展示通道，自动阻断次数保持在预算内", () => {
+    ([1, 2, 3, 4, 5, 6, 7, 8] as const).forEach((floor) => {
+      const moments = floorStoryMoments(floor);
+      expect(moments.every((moment) => (
+        ["blocking", "ambient", "inspect"].includes(moment.presentation)
+      ))).toBe(true);
+
+      const blocking = moments.filter(
+        (moment) => moment.presentation === "blocking",
+      );
+      if (floor === 1) expect(blocking).toHaveLength(3);
+      expect(blocking.length).toBeLessThanOrEqual(floor === 1 ? 3 : 4);
+      expect(moments[0]?.presentation).toBe("blocking");
+      expect(moments.at(-1)?.presentation).toBe("blocking");
+    });
+
+    expect(floorStoryMoments(2).find(
+      (moment) => moment.sourceId === "f2-story-low-tide",
+    )?.presentation).toBe("ambient");
+    expect(floorStoryMoments(4).find(
+      (moment) => moment.sourceId === "f4-story-ember-echo",
+    )?.presentation).toBe("inspect");
+    expect(floorStoryMoments(7).find(
+      (moment) => moment.sourceId === "f7-composite-lit",
+    )?.presentation).toBe("ambient");
   });
 
   it("第三层把关系写回环境，第四层以中层首领开启第一层残响", () => {
@@ -142,6 +228,44 @@ describe("F1-F8 现场剧情展示适配器", () => {
       sourceId: "f1-story-sealed-vault",
       title: "被撕下的页",
     });
+
+    expect(floorStoryInspectMomentForLandmark({
+      floor: 1,
+      mode: "explore",
+      completedLessons: ["select", "where", "is-null"],
+      defeatedMonsterIds: [],
+      openedGateIds: [],
+    }, "f1-sealed-vault")).toBeNull();
+    expect(floorStoryInspectMomentForLandmark({
+      floor: 1,
+      mode: "explore",
+      completedLessons: ["select", "where", "is-null"],
+      defeatedMonsterIds: [],
+      openedGateIds: ["gate:floor-1-treasure"],
+    }, "f1-sealed-vault")).toMatchObject({
+      presentation: "inspect",
+      sourceId: "f1-story-sealed-vault",
+      inspectLandmarkId: "f1-sealed-vault",
+    });
+  });
+
+  it("捷径供述只在玩家回到抄写员身边按 E 时读取", () => {
+    const state = {
+      floor: 1 as const,
+      mode: "explore",
+      completedLessons: ["select", "where", "is-null"] as const,
+      defeatedMonsterIds: [] as const,
+      openedGateIds: ["shortcut:1:return"] as const,
+    };
+
+    expect(floorStoryInspectMomentForLandmark(
+      state,
+      "npc-scribe-f1",
+    )).toMatchObject({ sourceId: "f1-story-shortcut-return" });
+    expect(floorStoryInspectMomentForLandmark(
+      state,
+      "f1-back-shortcut",
+    )).toBeNull();
   });
 
   it("同一次结算解锁多个节点时按策划顺序排队，重复刷新不会重复入队", () => {
@@ -152,10 +276,14 @@ describe("F1-F8 现场剧情展示适配器", () => {
     queue.enqueue(bossAndAscent);
 
     expect(queue.pendingIds).toEqual(bossAndAscent.map((moment) => moment.id));
-    expect(queue.takeNext()?.kind).toBe("boss");
+    expect(queue.peekNext()?.kind).toBe("boss");
+    expect(queue.pendingIds).toEqual(bossAndAscent.map((moment) => moment.id));
+    expect(queue.ackPresented(queue.peekNext()?.id)?.kind).toBe("boss");
     expect(queue.pendingIds).toEqual([bossAndAscent[1]?.id]);
-    expect(queue.takeNext()?.kind).toBe("ascent");
-    expect(queue.takeNext()).toBeNull();
+    expect(queue.ackPresented("not-the-head")).toBeNull();
+    expect(queue.peekNext()?.kind).toBe("ascent");
+    expect(queue.ackPresented()?.kind).toBe("ascent");
+    expect(queue.peekNext()).toBeNull();
 
     queue.enqueue(bossAndAscent);
     expect(queue.pendingIds).toEqual([]);
@@ -164,16 +292,38 @@ describe("F1-F8 现场剧情展示适配器", () => {
     expect(queue.pendingIds).toEqual(bossAndAscent.map((moment) => moment.id));
   });
 
-  it("读档首帧只回放最新节点，同时把更早节点标记为已记录", () => {
+  it("读档首帧只归档既有节点，不自动回放任何现场剧情", () => {
     const queue = new FloorStoryMomentQueue();
     const unlocked = floorStoryMoments(1).slice(0, 6);
 
-    queue.prime(unlocked);
+    queue.primeExisting(unlocked);
 
-    expect(queue.pendingIds).toEqual([unlocked.at(-1)?.id]);
-    expect(queue.takeNext()?.id).toBe(unlocked.at(-1)?.id);
+    expect(queue.pendingIds).toEqual([]);
+    expect(queue.peekNext()).toBeNull();
     queue.enqueue(unlocked);
     expect(queue.pendingIds).toEqual([]);
+  });
+
+  it("自动展示队列排除 inspect，仍按作者顺序保留 blocking 与 ambient", () => {
+    const queue = new FloorStoryMomentQueue();
+    const moments = floorStoryMoments(1).slice(0, 8);
+
+    queue.enqueue(moments);
+
+    expect(queue.pendingIds).toEqual(
+      moments
+        .filter((moment) => moment.presentation !== "inspect")
+        .map((moment) => moment.id),
+    );
+    expect(queue.pendingIds).not.toContain(
+      moments.find((moment) => moment.presentation === "inspect")?.id,
+    );
+    queue.enqueue(moments);
+    expect(queue.pendingIds).toEqual(
+      moments
+        .filter((moment) => moment.presentation !== "inspect")
+        .map((moment) => moment.id),
+    );
   });
 
   it("按当前 Run 的课程、捷径与击败记录逐步解锁，不读取永久图鉴代替本轮进度", () => {

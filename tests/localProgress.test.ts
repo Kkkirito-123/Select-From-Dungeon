@@ -406,6 +406,21 @@ describe("localProgress", () => {
     expect(new GameSession(loaded).snapshot().guidedMap.deadEndCaches).toContainEqual(cache);
   });
 
+  it("v11 能恢复 canonical 剧情证据标记，并拒绝其他楼层的伪造标记", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "story-evidence-roundtrip");
+    expect(session.recordStoryEvidence("lost-name:f1:current-record")).toBe(true);
+
+    saveRun(storage, session.toSavedRun());
+    expect(loadRun(storage)?.openedGateIds).toContain(
+      "story:evidence:lost-name:f1:current-record",
+    );
+
+    const forged = session.toSavedRun();
+    forged.openedGateIds.push("story:evidence:lost-name:f8:identity-set");
+    expect(isSavedRun(forged)).toBe(false);
+  });
+
   it("v11 只接受当前楼层与 Seed 实际生成的陷阱触发标记", () => {
     const storage = new MemoryStorage();
     const session = new GameSession(null, null, "floor-hazard-roundtrip");

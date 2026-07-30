@@ -244,6 +244,7 @@ export const FLOOR_THREE_EXPERIENCE: FloorExperienceDefinition = {
       actions: [
         { type: "camera-focus", landmarkId: "f3-reliquary" },
         { type: "world-effect", effect: "f3-reliquary-open" },
+        { type: "evidence", evidenceId: "lost-name:f3:current-owner" },
         { type: "dialogue", speaker: "抄写员", lines: ["CURRENT OWNER 已确认是 NULL。", "它没有现在的主人，却留下了过去的连接。"] },
       ],
       completionFact: "story:f3:reliquary",

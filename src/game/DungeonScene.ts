@@ -447,7 +447,10 @@ export class DungeonScene extends Phaser.Scene {
     if (resolution.ok && resolution.kind === "inspection") {
       this.resetPlayerMovement();
       window.dispatchEvent(new CustomEvent("dungeon:inspection", {
-        detail: { message: resolution.message },
+        detail: {
+          message: resolution.message,
+          landmarkId: resolution.landmarkId,
+        },
       }));
     }
   };

@@ -98,7 +98,12 @@ import {
   evaluateUnrevealedIdentityQuery,
   unrevealedIdentityQueryMessage,
 } from "./lessonEvaluator";
-import { floorStoryEvidenceQueryForLandmark } from "./floorStory";
+import {
+  floorStoryEvidenceIdForLandmark,
+  floorStoryEvidenceQueryForLandmark,
+  storyEvidenceMarkerId,
+  storyEvidenceMarkerIdsForFloor,
+} from "./floorStory";
 import {
   monsterIdLabel,
   monsterIntentName,
@@ -1037,6 +1042,21 @@ export class GameSession {
 
   toProfile(): ProfileProgress {
     return cloneProfile(this.profile);
+  }
+
+  /**
+   * 将玩家实际取得的现场证据写入本 Run，复用 openedGateIds 以保持
+   * SavedRun v11 兼容；这里只接受当前楼层内容真源中声明过的证据。
+   */
+  recordStoryEvidence(evidenceId: string): boolean {
+    const markerId = storyEvidenceMarkerId(evidenceId);
+    if (!storyEvidenceMarkerIdsForFloor(this.floorNumber).includes(markerId)) {
+      return false;
+    }
+    if (this.openedGateIds.has(markerId)) return false;
+    this.openedGateIds.add(markerId);
+    this.emit();
+    return true;
   }
 
   attemptPlayerMove(dx: number, dy: number): MoveResolution {
@@ -4020,8 +4040,10 @@ export class GameSession {
         `真实结果：${evidence.expectedRowCount} 行 · ${fields}`,
         evidence.purpose,
       ].join("\n");
+      const evidenceId = floorStoryEvidenceIdForLandmark(landmarkId);
+      if (evidenceId) this.recordStoryEvidence(evidenceId);
     }
-    return { ok: true, kind: "inspection", message };
+    return { ok: true, kind: "inspection", message, landmarkId };
   }
 
   private travelThroughRegionPortal(

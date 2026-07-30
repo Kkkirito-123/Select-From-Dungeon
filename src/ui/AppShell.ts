@@ -37,8 +37,11 @@ import {
 } from "../domain/narrative";
 import {
   FloorStoryMomentQueue,
+  floorStoryInspectMomentForLandmark,
   floorStoryProgress,
+  storyEvidenceIdFromMarker,
   type FloorStoryMoment,
+  type FloorStoryPresentation,
 } from "../domain/floorStory";
 import {
   monsterIdLabel,
@@ -144,11 +147,9 @@ export function shouldDismissTransientCard(
 }
 
 export function narrativeMomentUsesRecordOverlay(
-  kind: FloorStoryMoment["kind"],
-  hasQuery = false,
+  presentation: FloorStoryPresentation,
 ): boolean {
-  return hasQuery ||
-    ["entry", "secret", "scribe", "boss", "ascent"].includes(kind);
+  return presentation === "blocking" || presentation === "inspect";
 }
 
 export function storyMomentRecordBody(moment: FloorStoryMoment): string {
@@ -173,10 +174,7 @@ export function canPresentQueuedNarrativeMoment(
   blockingOverlayOpen: boolean,
 ): boolean {
   if (busy || combatSettlementVisible || blockingOverlayOpen) return false;
-  return mode !== "transition" &&
-    mode !== "victory" &&
-    mode !== "defeat" &&
-    mode !== "death-review";
+  return mode === "explore" || mode === "transition" || mode === "victory";
 }
 
 export function shapeOnlyQueryResultCopy(result: SqlQueryResult): {
@@ -371,17 +369,26 @@ export function narrativeProgressForSnapshot(
   )
     ? NARRATIVE_ENDINGS[0].steps.map((step) => step.id)
     : [];
+  const explicitlyDiscoveredEvidenceIds = snapshot.openedGateIds
+    .map(storyEvidenceIdFromMarker)
+    .filter((id): id is string => id !== null);
+  const hiddenAreaEvidenceIds = story.unlocked.flatMap((moment) => (
+    moment.unlock.type === "gate-opened" &&
+    snapshot.openedGateIds.includes(moment.unlock.gateId)
+      ? moment.actions.flatMap((action) => (
+          action.type === "evidence" ? [action.evidenceId] : []
+        ))
+      : []
+  ));
 
   return {
     seenBeatIds: seenBeats.map((beat) => beat.id),
     seenMomentIds: story.unlockedIds,
     unlockedMoments: story.unlocked,
-    discoveredEvidenceIds: [
-      ...seenBeats.flatMap((beat) => beat.evidenceIds),
-      ...story.unlocked.flatMap((moment) => moment.actions.flatMap((action) => (
-        action.type === "evidence" ? [action.evidenceId] : []
-      ))),
-    ],
+    discoveredEvidenceIds: [...new Set([
+      ...explicitlyDiscoveredEvidenceIds,
+      ...hiddenAreaEvidenceIds,
+    ])],
     completedAscentIds,
     completedMigrationStepIds,
     latestBeat: seenBeats.at(-1) ?? null,
@@ -459,10 +466,13 @@ export class AppShell {
   private terminalFocusTimer: number | null = null;
   private pickupShownAtMove: number | null = null;
   private settlementShownAtMove: number | null = null;
+  private settlementAutoCloseTimer: number | null = null;
   private narrativeBeatShownAtMove: number | null = null;
-  private lastNarrativeBeatId: string | null = null;
   private readonly narrativeMomentQueue = new FloorStoryMomentQueue();
   private narrativeMomentQueuePrimed = false;
+  private narrativeBootstrapMode: "new" | "restored";
+  private activeNarrativeMoment: FloorStoryMoment | null = null;
+  private narrativeActionInFlight = false;
   private floorTransitionTimer: number | null = null;
   private defeatRespawnTimer: number | null = null;
   private regionTransitionTimer: number | null = null;
@@ -479,8 +489,28 @@ export class AppShell {
 
   private readonly openTerminalHandler = (): void => this.openTerminal();
   private readonly inspectionHandler = (event: Event): void => {
-    const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+    const detail = (event as CustomEvent<{
+      message?: string;
+      landmarkId?: string;
+    }>).detail;
+    const message = detail?.message;
     if (typeof message === "string" && message.trim() !== "") {
+      if (typeof detail.landmarkId === "string") {
+        const inspectMoment = floorStoryInspectMomentForLandmark({
+          floor: this.lastSnapshot.floor,
+          mode: this.lastSnapshot.mode,
+          completedLessons: this.lastSnapshot.completedLessons,
+          defeatedMonsterIds: this.lastSnapshot.monsters
+            .filter((monster) => monster.hp <= 0)
+            .map((monster) => monster.id),
+          openedGateIds: this.lastSnapshot.openedGateIds,
+        }, detail.landmarkId);
+        if (inspectMoment) {
+          this.activeNarrativeMoment = inspectMoment;
+          this.openStoryMoment(inspectMoment, this.lastSnapshot, message);
+          return;
+        }
+      }
       this.openInspection(message);
     }
   };
@@ -518,7 +548,8 @@ export class AppShell {
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        this.closeInspection();
+        if (this.activeNarrativeMoment?.presentation === "blocking") return;
+        this.closeInspection(true, false);
         return;
       }
       if (event.key === "Tab") {
@@ -702,7 +733,10 @@ export class AppShell {
     private readonly feedback: FeedbackDirector,
     private readonly onboarding: OnboardingController,
     private readonly getBattleScene: () => BattleScene | null,
-  ) {}
+    initialRunSource: "new" | "restored" = "new",
+  ) {
+    this.narrativeBootstrapMode = initialRunSource;
+  }
 
   mount(): void {
     const schemaFieldCount = SQL_TABLES.reduce(
@@ -1436,8 +1470,12 @@ export class AppShell {
     this.terminalFocusTimer = null;
     this.pickupShownAtMove = null;
     this.settlementShownAtMove = null;
+    if (this.settlementAutoCloseTimer !== null) {
+      window.clearTimeout(this.settlementAutoCloseTimer);
+    }
+    this.settlementAutoCloseTimer = null;
     this.narrativeBeatShownAtMove = null;
-    this.lastNarrativeBeatId = null;
+    this.activeNarrativeMoment = null;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
     if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
@@ -2294,8 +2332,13 @@ export class AppShell {
     if (this.narrativeMomentQueuePrimed) {
       this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
     } else {
-      this.narrativeMomentQueue.prime(progress.unlockedMoments);
+      if (this.narrativeBootstrapMode === "restored") {
+        this.narrativeMomentQueue.primeExisting(progress.unlockedMoments);
+      } else {
+        this.narrativeMomentQueue.enqueue(progress.unlockedMoments);
+      }
       this.narrativeMomentQueuePrimed = true;
+      this.narrativeBootstrapMode = "restored";
     }
     this.narrativeCodex.render({
       floor: snapshot.floor,
@@ -2322,6 +2365,11 @@ export class AppShell {
         : "继续探索，寻找这一层留下的记录。";
 
     if (
+      (snapshot.mode === "transition" || snapshot.mode === "victory") &&
+      this.narrativeBeatShownAtMove !== null
+    ) {
+      this.hideNarrativeBeatCard();
+    } else if (
       shouldDismissTransientCard(
         this.narrativeBeatShownAtMove,
         snapshot.totalMoves,
@@ -2333,19 +2381,17 @@ export class AppShell {
     if (this.narrativeBeatShownAtMove !== null) return;
     if (!this.canPresentNarrativeCard(snapshot)) return;
 
-    const nextMoment = this.narrativeMomentQueue.takeNext();
-    if (nextMoment) {
-      if (progress.latestBeat) this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeMomentCard(nextMoment, snapshot);
-      return;
-    }
-
-    if (
-      progress.latestBeat &&
-      progress.latestBeat.id !== this.lastNarrativeBeatId
+    let nextMoment = this.narrativeMomentQueue.peekNext();
+    while (
+      nextMoment?.presentation === "ambient" &&
+      (snapshot.mode === "transition" || snapshot.mode === "victory")
     ) {
-      this.lastNarrativeBeatId = progress.latestBeat.id;
-      this.showNarrativeBeatCard(progress.latestBeat, snapshot);
+      this.executeStoryMomentActions(nextMoment, false);
+      this.narrativeMomentQueue.ackPresented(nextMoment.id);
+      nextMoment = this.narrativeMomentQueue.peekNext();
+    }
+    if (nextMoment) {
+      this.showNarrativeMomentCard(nextMoment, snapshot);
     }
   }
 
@@ -2364,44 +2410,23 @@ export class AppShell {
     );
     return canPresentQueuedNarrativeMoment(
       snapshot.mode,
-      this.busy,
+      this.busy || this.narrativeActionInFlight,
       this.isCombatSettlementVisible(),
       blockingOverlayOpen,
     );
-  }
-
-  private showNarrativeBeatCard(beat: NarrativeBeat, snapshot: GameSnapshot): void {
-    const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
-    const kindLabel: Readonly<Record<NarrativeBeat["kind"], string>> = {
-      "floor-entry": "LOST NAME / 入层",
-      "midpoint-evidence": "LOST NAME / 证据",
-      campfire: "SCRIBE / 篝火复盘",
-      boss: "ARCHIVE / 层主",
-      "floor-end": "ASCENT / 层末",
-    };
-    requiredElement(card, "#narrative-beat-kind").textContent = kindLabel[beat.kind];
-    requiredElement(card, "#narrative-beat-title").textContent =
-      redactSnapshotMonsterIdentity(beat.title, snapshot);
-    const lines = requiredElement(card, "#narrative-beat-lines");
-    lines.replaceChildren(...beat.lines.map((line) => {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = redactSnapshotMonsterIdentity(line, snapshot);
-      return paragraph;
-    }));
-    this.narrativeBeatShownAtMove = snapshot.totalMoves;
-    card.hidden = false;
-    card.classList.add("is-visible");
   }
 
   private showNarrativeMomentCard(
     moment: FloorStoryMoment,
     snapshot: GameSnapshot,
   ): void {
-    this.executeStoryMomentActions(moment);
-    if (narrativeMomentUsesRecordOverlay(moment.kind, moment.query !== null)) {
+    if (narrativeMomentUsesRecordOverlay(moment.presentation)) {
+      this.activeNarrativeMoment = moment;
       this.openStoryMoment(moment, snapshot);
       return;
     }
+    this.executeStoryMomentActions(moment, false);
+    this.narrativeMomentQueue.ackPresented(moment.id);
     const card = requiredElement<HTMLElement>(this.root, "#narrative-beat-card");
     requiredElement(card, "#narrative-beat-kind").textContent = moment.kicker;
     requiredElement(card, "#narrative-beat-title").textContent =
@@ -2417,7 +2442,10 @@ export class AppShell {
     card.classList.add("is-visible");
   }
 
-  private executeStoryMomentActions(moment: FloorStoryMoment): void {
+  private executeStoryMomentActions(
+    moment: FloorStoryMoment,
+    recordEvidence: boolean,
+  ): void {
     const musicState = moment.actions.find(
       (action) => action.type === "music-state",
     );
@@ -2431,6 +2459,13 @@ export class AppShell {
     }
     if (worldEffect?.type === "world-effect") {
       this.root.dataset.storyWorldEffect = worldEffect.effect;
+    }
+    if (recordEvidence) {
+      moment.actions.forEach((action) => {
+        if (action.type === "evidence") {
+          this.session.recordStoryEvidence(action.evidenceId);
+        }
+      });
     }
     window.dispatchEvent(new CustomEvent("dungeon:story-actions", {
       detail: {
@@ -2449,9 +2484,11 @@ export class AppShell {
 
   private resetAdminNarrativePresentation(): void {
     this.hideNarrativeBeatCard();
+    this.activeNarrativeMoment = null;
+    this.narrativeActionInFlight = false;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
-    this.lastNarrativeBeatId = null;
+    this.narrativeBootstrapMode = "new";
   }
 
   private openInspection(message: string): void {
@@ -2470,11 +2507,18 @@ export class AppShell {
   private openStoryMoment(
     moment: FloorStoryMoment,
     snapshot: GameSnapshot,
+    inspectionMessage?: string,
   ): void {
+    const recordBody = storyMomentRecordBody(moment);
     this.openRecordOverlay({
       kicker: moment.kicker,
       title: redactSnapshotMonsterIdentity(moment.title, snapshot),
-      body: redactSnapshotMonsterIdentity(storyMomentRecordBody(moment), snapshot),
+      body: redactSnapshotMonsterIdentity(
+        inspectionMessage
+          ? `${recordBody}\n\n现场调查\n${inspectionMessage}`
+          : recordBody,
+        snapshot,
+      ),
       closeLabel: "E · 继续探索",
       kind: "story",
     });
@@ -2544,28 +2588,51 @@ export class AppShell {
     });
   }
 
-  private closeInspection(returnFocus = true): void {
+  private closeInspection(
+    returnFocus = true,
+    confirmStory = true,
+  ): void {
     if (!this.isInspectionOpen()) return;
+    const confirmedMoment = confirmStory &&
+        this.inspectionOverlay.dataset.recordKind === "story"
+      ? this.activeNarrativeMoment
+      : null;
     this.inspectionOverlay.hidden = true;
     this.inspectionOverlay.inert = true;
     this.inspectionOverlay.setAttribute("aria-hidden", "true");
     delete this.inspectionOverlay.dataset.recordKind;
     this.pendingLabyrinthMove = null;
+    this.activeNarrativeMoment = null;
     this.root.classList.remove("inspection-active");
     if (!returnFocus) {
       this.focusBeforeInspection = null;
-      return;
-    }
-    const focusTarget = this.focusBeforeInspection;
-    this.focusBeforeInspection = null;
-    if (
-      focusTarget?.isConnected &&
-      !focusTarget.matches(":disabled") &&
-      !this.inspectionOverlay.contains(focusTarget)
-    ) {
-      focusTarget.focus({ preventScroll: true });
     } else {
-      requiredElement<HTMLElement>(this.root, "#game-root").focus({ preventScroll: true });
+      const focusTarget = this.focusBeforeInspection;
+      this.focusBeforeInspection = null;
+      if (
+        focusTarget?.isConnected &&
+        !focusTarget.matches(":disabled") &&
+        !this.inspectionOverlay.contains(focusTarget)
+      ) {
+        focusTarget.focus({ preventScroll: true });
+      } else {
+        requiredElement<HTMLElement>(this.root, "#game-root").focus({
+          preventScroll: true,
+        });
+      }
+    }
+    if (confirmedMoment) {
+      this.narrativeMomentQueue.ackPresented(confirmedMoment.id);
+      this.narrativeActionInFlight = true;
+      try {
+        this.executeStoryMomentActions(confirmedMoment, true);
+      } finally {
+        this.narrativeActionInFlight = false;
+      }
+      queueMicrotask(() => {
+        this.renderNarrativeProgress(this.lastSnapshot);
+        this.renderFloorTransition(this.lastSnapshot);
+      });
     }
   }
 
@@ -2822,6 +2889,20 @@ export class AppShell {
     this.settlementShownAtMove = this.lastSnapshot.totalMoves;
     card.hidden = false;
     card.classList.add("is-visible");
+    if (this.settlementAutoCloseTimer !== null) {
+      window.clearTimeout(this.settlementAutoCloseTimer);
+    }
+    if (resolution.mode === "transition" || resolution.mode === "victory") {
+      const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? 900
+        : 1_800;
+      this.settlementAutoCloseTimer = window.setTimeout(() => {
+        this.settlementAutoCloseTimer = null;
+        this.hideCombatSettlement();
+        this.renderNarrativeProgress(this.lastSnapshot);
+        this.renderFloorTransition(this.lastSnapshot);
+      }, delay);
+    }
   }
 
   private hidePickupCard(): void {
@@ -2835,6 +2916,10 @@ export class AppShell {
   private hideCombatSettlement(): void {
     const card = this.root.querySelector<HTMLElement>("#combat-result-card");
     if (!card) return;
+    if (this.settlementAutoCloseTimer !== null) {
+      window.clearTimeout(this.settlementAutoCloseTimer);
+      this.settlementAutoCloseTimer = null;
+    }
     this.settlementShownAtMove = null;
     card.classList.remove("is-visible");
     card.hidden = true;
@@ -2907,9 +2992,10 @@ export class AppShell {
     this.hidePickupCard();
     this.hideCombatSettlement();
     this.hideNarrativeBeatCard();
-    this.lastNarrativeBeatId = null;
+    this.activeNarrativeMoment = null;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
+    this.narrativeBootstrapMode = "new";
     if (this.defeatRespawnTimer !== null) {
       window.clearTimeout(this.defeatRespawnTimer);
       this.defeatRespawnTimer = null;
@@ -2939,7 +3025,21 @@ export class AppShell {
   }
 
   private render(snapshot: GameSnapshot): void {
-    if (snapshot.mode !== "explore" && this.isInspectionOpen()) {
+    const floorChanged = Boolean(
+      this.lastSnapshot && this.lastSnapshot.floor !== snapshot.floor,
+    );
+    if (floorChanged) {
+      this.hideNarrativeBeatCard();
+      this.activeNarrativeMoment = null;
+      this.narrativeMomentQueue.clear();
+      this.narrativeMomentQueuePrimed = false;
+      this.narrativeBootstrapMode = "new";
+    }
+    if (
+      snapshot.mode !== "explore" &&
+      this.isInspectionOpen() &&
+      this.inspectionOverlay.dataset.recordKind !== "story"
+    ) {
       this.closeInspection(false);
     }
     const pickedItems = this.lastSnapshot
@@ -3058,13 +3158,13 @@ export class AppShell {
       snapshot.mode === "transition" ||
       snapshot.mode === "defeat" ||
       snapshot.mode === "death-review";
-    this.renderFloorTransition(snapshot);
     this.renderRegionTransition(snapshot);
     this.renderDefeatTransition(snapshot, enteredDefeat);
     this.renderCampfireMenu(snapshot, enteredCampfire);
     this.renderInventoryMenu(snapshot, enteredInventory);
     this.renderLootMenu(snapshot, enteredLoot);
     this.renderNarrativeProgress(snapshot);
+    this.renderFloorTransition(snapshot);
     this.renderMonsterCodex(snapshot);
 
     this.renderTarget(target, snapshot);
@@ -3228,19 +3328,28 @@ export class AppShell {
 
   private renderFloorTransition(snapshot: GameSnapshot): void {
     const portal = requiredElement<HTMLElement>(this.root, "#floor-portal");
+    const victoryWasVisible = !portal.hidden && portal.dataset.state === "victory";
     const victoryActions = requiredElement<HTMLElement>(
       portal,
       "#floor-victory-actions",
     );
     const transitioning = snapshot.mode === "transition" && snapshot.floor < 8;
     const dungeonCleared = snapshot.mode === "victory";
-    const enteredVictory = dungeonCleared && this.lastMode !== "victory";
-    portal.hidden = !transitioning && !dungeonCleared;
-    portal.inert = !transitioning && !dungeonCleared;
-    portal.setAttribute("aria-hidden", String(!transitioning && !dungeonCleared));
-    victoryActions.hidden = !dungeonCleared;
-    this.root.classList.toggle("victory-active", dungeonCleared);
-    if (transitioning) {
+    const narrativePending = this.activeNarrativeMoment !== null ||
+      this.narrativeMomentQueue.pendingIds.length > 0;
+    const presentationBlocked = this.busy ||
+      this.isCombatSettlementVisible() ||
+      this.isLootMenuOpen() ||
+      this.isInspectionOpen() ||
+      narrativePending;
+    const transitionVisible = transitioning && !presentationBlocked;
+    const victoryVisible = dungeonCleared && !presentationBlocked;
+    portal.hidden = !transitionVisible && !victoryVisible;
+    portal.inert = !transitionVisible && !victoryVisible;
+    portal.setAttribute("aria-hidden", String(!transitionVisible && !victoryVisible));
+    victoryActions.hidden = !victoryVisible;
+    this.root.classList.toggle("victory-active", victoryVisible);
+    if (transitionVisible) {
       portal.dataset.state = "transition";
       portal.removeAttribute("role");
       portal.removeAttribute("aria-modal");
@@ -3259,8 +3368,7 @@ export class AppShell {
       requiredElement(portal, "#floor-clear-copy").textContent =
         `CONGRATULATIONS!! · ${transit.action}${transit.label} · 前往${arrival}`;
       this.hidePickupCard();
-      this.hideCombatSettlement();
-    } else if (dungeonCleared) {
+    } else if (victoryVisible) {
       portal.dataset.state = "victory";
       portal.setAttribute("role", "dialog");
       portal.setAttribute("aria-modal", "true");
@@ -3270,10 +3378,9 @@ export class AppShell {
       requiredElement(portal, "#floor-ascent-destination").textContent = "IDENTITY";
       requiredElement(portal, "#floor-clear-title").textContent = "DUNGEON CLEARED";
       requiredElement(portal, "#floor-clear-copy").textContent =
-        "CONGRATULATIONS!! · MIGRATE 已完成";
+        "CONGRATULATIONS!! · MIGRATE 验证完成，等待最终切换";
       this.hidePickupCard();
-      this.hideCombatSettlement();
-      if (enteredVictory) {
+      if (!victoryWasVisible) {
         queueMicrotask(() => {
           if (!this.isVictoryPortalOpen()) return;
           requiredElement<HTMLButtonElement>(
@@ -3288,7 +3395,7 @@ export class AppShell {
       portal.removeAttribute("aria-modal");
       portal.removeAttribute("aria-labelledby");
     }
-    if (!transitioning) {
+    if (!transitionVisible) {
       if (this.floorTransitionTimer !== null) {
         window.clearTimeout(this.floorTransitionTimer);
         this.floorTransitionTimer = null;

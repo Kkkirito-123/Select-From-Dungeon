@@ -27,6 +27,7 @@ import {
 } from "../domain/biome";
 import { generateFloorHazards } from "../domain/floorLabyrinth";
 import { isFloorOneChestMarker } from "../domain/floorOneTreasure";
+import { storyEvidenceMarkerIdsForFloor } from "../domain/floorStory";
 import {
   advanceCampaignProgress,
   createCampaignProgress,
@@ -1292,6 +1293,9 @@ function isSavedRunVersion(
         biomePlan,
       ).map((hazard) => hazard.id))
     : new Set<string>();
+  const storyEvidenceMarkerIds = new Set(
+    storyEvidenceMarkerIdsForFloor(run.floor),
+  );
   if (
     version >= 7 &&
     guidedMap &&
@@ -1321,6 +1325,7 @@ function isSavedRunVersion(
       guidedMap?.shortcuts.some((shortcut) => shortcut.id === id) ||
       guidedMap?.deadEndCaches.some((cache) => cache.id === id) ||
       floorHazardIds.has(id) ||
+      storyEvidenceMarkerIds.has(id) ||
       (run.floor === 1 && isFloorOneChestMarker(id))
     )) ||
     !hasUniqueValues(openedGateIds) ||

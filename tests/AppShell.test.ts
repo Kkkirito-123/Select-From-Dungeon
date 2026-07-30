@@ -111,7 +111,16 @@ describe("narrativeProgressForSnapshot", () => {
       "narrative:f1:midpoint-evidence",
       "narrative:f1:campfire",
     ]);
-    expect(midpoint.discoveredEvidenceIds).toContain(
+    expect(midpoint.discoveredEvidenceIds).not.toContain(
+      "lost-name:f1:current-record",
+    );
+    const inspectedMidpoint = narrativeProgressForSnapshot({
+      ...snapshot,
+      completedLessons: ["select", "where", "is-null"],
+      openedGateIds: ["story:evidence:lost-name:f1:current-record"],
+      respawnCampfireId: snapshot.campfires[0]?.id ?? null,
+    });
+    expect(inspectedMidpoint.discoveredEvidenceIds).toContain(
       "lost-name:f1:current-record",
     );
     expect(midpoint.seenMomentIds).toEqual(expect.arrayContaining([
@@ -133,7 +142,7 @@ describe("narrativeProgressForSnapshot", () => {
       completedLessons: ["select", "where", "is-null", "group-by"],
     });
     expect(bossReached.latestBeat?.kind).toBe("boss");
-    expect(bossReached.discoveredEvidenceIds).toContain(
+    expect(bossReached.discoveredEvidenceIds).not.toContain(
       "lost-name:f1:restore-permission",
     );
   });
@@ -182,12 +191,9 @@ describe("narrativeProgressForSnapshot", () => {
 
 describe("剧情节点呈现层级", () => {
   it("关键剧情占据主画面，机关变化继续使用三步短反馈", () => {
-    expect(narrativeMomentUsesRecordOverlay("entry")).toBe(true);
-    expect(narrativeMomentUsesRecordOverlay("secret")).toBe(true);
-    expect(narrativeMomentUsesRecordOverlay("boss")).toBe(true);
-    expect(narrativeMomentUsesRecordOverlay("world-change")).toBe(false);
-    expect(narrativeMomentUsesRecordOverlay("evidence")).toBe(false);
-    expect(narrativeMomentUsesRecordOverlay("evidence", true)).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("blocking")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("inspect")).toBe(true);
+    expect(narrativeMomentUsesRecordOverlay("ambient")).toBe(false);
   });
 });
 
@@ -219,6 +225,10 @@ describe("canPresentQueuedNarrativeMoment", () => {
     expect(canPresentQueuedNarrativeMoment("explore", true, false, false))
       .toBe(false);
     expect(canPresentQueuedNarrativeMoment("transition", false, false, false))
+      .toBe(true);
+    expect(canPresentQueuedNarrativeMoment("victory", false, false, false))
+      .toBe(true);
+    expect(canPresentQueuedNarrativeMoment("defeat", false, false, false))
       .toBe(false);
   });
 });

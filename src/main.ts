@@ -46,10 +46,19 @@ async function bootstrap(): Promise<void> {
   const feedback = new FeedbackDirector(audio);
   const onboarding = new OnboardingController(storage);
   let game: Phaser.Game | null = null;
-  const app = new AppShell(root, session, sql, audio, feedback, onboarding, () => {
-    if (!game) return null;
-    return game.scene.getScene("BattleScene") as BattleScene;
-  });
+  const app = new AppShell(
+    root,
+    session,
+    sql,
+    audio,
+    feedback,
+    onboarding,
+    () => {
+      if (!game) return null;
+      return game.scene.getScene("BattleScene") as BattleScene;
+    },
+    savedRun ? "restored" : "new",
+  );
   try {
     app.mount();
     game = createGame(session, audio, feedback);

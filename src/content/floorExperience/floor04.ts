@@ -317,7 +317,6 @@ export const FLOOR_FOUR_EXPERIENCE: FloorExperienceDefinition = {
       actions: [
         { type: "camera-focus", landmarkId: "f4-echo-gate" },
         { type: "world-effect", effect: "f4-echo-room-open" },
-        { type: "evidence", evidenceId: "lost-name:f4:recovery-permission" },
         { type: "dialogue", speaker: "抄写员", lines: ["这里复制了第一层的墙和火，却没有复制那时的你。", "只有恢复权限穿过四层，仍然有效。"] },
       ],
       completionFact: "story:f4:ember-echo",

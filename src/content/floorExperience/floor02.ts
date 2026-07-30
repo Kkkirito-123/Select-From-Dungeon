@@ -371,7 +371,7 @@ export const FLOOR_TWO_EXPERIENCE: FloorExperienceDefinition = {
       priority: 100,
       actions: [
         { type: "world-effect", effect: "f2-lighthouse-preserving" },
-        { type: "evidence", evidenceId: "lost-name:f2:seven-sources" },
+        { type: "evidence", evidenceId: "lost-name:f2:shared-trace" },
         { type: "dialogue", speaker: "抄写员", lines: ["我给它们编了七个页码。", "没有一个被写成你的真名。"] },
       ],
       completionFact: "story:f2:completed",

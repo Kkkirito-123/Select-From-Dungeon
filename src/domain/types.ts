@@ -651,6 +651,7 @@ export interface InteractionResolution {
     | "shortcut"
     | "region-portal";
   message: string;
+  landmarkId?: string;
 }
 
 export interface InventoryResolution {
