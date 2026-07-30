@@ -1,12 +1,12 @@
 # 《SELECT FROM 地牢》产品文档总索引
 
-> 文档集版本：`2.2-dev`
+> 文档集版本：`2.3-dev`
 >
 > 最后更新：`2026-07-30`
 >
-> 当前制作范围：第一至第八层运行时叙事、地标状态、隐藏区与 SQL 地图密文 V1
+> 当前制作范围：第一至第八层剧情精细化与怪物分布 V2 设计锁定
 >
-> 文档状态：`F1–F8 IMPLEMENTED DEV / BROWSER VISUAL QA 进行中`
+> 文档状态：`V1 RUNTIME CURRENT / V2 DESIGN LOCK / IMPLEMENTATION PENDING`
 
 ## 1. 文档集目标
 
@@ -50,6 +50,8 @@
 | `IMPLEMENTED_BALANCE_V1_1` | 八层经验阈值、生命公式与攻击曲线已进入运行时并有自动化证据 |
 | `TARGET_F1_F2` | 历史实施目标；当前文档集不应再以此声称 F1/F2 尚未落地 |
 | `CONTENT_LOCKED` | 事实和系统含义冻结，只允许文字润色 |
+| `DESIGN LOCK` | 下一版意图、稳定 ID、前置、输出与验收已冻结；不代表已经进入运行时 |
+| `IMPLEMENTATION PENDING` | 设计已可拆票，但代码、自动化或真人验收尚未完成 |
 | `DEFERRED` | 明确后置，不阻塞第一、二层 |
 | `RETIRED` | 被新方案替代，不再进入运行时 |
 
@@ -87,6 +89,9 @@
 - [第七层逐事件演出脚本](./narrative/FLOOR_07_SCRIPT.md)
 - [第八层逐事件演出脚本](./narrative/FLOOR_08_SCRIPT.md)
 - [八层主线精排与 SQL 地图解密](./narrative/EIGHT_FLOOR_STORY_ORDER.md)
+- [八层剧情精细化设计 V2](./narrative/EIGHT_FLOOR_NARRATIVE_DESIGN_V2.md)：锁定存在、来源、
+  关系、依赖、顺序、责任、访问与迁移的完整因果，统一九拍、人物弧、跨层线索和中断恢复；
+  当前为设计目标，不代表运行时已经精修完成。
 
 ### 3.4 系统
 
@@ -94,6 +99,8 @@
   判定与战斗。
 - [怪物、Boss 与图鉴规格](./systems/MONSTER_BOSS_AND_CODEX_SPEC.md)：怪物分类、Boss 机制、
   身份揭示和图鉴。
+- [八层怪物分布设计 V2](./systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md)：稳定 ID、三区生态、
+  课程 / 随机 / 精英 / 区域首领 / 层主职责、题阶、掉落和抗疲劳目标；当前为实现待办。
 - [成长、经济、篝火与探索系统](./systems/PROGRESSION_ECONOMY_AND_EXPLORATION_SPEC.md)：经验、装备、
   掉落、复活、捷径、Seed 与疲劳预算；同时记录当前运行时基线和待实现的八层经验、生命、攻击
   重平衡表。
@@ -113,6 +120,8 @@
   数据契约、存档、素材加载、降级和实施顺序。
 - [QA、体验遥测与发布计划](./production/QA_TELEMETRY_AND_RELEASE_PLAN.md)：功能、内容、学习、视觉、
   音频、性能和发布门禁。
+- [八层内容权威与追踪矩阵](./production/CONTENT_AUTHORITY_AND_TRACEABILITY.md)：记录运行事实 Owner、
+  设计目标、历史参考、已知漂移和稳定追踪键，阻止旧稿覆盖当前运行时。
 
 ## 4. 本轮定义完成
 
