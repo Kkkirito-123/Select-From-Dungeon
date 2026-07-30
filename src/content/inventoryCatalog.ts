@@ -93,7 +93,7 @@ export const ARMORS: Readonly<Record<Armor["id"], Armor>> = {
     id: "dragon-armor",
     name: "龙鳞甲",
     maxArmor: 3,
-    description: "巨龙鳞片编成的护甲，提供 3 点护甲生命。",
+    description: "熔巢鳞片编成的护甲，提供 3 点护甲生命。",
   },
   "crystal-armor": {
     id: "crystal-armor",

@@ -63,7 +63,7 @@ describe("课程文案", () => {
       ...LESSONS.flatMap((lesson) => lesson.stages),
       ...BIOME_ENCOUNTERS.flatMap((encounter) => encounter.stages),
     ];
-    expect(stages).toHaveLength(121);
+    expect(stages).toHaveLength(118);
     stages.forEach((stage) => {
       expect(stage.answerSql).toMatch(/^(?:SELECT|WITH|INSERT|UPDATE|DELETE|BEGIN)\b/i);
       expect(stage.answerSql.endsWith(";")).toBe(true);

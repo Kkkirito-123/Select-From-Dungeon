@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";
-import { INITIAL_MONSTERS, lessonById } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS, LESSONS, lessonById } from "../src/content/mvpLevel";
 import { GameSession } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
@@ -860,7 +860,14 @@ function clearLessonByWalking(
   });
   let repeatCount = 0;
   while (session.snapshot().mode === "combat" && repeatCount < 10) {
-    const resolution = session.resolveQuery(queries.at(-1)!);
+    const activeStageId = session.snapshot().lessonStageId;
+    const activeStage = LESSONS
+      .flatMap((lesson) => lesson.stages)
+      .find((stage) => stage.id === activeStageId);
+    const reviewQuery = engine && activeStage
+      ? engine.execute(activeStage.answerSql, session.snapshot().floor)
+      : queries.at(-1)!;
+    const resolution = session.resolveQuery(reviewQuery);
     expect(resolution.accepted, resolution.message).toBe(true);
     finalResolution = resolution;
     repeatCount += 1;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/floorExperience";
+import { ARMORS } from "../src/content/inventoryCatalog";
 import { biomeRegionAt } from "../src/domain/biome";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { safeZoneCellKeys } from "../src/domain/campfire";
@@ -720,7 +721,12 @@ describe("GameSession SQL 魔王城 Run", () => {
     session.interact();
 
     enterLesson(session, "group-by");
-    expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
+    expect(session.resolveQuery(GROUP_RESULT)).toMatchObject({
+      accepted: true,
+      stageAdvanced: true,
+      lessonCompleted: null,
+    });
+    expect(session.resolveQuery(NULL_NAME).lessonCompleted).toBe("group-by");
     expect(session.snapshot().mode).toBe("explore");
     expect(session.snapshot().lootBundles).toEqual([]);
     collectLessonChest(session, "group-by");
@@ -880,6 +886,103 @@ describe("GameSession SQL 魔王城 Run", () => {
     );
   });
 
+  it("高层旧战斗会按 canonical 阶段、锁与同一伤害函数恢复", () => {
+    const saved = freshFloorEightRun("canonical-combat-restore");
+    const target = saved.monsters.find((monster) => monster.id === 84);
+    const actor = saved.worldActors.find((entry) => entry.monsterId === 84);
+    if (!target || !actor) throw new Error("第八层缺少 ID #084 战斗锚点");
+    saved.mode = "combat";
+    saved.currentRoomId = actor.roomNodeId;
+    saved.player = {
+      ...saved.player,
+      x: actor.x,
+      y: actor.y,
+      hp: 10,
+      maxHp: 10,
+      armor: { ...ARMORS["bone-armor"] },
+      armorHp: 2,
+    };
+    saved.combat = {
+      targetId: 84,
+      kind: "curriculum",
+      round: 7,
+      successStep: 999,
+      intent: {
+        name: "旧版攻击",
+        damage: 99,
+        locks: ["旧版锁"],
+      },
+    };
+
+    const session = new GameSession(saved);
+    expect(session.snapshot()).toMatchObject({
+      lessonStageIndex: 4,
+      monsters: expect.arrayContaining([
+        expect.objectContaining({ id: 84, damage: 3 }),
+      ]),
+      combat: {
+        targetId: 84,
+        successStep: 4,
+        intent: {
+          damage: 3,
+        },
+      },
+    });
+
+    const wrong = session.resolveQuery(result("SELECT 1", ["1"], [{ "1": 1 }]));
+    expect(wrong).toMatchObject({
+      accepted: false,
+      playerDamage: 1,
+      armorDamage: 2,
+      events: expect.arrayContaining([
+        expect.objectContaining({ type: "enemy-hit", amount: 3 }),
+      ]),
+    });
+    expect(session.registerQueryError("near SELECT：语法错误", "SELEC 1"))
+      .toMatchObject({
+        playerDamage: 3,
+        armorDamage: 0,
+        events: expect.arrayContaining([
+          expect.objectContaining({ type: "enemy-hit", amount: 3 }),
+        ]),
+      });
+  });
+
+  it("高伤武器也不能跳过第八层 Boss 的剩余阶段", () => {
+    const saved = freshFloorEightRun("boss-stage-floor");
+    const target = saved.monsters.find((monster) => monster.id === 84);
+    const actor = saved.worldActors.find((entry) => entry.monsterId === 84);
+    if (!target || !actor) throw new Error("第八层缺少 ID #084 战斗锚点");
+    target.hp = 1;
+    saved.mode = "combat";
+    saved.currentRoomId = actor.roomNodeId;
+    saved.player.x = actor.x;
+    saved.player.y = actor.y;
+    saved.combat = {
+      targetId: 84,
+      kind: "curriculum",
+      round: 1,
+      successStep: 0,
+      intent: { name: "旧版攻击", damage: 99, locks: ["旧版锁"] },
+    };
+
+    const session = new GameSession(saved);
+    const firstStage = session.resolveQuery(result(
+      "SELECT value FROM tx_versions WHERE row_id = 2 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12)",
+      ["value"],
+      [{ value: "locked" }],
+    ));
+
+    expect(firstStage).toMatchObject({
+      accepted: true,
+      stageAdvanced: true,
+      lessonCompleted: null,
+    });
+    expect(session.snapshot().monsters.find((monster) => monster.id === 84)?.hp).toBe(1);
+    expect(session.snapshot().combat?.successStep).toBe(1);
+    expect(session.snapshot().profile.discoveredMonsterIds).not.toContain(84);
+  });
+
   it("相邻 E 打开篝火菜单，只有休息才回满生命并替换复活点", () => {
     const session = new GameSession(null, null, "campfire-rest");
     enterLesson(session, "select");
@@ -935,7 +1038,12 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.travelToRoom(hammerRoom.id).ok).toBe(true);
     expect(session.interact().ok).toBe(true);
     enterLesson(session, "group-by");
-    expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
+    expect(session.resolveQuery(GROUP_RESULT)).toMatchObject({
+      accepted: true,
+      stageAdvanced: true,
+      lessonCompleted: null,
+    });
+    expect(session.resolveQuery(NULL_NAME).lessonCompleted).toBe("group-by");
 
     expect(session.setPlayerPosition(middle.restPosition.x, middle.restPosition.y)).toBe(true);
     expect(session.interact().ok).toBe(true);
@@ -1413,6 +1521,9 @@ describe("GameSession SQL 魔王城 Run", () => {
         kind: "armor",
         guaranteed: true,
       });
+      if (entry.floor === 6) {
+        expect(JSON.stringify(reward)).not.toContain("巨龙");
+      }
     });
   });
 });

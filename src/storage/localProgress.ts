@@ -463,7 +463,29 @@ function migrateLegacyMonsterIds(value: unknown): unknown {
     : value.combat;
   const answerHistory = Array.isArray(value.answerHistory)
     ? value.answerHistory.map((record) => (
-        isRecord(record) ? migratedMonsterReference(record, "monsterId") : record
+        isRecord(record)
+          ? (() => {
+              const migrated = migratedMonsterReference(record, "monsterId");
+              const monsterId = migrated.monsterId;
+              const lesson = isLessonId(migrated.lessonId)
+                ? LESSONS.find((entry) => entry.id === migrated.lessonId)
+                : undefined;
+              const stage = lesson?.stages.find((entry) => entry.id === migrated.stageId);
+              const safeId = typeof monsterId === "number" && Number.isInteger(monsterId)
+                ? monsterId
+                : 0;
+              return {
+                ...migrated,
+                monsterName: `ID #${String(safeId).padStart(3, "0")}`,
+                stageObjective: stage?.objective
+                  ?? `旧版作答已迁移：按 ID #${String(safeId).padStart(3, "0")} 复盘。`,
+                sql: "",
+                answerSql: stage?.answerSql
+                  ?? `SELECT id FROM monsters WHERE id = ${safeId};`,
+                feedback: "旧版作答记录已迁移；怪物姓名仍需在当前版本重新恢复。",
+              };
+            })()
+          : record
       ))
     : value.answerHistory;
   const lootBundles = Array.isArray(value.lootBundles)
@@ -481,6 +503,7 @@ function migrateLegacyMonsterIds(value: unknown): unknown {
     combat,
     answerHistory,
     lootBundles,
+    banner: "旧版怪物编号与答题记录已迁移；未恢复的姓名继续只显示 ID。",
   };
 }
 
@@ -1125,6 +1148,7 @@ function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
       value.floor === 8
     ) &&
     isPositiveInteger(value.monsterId) &&
+    CURRENT_MONSTER_IDS_BY_FLOOR[value.floor as FloorNumber].includes(value.monsterId) &&
     typeof value.monsterName === "string" &&
     value.monsterName.length > 0 &&
     isLessonId(value.lessonId) &&

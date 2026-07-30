@@ -453,6 +453,14 @@ describe("localProgress", () => {
 
     const current = session.toSavedRun();
     const legacy = withLegacyMonsterIds(current);
+    legacy.banner = "已扫描 猎犬（ID #201），幽灵与石巨人仍在等待。";
+    const legacyWhereRecord = legacy.answerHistory.find((record) => record.monsterId === 201);
+    if (!legacyWhereRecord) throw new Error("测试存档缺少旧版 ID #201 答题记录");
+    legacyWhereRecord.monsterName = "猎犬";
+    legacyWhereRecord.stageObjective = "查询猎犬 name";
+    legacyWhereRecord.sql = "SELECT name FROM monsters WHERE name = '猎犬'";
+    legacyWhereRecord.answerSql = "SELECT weakness FROM monsters WHERE name = '猎犬'";
+    legacyWhereRecord.feedback = "猎犬、幽灵、石巨人均未命中";
     const historicMasterIds = new Map([
       [101, 7],
       [201, 11],
@@ -478,6 +486,11 @@ describe("localProgress", () => {
     expect(migrated?.worldActors.some((entry) => entry.monsterId === 1)).toBe(true);
     expect(migrated?.combat?.targetId).toBe(2);
     expect(migrated?.answerHistory.map((record) => record.monsterId)).toEqual([1, 1, 2]);
+    expect(JSON.stringify({
+      banner: migrated?.banner,
+      history: migrated?.answerHistory,
+    })).not.toMatch(/猎犬|幽灵|石巨人|ID #201/);
+    expect(migrated?.answerHistory.at(-1)?.monsterName).toBe("ID #002");
     expect(migrated?.monsters.every((monster) => (
       monster.masterId === null ||
       migrated.monsters.some((candidate) => candidate.id === monster.masterId)
@@ -947,6 +960,10 @@ describe("localProgress", () => {
     expectRunRejected(storage, run);
     run.answerHistory[0].id = 1;
     run.answerHistory[0].answerSql = "";
+    expectRunRejected(storage, run);
+
+    run.answerHistory[0].answerSql = "SELECT id FROM monsters WHERE id = 84;";
+    run.answerHistory[0].monsterId = 84;
     expectRunRejected(storage, run);
   });
 

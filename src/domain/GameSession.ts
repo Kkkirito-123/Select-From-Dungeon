@@ -128,6 +128,10 @@ import {
   createCampaignProgress,
   type CampaignProgress,
 } from "./campaign";
+import {
+  counterDamageForMonster,
+  stagesForEncounter,
+} from "./combatBalance";
 import { MAX_ANSWER_HISTORY } from "./types";
 import type {
   AnswerAttemptRecord,
@@ -416,7 +420,11 @@ function rewardItemKind(reward: ClaimableReward): GroundItem["kind"] {
 }
 
 function monstersForFloor(floor: FloorNumber): Monster[] {
-  return cloneMonsters(INITIAL_MONSTERS.filter((monster) => monster.floor === floor));
+  return cloneMonsters(INITIAL_MONSTERS.filter((monster) => monster.floor === floor))
+    .map((monster) => ({
+      ...monster,
+      damage: counterDamageForMonster(monster),
+    }));
 }
 
 function restoredMonstersForFloor(
@@ -730,6 +738,7 @@ export class GameSession {
       this.battleSequence = savedRun.battleSequence;
       this.reviewBattleId = savedRun.reviewBattleId;
       this.banner = restoredWorldBanner(savedRun.banner);
+      this.restoreCanonicalCombatState();
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
       this.labyrinthEntryConfirmed =
         floorLabyrinthAreaAt(
@@ -2079,10 +2088,11 @@ export class GameSession {
       }
     } else {
       const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
-      const damage = this.applyPlayerDamage(1);
+      const incomingDamage = target ? counterDamageForMonster(target) : 1;
+      const damage = this.applyPlayerDamage(incomingDamage);
       playerDamage = damage.playerDamage;
       armorDamage = damage.armorDamage;
-      events.push({ type: "enemy-hit", sourceId: target?.id, amount: 1 });
+      events.push({ type: "enemy-hit", sourceId: target?.id, amount: incomingDamage });
       const damageMessage = armorDamage > 0
         ? `护甲吸收 ${armorDamage} 点${playerDamage > 0 ? `，生命损失 ${playerDamage} 点` : ""}`
         : `生命损失 ${playerDamage} 点`;
@@ -2160,7 +2170,8 @@ export class GameSession {
     this.profile.attempts[lesson.id] += 1;
     this.player.heat = Math.min(99, this.player.heat + 1);
     const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
-    const damage = this.applyPlayerDamage(1);
+    const incomingDamage = target ? counterDamageForMonster(target) : 1;
+    const damage = this.applyPlayerDamage(incomingDamage);
     const playerDamage = damage.playerDamage;
     const armorDamage = damage.armorDamage;
     const playerDefeated = this.player.hp === 0;
@@ -2176,7 +2187,7 @@ export class GameSession {
       this.combat.round += 1;
     }
     const events: CombatEvent[] = [
-      { type: "enemy-hit", sourceId: target?.id, amount: playerDamage },
+      { type: "enemy-hit", sourceId: target?.id, amount: incomingDamage },
     ];
     if (reviewTarget) {
       this.appendAnswerRecord({
@@ -2414,11 +2425,49 @@ export class GameSession {
   }
 
   private currentCombatStages(): readonly LessonStageDefinition[] {
-    if (this.combat?.kind === "ambush") {
-      const practice = practiceStagesFor(this.combat.targetId);
-      if (practice.length > 0) return practice;
+    const targetId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id;
+    const monster = targetId === undefined
+      ? undefined
+      : this.monsters.find((entry) => entry.id === targetId);
+    return monster ? this.combatStagesForMonster(monster) : this.currentLesson().stages;
+  }
+
+  private combatStagesForMonster(monster: Monster): readonly LessonStageDefinition[] {
+    const authored = monster.encounterType === "ambush"
+      ? practiceStagesFor(monster.id)
+      : lessonById(monster.lessonId).stages;
+    const floorLessons = lessonsForFloor(monster.floor);
+    const lessonIndex = floorLessons.indexOf(monster.lessonId);
+    const reviewStages = floorLessons
+      .slice(0, Math.max(0, lessonIndex))
+      .flatMap((lessonId) => lessonById(lessonId).stages);
+    return stagesForEncounter(monster, authored, reviewStages);
+  }
+
+  private restoreCanonicalCombatState(): void {
+    if (!this.combat) return;
+    const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
+    if (!target) {
+      this.combat = null;
+      if (this.mode === "combat") this.mode = "explore";
+      return;
     }
-    return this.currentLesson().stages;
+    const stages = this.combatStagesForMonster(target);
+    if (stages.length === 0) {
+      this.combat = null;
+      if (this.mode === "combat") this.mode = "explore";
+      return;
+    }
+    this.combat.successStep = Math.min(
+      Math.max(0, this.combat.successStep),
+      stages.length - 1,
+    );
+    const stage = stages[this.combat.successStep];
+    this.combat.intent = {
+      name: target.attackName,
+      damage: counterDamageForMonster(target),
+      locks: [...stage.locks],
+    };
   }
 
   private monsterForCurrentRoom(): Monster | undefined {
@@ -2498,11 +2547,8 @@ export class GameSession {
     if (accessMessage && encounter?.role !== "area-boss") {
       return this.interactionFailure(accessMessage);
     }
-    const lesson = lessonById(room.lessonId);
     const combatKind = monster.encounterType;
-    const stages = combatKind === "ambush"
-      ? practiceStagesFor(monster.id)
-      : lesson.stages;
+    const stages = this.combatStagesForMonster(monster);
     const stage = stages[0];
     if (!stage) return this.interactionFailure("这只怪物尚未配置可执行的 SQL 题。");
     this.currentRoomId = room.id;
@@ -2516,7 +2562,7 @@ export class GameSession {
       successStep: 0,
       intent: {
         name: monster.attackName,
-        damage: monster.damage,
+        damage: counterDamageForMonster(monster),
         locks: [...stage.locks],
       },
     };
@@ -2562,7 +2608,7 @@ export class GameSession {
     this.encounterMeter = advance.meter;
     if (advance.targetId === null) return null;
     const monster = this.monsters.find((entry) => entry.id === advance.targetId);
-    const stages = monster ? practiceStagesFor(monster.id) : [];
+    const stages = monster ? this.combatStagesForMonster(monster) : [];
     const stage = stages[0];
     if (!monster || !stage) return null;
 
@@ -2575,7 +2621,7 @@ export class GameSession {
       successStep: 0,
       intent: {
         name: monster.attackName,
-        damage: 1,
+        damage: counterDamageForMonster(monster),
         locks: [...stage.locks],
       },
     };
@@ -3342,10 +3388,19 @@ export class GameSession {
 
   private engageMimicChest(): InteractionResolution {
     if (this.mode !== "explore") {
-      return this.interactionFailure("当前不能打开宝箱怪。 ");
+      return this.interactionFailure("当前不能打开沉默木箱。 ");
+    }
+    const requiredLessons: readonly LessonId[] = ["select", "where", "is-null"];
+    const missingLesson = requiredLessons.find(
+      (lessonId) => !this.completedLessons.has(lessonId),
+    );
+    if (missingLesson) {
+      return this.interactionFailure(
+        "沉默木箱尚未响应：先完成 SELECT、WHERE 与 IS NULL 三项基础课程。",
+      );
     }
     const monster = this.monsters.find((entry) => entry.id === FLOOR_ONE_MIMIC_MONSTER_ID);
-    const stages = monster ? practiceStagesFor(monster.id) : [];
+    const stages = monster ? this.combatStagesForMonster(monster) : [];
     if (!monster || monster.hp <= 0 || stages.length === 0) {
       return this.interactionFailure("箱盖已经安静下来。 ");
     }
@@ -3358,13 +3413,13 @@ export class GameSession {
       successStep: 0,
       intent: {
         name: monster.attackName,
-        damage: monster.damage,
+        damage: counterDamageForMonster(monster),
         locks: [...stages[0].locks],
       },
     };
     this.selectedMonsterId = monster.id;
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
-    this.banner = `沉默木箱突然合拢：ID #${String(monster.id).padStart(3, "0")} 宝箱怪苏醒。完成 ${stages.length} 道第一层基础题，才能打开箱腹。`;
+    this.banner = `沉默木箱突然合拢：ID #${String(monster.id).padStart(3, "0")} 苏醒。完成 ${stages.length} 道第一层基础题，才能打开箱腹。`;
     this.emit();
     return { ok: true, kind: "combat", message: this.banner };
   }
