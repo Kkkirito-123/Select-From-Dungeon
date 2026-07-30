@@ -45,6 +45,7 @@ describe("FLOOR_MAP_BLUEPRINTS", () => {
 
   it("第一、二层保留已发布 v11 布局名作为只读存档兼容身份", () => {
     expect(compatibleFloorLayoutNames(1)).toEqual([
+      "双岸失名档案",
       "地下余烬档案回环",
       "回燃档案环廊",
     ]);

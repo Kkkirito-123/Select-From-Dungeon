@@ -77,6 +77,12 @@ export const ARMORS: Readonly<Record<Armor["id"], Armor>> = {
     maxArmor: 2,
     description: "元素符文稳定的护甲，提供 2 点护甲生命。",
   },
+  "ember-echo-robe": {
+    id: "ember-echo-robe",
+    name: "回燃衣",
+    maxArmor: 2,
+    description: "回燃残响中保存的记录衣，提供 2 点护甲生命。装备后外袍会显出余烬兜帽、黄铜护肩与持续发亮的恢复印。",
+  },
   "iron-armor": {
     id: "iron-armor",
     name: "黑铁甲",

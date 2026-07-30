@@ -1,17 +1,50 @@
 import { describe, expect, it } from "vitest";
 import {
   FloorStoryMomentQueue,
+  floorStoryEvidenceQueryForLandmark,
   floorStoryMoments,
   floorStoryProgress,
   validateFloorStoryContent,
 } from "../src/domain/floorStory";
 import { storyQuery } from "../src/sql/storyQueryCatalog";
 
-describe("F1/F2 现场剧情展示适配器", () => {
+describe("F1-F8 现场剧情展示适配器", () => {
+  it("完成对应课程后可在地图地标按 E 重读已解密 SQL 证据", () => {
+    const none = floorStoryEvidenceQueryForLandmark(
+      "f8-version-gallery",
+      new Set(),
+      new Set(),
+    );
+    expect(none).toBeNull();
+
+    expect(floorStoryEvidenceQueryForLandmark(
+      "f8-version-gallery",
+      new Set(["f8-mvcc"]),
+      new Set(),
+    )).toEqual(storyQuery("f8-visible-snapshot"));
+
+    expect(floorStoryEvidenceQueryForLandmark(
+      "f1-sealed-vault",
+      new Set(),
+      new Set(),
+    )).toBeNull();
+    expect(floorStoryEvidenceQueryForLandmark(
+      "f1-sealed-vault",
+      new Set(),
+      new Set(["gate:floor-1-treasure"]),
+    )).toEqual(storyQuery("f1-restore-contradiction"));
+  });
+
   it("只从现有楼层事件、环境规则与故事查询目录组装可见节点", () => {
     expect(validateFloorStoryContent()).toEqual([]);
-    expect(floorStoryMoments(1)).toHaveLength(9);
-    expect(floorStoryMoments(2)).toHaveLength(10);
+    expect(floorStoryMoments(1)).toHaveLength(10);
+    expect(floorStoryMoments(2)).toHaveLength(11);
+    expect(floorStoryMoments(3)).toHaveLength(11);
+    expect(floorStoryMoments(4)).toHaveLength(12);
+    expect(floorStoryMoments(5)).toHaveLength(10);
+    expect(floorStoryMoments(6)).toHaveLength(11);
+    expect(floorStoryMoments(7)).toHaveLength(10);
+    expect(floorStoryMoments(8)).toHaveLength(11);
 
     const opening = floorStoryMoments(1)[0];
     expect(opening?.sourceId).toBe("f1-story-fire-remembers");
@@ -19,10 +52,70 @@ describe("F1/F2 现场剧情展示适配器", () => {
     expect(opening?.archiveLine).toBe(
       storyQuery("f1-current-resident").purpose,
     );
+    expect(opening?.actions).toEqual(expect.arrayContaining([
+      { type: "music-state", state: "f1-home-ember" },
+      { type: "camera-focus", landmarkId: "f1-spawn-ember" },
+    ]));
 
     const sevenPages = floorStoryMoments(2)[0];
     expect(sevenPages?.sourceId).toBe("f2-story-seven-wet-pages");
     expect(sevenPages?.query).toEqual(storyQuery("f2-seven-source-pages"));
+
+    const evidenceQueries = [3, 4, 5, 6, 7, 8].flatMap((floor) =>
+      floorStoryMoments(floor as 3 | 4 | 5 | 6 | 7 | 8)
+        .map((moment) => moment.query?.id)
+        .filter(Boolean)
+    );
+    expect(evidenceQueries).toEqual([
+      "f3-unarmed-record-preserved",
+      "f3-room-relic-chain",
+      "f4-three-incident-fronts",
+      "f4-dependency-lineage",
+      "f5-stable-duty-order",
+      "f5-ties-preserved",
+      "f6-duplicate-candidates",
+      "f6-baseline-restored",
+      "f7-all-realms-present",
+      "f7-crystal-plan-candidates",
+      "f8-visible-snapshot",
+      "f8-deadlock-cycle",
+    ]);
+  });
+
+  it("第三层把关系写回环境，第四层以中层首领开启第一层残响", () => {
+    const floorThree = floorStoryMoments(3);
+    expect(floorThree).toHaveLength(11);
+    expect(floorThree.map((entry) => entry.sourceId)).toEqual(
+      expect.arrayContaining([
+        "f3-story-no-owner",
+        "f3-bone-linked",
+        "f3-story-reliquary",
+        "f3-story-grave-lord",
+        "f3-story-audit-complete",
+      ]),
+    );
+
+    const beforeBoss = floorStoryProgress({
+      floor: 4,
+      mode: "explore",
+      completedLessons: ["f4-scalar", "f4-in", "f4-exists"],
+      defeatedMonsterIds: [],
+      openedGateIds: [],
+    });
+    expect(beforeBoss.unlocked.map((entry) => entry.sourceId))
+      .not.toContain("f4-story-forge-lord");
+
+    const echoOpened = floorStoryProgress({
+      floor: 4,
+      mode: "explore",
+      completedLessons: ["f4-scalar", "f4-in", "f4-exists"],
+      defeatedMonsterIds: [44],
+      openedGateIds: ["gate:floor-4-treasure"],
+    });
+    expect(echoOpened.unlocked.map((entry) => entry.sourceId)).toEqual(
+      expect.arrayContaining(["f4-story-forge-lord", "f4-story-ember-echo"]),
+    );
+    expect(echoOpened.latest?.title).toBe("火记得你，第二次");
   });
 
   it("隐藏区域只在对应实体暗门开启后进入现场档案", () => {

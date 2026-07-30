@@ -10,7 +10,10 @@ import {
   floorTransitPresentation,
   regionPortalsEnabledForFloor,
 } from "../content/floorMapBlueprints";
-import { floorExperience } from "../content/floorExperience";
+import {
+  floorExperience,
+  hasFloorExperience,
+} from "../content/floorExperience";
 import type { OnboardingMilestone } from "../content/onboarding";
 import {
   INITIAL_MONSTERS,
@@ -57,7 +60,7 @@ import type { FeedbackDirector, FeedbackNotice } from "../feedback/FeedbackDirec
 import type { BattleScene } from "../game/BattleScene";
 import { pickedItemsBetween } from "../game/snapshotFeedback";
 import { createRunSeed } from "../storage/localProgress";
-import { SqlEngine } from "../sql/SqlEngine";
+import type { SqlEngine } from "../sql/SqlEngine";
 import type { OnboardingController, OnboardingSnapshot } from "./OnboardingController";
 import {
   AnswerReviewView,
@@ -111,6 +114,14 @@ export function canOpenCombatTerminal(
   return mode === "combat" && !busy;
 }
 
+export function isInspectionPrimaryKey(
+  event: Pick<KeyboardEvent, "code" | "key" | "repeat">,
+): boolean {
+  if (event.repeat) return false;
+  return event.code === "KeyE" || event.key.toLowerCase() === "e" ||
+    event.key === "Enter";
+}
+
 export function shouldDismissTransientCard(
   shownAtMove: number | null,
   currentTotalMoves: number,
@@ -120,8 +131,25 @@ export function shouldDismissTransientCard(
 
 export function narrativeMomentUsesRecordOverlay(
   kind: FloorStoryMoment["kind"],
+  hasQuery = false,
 ): boolean {
-  return ["entry", "secret", "scribe", "boss", "ascent"].includes(kind);
+  return hasQuery ||
+    ["entry", "secret", "scribe", "boss", "ascent"].includes(kind);
+}
+
+export function storyMomentRecordBody(moment: FloorStoryMoment): string {
+  if (!moment.query) return moment.lines.join("\n");
+  const fields = moment.query.expectedColumns.length > 0
+    ? moment.query.expectedColumns.join(" · ")
+    : "无返回字段";
+  return [
+    ...moment.lines,
+    "",
+    `SQL 证据 · ${moment.query.title}`,
+    moment.query.sql,
+    `真实结果 · ${moment.query.expectedRowCount} 行 · ${fields}`,
+    moment.query.purpose,
+  ].join("\n");
 }
 
 export function canPresentQueuedNarrativeMoment(
@@ -334,7 +362,12 @@ export function narrativeProgressForSnapshot(
     seenBeatIds: seenBeats.map((beat) => beat.id),
     seenMomentIds: story.unlockedIds,
     unlockedMoments: story.unlocked,
-    discoveredEvidenceIds: seenBeats.flatMap((beat) => beat.evidenceIds),
+    discoveredEvidenceIds: [
+      ...seenBeats.flatMap((beat) => beat.evidenceIds),
+      ...story.unlocked.flatMap((moment) => moment.actions.flatMap((action) => (
+        action.type === "evidence" ? [action.evidenceId] : []
+      ))),
+    ],
     completedAscentIds,
     completedMigrationStepIds,
     latestBeat: seenBeats.at(-1) ?? null,
@@ -407,6 +440,7 @@ export class AppShell {
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
   private focusBeforeInspection: HTMLElement | null = null;
+  private pendingLabyrinthMove: { x: number; y: number } | null = null;
   private toastTimer: number | null = null;
   private terminalFocusTimer: number | null = null;
   private pickupShownAtMove: number | null = null;
@@ -436,12 +470,35 @@ export class AppShell {
       this.openInspection(message);
     }
   };
+  private readonly labyrinthEntryHandler = (event: Event): void => {
+    const detail = (event as CustomEvent<{
+      dx?: number;
+      dy?: number;
+      message?: string;
+    }>).detail;
+    if (
+      typeof detail?.dx !== "number" ||
+      typeof detail.dy !== "number"
+    ) return;
+    this.pendingLabyrinthMove = { x: detail.dx, y: detail.dy };
+    this.openRecordOverlay({
+      kicker: "THRESHOLD / 安全区边界",
+      title: "是否进入失名迷宫？",
+      body: detail.message ?? "迷宫内视野降低，怪物和伤害机关会开始活动。",
+      closeLabel: "ESC · 暂不进入",
+      kind: "labyrinth",
+    });
+  };
   private readonly keydownHandler = (event: KeyboardEvent): void => {
     if (this.isInspectionOpen()) {
-      if (event.code === "KeyE" && !event.repeat) {
+      if (isInspectionPrimaryKey(event)) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        this.closeInspection();
+        if (this.inspectionOverlay.dataset.recordKind === "labyrinth") {
+          this.confirmLabyrinthEntry();
+        } else {
+          this.closeInspection();
+        }
         return;
       }
       if (event.key === "Escape") {
@@ -677,7 +734,10 @@ export class AppShell {
                   <span id="inspection-kicker">FIELD NOTE / 现场记录</span>
                   <h2 id="inspection-title">现场调查</h2>
                   <p id="inspection-message"></p>
-                  <button id="close-inspection" type="button">E · 关闭记录</button>
+                  <div class="inspection-overlay__actions">
+                    <button id="confirm-labyrinth-entry" type="button" hidden>E · 进入迷宫</button>
+                    <button id="close-inspection" type="button">E · 关闭记录</button>
+                  </div>
                 </article>
               </section>
 
@@ -866,7 +926,7 @@ export class AppShell {
                     <span class="terminal-prompt">OPTIONAL BREACH / 越级机关</span>
                     <strong id="gate-terminal-title">高难 SQL 机关</strong>
                   </div>
-                  <button id="close-gate-terminal" type="button" class="icon-action" aria-label="退出机关破解">ESC 安全退出</button>
+                  <button id="close-gate-terminal" type="button" class="icon-action" aria-label="退出 SQL 密文解读">ESC 安全退出</button>
                 </div>
 
                 <div class="terminal-grid gate-terminal__grid">
@@ -886,7 +946,7 @@ export class AppShell {
                   </section>
 
                   <section class="terminal-editor gate-terminal__editor">
-                    <label class="sr-only" for="gate-sql-editor">输入机关破解 SQL</label>
+                    <label class="sr-only" for="gate-sql-editor">输入 SQL 密文查询</label>
                     <div class="sql-editor-shell sql-editor-shell--gate">
                       <textarea id="gate-sql-editor" spellcheck="false" autocomplete="off" placeholder="写出完整查询计划，破解结果集校验…"></textarea>
                       <div class="sql-assist-rail" aria-hidden="true">
@@ -1035,9 +1095,9 @@ export class AppShell {
             <section class="admin-preset-section" aria-labelledby="admin-preset-title">
               <div class="card-heading">
                 <span id="admin-preset-title">世界状态预设</span>
-                <span>F1 / F2 精修切片</span>
+                <span>F1–F8 剧情切片</span>
               </div>
-              <p>直接检查入层、中段、捷径与通关后的地图变化；只影响本次管理员预览。</p>
+              <p>直接检查入层、隐藏区、SQL 密文门与通关后的地图变化；只影响本次管理员预览。</p>
               <div id="admin-preset-list" class="admin-preset-list"></div>
             </section>
             <div id="admin-region-list" class="admin-region-list"></div>
@@ -1117,6 +1177,11 @@ export class AppShell {
     requiredElement(this.root, "#close-inspection").addEventListener(
       "click",
       () => this.closeInspection(),
+      listenerOptions,
+    );
+    requiredElement(this.root, "#confirm-labyrinth-entry").addEventListener(
+      "click",
+      () => this.confirmLabyrinthEntry(),
       listenerOptions,
     );
     requiredElement(this.root, "#cancel-gate-query").addEventListener(
@@ -1313,9 +1378,17 @@ export class AppShell {
     this.releaseAudioGesture = this.audio.armFirstGesture(window);
     window.addEventListener("dungeon:open-terminal", this.openTerminalHandler, listenerOptions);
     window.addEventListener("dungeon:inspection", this.inspectionHandler, listenerOptions);
+    window.addEventListener(
+      "dungeon:labyrinth-entry",
+      this.labyrinthEntryHandler,
+      listenerOptions,
+    );
     window.addEventListener("dungeon:milestone", this.milestoneHandler, listenerOptions);
     window.addEventListener("dungeon:patrol", this.patrolHandler, listenerOptions);
-    window.addEventListener("keydown", this.keydownHandler, listenerOptions);
+    window.addEventListener("keydown", this.keydownHandler, {
+      ...listenerOptions,
+      capture: true,
+    });
     window.addEventListener("keyup", this.keyupHandler, listenerOptions);
     window.addEventListener("blur", this.blurHandler, listenerOptions);
     this.unsubscribeFeedback = this.feedback.subscribe((_event, notice) => {
@@ -1611,7 +1684,8 @@ export class AppShell {
       this.isReviewOpen() ||
       this.isMonsterCodexOpen() ||
       this.isNarrativeCodexOpen() ||
-      this.isCampfireMenuOpen()
+      this.isCampfireMenuOpen() ||
+      this.isInspectionOpen()
         ? "thinking"
         : "world",
     );
@@ -1724,6 +1798,7 @@ export class AppShell {
     this.sql.reset(snapshot.monsters);
     this.getBattleScene()?.abortEncounter();
     this.clearQueryArtifacts();
+    this.resetAdminNarrativePresentation();
     this.renderAdminMenu(snapshot);
   }
 
@@ -1756,6 +1831,7 @@ export class AppShell {
     this.sql.reset(snapshot.monsters);
     this.getBattleScene()?.abortEncounter();
     this.clearQueryArtifacts();
+    this.resetAdminNarrativePresentation();
     this.renderAdminMenu(snapshot);
   }
 
@@ -1780,7 +1856,7 @@ export class AppShell {
     }
     const presets = requiredElement(this.adminMenu, "#admin-preset-list");
     presets.replaceChildren();
-    if (snapshot.floor === 1 || snapshot.floor === 2) {
+    if (hasFloorExperience(snapshot.floor)) {
       for (const preset of floorExperience(snapshot.floor).adminPresets) {
         const button = document.createElement("button");
         button.type = "button";
@@ -1790,7 +1866,7 @@ export class AppShell {
       }
     } else {
       const unavailable = document.createElement("p");
-      unavailable.textContent = "本轮世界状态预设只覆盖完成精修的第一、二层。";
+      unavailable.textContent = "本轮世界状态预设目前覆盖完成精修的第一至四层。";
       presets.append(unavailable);
     }
     const regions = requiredElement(this.adminMenu, "#admin-region-list");
@@ -2294,7 +2370,8 @@ export class AppShell {
     moment: FloorStoryMoment,
     totalMoves: number,
   ): void {
-    if (narrativeMomentUsesRecordOverlay(moment.kind)) {
+    this.executeStoryMomentActions(moment);
+    if (narrativeMomentUsesRecordOverlay(moment.kind, moment.query !== null)) {
       this.openStoryMoment(moment);
       return;
     }
@@ -2312,11 +2389,41 @@ export class AppShell {
     card.classList.add("is-visible");
   }
 
+  private executeStoryMomentActions(moment: FloorStoryMoment): void {
+    const musicState = moment.actions.find(
+      (action) => action.type === "music-state",
+    );
+    const worldEffect = moment.actions.find(
+      (action) => action.type === "world-effect",
+    );
+    if (musicState?.type === "music-state") {
+      this.root.dataset.storyMusicState = musicState.state;
+      this.audio.setFocus("resolving");
+      void this.audio.playSfx("stage-clear");
+    }
+    if (worldEffect?.type === "world-effect") {
+      this.root.dataset.storyWorldEffect = worldEffect.effect;
+    }
+    window.dispatchEvent(new CustomEvent("dungeon:story-actions", {
+      detail: {
+        momentId: moment.id,
+        actions: moment.actions,
+      },
+    }));
+  }
+
   private hideNarrativeBeatCard(): void {
     const card = this.root.querySelector<HTMLElement>("#narrative-beat-card");
     card?.classList.remove("is-visible");
     if (card) card.hidden = true;
     this.narrativeBeatShownAtMove = null;
+  }
+
+  private resetAdminNarrativePresentation(): void {
+    this.hideNarrativeBeatCard();
+    this.narrativeMomentQueue.clear();
+    this.narrativeMomentQueuePrimed = false;
+    this.lastNarrativeBeatId = null;
   }
 
   private openInspection(message: string): void {
@@ -2334,7 +2441,7 @@ export class AppShell {
     this.openRecordOverlay({
       kicker: moment.kicker,
       title: moment.title,
-      body: moment.lines.join("\n"),
+      body: storyMomentRecordBody(moment),
       closeLabel: "E · 继续探索",
       kind: "story",
     });
@@ -2345,7 +2452,7 @@ export class AppShell {
     title: string;
     body: string;
     closeLabel: string;
-    kind: "inspection" | "story";
+    kind: "inspection" | "story" | "labyrinth";
   }): void {
     if (!this.isInspectionOpen()) {
       this.focusBeforeInspection = document.activeElement instanceof HTMLElement
@@ -2359,13 +2466,47 @@ export class AppShell {
       this.inspectionOverlay,
       "#close-inspection",
     ).textContent = copy.closeLabel;
+    const confirmButton = requiredElement<HTMLButtonElement>(
+      this.inspectionOverlay,
+      "#confirm-labyrinth-entry",
+    );
+    confirmButton.hidden = copy.kind !== "labyrinth";
     this.inspectionOverlay.dataset.recordKind = copy.kind;
     this.hideNarrativeBeatCard();
     this.inspectionOverlay.hidden = false;
     this.inspectionOverlay.inert = false;
     this.inspectionOverlay.setAttribute("aria-hidden", "false");
     this.root.classList.add("inspection-active");
-    requiredElement<HTMLButtonElement>(this.inspectionOverlay, "#close-inspection").focus({
+    (copy.kind === "labyrinth"
+      ? confirmButton
+      : requiredElement<HTMLButtonElement>(this.inspectionOverlay, "#close-inspection")
+    ).focus({
+      preventScroll: true,
+    });
+  }
+
+  private confirmLabyrinthEntry(): void {
+    const direction = this.pendingLabyrinthMove;
+    if (!direction) return;
+    if (!this.session.confirmFloorOneLabyrinthEntry()) {
+      this.closeInspection();
+      return;
+    }
+    this.pendingLabyrinthMove = null;
+    this.closeInspection(false);
+    const resolution = this.session.attemptPlayerMove(direction.x, direction.y);
+    if (resolution.ok && resolution.moved) {
+      this.feedback.dispatch({ type: "player-step" });
+      window.dispatchEvent(new CustomEvent("dungeon:milestone", {
+        detail: { type: "player-step" },
+      }));
+    } else if (!resolution.ok) {
+      this.showFeedbackNotice({
+        message: resolution.message,
+        tone: "info",
+      });
+    }
+    requiredElement<HTMLElement>(this.root, "#game-root").focus({
       preventScroll: true,
     });
   }
@@ -2376,6 +2517,7 @@ export class AppShell {
     this.inspectionOverlay.inert = true;
     this.inspectionOverlay.setAttribute("aria-hidden", "true");
     delete this.inspectionOverlay.dataset.recordKind;
+    this.pendingLabyrinthMove = null;
     this.root.classList.remove("inspection-active");
     if (!returnFocus) {
       this.focusBeforeInspection = null;

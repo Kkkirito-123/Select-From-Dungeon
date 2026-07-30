@@ -108,6 +108,18 @@ export function createPlayerActor(
       rectangle(scene, 12, 3, 5, 9, profile.armor, 0.8),
     );
   }
+  if (profile.armorStyle === "ember-echo") {
+    parts.push(
+      rectangle(scene, 0, -20, 24, 5, 0x382a31, 0.96)
+        .setStrokeStyle(1, profile.trim, 0.82),
+      rectangle(scene, -12, -11, 5, 18, 0x382a31, 0.96),
+      rectangle(scene, 12, -11, 5, 18, 0x382a31, 0.96),
+      rectangle(scene, -14, 1, 7, 10, profile.trim, 0.92),
+      rectangle(scene, 14, 1, 7, 10, profile.trim, 0.92),
+      rectangle(scene, 0, 7, 7, 7, 0xe16b42, 0.96)
+        .setStrokeStyle(1, 0xf4d17b, 0.9),
+    );
+  }
 
   const weapon = rectangle(scene, 14, 2, 3, 29, profile.weapon)
     .setStrokeStyle(1, profile.lining, 0.75)
@@ -123,6 +135,7 @@ export function createPlayerActor(
   const container = actorContainer(scene, options, parts);
   container.setData("actor-kind", "player");
   container.setData("actor-stage", profile.stage);
+  container.setData("armor-style", profile.armorStyle);
   return { container, idle: "breathe" };
 }
 

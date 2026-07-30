@@ -343,11 +343,11 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
     room({
       id: REST_ID,
       type: "rest",
-      title: "余烬篝火室",
+      title: "登记前哨",
       depth: 2,
       lane: laneById.get(REST_ID) ?? 0,
       required: false,
-      prerequisiteLessons: ["select"],
+      prerequisiteLessons: ["group-by"],
       reward: pick(OPTIONAL_REWARDS.rest, random),
       next: [HUB_ID],
     }),

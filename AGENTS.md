@@ -81,16 +81,24 @@ evidence entries per floor unlock from existing Run progress; the local
 `失名录` distinguishes unknown, confirmed `NULL`, and actual values. The eighth
 floor resolves the sole MVP 2.0 ending, `MIGRATE`; no Agent, account, backend,
 or network log is used.
-Floors one and two also each contain exactly one optional physical hidden room:
+Floors one through eight each contain exactly one optional physical hidden room:
 the first-floor sealed archive opens after `WHERE / IS NULL`, and the
-second-floor wreck ledger opens after `ORDER BY / LIMIT / DISTINCT`. Their
-gate state reuses `openedGateIds`, campfires are never placed inside them, and
-their evidence may reinforce but never gate the main story or curriculum.
+second-floor wreck ledger opens after `ORDER BY / LIMIT / DISTINCT`. Floor
+three opens an ownerless reliquary after its first three relationship lessons.
+Floor four reveals a compact first-floor ember echo only after the first three
+subquery lessons and middle area Boss `ID #044`; that room deterministically
+offers the `回燃衣` armor, whose equipped actor has a distinct hood, shoulders,
+seal, and palette. Floors five through eight respectively hide the Silent
+Roster, Uncommitted Rookery, Blind Index Garden, and Zero-Row Chapel; they
+deterministically offer iron, dragon, crystal, and royal armor with visible
+equipped silhouettes. Hidden-area gate state reuses `openedGateIds`, campfires
+are never placed inside these rooms, and optional evidence or gear never gates
+the main story or curriculum.
 Ordinary world monsters take one slow patrol step about every 1,100 ms while
 exploration is active. Each floor's locked Boss gate also exposes one optional
-high-difficulty SQL breach: a correct composite query opens only that physical
-gate, while a wrong or invalid query deals one armor-first damage and never
-grants mastery, XP, or loot.
+physical SQL cipher: a correct composite query opens only that physical route
+and permanently changes its seal state, while a wrong or invalid query deals
+one armor-first damage and never grants mastery, XP, or loot.
 The top-console `答题复盘` view reads a browser-local answer log for the latest
 battle and current floor. Each record contains the submitted SQL, explicit
 reference SQL, result category, hint level, and battle outcome. The log is
@@ -120,6 +128,15 @@ explicit exception: it remains one continuous authored route and uses water
 state plus the guaranteed physical shortcut instead of generic region portals.
 These actors never enter entrance or campfire safe zones and do not gate
 curriculum completion.
+Floors one through eight have authored runtime experience definitions:
+stable landmarks, physical hidden-room entrances, derived world-state changes,
+one physical SQL cipher, story triggers, Scribe placement, and admin presets.
+Floor three makes JOIN
+relationships visible through a bone bridge, paired steles, a relic chain, and
+preserved witnesses. Floor four uses fire, frost, and storm regions; its middle
+Boss `ID #044` blocks the rear region and reveals the optional first-floor ember
+echo after defeat. The echo is an in-floor memory space, not a floor transition
+or a second copy of first-floor progress.
 
 The current product deliberately does not include AI generation, accounts,
 leaderboards, multiplayer, a server database, or a faithful MySQL
@@ -148,6 +165,7 @@ index.html -> src/main.ts
   -> CampaignDomain (ordered eight-floor slots and transition invariants)
   -> RunGraph (curriculum dependency and point-of-interest graph)
   -> FloorMapBlueprints (eight authored macro layouts and transit identities)
+  -> FloorExperience (authored F1-F8 landmarks, hidden rooms, SQL ciphers, story, world states)
   -> MazeGenerator/MazeValidation (deterministic 48x36 generator-v5 world)
   -> CampfireDomain (two seeded checkpoints, entrance anchor, safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
@@ -300,7 +318,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   bundles, inventory, armor, consumables, unique-item history, key items, fog,
   two campfires, the entrance anchor, active checkpoint, encounter meter,
   level/XP, opened
-  challenge gates/shortcuts/dead-end caches/first-two-floor hidden rooms,
+  SQL cipher gates/shortcuts/dead-end caches/eight-floor hidden rooms,
   active gate challenge, at most 200
   local answer records, and disposable current Run state),
   `select-from-dungeon:profile:v3` (47 mastered lessons, recovered monster IDs,
@@ -329,14 +347,15 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - One SQL submission is one combat turn, with no timer while thinking or typing.
   Correct results only trigger the player attack; wrong results and syntax
   errors trigger the telegraphed enemy counter. Empty input consumes no turn.
-- Standing beside a locked Boss gate and pressing `E` opens an optional
-  `QUERY BREACH` terminal. Floor one requires a composite
+- Standing beside a locked Boss route and pressing `E` opens its optional
+  physical SQL cipher terminal. Floor one requires a composite
   `JOIN + WHERE + COUNT + GROUP BY + HAVING + ORDER BY` query; floor two adds
   `LEFT JOIN`, `COUNT(DISTINCT ...)`, and `LIMIT`; floor three uses a three-table
   gear audit; floor four uses a CTE with grouped maximum power; floors five
   through eight continue with window, transaction, plan, and incident
   composites. Both query features and exact
-  result semantics are validated. Success opens only that physical gate and
+  result semantics are validated. Success opens only that physical route,
+  permanently changes the seal's visible state, and
   grants no mastery, attempts, XP, or loot. Wrong results and syntax errors deal
   one armor-first damage; empty input and `Escape` consume nothing.
 - New Runs use generator-v5 `48x36` `MazeFloor` records built from eight
@@ -388,7 +407,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   entrance with full HP, while mastery, XP, gear, doors, defeated enemies, and
   the surviving enemy's current HP remain intact. The automatically opened
   review is scoped to the battle that caused death.
-- First- and second-floor entry, hidden-room discovery, Scribe, Boss, and ascent
+- First- through fourth-floor entry, hidden-room discovery, Scribe, Boss, and ascent
   story nodes use a dedicated main-stage record dialog; first-floor Scribe,
   archive-wheel, nameless-dormitory, and authored second-floor landmark
   investigations use the same dialog instead of overwriting the persistent
@@ -407,6 +426,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - The renderer targets 30 FPS. Page-hidden lifecycle handling flushes progress,
   sleeps the Phaser loop, stops scheduled audio, and resumes safely when visible.
   Unchanged heavy HUD lists are reused instead of rebuilt on every snapshot.
+- The production build keeps Phaser, `sql.js`, and SQLite WASM in separate
+  cacheable assets. `sqlite-runtime` must remain outside the application entry;
+  the WASM file remains an external fetched asset and is not inlined.
 - Characters and UI effects remain generated from project code. The first two
   floor slices may also load the audited CC0 tile/prop packs declared in their
   runtime manifests; source archives, hashes, licenses, and transformed outputs

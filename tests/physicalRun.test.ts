@@ -1,7 +1,11 @@
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";
+import { INITIAL_MONSTERS, lessonById } from "../src/content/mvpLevel";
 import { GameSession } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
+import { SqlEngine } from "../src/sql/SqlEngine";
 import { isSavedRun } from "../src/storage/localProgress";
 import type {
   GroundItem,
@@ -62,9 +66,10 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       [{ weakness: "slash" }],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 1",
-      ["name"],
-      [{ name: "史莱姆" }],
+      "SELECT id, status FROM monsters WHERE id = 1",
+      ["id", "status"],
+      [{ id: 1, status: "idle" }],
+      [1],
     ),
   ],
   where: [
@@ -88,9 +93,10 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       [3],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
-      ["name"],
-      [{ name: "毒史莱姆" }],
+      "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
+      ["id"],
+      [{ id: 3 }],
+      [3],
     ),
   ],
   "group-by": [
@@ -147,9 +153,10 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       [{ id: 12, sector: "forest" }],
     ),
     teachingResult(
-      "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
-      ["name", "room_name"],
-      [{ name: "树妖", room_name: "古树桥" }],
+      "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
+      ["id", "room_name"],
+      [{ id: 12, room_name: "古树桥" }],
+      [12],
     ),
   ],
   "left-join": [
@@ -171,9 +178,10 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
       ],
     ),
     teachingResult(
-      "SELECT m.name, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1",
-      ["name", "power"],
-      [{ name: "灯塔守卫", power: 21 }],
+      "SELECT m.id, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1",
+      ["id", "power"],
+      [{ id: 14, power: 21 }],
+      [14],
     ),
   ],
   "f3-inner": [teachingResult(
@@ -486,9 +494,10 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
 
 const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
   6: [teachingResult(
-    "SELECT name FROM monsters WHERE id = 6",
-    ["name"],
-    [{ name: "小水怪" }],
+    "SELECT id, status FROM monsters WHERE id = 6",
+    ["id", "status"],
+    [{ id: 6, status: "dripping" }],
+    [6],
   )],
   7: [teachingResult(
     "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
@@ -497,9 +506,10 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     [7],
   )],
   8: [teachingResult(
-    "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
-    ["name"],
-    [{ name: "灰史莱姆" }],
+    "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
+    ["id"],
+    [{ id: 8 }],
+    [8],
   )],
   9: [
     teachingResult(
@@ -511,9 +521,10 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     ],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 9",
-      ["name"],
-      [{ name: "铁泥怪" }],
+      "SELECT id, status FROM monsters WHERE id = 9",
+      ["id", "status"],
+      [{ id: 9, status: "armored" }],
+      [9],
     ),
   ],
   15: [teachingResult(
@@ -527,9 +538,10 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
     [{ channel: "echo" }, { channel: "mirror" }],
   )],
   17: [teachingResult(
-    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17",
-    ["name", "room_name"],
-    [{ name: "青蛙", room_name: "泥沼石径" }],
+    "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17",
+    ["id", "room_name"],
+    [{ id: 17, room_name: "泥沼石径" }],
+    [17],
   )],
   18: [
     teachingResult(
@@ -539,15 +551,17 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
       [18],
     ),
     teachingResult(
-      "SELECT name FROM monsters WHERE id = 18 AND status = 'toxic'",
-      ["name"],
-      [{ name: "毒蛙" }],
+      "SELECT id FROM monsters WHERE id = 18 AND status = 'toxic'",
+      ["id"],
+      [{ id: 18 }],
+      [18],
     ),
   ],
   19: [teachingResult(
-    "SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1",
-    ["name", "hp"],
-    [{ name: "猎犬", hp: 13 }],
+    "SELECT id, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1",
+    ["id", "hp"],
+    [{ id: 19, hp: 13 }],
+    [19],
   )],
   20: [
     teachingResult(
@@ -556,9 +570,10 @@ const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
       [{ id: 20, room_name: "盘根林地" }],
     ),
     teachingResult(
-      "SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1",
-      ["name", "room_sector"],
-      [{ name: "树妖", room_sector: "forest" }],
+      "SELECT m.id, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1",
+      ["id", "room_sector"],
+      [{ id: 20, room_sector: "forest" }],
+      [20],
     ),
   ],
   29: [teachingResult(
@@ -758,7 +773,11 @@ function pathToAny(session: GameSession, goals: readonly Position[]): Position[]
 
 function walkPath(session: GameSession, path: readonly Position[]): void {
   path.forEach((step) => {
-    const move = session.attemptPlayerMove(step.x, step.y);
+    let move = session.attemptPlayerMove(step.x, step.y);
+    if (move.blockedBy === "threshold") {
+      expect(session.confirmFloorOneLabyrinthEntry()).toBe(true);
+      move = session.attemptPlayerMove(step.x, step.y);
+    }
     expect(move, move.message).toMatchObject({ ok: true, moved: true });
     if (move.encounterId !== null) {
       const queries = AMBUSH_QUERIES[move.encounterId];
@@ -804,7 +823,11 @@ function engageLessonByWalking(session: GameSession, lessonId: LessonId): void {
   walkPath(session, pathToAny(session, adjacent));
   const player = session.snapshot().player;
   const encounter = session.attemptPlayerMove(actor.x - player.x, actor.y - player.y);
-  expect(encounter).toMatchObject({ ok: true, moved: false, encounterId: monster.id });
+  expect(encounter, encounter.message).toMatchObject({
+    ok: true,
+    moved: false,
+    encounterId: monster.id,
+  });
   expect(session.snapshot()).toMatchObject({ mode: "combat", lessonId });
 }
 
@@ -817,9 +840,17 @@ function collectItemByWalking(session: GameSession, item: GroundItem): void {
   }
 }
 
-function clearLessonByWalking(session: GameSession, lessonId: LessonId): void {
+function clearLessonByWalking(
+  session: GameSession,
+  lessonId: LessonId,
+  engine?: SqlEngine,
+): void {
   engageLessonByWalking(session, lessonId);
-  const queries = LESSON_QUERIES[lessonId];
+  const queries = engine
+    ? lessonById(lessonId).stages.map((stage) => (
+      engine.execute(stage.answerSql, session.snapshot().floor)
+    ))
+    : LESSON_QUERIES[lessonId];
   if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
   let finalResolution: ReturnType<GameSession["resolveQuery"]> | null = null;
   queries.forEach((query) => {
@@ -856,101 +887,153 @@ function collectAggregateHammer(session: GameSession): void {
   expect(session.snapshot().player.weapon.id).toBe("aggregate-hammer");
 }
 
+function defeatAreaBossByWalking(
+  session: GameSession,
+  monsterId: number,
+  engine: SqlEngine,
+): void {
+  const snapshot = session.snapshot();
+  const actor = snapshot.worldActors.find((entry) => entry.monsterId === monsterId);
+  if (!actor) throw new Error(`缺少区域首领 Actor：${monsterId}`);
+  const adjacent = DIRECTIONS.map((direction) => ({
+    x: actor.x + direction.x,
+    y: actor.y + direction.y,
+  })).filter((position) => isMazeWalkable(
+    snapshot.mazeFloor,
+    position.x,
+    position.y,
+    new Set(snapshot.completedLessons),
+    new Set(snapshot.openedGateIds),
+  ));
+  walkPath(session, pathToAny(session, adjacent));
+  const player = session.snapshot().player;
+  const encounter = session.attemptPlayerMove(actor.x - player.x, actor.y - player.y);
+  expect(encounter).toMatchObject({
+    ok: true,
+    moved: false,
+    encounterId: monsterId,
+  });
+
+  const stages = BIOME_PRACTICE_STAGES[monsterId];
+  if (!stages?.length) throw new Error(`区域首领 ${monsterId} 缺少 SQL 阶段`);
+  stages.forEach((stage) => {
+    const resolution = session.resolveQuery(
+      engine.execute(stage.answerSql, session.snapshot().floor),
+    );
+    expect(resolution.accepted, resolution.message).toBe(true);
+  });
+  expect(session.snapshot().monsters.find((monster) => monster.id === monsterId)?.hp)
+    .toBe(0);
+  expect(session.snapshot().profile.discoveredMonsterIds).toContain(monsterId);
+}
+
 describe("continuous physical maze run", () => {
   it.each([
     ["where", "is-null"],
     ["is-null", "where"],
-  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通八层", (first, second) => {
+  ] as const)("分支顺序 %s → %s 不依赖调试传送也能贯通八层", async (first, second) => {
+    const wasmLocation = fileURLToPath(new URL(
+      "../node_modules/sql.js/dist/sql-wasm.wasm",
+      import.meta.url,
+    ));
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
     const session = new GameSession(null, null, `physical-${first}-${second}`);
-    clearLessonByWalking(session, "select");
-    clearLessonByWalking(session, first);
-    clearLessonByWalking(session, second);
+    clearLessonByWalking(session, "select", engine);
+    clearLessonByWalking(session, first, engine);
+    clearLessonByWalking(session, second, engine);
     collectAggregateHammer(session);
-    clearLessonByWalking(session, "group-by");
-    clearLessonByWalking(session, "having");
+    clearLessonByWalking(session, "group-by", engine);
+    clearLessonByWalking(session, "having", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 1 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 2 });
 
-    clearLessonByWalking(session, "order-by");
-    clearLessonByWalking(session, "distinct");
-    clearLessonByWalking(session, "inner-join");
-    clearLessonByWalking(session, "left-join");
-    clearLessonByWalking(session, "join-boss");
+    clearLessonByWalking(session, "order-by", engine);
+    clearLessonByWalking(session, "distinct", engine);
+    clearLessonByWalking(session, "inner-join", engine);
+    clearLessonByWalking(session, "left-join", engine);
+    defeatAreaBossByWalking(session, 22, engine);
+    clearLessonByWalking(session, "join-boss", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 2 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 3 });
     expect(isSavedRun(session.toSavedRun())).toBe(true);
 
-    clearLessonByWalking(session, "f3-inner");
-    clearLessonByWalking(session, "f3-left");
-    clearLessonByWalking(session, "f3-self");
-    clearLessonByWalking(session, "f3-chain");
-    clearLessonByWalking(session, "f3-union");
-    clearLessonByWalking(session, "f3-audit");
+    clearLessonByWalking(session, "f3-inner", engine);
+    clearLessonByWalking(session, "f3-left", engine);
+    clearLessonByWalking(session, "f3-self", engine);
+    clearLessonByWalking(session, "f3-chain", engine);
+    defeatAreaBossByWalking(session, 33, engine);
+    clearLessonByWalking(session, "f3-union", engine);
+    clearLessonByWalking(session, "f3-audit", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 3 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 4 });
     expect(isSavedRun(session.toSavedRun())).toBe(true);
 
-    clearLessonByWalking(session, "f4-scalar");
-    clearLessonByWalking(session, "f4-in");
-    clearLessonByWalking(session, "f4-exists");
-    clearLessonByWalking(session, "f4-correlated");
-    clearLessonByWalking(session, "f4-cte");
-    clearLessonByWalking(session, "f4-recursive");
+    clearLessonByWalking(session, "f4-scalar", engine);
+    clearLessonByWalking(session, "f4-in", engine);
+    defeatAreaBossByWalking(session, 44, engine);
+    clearLessonByWalking(session, "f4-exists", engine);
+    clearLessonByWalking(session, "f4-correlated", engine);
+    clearLessonByWalking(session, "f4-cte", engine);
+    clearLessonByWalking(session, "f4-recursive", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 4 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 5 });
     expect(isSavedRun(session.toSavedRun())).toBe(true);
 
-    clearLessonByWalking(session, "f5-over");
-    clearLessonByWalking(session, "f5-row-number");
-    clearLessonByWalking(session, "f5-rank");
-    clearLessonByWalking(session, "f5-lag-lead");
-    clearLessonByWalking(session, "f5-frame");
-    clearLessonByWalking(session, "f5-top-n");
+    clearLessonByWalking(session, "f5-over", engine);
+    clearLessonByWalking(session, "f5-row-number", engine);
+    clearLessonByWalking(session, "f5-rank", engine);
+    clearLessonByWalking(session, "f5-lag-lead", engine);
+    defeatAreaBossByWalking(session, 55, engine);
+    clearLessonByWalking(session, "f5-frame", engine);
+    clearLessonByWalking(session, "f5-top-n", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 5 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 6 });
     expect(isSavedRun(session.toSavedRun())).toBe(true);
 
-    clearLessonByWalking(session, "f6-insert");
-    clearLessonByWalking(session, "f6-update");
-    clearLessonByWalking(session, "f6-delete");
-    clearLessonByWalking(session, "f6-constraint");
-    clearLessonByWalking(session, "f6-transaction");
-    clearLessonByWalking(session, "f6-savepoint");
+    clearLessonByWalking(session, "f6-insert", engine);
+    clearLessonByWalking(session, "f6-update", engine);
+    clearLessonByWalking(session, "f6-delete", engine);
+    clearLessonByWalking(session, "f6-constraint", engine);
+    defeatAreaBossByWalking(session, 66, engine);
+    clearLessonByWalking(session, "f6-transaction", engine);
+    clearLessonByWalking(session, "f6-savepoint", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 6 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 7 });
     expect(isSavedRun(session.toSavedRun())).toBe(true);
 
-    clearLessonByWalking(session, "f7-btree");
-    clearLessonByWalking(session, "f7-composite");
-    clearLessonByWalking(session, "f7-covering");
-    clearLessonByWalking(session, "f7-invalid");
-    clearLessonByWalking(session, "f7-plan");
-    clearLessonByWalking(session, "f7-optimize");
+    clearLessonByWalking(session, "f7-btree", engine);
+    clearLessonByWalking(session, "f7-composite", engine);
+    clearLessonByWalking(session, "f7-covering", engine);
+    clearLessonByWalking(session, "f7-invalid", engine);
+    defeatAreaBossByWalking(session, 77, engine);
+    clearLessonByWalking(session, "f7-plan", engine);
+    clearLessonByWalking(session, "f7-optimize", engine);
 
     expect(session.snapshot()).toMatchObject({ mode: "transition", floor: 7 });
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({ mode: "explore", floor: 8 });
     expect(isSavedRun(session.toSavedRun())).toBe(true);
 
-    clearLessonByWalking(session, "f8-mvcc");
-    clearLessonByWalking(session, "f8-lock");
-    clearLessonByWalking(session, "f8-isolation");
-    clearLessonByWalking(session, "f8-modeling");
-    clearLessonByWalking(session, "f8-replication");
-    clearLessonByWalking(session, "f8-sharding");
-    clearLessonByWalking(session, "f8-security");
+    clearLessonByWalking(session, "f8-mvcc", engine);
+    clearLessonByWalking(session, "f8-lock", engine);
+    clearLessonByWalking(session, "f8-isolation", engine);
+    clearLessonByWalking(session, "f8-modeling", engine);
+    defeatAreaBossByWalking(session, 89, engine);
+    clearLessonByWalking(session, "f8-replication", engine);
+    clearLessonByWalking(session, "f8-sharding", engine);
+    clearLessonByWalking(session, "f8-security", engine);
 
     expect(session.snapshot().mode).toBe("victory");
     expect(session.snapshot().campaign).toMatchObject({

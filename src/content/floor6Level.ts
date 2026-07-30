@@ -280,7 +280,7 @@ export const FLOOR_SIX_LESSON_DEFINITIONS: readonly LessonDefinition[] = [
   {
     id: "f6-savepoint",
     concept: "SAVEPOINT / ROLLBACK TO",
-    title: "龙王巢 · 局部回滚后提交",
+    title: "王焰巢 · 局部回滚后提交",
     intro: "保存点只撤销局部错误；外层已经完成的修复仍可以提交。",
     schema: SANDBOX_SCHEMA,
     primaryMonsterId: 61,

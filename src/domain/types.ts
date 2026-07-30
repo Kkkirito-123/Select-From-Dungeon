@@ -13,6 +13,7 @@ import type {
   BiomeKind,
 } from "../content/biomeContent";
 import type { BiomePlan } from "./biome";
+import type { FloorHazard } from "./floorOneLabyrinth";
 
 export type LessonId = RunLessonId;
 
@@ -302,6 +303,7 @@ export interface Armor {
     | "vine-armor"
     | "bone-armor"
     | "rune-armor"
+    | "ember-echo-robe"
     | "iron-armor"
     | "dragon-armor"
     | "crystal-armor"
@@ -513,6 +515,7 @@ export interface GameSnapshot {
   mazeFloor: MazeFloor;
   guidedMap: GuidedMapPlan;
   campfires: Campfire[];
+  hazards: FloorHazard[];
   activeCampfireId: string | null;
   respawnCampfireId: string | null;
   activeLootBundleId: string | null;
@@ -611,7 +614,13 @@ export interface MoveResolution {
   to: Position;
   encounterId: number | null;
   pickedItemIds: string[];
-  blockedBy: "none" | "wall" | "gate" | "campfire" | "mode";
+  blockedBy: "none" | "wall" | "gate" | "campfire" | "threshold" | "mode";
+  hazard: {
+    id: string;
+    name: string;
+    playerDamage: number;
+    armorDamage: number;
+  } | null;
   message: string;
 }
 

@@ -16,7 +16,7 @@ const GENERATED_SEED_SAMPLES = 8;
 
 describe("campfire generation", () => {
   it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(
-    "第 %i 层固定生成中、后两个互异篝火，出生点单独承担前段安全锚点",
+    "第 %i 层固定生成两个互异篝火；第一层为双岸，后续层为中后段",
     (floorNumber) => {
     for (let index = 0; index < GENERATED_SEED_SAMPLES; index += 1) {
       const seed = `campfire-contract:${floorNumber}:${index}`;
@@ -25,14 +25,13 @@ describe("campfire generation", () => {
       const campfires = generateCampfires(graph, floor);
 
       expect(campfires).toHaveLength(2);
-      expect(campfires.map((campfire) => campfire.phase)).toEqual([
-        "middle",
-        "rear",
-      ]);
-      expect(campfires.map((campfire) => campfire.id)).toEqual([
-        `campfire:${floorNumber}:middle`,
-        `campfire:${floorNumber}:rear`,
-      ]);
+      const phases = floorNumber === 1
+        ? ["front", "rear"]
+        : ["middle", "rear"];
+      expect(campfires.map((campfire) => campfire.phase)).toEqual(phases);
+      expect(campfires.map((campfire) => campfire.id)).toEqual(
+        phases.map((phase) => `campfire:${floorNumber}:${phase}`),
+      );
       expect(new Set(campfires.map((campfire) => campfire.roomNodeId)).size).toBe(2);
       const distances = campfires.map((campfire) => (
         findGridPath(

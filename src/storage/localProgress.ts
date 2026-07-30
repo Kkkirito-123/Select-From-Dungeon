@@ -192,6 +192,7 @@ const ARMOR_IDS = [
   "vine-armor",
   "bone-armor",
   "rune-armor",
+  "ember-echo-robe",
   "iron-armor",
   "dragon-armor",
   "crystal-armor",
@@ -1174,17 +1175,28 @@ function validatedCampfires(
   if (legacy) return campfires;
   let expected: Campfire[];
   let legacyExpected: Campfire[];
+  let legacyFloorOneExpected: Campfire[];
+  let legacyHiddenFloorOneExpected: Campfire[];
   try {
     expected = generateCampfires(graph, floor);
     legacyExpected = generateCampfires(graph, floor, {
       includeHiddenTreasureRooms: true,
+    });
+    legacyFloorOneExpected = generateCampfires(graph, floor, {
+      useLegacyFloorOnePlacement: true,
+    });
+    legacyHiddenFloorOneExpected = generateCampfires(graph, floor, {
+      includeHiddenTreasureRooms: true,
+      useLegacyFloorOnePlacement: true,
     });
   } catch {
     return null;
   }
   return (
     JSON.stringify(campfires) === JSON.stringify(expected) ||
-    JSON.stringify(campfires) === JSON.stringify(legacyExpected)
+    JSON.stringify(campfires) === JSON.stringify(legacyExpected) ||
+    JSON.stringify(campfires) === JSON.stringify(legacyFloorOneExpected) ||
+    JSON.stringify(campfires) === JSON.stringify(legacyHiddenFloorOneExpected)
   ) ? campfires : null;
 }
 

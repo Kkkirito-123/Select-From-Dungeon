@@ -18,6 +18,7 @@ import {
 } from "../content/gateChallenges";
 import { RELICS, rewardDetails, roomFlavor } from "../content/runContent";
 import {
+  ARMORS,
   CONSUMABLE_SLOT_CAPACITY,
   CONSUMABLE_STACK_CAPACITY,
   EQUIPMENT_CAPACITY,
@@ -32,7 +33,10 @@ import {
   floorTransitPresentation,
   regionPortalsEnabledForFloor,
 } from "../content/floorMapBlueprints";
-import { floorExperience } from "../content/floorExperience";
+import {
+  floorExperience,
+  hasFloorExperience,
+} from "../content/floorExperience";
 import {
   cloneMazeFloor,
   generateMazeFloor,
@@ -70,11 +74,20 @@ import {
   safeZoneCellKeys,
 } from "./campfire";
 import {
+  crossesIntoFloorOneLabyrinth,
+  floorOneAreaAt,
+  floorOneSafeAreaCellKeys,
+  generateFloorOneHazards,
+  type FloorHazard,
+} from "./floorOneLabyrinth";
+import {
   evaluateStage,
   evaluateUnrevealedIdentityQuery,
   unrevealedIdentityQueryMessage,
 } from "./lessonEvaluator";
+import { floorStoryEvidenceQueryForLandmark } from "./floorStory";
 import {
+  monsterIdLabel,
   monsterIntentName,
   monsterNameForProfile,
   recoverMonsterIdentity,
@@ -193,6 +206,19 @@ const LESSON_ORDER: readonly LessonId[] = [
   "f6-constraint",
   "f6-transaction",
   "f6-savepoint",
+  "f7-btree",
+  "f7-composite",
+  "f7-covering",
+  "f7-invalid",
+  "f7-plan",
+  "f7-optimize",
+  "f8-mvcc",
+  "f8-lock",
+  "f8-isolation",
+  "f8-modeling",
+  "f8-replication",
+  "f8-sharding",
+  "f8-security",
 ];
 
 export const LEVEL_XP_THRESHOLDS = [0, 2, 4, 6, 8, 12, 16, 20, 24] as const;
@@ -528,6 +554,7 @@ export class GameSession {
   private adminIdentityMonsterIds = new Set<number>();
   private regionTransferSequence = 0;
   private regionTransfer: GameSnapshot["regionTransfer"] = null;
+  private floorOneLabyrinthEntryConfirmed = false;
   private profile: ProfileProgress;
   private readonly listeners = new Set<SessionListener>();
 
@@ -663,8 +690,12 @@ export class GameSession {
       this.reviewBattleId = savedRun.reviewBattleId;
       this.banner = restoredWorldBanner(savedRun.banner);
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
+      this.floorOneLabyrinthEntryConfirmed = this.floorNumber !== 1 ||
+        floorOneAreaAt(this.mazeFloor, this.player) === "labyrinth" ||
+        this.visitedRoomIds.size > 1;
       this.revealAt(this.player);
     }
+    this.ensureOpenedHiddenAreaRewards();
   }
 
   subscribe(listener: SessionListener): () => void {
@@ -773,6 +804,7 @@ export class GameSession {
         ...campfire,
         restPosition: { ...campfire.restPosition },
       })),
+      hazards: this.floorHazards(),
       activeCampfireId: this.activeCampfireId,
       respawnCampfireId: this.respawnCampfireId,
       activeLootBundleId: this.activeLootBundleId,
@@ -926,12 +958,31 @@ export class GameSession {
       const missing = gate?.requires.filter((lesson) => !this.completedLessons.has(lesson)) ?? [];
       const message = missing.length > 0
         ? `知识门需要：${missing.map((lesson) => lessonById(lesson).concept).join("、")}。${
-            gate?.id === this.challengeGateId() ? " 靠近按 E 可尝试高难越级破解。" : ""
+            gate?.id === this.challengeGateId() ? " 靠近按 E 可解读本层 SQL 密文。" : ""
           }`
         : "前方是无法穿过的魔王城石墙。";
       this.banner = message;
       this.emit();
       return this.moveFailure(from, to, gate ? "gate" : "wall", message);
+    }
+
+    const regionGuardianMessage = this.regionGuardianAccessMessage(from, to);
+    if (regionGuardianMessage) {
+      this.banner = regionGuardianMessage;
+      this.emit();
+      return this.moveFailure(from, to, "gate", regionGuardianMessage);
+    }
+
+    if (
+      this.floorNumber === 1 &&
+      !this.adminMode &&
+      !this.floorOneLabyrinthEntryConfirmed &&
+      crossesIntoFloorOneLabyrinth(this.mazeFloor, from, to)
+    ) {
+      const message = "失名迷宫内视野会缩小，怪物与档案切纸轮只在其中活动。进入后仍可原路返回安全区。";
+      this.banner = message;
+      this.emit();
+      return this.moveFailure(from, to, "threshold", message);
     }
 
     const blockingCampfire = this.campfires.find(
@@ -955,6 +1006,7 @@ export class GameSession {
         encounterId: encounter.ok ? actor.monsterId : null,
         pickedItemIds: [],
         blockedBy: "none",
+        hazard: null,
         message: encounter.message,
       };
     }
@@ -971,10 +1023,36 @@ export class GameSession {
       const result = this.collectGroundItem(item, false);
       if (result.ok) pickedItemIds.push(item.id);
     });
-    const encounterId = this.mode === "explore"
+    let hazardResolution: MoveResolution["hazard"] = null;
+    const hazard = this.floorHazards().find((entry) => (
+      entry.x === to.x &&
+      entry.y === to.y &&
+      !this.openedGateIds.has(entry.id)
+    ));
+    if (hazard) {
+      this.openedGateIds.add(hazard.id);
+      const damage = this.applyPlayerDamage(hazard.damage);
+      hazardResolution = {
+        id: hazard.id,
+        name: hazard.name,
+        playerDamage: damage.playerDamage,
+        armorDamage: damage.armorDamage,
+      };
+      const damageMessage = damage.armorDamage > 0
+        ? `护甲吸收 ${damage.armorDamage} 点${damage.playerDamage > 0 ? `，生命损失 ${damage.playerDamage} 点` : ""}`
+        : `生命损失 ${damage.playerDamage} 点`;
+      this.banner = `${hazard.name}突然旋转：${damageMessage}。这类机关不会进入 SQL 战斗。`;
+      if (this.player.hp <= 0) this.enterDefeat("hazard");
+    }
+    const encounterId = this.mode === "explore" && hazardResolution === null
       ? this.rollAmbush(pickedItemIds.length === 0)
       : null;
-    if (pickedItemIds.length === 0 && encounterId === null && this.mode === "explore") {
+    if (
+      hazardResolution === null &&
+      pickedItemIds.length === 0 &&
+      encounterId === null &&
+      this.mode === "explore"
+    ) {
       const biome = biomeRegionAt(this.biomePlan, this.player);
       this.banner = `${biome.name} · ${this.currentRoom().title} · 已探索 ${this.discoveredCells.size} 格。`;
     }
@@ -987,8 +1065,15 @@ export class GameSession {
       encounterId,
       pickedItemIds,
       blockedBy: "none",
+      hazard: hazardResolution,
       message: this.banner,
     };
+  }
+
+  confirmFloorOneLabyrinthEntry(): boolean {
+    if (this.floorNumber !== 1 || this.mode !== "explore") return false;
+    this.floorOneLabyrinthEntryConfirmed = true;
+    return true;
   }
 
   setPlayerPosition(x: number, y: number): boolean {
@@ -1157,7 +1242,7 @@ export class GameSession {
       return this.interactionFailure("战斗已经开始。按住 Q + S 打开 SQL 终端。");
     }
     if (this.mode === "challenge") {
-      return this.interactionFailure("机关破解终端已经开启。提交查询或按 ESC 退出。");
+      return this.interactionFailure("SQL 密文终端已经开启。提交查询或按 ESC 退出。");
     }
     const shortcutKey = this.guidedMap.shortcuts.find((shortcut) => (
       !this.keyItems.includes(shortcut.keyId) &&
@@ -1224,7 +1309,20 @@ export class GameSession {
           message: `${area.title}：${area.sealedMessage}`,
         };
       }
+      const livingGuardians = (area.requiredMonsterIds ?? []).filter(
+        (monsterId) => this.monsters.some(
+          (monster) => monster.id === monsterId && monster.hp > 0,
+        ),
+      );
+      if (livingGuardians.length > 0) {
+        return {
+          ok: true,
+          kind: "inspection",
+          message: `${area.title}：${area.sealedMessage}`,
+        };
+      }
       this.openedGateIds.add(area.gateId);
+      this.ensureHiddenAreaReward(area);
       this.banner = area.openedMessage;
       this.emit();
       return { ok: true, kind: "secret", message: this.banner };
@@ -1607,7 +1705,7 @@ export class GameSession {
     if (this.mode !== "challenge" || !this.activeGateChallengeId) return false;
     this.mode = "explore";
     this.activeGateChallengeId = null;
-    this.banner = "已断开越级破解终端。机关门仍保持锁定，退出不会损失生命。";
+    this.banner = "已断开 SQL 密文终端。机关门仍保持锁定，退出不会损失生命。";
     this.emit();
     return true;
   }
@@ -1632,7 +1730,7 @@ export class GameSession {
       this.openedGateIds.add(gateId);
       this.activeGateChallengeId = null;
       this.mode = "explore";
-      this.banner = "越级查询通过：机关门已经永久开启。课程掌握、经验与战利品均未改变。";
+      this.banner = "SQL 密文解开：机关门已经永久开启，地图留下新的通路。课程掌握、经验与战利品均未改变。";
       this.emit();
       return {
         accepted: true,
@@ -2052,6 +2150,7 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.regionTransfer = null;
+    this.floorOneLabyrinthEntryConfirmed = false;
     const floorNames: Record<FloorNumber, string> = {
       1: "余烬地窖",
       2: "潮汐群岛",
@@ -2139,6 +2238,7 @@ export class GameSession {
     this.battleSequence = 0;
     this.reviewBattleId = null;
     this.regionTransfer = null;
+    this.floorOneLabyrinthEntryConfirmed = false;
     this.banner = "新迷宫已生成。沿青色箭头触碰 ID #001 开始 SELECT；永久怪物图鉴保持不变。";
     this.revealAt(this.player);
     this.emit();
@@ -2247,8 +2347,11 @@ export class GameSession {
     ) {
       return this.interactionFailure("安全区内不会开始战斗。离开石圈后怪物才会接近。");
     }
+    const encounter = biomeEncounterFor(monster.id);
     const accessMessage = this.roomAccessMessage(room);
-    if (accessMessage) return this.interactionFailure(accessMessage);
+    if (accessMessage && encounter?.role !== "area-boss") {
+      return this.interactionFailure(accessMessage);
+    }
     const lesson = lessonById(room.lessonId);
     const combatKind = monster.encounterType;
     const stages = combatKind === "ambush"
@@ -2273,7 +2376,6 @@ export class GameSession {
     };
     this.selectedMonsterId = monster.id;
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
-    const encounter = biomeEncounterFor(monster.id);
     const roleLabel = encounter?.role === "area-boss"
       ? "区域首领"
       : encounter?.role === "mini-elite" ? "小型精英" : "触碰遭遇";
@@ -2785,6 +2887,7 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.regionTransfer = null;
+    this.floorOneLabyrinthEntryConfirmed = floor !== 1;
     this.revealAt(this.player);
     this.banner = `管理员预览：第 ${floor} 层全图已载入。刷新页面可回到最后一次正式存档。`;
     this.emit();
@@ -2795,8 +2898,8 @@ export class GameSession {
     if (!this.adminMode || this.mode !== "explore") {
       return this.interactionFailure("管理员状态预设当前不可用。");
     }
-    if (this.floorNumber !== 1 && this.floorNumber !== 2) {
-      return this.interactionFailure("状态预设目前只覆盖精修后的第一、二层。");
+    if (!hasFloorExperience(this.floorNumber)) {
+      return this.interactionFailure("当前楼层还没有可用的精修状态预设。");
     }
     const experience = floorExperience(this.floorNumber);
     const preset = experience.adminPresets.find((entry) => entry.id === presetId);
@@ -2846,6 +2949,7 @@ export class GameSession {
       (item) => !progressedRoomIds.has(item.sourceRoomId),
     );
     this.lootBundles = [];
+    this.ensureOpenedHiddenAreaRewards();
 
     const target = {
       x: Math.round(
@@ -3153,7 +3257,7 @@ export class GameSession {
   }
 
   private floorLandmarkPosition(landmarkId: string): Position | null {
-    if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
+    if (!hasFloorExperience(this.floorNumber)) return null;
     const landmark = floorExperience(this.floorNumber).landmarks.find(
       (entry) => entry.id === landmarkId,
     );
@@ -3169,8 +3273,45 @@ export class GameSession {
   }
 
   private floorHiddenAreas() {
-    if (this.floorNumber !== 1 && this.floorNumber !== 2) return [];
+    if (!hasFloorExperience(this.floorNumber)) return [];
     return floorExperience(this.floorNumber).hiddenAreas;
+  }
+
+  private ensureOpenedHiddenAreaRewards(): void {
+    this.floorHiddenAreas()
+      .filter((area) => this.openedGateIds.has(area.gateId))
+      .forEach((area) => this.ensureHiddenAreaReward(area));
+  }
+
+  private ensureHiddenAreaReward(
+    area: ReturnType<GameSession["floorHiddenAreas"]>[number],
+  ): void {
+    const armorId = area.rewardArmorId;
+    if (!armorId || this.acquiredUniqueItemIds.has(armorId)) return;
+    const bundleId = `hidden-reward:${area.id}`;
+    if (this.lootBundles.some((bundle) => bundle.id === bundleId)) return;
+    const armor = ARMORS[armorId];
+    const position = this.mazeFloor.anchors[area.roomNodeId];
+    if (!armor || !position) return;
+    this.lootBundles.push({
+      id: bundleId,
+      sourceMonsterId: null,
+      sourceRoomId: area.roomNodeId,
+      floor: this.floorNumber,
+      ...position,
+      items: [{
+        dropId: `${bundleId}:${armor.id}`,
+        itemId: armor.id,
+        kind: "armor",
+        name: armor.name,
+        description: armor.description,
+        guaranteed: true,
+        probability: 1,
+        protected: false,
+        armor: { ...armor },
+        armorHp: armor.maxArmor,
+      }],
+    });
   }
 
   private nearbyHiddenAreaEntrance(): {
@@ -3187,7 +3328,7 @@ export class GameSession {
   }
 
   private floorNpcPosition(npcId: string): Position | null {
-    if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
+    if (!hasFloorExperience(this.floorNumber)) return null;
     const npc = floorExperience(this.floorNumber).npcPlacements.find(
       (entry) => entry.id === npcId,
     );
@@ -3203,11 +3344,17 @@ export class GameSession {
   }
 
   private nearbyInspectableFloorLandmark(): { id: string; position: Position } | null {
-    if (this.floorNumber !== 1 && this.floorNumber !== 2) return null;
-    const ids = this.floorNumber === 1
-      ? ["f1-water-wheel", "f1-nameless-beds", "f1-sealed-vault"]
-      : ["f2-ranked-beacons", "f2-drowned-village", "f2-root-bridge", "f2-wreck-ledger"];
-    const npcId = this.floorNumber === 1 ? "npc-scribe-f1" : "npc-scribe-f2";
+    if (!hasFloorExperience(this.floorNumber)) return null;
+    const experience = floorExperience(this.floorNumber);
+    const ids = experience.landmarks
+      .filter((landmark) => (
+        landmark.interaction !== null
+        && landmark.kind !== "campfire"
+        && landmark.kind !== "transit"
+        && landmark.kind !== "sql-seal"
+      ))
+      .map((landmark) => landmark.id);
+    const npcId = `npc-scribe-f${this.floorNumber}`;
     return [
       { id: npcId, position: this.floorNpcPosition(npcId) },
       ...ids.map((id) => ({ id, position: this.floorLandmarkPosition(id) })),
@@ -3275,8 +3422,249 @@ export class GameSession {
         : "根桥已经按 monsters.room_id = rooms.id 接通。关系必须说明两端，不能只凭相似名字猜测。";
     } else if (landmarkId === "f2-wreck-ledger") {
       message = "沉船记录舱：七只防水匣来自七个港口，共享同一枚恢复印。构筑宝箱不会替你选出唯一真名；这间舱室只证明来源不能被粗暴去重。";
+    } else if (landmarkId === "npc-scribe-f3") {
+      message = !this.completedLessons.has("f3-inner")
+        ? "抄写员：先走到断裂骨桥。给 monsters 和 rooms 各取一个短别名，再用 ON 明确连接两端。"
+        : !this.completedLessons.has("f3-left")
+          ? "抄写员：匹配成功的记录已经接上。现在保留没有装备记录的怪物，别让缺失的右表吞掉左表。"
+          : !this.completedLessons.has("f3-self")
+            ? "抄写员：同一张 monsters 表里同时有死者和主人。给它两种身份，再沿 master_id 找过去。"
+            : !this.completedLessons.has("f3-chain")
+              ? "抄写员：两端还不够。把怪物、墓室与遗物串成三段证据链。"
+              : !this.completedLessons.has("f3-union")
+                ? "抄写员：两片墓园都留下了证词。用 UNION 保留双方，而不是替它们选一个胜者。"
+                : "抄写员：关系已经完整。去审计死灵王所谓的唯一继承人，然后点燃葬火井。";
+    } else if (landmarkId === "f3-relation-bridge") {
+      message = this.completedLessons.has("f3-inner")
+        ? "骨桥已按 monsters.room_id = rooms.id 接合。桥能成立，是因为关系明确写出了两端。"
+        : "断桥两端分别刻着 monsters.room_id 与 rooms.id。完成 INNER JOIN / ON，桥骨才会找到对应的墓室。";
+    } else if (landmarkId === "f3-master-steles") {
+      message = this.completedLessons.has("f3-self")
+        ? "双名墓碑已分别标为 child 与 master：同一张表可以在一次查询中承担不同身份。"
+        : "两块墓碑来自同一张 monsters 表。若不给它们不同别名，无法分清谁是死者、谁是主人。";
+    } else if (landmarkId === "f3-relic-chain") {
+      message = this.completedLessons.has("f3-chain")
+        ? "三段遗物链已经闭合：怪物记录连到墓室，墓室旁的装备记录再提供遗物力量。"
+        : "断链横跨 monsters、rooms 与 monster_gear。只有三张表都写出别名与连接条件，证据才完整。";
+    } else if (landmarkId === "f3-reliquary") {
+      message = "无主遗物室：current_owner 已确认是 NULL。它没有现在的主人，不代表它从未属于任何人。";
+    } else if (landmarkId === "npc-scribe-f4") {
+      message = !this.completedLessons.has("f4-scalar")
+        ? "抄写员：不要同时追三条管线。先让内层查询返回一个 id，再由外层读取对应记录。"
+        : !this.completedLessons.has("f4-in")
+          ? "抄写员：一个结果已经找到。冰库需要一组房间 id，用 IN 判断怪物是否属于这组结果。"
+          : !this.completedLessons.has("f4-exists")
+            ? "抄写员：雷晶只关心记录是否存在。用 EXISTS，让内层回答有或没有。"
+            : !this.completedLessons.has("f4-correlated")
+              ? "抄写员：下一步让内层查询引用当前外层记录，逐行核对各自的装备力量。"
+              : !this.completedLessons.has("f4-cte")
+                ? "抄写员：依赖链太长了。先用 WITH 给中间结果命名，再从这个结果继续查询。"
+                : "抄写员：最后沿 master_id 递归追到源头。三场事故会回到同一个仍为 OPEN 的命令。";
+    } else if (landmarkId === "f4-source-core") {
+      message = this.completedLessons.has("f4-scalar")
+        ? "命令源炉已经显示内层得到的单一 id；外层只负责读取这个 id 对应的记录。"
+        : "源炉外层没有目标。先在括号内查询一个确定 id，再把它交给外层条件。";
+    } else if (landmarkId === "f4-frost-array") {
+      message = this.completedLessons.has("f4-in")
+        ? "属于第四层 frost 区域的冰槽已被同时选中。IN 接受的是一组结果，不必把每个 id 写死。"
+        : "冻结阵列需要 rooms 表返回一组 id，再由 monsters.room_id 判断成员关系。";
+    } else if (landmarkId === "f4-forge-lord") {
+      const defeated = this.monsters.some((monster) => monster.id === 44 && monster.hp <= 0);
+      message = defeated
+        ? "炉主已经倒下。它身后的回燃门开始显形，保存着第一层登记厅的一段残响。"
+        : "中层首领 ID #044 截断了火炉与雷晶核心之间的依赖链。击败它，才能让回燃门出现。";
+    } else if (landmarkId === "f4-dependency-spine") {
+      message = this.completedLessons.has("f4-recursive")
+        ? "完整递归链已经落在 ROYAL-UPDATE-01；事务状态是 OPEN，而不是失败或已撤销。"
+        : this.completedLessons.has("f4-cte")
+          ? "公共表表达式已有名字。继续用递归项沿 master_id 逐层追溯，直到没有上级记录。"
+          : "三种元素管线都连到同一根脊柱。用 WITH 命名中间结果，避免反复重写同一段子查询。";
+    } else if (landmarkId === "f4-echo-gate") {
+      message = this.openedGateIds.has("gate:floor-4-treasure")
+        ? "回燃残响：这里复制了第一层的墙与火，却没有复制当时的你。房间深处留着一件可换装的回燃衣。"
+        : "回燃门仍封闭。完成前三种子查询并击败中层首领 ID #044，余烬轮廓才会成为入口。";
+    } else if (landmarkId === "f4-echo-registry") {
+      message = "残响登记台：水轮只是一次保存下来的调用轮廓。旧页上的姓名仍被裁去，只有“恢复许可有效”这一枚印记在四层之后继续返回真值。";
+    } else if (landmarkId === "f4-echo-ember") {
+      message = "无温余烬：它记得你曾被火送回，却不提供新的休息与复活点。当前复活点仍由第四层真正点燃的篝火决定。";
+    } else if (landmarkId === "f4-echo-null-bed") {
+      message = "NULL 床位残影：床位记录仍在，只是姓名关联缺失。四层过去，这条区别依然成立——NULL 不是空字符串，也不是整行不存在。";
+    } else if (landmarkId === "f4-echo-return") {
+      message = "依赖返回门：沿原路离开即可回到三相升炉。残响不会重置第四层怪物、篝火、迷雾，也不会改写第一层的真实进度。";
+    } else if (landmarkId === "npc-scribe-f5") {
+      message = !this.completedLessons.has("f5-over")
+        ? "抄写员：先别急着排名。用 OVER 指定窗口，让每一名守卫仍保留自己的明细。"
+        : !this.completedLessons.has("f5-row-number")
+          ? "抄写员：分区已经可见。现在用 ROW_NUMBER 给同一分区建立稳定岗次。"
+          : !this.completedLessons.has("f5-rank")
+            ? "抄写员：相同分数不该被假装成不同。比较 RANK 与 DENSE_RANK，看看空档落在哪里。"
+            : !this.completedLessons.has("f5-lag-lead")
+              ? "抄写员：排名只能告诉你位置。用 LAG 与 LEAD 读取前后岗，找出巡逻断点。"
+              : !this.completedLessons.has("f5-frame")
+                ? "抄写员：警戒值正在逐行累积。把窗口范围写清楚，不要让未来行泄露进当前判断。"
+                : "抄写员：最后只保留每个分区的前几名。可我开始怀疑，决定公开顺序的人才是这座城真正的主人。";
+    } else if (landmarkId === "f5-muster-board") {
+      message = this.completedLessons.has("f5-row-number")
+        ? "轮值表已按 sector 分区，并为每名守卫保留稳定 row_number。没有一行因为聚合而消失。"
+        : this.completedLessons.has("f5-over")
+          ? "轮值表已经按分区展开，但同分守卫的先后仍不稳定。下一步补上确定排序。"
+          : "整座外城只显示一条总计。用 OVER (PARTITION BY ...) 保留明细，再观察每个分区内部的结果。";
+    } else if (landmarkId === "f5-rank-standards") {
+      message = this.completedLessons.has("f5-rank")
+        ? "两面旗已经同时升起：RANK 为并列名次留下空档，DENSE_RANK 则紧密衔接。"
+        : "两面标准旗把同分守卫强行排成不同名次。完成排名题，让并列关系真正显形。";
+    } else if (landmarkId === "f5-patrol-chain") {
+      message = this.completedLessons.has("f5-lag-lead")
+        ? "岗灯已连接前后记录；链条断开的地方就是巡逻空档。"
+        : "每盏岗灯只知道自己。用 LAG / LEAD 让当前行看到同一分区中的前一岗与后一岗。";
+    } else if (landmarkId === "f5-alert-wall") {
+      message = this.completedLessons.has("f5-frame")
+        ? "警戒墙只累计到当前岗，未来记录不再提前污染判断。"
+        : "警戒墙把整个分区一次性照亮。为窗口指定从首行到当前行的范围，恢复真实累计过程。";
+    } else if (landmarkId === "f5-silent-roster") {
+      message = this.openedGateIds.has("gate:floor-5-treasure")
+        ? "静默名册室保存着从未公开的居民顺序。黑铁甲放在中央，穿上后角色会换成重甲轮廓。"
+        : "无编号铁门只接受完整窗口推理：OVER、ROW_NUMBER 与 RANK 都成立后，名册才会开口。";
+    } else if (landmarkId === "npc-scribe-f6") {
+      message = !this.completedLessons.has("f6-insert")
+        ? "抄写员：所有写操作都只发生在一次性副本。先明确列名和值，再插入一条修复记录。"
+        : !this.completedLessons.has("f6-update")
+          ? "抄写员：新记录已经存在。用 WHERE 只更新目标鳞片，别让整张表一起改变。"
+          : !this.completedLessons.has("f6-delete")
+            ? "抄写员：重复记录可以删除，但必须先用条件证明你锁定的是哪一行。"
+            : !this.completedLessons.has("f6-constraint")
+              ? "抄写员：让约束替我们拒绝不可能的候选状态。失败也应当留下可读原因。"
+              : !this.completedLessons.has("f6-transaction")
+                ? "抄写员：现在同时看原始状态和候选状态。BEGIN 后修改，再用 ROLLBACK 安全返回。"
+                : "抄写员：最后用 SAVEPOINT 只撤销错误的一段。安全不是永远不改，而是让每次改变都能被验证。";
+    } else if (landmarkId === "f6-sandbox-incubator") {
+      message = this.completedLessons.has("f6-update")
+        ? "孵化副本显示原始与候选两列；只有被 WHERE 锁定的记录发生了改变。"
+        : this.completedLessons.has("f6-insert")
+          ? "新鳞片已经写入隔离副本。下一步只更新指定 id，不要省略 WHERE。"
+          : "孵化台每次都会重置。写出明确列名的 INSERT，观察新记录怎样进入候选状态。";
+    } else if (landmarkId === "f6-cleanup-sluice") {
+      message = this.completedLessons.has("f6-delete")
+        ? "清理槽只吞下了被 id 与状态共同锁定的重复鳞片，其余记录仍在。"
+        : "槽内混有真鳞与重复鳞片。DELETE 前先写 WHERE；没有边界的删除不会被工坊接受。";
+    } else if (landmarkId === "f6-constraint-door") {
+      message = this.completedLessons.has("f6-constraint")
+        ? "无效候选被 CHECK 约束挡在门外；原始数据没有受到污染。"
+        : "龙晶门正在测试一条违反约束的候选记录。读懂失败原因，再处理合法值。";
+    } else if (landmarkId === "f6-state-bridge") {
+      message = this.completedLessons.has("f6-transaction")
+        ? "双轨桥重新重合：候选修改已经回滚，原始状态保持完整。"
+        : "左轨是事务开始前，右轨是修改后。完成 BEGIN / ROLLBACK，让损坏的候选回到原点。";
+    } else if (landmarkId === "f6-savepoint-altar") {
+      message = this.completedLessons.has("f6-savepoint")
+        ? "祭台保留了已验证步骤，只撤销保存点之后的错误操作。"
+        : "整次回滚会丢掉已经正确的修改。设置 SAVEPOINT，再局部退回。";
+    } else if (landmarkId === "f6-uncommitted-rookery") {
+      message = this.openedGateIds.has("gate:floor-6-treasure")
+        ? "未提交育龙室保存着候选生命的审计痕迹。龙鳞甲已可领取并换装。"
+        : "育龙室要求你先证明三件事：能明确写入、能定向更新、也能精确删除。";
+    } else if (landmarkId === "npc-scribe-f7") {
+      message = !this.completedLessons.has("f7-btree")
+        ? "抄写员：先沿 B-Tree 找到单点路径。索引不是答案，只是缩短抵达答案的路。"
+        : !this.completedLessons.has("f7-composite")
+          ? "抄写员：复合索引有顺序。先使用最左列，再观察后续列是否还能收窄范围。"
+          : !this.completedLessons.has("f7-covering")
+            ? "抄写员：若索引已经包含所需字段，就不必每次回到主表湖底。"
+            : !this.completedLessons.has("f7-invalid")
+              ? "抄写员：函数、隐式转换和范围条件可能让好索引失效。先解释为什么，再修查询。"
+              : !this.completedLessons.has("f7-plan")
+                ? "抄写员：读取执行计划，不要只凭查询看起来短就宣布它更快。"
+                : "抄写员：最后比较候选路径的代价。最快的路不是唯一的路，也不一定是永远正确的路。";
+    } else if (landmarkId === "f7-scan-road" || landmarkId === "f7-index-road") {
+      message = this.completedLessons.has("f7-composite")
+        ? "索引石径已形成复合路径：最左前缀先定位，再由后续列继续缩小候选范围。"
+        : this.completedLessons.has("f7-btree")
+          ? "第一段 B-Tree 石径已经点亮。继续检查复合索引的列顺序。"
+          : "石径仍暗。先让等值条件沿 B-Tree 从根节点走到目标叶节点。";
+    } else if (landmarkId === "f7-covering-lake") {
+      message = this.completedLessons.has("f7-covering")
+        ? "索引已经覆盖本次读取字段，湖面直接映出结果，不再潜回主表。"
+        : "每次查询都从索引岸边潜回主表湖底。尝试让索引包含本次真正需要的字段。";
+    } else if (landmarkId === "f7-broken-root") {
+      message = this.completedLessons.has("f7-invalid")
+        ? "缠根条件已经改写，范围门重新使用可索引列打开。"
+        : "函数包裹和隐式转换缠住了索引根。找出失效原因，再恢复可搜索条件。";
+    } else if (landmarkId === "f7-plan-tree") {
+      message = this.completedLessons.has("f7-plan")
+        ? "执行计划树已展开：访问方式、估算行数与额外排序都可逐节点读取。"
+        : "计划树只显示一个黑箱。使用 EXPLAIN，比较实际访问路径而不是猜测。";
+    } else if (landmarkId === "f7-blind-garden") {
+      message = this.openedGateIds.has("gate:floor-7-treasure")
+        ? "盲索引花园没有路标，却保留所有候选路径。晶甲会让角色换成折光轮廓。"
+        : "花园拒绝只背结论的人。完成 B-Tree、复合索引和覆盖索引，暗门才会显形。";
+    } else if (landmarkId === "npc-scribe-f8") {
+      message = !this.completedLessons.has("f8-mvcc")
+        ? "抄写员：先看两个事务如何读取同一份历史。MVCC 让读者看到一致快照。"
+        : !this.completedLessons.has("f8-lock")
+          ? "抄写员：快照保护了读，却没有消除写冲突。把等待关系画成环，找出死锁。"
+          : !this.completedLessons.has("f8-isolation")
+            ? "抄写员：选择隔离级别，就是选择哪些并发现象可以被接受。"
+            : !this.completedLessons.has("f8-modeling")
+              ? "抄写员：高堂要求重新划分实体、关系与约束。模型决定未来查询能否被清楚表达。"
+              : !this.completedLessons.has("f8-replication")
+                ? "抄写员：复制带来可用性，也带来延迟。先声明读到旧数据时系统如何回应。"
+                : !this.completedLessons.has("f8-sharding")
+                  ? "抄写员：分片键会决定数据聚在一起还是永远跨区奔波。"
+                  : "抄写员：最后审计最小权限与迁移顺序。我们不是来覆盖旧库，而是让它第一次承认自己改过什么。";
+    } else if (landmarkId === "f8-version-gallery") {
+      message = this.completedLessons.has("f8-mvcc")
+        ? "版本长廊已经冻结为一致快照；较新的版本仍存在，只是不属于当前读视图。"
+        : "多条版本在长廊中互相覆盖。先确定 MVCC 快照边界，让当前事务只读取应当可见的版本。";
+    } else if (landmarkId === "f8-deadlock-gate") {
+      message = this.completedLessons.has("f8-lock")
+        ? "等待图中的环已经暴露，牺牲者被明确选择，门锁随之解除。"
+        : "两扇黑金门互相等待。读取锁持有者与等待者，找出闭合环。";
+    } else if (landmarkId === "f8-incident-wings") {
+      const completed = ["f8-isolation", "f8-modeling", "f8-replication", "f8-sharding"]
+        .filter((lessonId) => this.completedLessons.has(lessonId as LessonId)).length;
+      message = `四座事故侧翼已修复 ${completed}/4：隔离、建模、复制、分片。每修复一翼，中央迁移台就多获得一份可验证输入。`;
+    } else if (landmarkId === "f8-migration-dais") {
+      message = this.completedLessons.has("f8-sharding")
+        ? "迁移台已收齐四份事故修复记录。最终步骤必须包含校验、最小权限与可回滚边界。"
+        : "迁移台仍在等待四座事故侧翼。先完成隔离、建模、复制与分片，再提交最后方案。";
+    } else if (landmarkId === "f8-zero-row-chapel") {
+      message = this.openedGateIds.has("gate:floor-8-treasure")
+        ? "零行礼拜堂证明：结果为空不等于查询失败。王室甲已经从旧展示柜移交给你。"
+        : "礼拜堂只为能区分空结果、错误结果与权限拒绝的人开启。先完成前四座事故侧翼。";
+    } else if (landmarkId === "f8-sunset-vista") {
+      const finished = this.monsters.some((monster) => monster.id === 84 && monster.hp <= 0)
+        || this.completedLessons.has("f8-security");
+      message = finished
+        ? "落日之后出现了新的晨线。旧库没有被删除；它带着迁移记录成为可被追溯的历史。"
+        : "高堂尽头仍只有正在褪色的落日。完成最终审计后，这里才会显示新的天光。";
     } else {
-      return this.interactionFailure("这处地标没有可读取的记录。");
+      const landmark = hasFloorExperience(this.floorNumber)
+        ? floorExperience(this.floorNumber).landmarks.find(
+            (entry) => entry.id === landmarkId,
+          )
+        : null;
+      if (!landmark?.interaction) {
+        return this.interactionFailure("这处地标没有可读取的记录。");
+      }
+      message = `${landmark.name}：${landmark.interaction}。`;
+    }
+    const evidence = floorStoryEvidenceQueryForLandmark(
+      landmarkId,
+      this.completedLessons,
+      this.openedGateIds,
+    );
+    if (evidence) {
+      const fields = evidence.expectedColumns.length > 0
+        ? evidence.expectedColumns.join(" · ")
+        : "无返回字段";
+      message = [
+        message,
+        "",
+        `已解密 SQL · ${evidence.title}`,
+        evidence.sql,
+        `真实结果：${evidence.expectedRowCount} 行 · ${fields}`,
+        evidence.purpose,
+      ].join("\n");
     }
     return { ok: true, kind: "inspection", message };
   }
@@ -3334,6 +3722,36 @@ export class GameSession {
     return { ok: true, kind: "region-portal", message: this.banner };
   }
 
+  private regionGuardianAccessMessage(
+    from: Position,
+    to: Position,
+  ): string | null {
+    if (!regionPortalsEnabledForFloor(this.floorNumber)) return null;
+    const rearPortal = this.biomePlan.portals.find(
+      (portal) => portal.id === `biome-portal:${this.floorNumber}:middle-rear`,
+    );
+    if (rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined) {
+      return null;
+    }
+    const fromRegion = biomeRegionAt(this.biomePlan, from);
+    const toRegion = biomeRegionAt(this.biomePlan, to);
+    if (
+      fromRegion.id === toRegion.id ||
+      toRegion.id !== rearPortal.toRegionId ||
+      fromRegion.id === rearPortal.toRegionId
+    ) {
+      return null;
+    }
+    const guardian = this.monsters.find(
+      (monster) => monster.id === rearPortal.requiredBossId && monster.hp > 0,
+    );
+    if (!guardian) return null;
+    const transit = floorTransitPresentation(
+      floorMapBlueprint(this.floorNumber).routeTransit,
+    );
+    return `${transit.label}前的主线被区域首领 ${monsterIdLabel(guardian.id)} 截断。回到中段击败它；胜利后会自动送入后段区域。`;
+  }
+
   private safeRegionPortalDestination(
     origin: Position,
     targetRegionId: string,
@@ -3377,7 +3795,25 @@ export class GameSession {
   }
 
   private revealAt(position: Position): void {
-    revealAround(this.mazeFloor, position, 5).forEach((cell) => this.discoveredCells.add(cell));
+    const floorOneArea = this.floorNumber === 1
+      ? floorOneAreaAt(this.mazeFloor, position)
+      : "labyrinth";
+    if (floorOneArea !== "labyrinth") {
+      floorOneSafeAreaCellKeys(this.mazeFloor, floorOneArea).forEach(
+        (cell) => this.discoveredCells.add(cell),
+      );
+      return;
+    }
+    const radius = this.floorNumber === 1 ? 4 : 5;
+    revealAround(this.mazeFloor, position, radius).forEach(
+      (cell) => this.discoveredCells.add(cell),
+    );
+  }
+
+  private floorHazards(): FloorHazard[] {
+    return this.floorNumber === 1
+      ? generateFloorOneHazards(this.mazeFloor, this.campfires, this.guidedMap)
+      : [];
   }
 
   private campfirePhaseName(campfire: Campfire): string {
@@ -3393,7 +3829,7 @@ export class GameSession {
     if (this.mode === "inventory") return "背包管理中 · 换装、使用或丢弃 · ESC 关闭";
     if (this.mode === "loot") return "战利品选择中 · 拾取、装备或保留 · ESC 关闭";
     if (this.mode === "death-review") return "完成本场复盘后重新出发";
-    if (this.mode === "challenge") return "机关破解中 · Ctrl + Enter 提交 · ESC 安全退出";
+    if (this.mode === "challenge") return "SQL 密文解读中 · Ctrl + Enter 提交 · ESC 安全退出";
     if (this.mode === "combat") return "Q + S  打开 SQL 战斗终端";
     if (this.mode === "transition") return `传送门启动 · 自动进入第 ${this.floorNumber + 1} 层`;
     if (this.mode === "victory") return "八层已贯通 · 可开始新 Run";
@@ -3437,10 +3873,15 @@ export class GameSession {
     }
     const hiddenAreaEntrance = this.nearbyHiddenAreaEntrance();
     if (hiddenAreaEntrance) {
-      const ready = hiddenAreaEntrance.area.requiredLessonIds.every(
+      const lessonsReady = hiddenAreaEntrance.area.requiredLessonIds.every(
         (lessonId) => this.completedLessons.has(lessonId),
       );
-      return ready
+      const guardiansReady = (hiddenAreaEntrance.area.requiredMonsterIds ?? []).every(
+        (monsterId) => this.monsters.some(
+          (monster) => monster.id === monsterId && monster.hp <= 0,
+        ),
+      );
+      return lessonsReady && guardiansReady
         ? hiddenAreaEntrance.area.openPrompt
         : hiddenAreaEntrance.area.sealedPrompt;
     }
@@ -3473,7 +3914,18 @@ export class GameSession {
         : `E  调查 ${interactItem.name}`;
     }
     const challengeGate = this.nearbyLockedChallengeGate();
-    if (challengeGate) return "E  接入高难 SQL 机关 · 错误造成 1 点伤害";
+    if (challengeGate) return "E  解读高难 SQL 密文 · 成功永久开路，错误反噬 1 点";
+    const floorLandmark = this.nearbyInspectableFloorLandmark();
+    if (floorLandmark) {
+      const experience = floorExperience(this.floorNumber);
+      const landmark = experience.landmarks.find(
+        (entry) => entry.id === floorLandmark.id,
+      );
+      const label = floorLandmark.id.startsWith("npc-scribe-")
+        ? "抄写员"
+        : landmark?.name ?? "现场记录";
+      return `E  调查 ${label}`;
+    }
     const touchItem = this.groundItems.find((item) => distance(item, this.player) <= 2);
     if (touchItem) return `走到 ${touchItem.name} 上自动拾取`;
     const actor = this.actorForRoom(this.currentRoomId);
@@ -3524,14 +3976,14 @@ export class GameSession {
     };
   }
 
-  private enterDefeat(source: "combat" | "gate"): void {
+  private enterDefeat(source: "combat" | "gate" | "hazard"): void {
     this.mode = "defeat";
     this.combat = null;
     this.selectedMonsterId = null;
     this.activeGateChallengeId = null;
     this.activeCampfireId = null;
     this.activeLootBundleId = null;
-    if (source === "gate") {
+    if (source !== "combat") {
       // Gate challenges do not create battle answer records. Clearing this
       // prevents an unrelated previous battle from appearing after respawn.
       this.reviewBattleId = null;
@@ -3553,6 +4005,7 @@ export class GameSession {
       encounterId: null,
       pickedItemIds: [],
       blockedBy,
+      hazard: null,
       message,
     };
   }

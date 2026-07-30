@@ -75,7 +75,7 @@ describe("high-difficulty gate challenges", () => {
   it("第三层要求三表连接，第四层要求 CTE 聚合", async () => {
     const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
     const grave = engine.executeSelect(`
-      SELECT m.id, m.name, r.name AS room_name, g.power
+      SELECT m.id, r.name AS room_name, g.power
       FROM monsters m
       INNER JOIN rooms r ON m.room_id = r.id
       INNER JOIN monster_gear g ON m.id = g.monster_id
@@ -92,7 +92,7 @@ describe("high-difficulty gate challenges", () => {
         GROUP BY monster_id
         HAVING MAX(power) >= 20
       )
-      SELECT m.id, m.name, s.max_power
+      SELECT m.id, s.max_power
       FROM monsters m
       INNER JOIN strong s ON m.id = s.monster_id
       WHERE m.room_id BETWEEN 51 AND 60
@@ -115,7 +115,7 @@ describe("high-difficulty gate challenges", () => {
       WITH ranked AS (
         SELECT
           r.sector,
-          m.name,
+          m.id,
           g.power,
           ROW_NUMBER() OVER (
             PARTITION BY r.sector
@@ -126,7 +126,7 @@ describe("high-difficulty gate challenges", () => {
         INNER JOIN monster_gear g ON g.monster_id = m.id
         WHERE r.floor = 5
       )
-      SELECT sector, name, power, rn
+      SELECT sector, id, power, rn
       FROM ranked
       WHERE rn = 1
       ORDER BY power DESC, sector ASC
@@ -138,7 +138,6 @@ describe("high-difficulty gate challenges", () => {
       WITH ranked AS (
         SELECT
           m.id,
-          m.name,
           g.power,
           ROW_NUMBER() OVER (
             PARTITION BY r.sector
@@ -149,12 +148,87 @@ describe("high-difficulty gate challenges", () => {
         INNER JOIN monster_gear g ON g.monster_id = m.id
         WHERE r.floor = 6
       )
-      SELECT id, name, power
+      SELECT id, power
       FROM ranked
       WHERE rn = 1
       ORDER BY power DESC, id ASC
       LIMIT 3
     `);
     expect(evaluateGateChallenge(6, dragon)).toMatchObject({ accepted: true });
+  });
+
+  it("第七、八层密文使用真实 SQLite 教学表，并拒绝省略窗口结构", async () => {
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    const indexResult = engine.executeSelect(`
+      WITH ranked AS (
+        SELECT
+          realm,
+          code,
+          score,
+          ROW_NUMBER() OVER (
+            PARTITION BY realm
+            ORDER BY score DESC, id ASC
+          ) AS rn
+        FROM index_records
+      )
+      SELECT realm, code, score
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY score DESC
+      LIMIT 3
+    `);
+    expect(indexResult.rows).toEqual([
+      { realm: "crystal", code: "CRY-106", score: 95 },
+      { realm: "ember", code: "EMB-203", score: 92 },
+      { realm: "void", code: "VOI-302", score: 86 },
+    ]);
+    expect(evaluateGateChallenge(7, indexResult)).toMatchObject({ accepted: true });
+
+    const indexShortcut = engine.executeSelect(`
+      SELECT realm, code, score
+      FROM index_records
+      WHERE id IN (6, 10, 12)
+      ORDER BY score DESC
+      LIMIT 3
+    `);
+    expect(evaluateGateChallenge(7, indexShortcut)).toMatchObject({
+      accepted: false,
+      missingFeatures: expect.arrayContaining(["cte", "row-number", "partition-by"]),
+    });
+
+    const replicaResult = engine.executeSelect(`
+      WITH ranked AS (
+        SELECT
+          region,
+          node,
+          lag_ms,
+          ROW_NUMBER() OVER (
+            PARTITION BY region
+            ORDER BY lag_ms ASC, node ASC
+          ) AS rn
+        FROM replica_status
+        WHERE role = 'replica' AND healthy = 1
+      )
+      SELECT region, node, lag_ms
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY lag_ms ASC
+    `);
+    expect(replicaResult.rows).toEqual([
+      { region: "west", node: "replica-b", lag_ms: 18 },
+      { region: "north", node: "replica-c", lag_ms: 42 },
+    ]);
+    expect(evaluateGateChallenge(8, replicaResult)).toMatchObject({ accepted: true });
+
+    const replicaShortcut = engine.executeSelect(`
+      SELECT region, node, lag_ms
+      FROM replica_status
+      WHERE node IN ('replica-b', 'replica-c') AND healthy = 1
+      ORDER BY lag_ms ASC
+    `);
+    expect(evaluateGateChallenge(8, replicaShortcut)).toMatchObject({
+      accepted: false,
+      missingFeatures: expect.arrayContaining(["cte", "row-number", "partition-by"]),
+    });
   });
 });

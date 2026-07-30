@@ -1,12 +1,12 @@
 # 《SELECT FROM 地牢》产品文档总索引
 
-> 文档集版本：`2.1-rc`
+> 文档集版本：`2.2-dev`
 >
-> 最后更新：`2026-07-26`
+> 最后更新：`2026-07-29`
 >
-> 当前制作范围：第一层“地下余烬档案”与第二层“潮汐群岛”垂直切片
+> 当前制作范围：第一至第八层运行时叙事、地标状态、隐藏区与 SQL 地图密文 V1
 >
-> 文档状态：`IMPLEMENTED RC / PR 归档与主观音频 QA 待完成`
+> 文档状态：`F1–F8 IMPLEMENTED DEV / BROWSER VISUAL QA 进行中`
 
 ## 1. 文档集目标
 
@@ -32,7 +32,8 @@
 发生冲突时按以下顺序处理：
 
 1. `AGENTS.md`、当前代码、自动化测试与发布检查表记录的运行事实；
-2. 本目录中状态为 `IMPLEMENTED_F1_F2` 或 `CONTENT_LOCKED` 的文档；
+2. 本目录中状态为 `IMPLEMENTED_F1_F2`、`IMPLEMENTED_F3_F4`、`IMPLEMENTED_F5_F8`
+   或 `CONTENT_LOCKED` 的文档；
 3. 第一、二层关卡圣经和系统专项规格；
 4. `docs/design/` 中标记为保留依据的历史设计；
 5. 更早的课程、主题和路线图。
@@ -43,6 +44,10 @@
 |---|---|
 | `CURRENT` | 当前运行时代码已存在且有验证证据 |
 | `IMPLEMENTED_F1_F2` | 第一、二层垂直切片已进入运行时并通过自动化与浏览器 RC 门；人工边界另列 |
+| `IMPLEMENTED_F3_F4` | 第三、四层叙事、地标、世界状态和第四层回燃支线已进入运行时；浏览器主观 QA 另列 |
+| `IMPLEMENTED_F5_F8` | 第五至八层叙事、地标状态、隐藏换装、SQL 密文门和管理员预设已进入运行时；视觉精修另列 |
+| `NEXT_V1_1_DESIGN_LOCKED` | 第一层下一迭代规则已确认，但宝箱、传送与视野改动尚未进入运行时 |
+| `NEXT_BALANCE_LOCKED` | 八层经验、生命与攻击目标已完成数值设计，尚未替换当前运行时基线 |
 | `TARGET_F1_F2` | 历史实施目标；当前文档集不应再以此声称 F1/F2 尚未落地 |
 | `CONTENT_LOCKED` | 事实和系统含义冻结，只允许文字润色 |
 | `DEFERRED` | 明确后置，不阻塞第一、二层 |
@@ -61,7 +66,12 @@
 ### 3.2 关卡
 
 - [第一层：地下余烬档案](./floors/FLOOR_01_EMBER_ARCHIVE.md)
+- [第一层三区灰盒：双岸与失名迷宫](./floors/FLOOR_01_THREE_ZONE_GRAYBOX.md)：左、右安全区、
+  中央 Seed 迷宫、进入确认、有限视野与直接伤害陷阱的实施契约，以及 V1.1 宝箱怪、稳定传送、
+  3 格视野和陷阱信息收束方案。
 - [第二层：潮汐群岛](./floors/FLOOR_02_TIDAL_ARCHIPELAGO.md)
+- 第三层“白霜墓原”至第八层“黑金迁移高堂”当前由逐事件脚本、八层总精排和运行时体验定义
+  共同拥有；完整关卡圣经将在视觉 QA 后按层补齐。
 
 关卡圣经负责“玩家在什么时候、什么地点、做什么、世界如何改变”。逐字对白与镜头细节放入
 叙事脚本，避免同一事实在三处互相漂移。
@@ -71,6 +81,13 @@
 - [叙事圣经](./narrative/NARRATIVE_BIBLE.md)：世界规则、主题、角色弧与八层宏观真相。
 - [第一层逐事件演出脚本](./narrative/FLOOR_01_SCRIPT.md)
 - [第二层逐事件演出脚本](./narrative/FLOOR_02_SCRIPT.md)
+- [第三层逐事件演出脚本](./narrative/FLOOR_03_SCRIPT.md)
+- [第四层逐事件演出脚本](./narrative/FLOOR_04_SCRIPT.md)
+- [第五层逐事件演出脚本](./narrative/FLOOR_05_SCRIPT.md)
+- [第六层逐事件演出脚本](./narrative/FLOOR_06_SCRIPT.md)
+- [第七层逐事件演出脚本](./narrative/FLOOR_07_SCRIPT.md)
+- [第八层逐事件演出脚本](./narrative/FLOOR_08_SCRIPT.md)
+- [八层主线精排与 SQL 地图解密](./narrative/EIGHT_FLOOR_STORY_ORDER.md)
 
 ### 3.4 系统
 
@@ -79,7 +96,8 @@
 - [怪物、Boss 与图鉴规格](./systems/MONSTER_BOSS_AND_CODEX_SPEC.md)：怪物分类、Boss 机制、
   身份揭示和图鉴。
 - [成长、经济、篝火与探索系统](./systems/PROGRESSION_ECONOMY_AND_EXPLORATION_SPEC.md)：经验、装备、
-  掉落、复活、捷径、Seed 与疲劳预算。
+  掉落、复活、捷径、Seed 与疲劳预算；同时记录当前运行时基线和待实现的八层经验、生命、攻击
+  重平衡表。
 - [UI、UX 与可访问性规格](./systems/UX_UI_AND_ACCESSIBILITY_SPEC.md)：完整界面状态、输入、反馈与
   响应式边界。
 
@@ -104,10 +122,10 @@
 1. 有目标体验和反目标；
 2. 有玩家输入、触发条件、状态、输出和失败兜底；
 3. 有数据所有者和代码落点；
-4. 有第一、二层的实际内容，不只写抽象原则；
+4. 有第一至第八层的实际内容，不只写抽象原则；
 5. 有可自动或人工执行的验收；
 6. 有性能、可访问性、版权和旧存档风险；
-7. 明确第三至八层只是宏观占位，不伪装成本轮完成。
+7. 明确区分运行时 V1、文字精修、正式美术与最终音频，不把 V1 线框机关宣称成最终资产。
 
 ## 5. 变更控制
 

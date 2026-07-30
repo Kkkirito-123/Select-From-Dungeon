@@ -277,7 +277,7 @@ describe("buildNarrativeCodexModel", () => {
       ],
     });
 
-    expect(model.moments).toHaveLength(9);
+    expect(model.moments).toHaveLength(10);
     expect(model.moments[0]).toMatchObject({
       complete: true,
       query: {

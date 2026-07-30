@@ -70,11 +70,11 @@
 
 ## 4. 验证门
 
-- [x] `pnpm test` 全部通过：49 个测试文件、330 项测试。
+- [x] `pnpm test` 全部通过：51 个测试文件、362 项测试。
 - [x] `pnpm build` 类型检查与生产构建通过；入口
-  `602.66 kB / gzip 177.47 kB`，游戏逻辑分块 `85.86 kB / gzip 27.36 kB`，Phaser 独立缓存块
-  `1,375.72 kB / gzip 357.84 kB`，SQLite WASM
-  `659.73 kB / gzip 326.10 kB`。
+  `22.46 kB / gzip 7.89 kB`、界面 `199.56 kB / gzip 56.05 kB`、世界规则
+  `463.75 kB / gzip 136.49 kB`、游戏逻辑 `111.73 kB / gzip 35.02 kB`、Phaser 独立缓存块
+  `1,375.72 kB / gzip 357.84 kB`、SQLite WASM `659.73 kB / gzip 326.10 kB`。
 - [x] `python3 scripts/test_validate_rules.py` 通过：8 项校验器回归。
 - [x] `python3 scripts/validate-rules.py` 通过：12 项规则检查，包含本地 Markdown 链接与空白。
 - [x] CC0 来源校验通过：3 个来源、26 个记录文件；运行时校验通过：8 张图片、120,525 B。

@@ -452,11 +452,13 @@ consumedStoryEventIds: string[];
 | SQLite 查询 | 普通题 <50 ms | 限制数据量和结果行数 |
 | 存档写入 | <100 ms 目标 | 批量结算后写，不每步写 |
 
-当前生产构建为：入口 JS `602.66 kB / gzip 177.47 kB`、游戏逻辑分块
-`85.86 kB / gzip 27.36 kB`、可缓存 Phaser 分块 `1,375.72 kB / gzip 357.84 kB`，以及独立
-SQLite WASM 资产 `659.73 kB / gzip 326.10 kB`。Vite 的大块提醒只针对 JS chunk，不能把 WASM
-误称为“主包警告”；它属于后续拆包 / 加载优化，不是当前功能错误。本轮先保证新图片和音频按楼层
-独立资源，不继续扩大启动入口。最终性能阶段再评估动态 import、vendor chunk 与按层预加载。
+当前生产构建为：入口 `22.46 kB / gzip 7.89 kB`、界面
+`199.56 kB / gzip 56.05 kB`、世界规则 `463.75 kB / gzip 136.49 kB`、游戏逻辑
+`111.73 kB / gzip 35.02 kB`、SQLite JS 运行时 `39.69 kB / gzip 14.09 kB`、可缓存 Phaser
+分块 `1,375.72 kB / gzip 357.84 kB`，以及独立 SQLite WASM
+`659.73 kB / gzip 326.10 kB`。首方 JS 已全部低于 500 kB；Phaser 与 WASM 是单独缓存的上游
+运行时，并未重复进入业务分块。后续优化应以真实首屏时序、解码内存和低端设备帧时间为证据，
+不再通过单纯提高告警阈值冒充性能改善。
 
 ## 15. 实施 Checkpoint 记录
 

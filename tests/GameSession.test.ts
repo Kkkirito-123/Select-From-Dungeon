@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/floorExperience";
+import { biomeRegionAt } from "../src/domain/biome";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { safeZoneCellKeys } from "../src/domain/campfire";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
+import { isMazeWalkable } from "../src/domain/mazeGenerator";
 import { isSavedRun } from "../src/storage/localProgress";
 import type {
   GroundItem,
@@ -30,9 +32,10 @@ function result(
 }
 
 const SELECT_NAME = result(
-  "SELECT name FROM monsters WHERE id = 1",
-  ["name"],
-  [{ name: "史莱姆" }],
+  "SELECT id, status FROM monsters WHERE id = 1",
+  ["id", "status"],
+  [{ id: 1, status: "idle" }],
+  [1],
 );
 const SELECT_WEAKNESS = result(
   "SELECT weakness FROM monsters WHERE id = 1",
@@ -57,9 +60,10 @@ const NULL_TARGET = result(
   [3],
 );
 const NULL_NAME = result(
-  "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
-  ["name"],
-  [{ name: "毒史莱姆" }],
+  "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
+  ["id"],
+  [{ id: 3 }],
+  [3],
 );
 const GROUP_RESULT = result(
   "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 4 GROUP BY channel",
@@ -144,9 +148,6 @@ function collectLessonChest(
 
 function placeNearFloorLandmark(session: GameSession, landmarkId: string): void {
   const snapshot = session.snapshot();
-  if (snapshot.floor !== 1 && snapshot.floor !== 2) {
-    throw new Error("只有前两层拥有正式地标定义");
-  }
   const landmark = floorExperience(snapshot.floor).landmarks.find(
     (entry) => entry.id === landmarkId,
   );
@@ -172,9 +173,6 @@ function placeNearFloorLandmark(session: GameSession, landmarkId: string): void 
 
 function placeNearFloorNpc(session: GameSession, npcId: string): void {
   const snapshot = session.snapshot();
-  if (snapshot.floor !== 1 && snapshot.floor !== 2) {
-    throw new Error("只有前两层拥有正式 NPC 定义");
-  }
   const npc = floorExperience(snapshot.floor).npcPlacements.find(
     (entry) => entry.id === npcId,
   );
@@ -881,6 +879,19 @@ describe("GameSession SQL 魔王城 Run", () => {
       player: { hp: 2, maxHp: 2 },
     });
 
+    clearBranch(session, "where");
+    returnToHub(session);
+    clearBranch(session, "is-null");
+    returnToHub(session);
+    const hammerRoom = session.snapshot().roomGraph.nodes.find(
+      (node) => node.reward === "aggregate-hammer",
+    );
+    if (!hammerRoom) throw new Error("测试楼层缺少聚合战锤房");
+    expect(session.travelToRoom(hammerRoom.id).ok).toBe(true);
+    expect(session.interact().ok).toBe(true);
+    enterLesson(session, "group-by");
+    expect(session.resolveQuery(GROUP_RESULT).lessonCompleted).toBe("group-by");
+
     expect(session.setPlayerPosition(middle.restPosition.x, middle.restPosition.y)).toBe(true);
     expect(session.interact().ok).toBe(true);
     expect(session.leaveCampfire()).toBe(true);
@@ -1161,7 +1172,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(formalSave.graph.seed).toBe("admin-overview");
   });
 
-  it("管理员状态预设可复现前两层关键世界状态且不污染永久图鉴", () => {
+  it("管理员状态预设可复现前四层关键世界状态、回燃换装且不污染永久图鉴", () => {
     const session = new GameSession(null, null, "admin-presets");
     const formalProfile = session.toProfile();
 
@@ -1195,5 +1206,168 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(floorTwoLowTide.profile.discoveredMonsterIds).toContain(21);
     expect(floorTwoLowTide.openedGateIds).toContain("shortcut:2:return");
     expect(session.toProfile()).toEqual(formalProfile);
+
+    expect(session.adminLoadFloor(4)).toMatchObject({ ok: true });
+    expect(session.adminApplyPreset("f4-admin-echo")).toMatchObject({ ok: true });
+    const floorFourEcho = session.snapshot();
+    expect(floorFourEcho.monsters.find((monster) => monster.id === 44)?.hp).toBe(0);
+    expect(floorFourEcho.openedGateIds).toContain("gate:floor-4-treasure");
+    const echoBundle = floorFourEcho.lootBundles.find(
+      (bundle) => bundle.id === "hidden-reward:f4-hidden-ember-echo",
+    );
+    expect(echoBundle?.items[0]).toMatchObject({
+      itemId: "ember-echo-robe",
+      kind: "armor",
+      guaranteed: true,
+    });
+    if (!echoBundle) throw new Error("回燃残响缺少确定护甲奖励");
+    expect(session.setPlayerPosition(echoBundle.x, echoBundle.y)).toBe(true);
+    expect(session.interact()).toMatchObject({ ok: true, kind: "loot-bundle" });
+    expect(session.takeLootItem(
+      echoBundle.id,
+      echoBundle.items[0]!.dropId,
+      "equip",
+    )).toMatchObject({ ok: true });
+    expect(session.snapshot().player.armor?.id).toBe("ember-echo-robe");
+    expect(session.toProfile()).toEqual(formalProfile);
+  });
+
+  it("第四层炉主同时封锁区域交通和普通步行边界，击败后才能穿过", () => {
+    const session = new GameSession(null, null, "f4-guardian-boundary");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminLoadFloor(4)).toMatchObject({ ok: true });
+    expect(session.adminApplyPreset("f4-admin-forge-lord")).toMatchObject({ ok: true });
+
+    const before = session.snapshot();
+    const portal = before.biomePlan.portals.find(
+      (entry) => entry.id === "biome-portal:4:middle-rear",
+    );
+    if (!portal) throw new Error("第四层缺少中后段交通");
+    const pairs = before.mazeFloor.tiles.flatMap((row, y) => [...row].flatMap((_tile, x) => (
+      [
+        { from: { x, y }, to: { x: x + 1, y } },
+        { from: { x, y }, to: { x: x - 1, y } },
+        { from: { x, y }, to: { x, y: y + 1 } },
+        { from: { x, y }, to: { x, y: y - 1 } },
+      ]
+    ))).filter(({ from, to }) => (
+      isMazeWalkable(
+        before.mazeFloor,
+        from.x,
+        from.y,
+        new Set(before.completedLessons),
+        new Set(before.openedGateIds),
+      ) &&
+      isMazeWalkable(
+        before.mazeFloor,
+        to.x,
+        to.y,
+        new Set(before.completedLessons),
+        new Set(before.openedGateIds),
+      ) &&
+      biomeRegionAt(before.biomePlan, from).id === portal.fromRegionId &&
+      biomeRegionAt(before.biomePlan, to).id === portal.toRegionId
+    ));
+    const boundary = pairs.find(({ from }) => (
+      session.setPlayerPosition(from.x, from.y)
+    ));
+    if (!boundary) throw new Error("第四层中后段缺少可验证步行边界");
+
+    expect(session.attemptPlayerMove(
+      boundary.to.x - boundary.from.x,
+      boundary.to.y - boundary.from.y,
+    )).toMatchObject({
+      ok: false,
+      moved: false,
+      blockedBy: "gate",
+      message: expect.stringContaining("ID #044"),
+    });
+
+    expect(session.adminApplyPreset("f4-admin-echo")).toMatchObject({ ok: true });
+    expect(session.setPlayerPosition(boundary.from.x, boundary.from.y)).toBe(true);
+    expect(session.attemptPlayerMove(
+      boundary.to.x - boundary.from.x,
+      boundary.to.y - boundary.from.y,
+    )).toMatchObject({
+      ok: true,
+      moved: true,
+      blockedBy: "none",
+    });
+  });
+
+  it("第五至八层管理员预设、实体地标指导、密文门与隐藏护甲都可复现", () => {
+    const session = new GameSession(null, null, "late-floor-presets");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+
+    const cases = [
+      {
+        floor: 5,
+        entryPreset: "f5-admin-entry",
+        entryLandmark: "f5-muster-board",
+        entryCopy: "OVER",
+        cipherPreset: "f5-admin-cipher",
+        cipherGate: "gate:floor-5-lesson-6",
+        hiddenPreset: "f5-admin-roster",
+        hiddenBundle: "hidden-reward:f5-hidden-silent-roster",
+        armorId: "iron-armor",
+      },
+      {
+        floor: 6,
+        entryPreset: "f6-admin-entry",
+        entryLandmark: "f6-sandbox-incubator",
+        entryCopy: "INSERT",
+        cipherPreset: "f6-admin-cipher",
+        cipherGate: "gate:floor-6-lesson-6",
+        hiddenPreset: "f6-admin-rookery",
+        hiddenBundle: "hidden-reward:f6-hidden-uncommitted-rookery",
+        armorId: "dragon-armor",
+      },
+      {
+        floor: 7,
+        entryPreset: "f7-admin-entry",
+        entryLandmark: "f7-scan-road",
+        entryCopy: "B-Tree",
+        cipherPreset: "f7-admin-cipher",
+        cipherGate: "gate:floor-7-lesson-6",
+        hiddenPreset: "f7-admin-garden",
+        hiddenBundle: "hidden-reward:f7-hidden-blind-garden",
+        armorId: "crystal-armor",
+      },
+      {
+        floor: 8,
+        entryPreset: "f8-admin-entry",
+        entryLandmark: "f8-version-gallery",
+        entryCopy: "MVCC",
+        cipherPreset: "f8-admin-cipher",
+        cipherGate: "gate:floor-8-lesson-7",
+        hiddenPreset: "f8-admin-chapel",
+        hiddenBundle: "hidden-reward:f8-hidden-zero-row-chapel",
+        armorId: "royal-armor",
+      },
+    ] as const;
+
+    cases.forEach((entry) => {
+      expect(session.adminLoadFloor(entry.floor)).toMatchObject({ ok: true });
+      expect(session.adminApplyPreset(entry.entryPreset)).toMatchObject({ ok: true });
+      placeNearFloorLandmark(session, entry.entryLandmark);
+      expect(session.interact()).toMatchObject({
+        ok: true,
+        kind: "inspection",
+        message: expect.stringContaining(entry.entryCopy),
+      });
+
+      expect(session.adminApplyPreset(entry.cipherPreset)).toMatchObject({ ok: true });
+      expect(session.snapshot().openedGateIds).toContain(entry.cipherGate);
+
+      expect(session.adminApplyPreset(entry.hiddenPreset)).toMatchObject({ ok: true });
+      const reward = session.snapshot().lootBundles.find(
+        (bundle) => bundle.id === entry.hiddenBundle,
+      );
+      expect(reward?.items[0]).toMatchObject({
+        itemId: entry.armorId,
+        kind: "armor",
+        guaranteed: true,
+      });
+    });
   });
 });

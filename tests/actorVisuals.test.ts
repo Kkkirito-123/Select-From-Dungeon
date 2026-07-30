@@ -86,4 +86,18 @@ describe("MVP 2.0 actor visual catalog", () => {
     expect(royal.armor).toBe(0xc7a74f);
     expect(royal.hasLongCoat).toBe(true);
   });
+
+  it("回燃衣使用专属轮廓与余烬配色，而不是普通符文甲换色", () => {
+    const echo = playerActorProfile(4, {
+      weapon: WEAPONS["rune-staff"],
+      armor: ARMORS["ember-echo-robe"],
+    });
+    expect(echo).toMatchObject({
+      armorStyle: "ember-echo",
+      hasMantle: true,
+      hasLongCoat: true,
+      trim: 0xe0b65d,
+    });
+    expect(echo.armor).toBe(0x9d533d);
+  });
 });

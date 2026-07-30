@@ -475,17 +475,17 @@ export const FLOOR_FOUR_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 4,
     id: 44,
-    lessonId: "f4-cte",
+    lessonId: "f4-in",
     roomId: 60,
     name: "炉主",
-    species: "forge_lord",
+    species: "mirror_forge_lord",
     kind: "elemental-king",
     hp: 32,
     maxHp: 32,
     armor: 2,
     damage: 3,
-    attackName: "熔炉封锁",
-    status: "forging",
+    attackName: "炉火封锁",
+    status: "sealed",
     weakness: "cte",
     masterId: 39,
     isBoss: true,
@@ -757,14 +757,14 @@ export const FLOOR_EIGHT_BIOME_MONSTERS: readonly Monster[] = [
 
 const PRACTICE_SELECT: LessonStageDefinition = {
   id: "practice-select",
-  objective: "查询 id = 6 的怪物名字 name。",
+  objective: "查询 id = 6 的怪物 id 与 status。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE id = 6;",
+  answerSql: "SELECT id, status FROM monsters WHERE id = 6;",
   hints: [
-    "读取怪物名字。",
+    "读取 id 与 status。",
     "目标表是 monsters。",
     "用 id = 6 锁定目标记录。",
-    "完整写法：SELECT name FROM monsters WHERE id = 6;",
+    "完整写法：SELECT id, status FROM monsters WHERE id = 6;",
   ],
   locks: ["SELECT", "FROM"],
   requiredFeatures: ["select", "from"],
@@ -789,14 +789,14 @@ const PRACTICE_WHERE: LessonStageDefinition = {
 
 const PRACTICE_NULL: LessonStageDefinition = {
   id: "practice-null",
-  objective: "查询 status = 'toxic' 且 master_id 为空的怪物 name。",
+  objective: "查询 status = 'toxic' 且 master_id 为空的怪物 id。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic';",
+  answerSql: "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'toxic';",
   hints: [
     "先找没有主人的怪物。",
     "NULL 使用 IS NULL。",
     "再用 AND 过滤 toxic 状态。",
-    "完整写法：SELECT name FROM monsters WHERE master_id IS NULL AND status = 'toxic';",
+    "完整写法：SELECT id FROM monsters WHERE master_id IS NULL AND status = 'toxic';",
   ],
   locks: ["WHERE", "IS NULL"],
   requiredFeatures: ["where", "is-null"],
@@ -822,14 +822,14 @@ const PRACTICE_GROUP: LessonStageDefinition = {
 
 const PRACTICE_GROUP_CORE: LessonStageDefinition = {
   id: "practice-group-core",
-  objective: "第二击：查询 id = 9 的怪物 name。",
+  objective: "第二击：查询 id = 9 的怪物 id 与 status。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE id = 9;",
+  answerSql: "SELECT id, status FROM monsters WHERE id = 9;",
   hints: [
-    "读取 name。",
+    "读取 id 与 status。",
     "目标表是 monsters。",
     "用 id = 9 锁定目标记录。",
-    "完整写法：SELECT name FROM monsters WHERE id = 9;",
+    "完整写法：SELECT id, status FROM monsters WHERE id = 9;",
   ],
   locks: ["SELECT", "FROM", "WHERE"],
   requiredFeatures: ["select", "from", "where"],
@@ -871,14 +871,14 @@ const PRACTICE_DISTINCT: LessonStageDefinition = {
 
 const PRACTICE_INNER_JOIN: LessonStageDefinition = {
   id: "practice-inner-join",
-  objective: "给 monsters 使用别名 m、rooms 使用别名 r；连接后返回 m.id = 17 的 m.name，并把 r.name 命名为 room_name。",
+  objective: "给 monsters 使用别名 m、rooms 使用别名 r；连接后返回 m.id = 17 的 m.id，并把 r.name 命名为 room_name。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17;",
+  answerSql: "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17;",
   hints: [
     "monsters.room_id 对应 rooms.id。",
     "给两张表使用短别名。",
     "把 rooms.name 命名为 room_name。",
-    "完整写法：SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17;",
+    "完整写法：SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17;",
   ],
   locks: ["INNER JOIN", "ON"],
   requiredFeatures: ["join", "on"],
@@ -903,14 +903,14 @@ const PRACTICE_LEFT_JOIN: LessonStageDefinition = {
 
 const PRACTICE_LEFT_CORE: LessonStageDefinition = {
   id: "practice-left-core",
-  objective: "第二击：从 monsters 返回 id = 18 且 status = 'toxic' 的 name。",
+  objective: "第二击：从 monsters 返回 id = 18 且 status = 'toxic' 的 id。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE id = 18 AND status = 'toxic';",
+  answerSql: "SELECT id FROM monsters WHERE id = 18 AND status = 'toxic';",
   hints: [
-    "读取 name。",
+    "读取 id。",
     "使用 WHERE。",
     "用 AND 同时检查 id 与 status。",
-    "完整写法：SELECT name FROM monsters WHERE id = 18 AND status = 'toxic';",
+    "完整写法：SELECT id FROM monsters WHERE id = 18 AND status = 'toxic';",
   ],
   locks: ["WHERE", "AND"],
   requiredFeatures: ["where", "and"],
@@ -919,14 +919,14 @@ const PRACTICE_LEFT_CORE: LessonStageDefinition = {
 
 const FOREST_ORDER: LessonStageDefinition = {
   id: "practice-forest-order",
-  objective: "从 monsters 返回 id = 19 的 name 与 hp，按 hp 降序并只取一行。",
+  objective: "从 monsters 返回 id = 19 的 id 与 hp，按 hp 降序并只取一行。",
   queryTemplate: "",
-  answerSql: "SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;",
+  answerSql: "SELECT id, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;",
   hints: [
-    "读取 name 与 hp。",
+    "读取 id 与 hp。",
     "先用 WHERE 锁定 ID #019。",
     "按 hp DESC 排序并 LIMIT 1。",
-    "完整写法：SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;",
+    "完整写法：SELECT id, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;",
   ],
   locks: ["ORDER BY", "LIMIT"],
   requiredFeatures: ["order-by", "limit"],
@@ -951,14 +951,14 @@ const FOREST_JOIN: LessonStageDefinition = {
 
 const FOREST_JOIN_CORE: LessonStageDefinition = {
   id: "practice-forest-join-core",
-  objective: "第二击：连接 monsters AS m 与 rooms AS r，返回 m.id = 20 的 m.name，并把 r.sector 命名为 room_sector；按 r.sector 排序且只取一行。",
+  objective: "第二击：连接 monsters AS m 与 rooms AS r，返回 m.id = 20 的 m.id，并把 r.sector 命名为 room_sector；按 r.sector 排序且只取一行。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
+  answerSql: "SELECT m.id, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
   hints: [
     "保持 monsters 与 rooms 的连接。",
-    "读取 m.name，并把 r.sector 命名为 room_sector。",
+    "读取 m.id，并把 r.sector 命名为 room_sector。",
     "按 r.sector 排序并 LIMIT 1。",
-    "完整写法：SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
+    "完整写法：SELECT m.id, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;",
   ],
   locks: ["INNER JOIN", "ON", "ORDER BY", "LIMIT"],
   requiredFeatures: ["join", "on", "order-by", "limit"],
@@ -1015,14 +1015,14 @@ const FROG_BOSS_LEFT: LessonStageDefinition = {
 
 const FROG_BOSS_DISTINCT: LessonStageDefinition = {
   id: "frog-boss-distinct",
-  objective: "第二击：连接 monsters AS m 与 rooms AS r，去重返回二层 m.id = 22 的 m.name，并把 r.name 命名为 room_name；按 m.id 排序。",
+  objective: "第二击：连接 monsters AS m 与 rooms AS r，去重返回二层 m.id = 22 的 m.id，并把 r.name 命名为 room_name；按 m.id 排序。",
   queryTemplate: "",
-  answerSql: "SELECT DISTINCT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;",
+  answerSql: "SELECT DISTINCT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;",
   hints: [
     "连接 monsters 与 rooms。",
-    "用 DISTINCT 读取 m.name，并把 r.name 命名为 room_name。",
+    "用 DISTINCT 读取 m.id，并把 r.name 命名为 room_name。",
     "WHERE 限定二层和 ID #022，最后排序。",
-    "完整写法：SELECT DISTINCT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;",
+    "完整写法：SELECT DISTINCT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;",
   ],
   locks: ["DISTINCT", "INNER JOIN", "ON", "ORDER BY"],
   requiredFeatures: ["distinct", "join", "on", "order-by"],
@@ -1031,14 +1031,14 @@ const FROG_BOSS_DISTINCT: LessonStageDefinition = {
 
 const PRACTICE_BONE: LessonStageDefinition = {
   id: "practice-bone",
-  objective: "连接 monsters 与 rooms，查询 id = 29 的 name 与 room_name。",
+  objective: "连接 monsters 与 rooms，查询 id = 29 的 id 与 room_name。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 29;",
+  answerSql: "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 29;",
   hints: [
-    "读取怪物名与房间名。",
+    "读取怪物 ID 与房间名。",
     "连接 monsters 与 rooms。",
     "ON m.room_id = r.id。",
-    "完整写法：SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 29;",
+    "完整写法：SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 29;",
   ],
   locks: ["INNER JOIN", "ON"],
   requiredFeatures: ["join", "on"],
@@ -1047,14 +1047,14 @@ const PRACTICE_BONE: LessonStageDefinition = {
 
 const PRACTICE_ZOMBIE: LessonStageDefinition = {
   id: "practice-zombie",
-  objective: "LEFT JOIN 装备表，找出 id = 30 且没有装备的腐尸。",
+  objective: "LEFT JOIN 装备表，找出 id = 30 且没有装备的记录。",
   queryTemplate: "",
-  answerSql: "SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 30 AND g.monster_id IS NULL;",
+  answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 30 AND g.monster_id IS NULL;",
   hints: [
     "从 monsters m 开始。",
     "LEFT JOIN monster_gear g。",
     "检查 g.monster_id IS NULL。",
-    "完整写法：SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 30 AND g.monster_id IS NULL;",
+    "完整写法：SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 30 AND g.monster_id IS NULL;",
   ],
   locks: ["LEFT JOIN", "IS NULL"],
   requiredFeatures: ["left-join", "is-null"],
@@ -1063,14 +1063,14 @@ const PRACTICE_ZOMBIE: LessonStageDefinition = {
 
 const PRACTICE_SPIRIT: LessonStageDefinition = {
   id: "practice-spirit",
-  objective: "自连接 monsters，查询鬼火 #31 的 name 与 master_name。",
+  objective: "自连接 monsters，查询 ID #031 的 child_id 与 master_id。",
   queryTemplate: "",
-  answerSql: "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31;",
+  answerSql: "SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31;",
   hints: [
     "同一张表使用 child 与 master 两个别名。",
     "连接 child.master_id = master.id。",
     "锁定 child.id = 31。",
-    "完整写法：SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31;",
+    "完整写法：SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31;",
   ],
   locks: ["SELF JOIN", "ON"],
   requiredFeatures: ["self-join", "on"],
@@ -1079,14 +1079,14 @@ const PRACTICE_SPIRIT: LessonStageDefinition = {
 
 const PRACTICE_SPIRIT_CORE: LessonStageDefinition = {
   id: "practice-spirit-core",
-  objective: "第二击：查询 id = 31 且 status = 'haunting' 的鬼火 name。",
+  objective: "第二击：查询 id = 31 且 status = 'haunting' 的 id。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE id = 31 AND status = 'haunting';",
+  answerSql: "SELECT id FROM monsters WHERE id = 31 AND status = 'haunting';",
   hints: [
-    "读取 name。",
+    "读取 id。",
     "使用 WHERE。",
     "用 AND 同时限定 id 与 status。",
-    "完整写法：SELECT name FROM monsters WHERE id = 31 AND status = 'haunting';",
+    "完整写法：SELECT id FROM monsters WHERE id = 31 AND status = 'haunting';",
   ],
   locks: ["WHERE", "AND"],
   requiredFeatures: ["where", "and"],
@@ -1095,14 +1095,14 @@ const PRACTICE_SPIRIT_CORE: LessonStageDefinition = {
 
 const PRACTICE_WRAITH: LessonStageDefinition = {
   id: "practice-wraith",
-  objective: "自连接 monsters，查询游魂 #32 的 name 与 master_name。",
+  objective: "自连接 monsters，查询 ID #032 的 child_id 与 master_id。",
   queryTemplate: "",
-  answerSql: "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 32;",
+  answerSql: "SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 32;",
   hints: [
     "同一张表使用两个别名。",
     "连接 child.master_id = master.id。",
     "锁定 child.id = 32。",
-    "完整写法：SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 32;",
+    "完整写法：SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 32;",
   ],
   locks: ["SELF JOIN", "ON"],
   requiredFeatures: ["self-join", "on"],
@@ -1111,14 +1111,14 @@ const PRACTICE_WRAITH: LessonStageDefinition = {
 
 const GRAVE_BOSS_SCAN: LessonStageDefinition = {
   id: "grave-boss-scan",
-  objective: "墓主第一击：用 UNION 合并 room_id = 49 与 50 的 id、name，并按 id 排序。",
+  objective: "区域首领第一击：用 UNION 合并 room_id = 49 与 50 的 id，并按 id 排序。",
   queryTemplate: "",
-  answerSql: "SELECT id, name FROM monsters WHERE room_id = 49 UNION SELECT id, name FROM monsters WHERE room_id = 50 ORDER BY id;",
+  answerSql: "SELECT id FROM monsters WHERE room_id = 49 UNION SELECT id FROM monsters WHERE room_id = 50 ORDER BY id;",
   hints: [
-    "两边都返回 id、name。",
+    "两边都只返回 id。",
     "分别过滤 room_id = 49 与 50。",
     "用 UNION 合并。",
-    "完整写法：SELECT id, name FROM monsters WHERE room_id = 49 UNION SELECT id, name FROM monsters WHERE room_id = 50 ORDER BY id;",
+    "完整写法：SELECT id FROM monsters WHERE room_id = 49 UNION SELECT id FROM monsters WHERE room_id = 50 ORDER BY id;",
   ],
   locks: ["UNION", "ORDER BY"],
   requiredFeatures: ["union", "order-by"],
@@ -1127,14 +1127,14 @@ const GRAVE_BOSS_SCAN: LessonStageDefinition = {
 
 const GRAVE_BOSS_CORE: LessonStageDefinition = {
   id: "grave-boss-core",
-  objective: "墓主第二击：自连接 monsters，返回 id = 33 的 name 与 master_name。",
+  objective: "区域首领第二击：自连接 monsters，返回 id = 33 的 child_id 与 master_id。",
   queryTemplate: "",
-  answerSql: "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 33;",
+  answerSql: "SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 33;",
   hints: [
     "为 monsters 使用 child 与 master 两个别名。",
     "连接 child.master_id = master.id。",
     "锁定 child.id = 33。",
-    "完整写法：SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 33;",
+    "完整写法：SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 33;",
   ],
   locks: ["SELF JOIN", "ON"],
   requiredFeatures: ["self-join", "on"],
@@ -1143,14 +1143,14 @@ const GRAVE_BOSS_CORE: LessonStageDefinition = {
 
 const PRACTICE_FIRE: LessonStageDefinition = {
   id: "practice-fire",
-  objective: "用标量子查询返回 room_id = 57 中最小 id 对应的 name。",
+  objective: "用标量子查询返回 room_id = 57 中最小的 id。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57);",
+  answerSql: "SELECT id FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57);",
   hints: [
-    "外层读取 name。",
+    "外层读取 id。",
     "内层计算 room_id = 57 的 MIN(id)。",
     "外层用 id = (...)。",
-    "完整写法：SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57);",
+    "完整写法：SELECT id FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57);",
   ],
   locks: ["SUBQUERY"],
   requiredFeatures: ["subquery"],
@@ -1159,14 +1159,14 @@ const PRACTICE_FIRE: LessonStageDefinition = {
 
 const PRACTICE_ICE: LessonStageDefinition = {
   id: "practice-ice",
-  objective: "用 IN 子查询返回 room_id 位于 frost-vault 区域的冰晶 name。",
+  objective: "用 IN 子查询返回 room_id 位于 frost-vault 区域的怪物 id。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name;",
+  answerSql: "SELECT id FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY id;",
   hints: [
     "内层从 rooms 查询 id。",
     "过滤 sector = 'frost-vault'。",
     "外层用 room_id IN (...)。",
-    "完整写法：SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name;",
+    "完整写法：SELECT id FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY id;",
   ],
   locks: ["IN", "SUBQUERY"],
   requiredFeatures: ["in", "subquery"],
@@ -1175,14 +1175,14 @@ const PRACTICE_ICE: LessonStageDefinition = {
 
 const PRACTICE_STORM: LessonStageDefinition = {
   id: "practice-storm",
-  objective: "用 EXISTS 查询 id = 42 且存在装备记录的雷兽 name。",
+  objective: "用 EXISTS 查询 id = 42 且存在装备记录的怪物 id。",
   queryTemplate: "",
-  answerSql: "SELECT m.name FROM monsters m WHERE m.id = 42 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  answerSql: "SELECT m.id FROM monsters m WHERE m.id = 42 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
   hints: [
-    "外层锁定雷兽。",
+    "外层锁定 ID #042。",
     "EXISTS 内层查询 monster_gear。",
     "用 g.monster_id = m.id 相关。",
-    "完整写法：SELECT m.name FROM monsters m WHERE m.id = 42 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+    "完整写法：SELECT m.id FROM monsters m WHERE m.id = 42 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
   ],
   locks: ["EXISTS", "SUBQUERY"],
   requiredFeatures: ["exists", "subquery"],
@@ -1191,14 +1191,14 @@ const PRACTICE_STORM: LessonStageDefinition = {
 
 const PRACTICE_STORM_CORE: LessonStageDefinition = {
   id: "practice-storm-core",
-  objective: "第二击：查询 id = 42 且 status = 'charged' 的雷兽 name。",
+  objective: "第二击：查询 id = 42 且 status = 'charged' 的 id。",
   queryTemplate: "",
-  answerSql: "SELECT name FROM monsters WHERE id = 42 AND status = 'charged';",
+  answerSql: "SELECT id FROM monsters WHERE id = 42 AND status = 'charged';",
   hints: [
-    "读取 name。",
+    "读取 id。",
     "使用 WHERE 与 AND。",
     "同时限定 id 和 status。",
-    "完整写法：SELECT name FROM monsters WHERE id = 42 AND status = 'charged';",
+    "完整写法：SELECT id FROM monsters WHERE id = 42 AND status = 'charged';",
   ],
   locks: ["WHERE", "AND"],
   requiredFeatures: ["where", "and"],
@@ -1207,14 +1207,14 @@ const PRACTICE_STORM_CORE: LessonStageDefinition = {
 
 const PRACTICE_SPARK: LessonStageDefinition = {
   id: "practice-spark",
-  objective: "用 EXISTS 查询 id = 43 且存在装备记录的电球 name。",
+  objective: "用 EXISTS 查询 id = 43 且存在装备记录的怪物 id。",
   queryTemplate: "",
-  answerSql: "SELECT m.name FROM monsters m WHERE m.id = 43 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  answerSql: "SELECT m.id FROM monsters m WHERE m.id = 43 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
   hints: [
-    "外层读取 m.name。",
+    "外层读取 m.id。",
     "EXISTS 内层检查 monster_gear。",
     "通过 g.monster_id = m.id 关联。",
-    "完整写法：SELECT m.name FROM monsters m WHERE m.id = 43 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+    "完整写法：SELECT m.id FROM monsters m WHERE m.id = 43 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
   ],
   locks: ["EXISTS", "SUBQUERY"],
   requiredFeatures: ["exists", "subquery"],
@@ -1223,14 +1223,14 @@ const PRACTICE_SPARK: LessonStageDefinition = {
 
 const FORGE_BOSS_SCAN: LessonStageDefinition = {
   id: "forge-boss-scan",
-  objective: "炉主第一击：从 monster_gear 用 CTE 保存 power >= 19 的 monster_id，返回 monsters.id = 44 的 name。",
+  objective: "区域首领第一击：从 monster_gear 用 CTE 保存 power >= 19 的 monster_id，返回 monsters.id = 44 的 id。",
   queryTemplate: "",
-  answerSql: "WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.name FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 44;",
+  answerSql: "WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.id FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 44;",
   hints: [
     "先写 WITH strong AS (...)。",
     "CTE 过滤 power >= 19。",
     "主查询连接 monsters 与 strong。",
-    "完整写法：WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.name FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 44;",
+    "完整写法：WITH strong AS (SELECT monster_id FROM monster_gear WHERE power >= 19) SELECT m.id FROM monsters m INNER JOIN strong s ON m.id = s.monster_id WHERE m.id = 44;",
   ],
   locks: ["WITH / CTE", "JOIN"],
   requiredFeatures: ["cte", "join"],
@@ -1239,14 +1239,14 @@ const FORGE_BOSS_SCAN: LessonStageDefinition = {
 
 const FORGE_BOSS_CORE: LessonStageDefinition = {
   id: "forge-boss-core",
-  objective: "炉主第二击：用 EXISTS 返回 id = 44 且存在装备记录的 name。",
+  objective: "区域首领第二击：用 EXISTS 返回 id = 44 且存在装备记录的 id。",
   queryTemplate: "",
-  answerSql: "SELECT m.name FROM monsters m WHERE m.id = 44 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+  answerSql: "SELECT m.id FROM monsters m WHERE m.id = 44 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
   hints: [
-    "外层读取 m.name。",
+    "外层读取 m.id。",
     "EXISTS 检查装备记录。",
     "内层关联 g.monster_id = m.id。",
-    "完整写法：SELECT m.name FROM monsters m WHERE m.id = 44 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
+    "完整写法：SELECT m.id FROM monsters m WHERE m.id = 44 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id);",
   ],
   locks: ["EXISTS", "SUBQUERY"],
   requiredFeatures: ["exists", "subquery"],
@@ -1255,14 +1255,14 @@ const FORGE_BOSS_CORE: LessonStageDefinition = {
 
 const PRACTICE_GOBLIN: LessonStageDefinition = {
   id: "practice-goblin",
-  objective: "查询 id 51 到 52 的 name，并按 master_id 分区计算 guard_total。",
+  objective: "查询 id 51 到 52 的 id，并按 master_id 分区计算 guard_total。",
   queryTemplate: "",
-  answerSql: "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 51 AND 52 ORDER BY id;",
+  answerSql: "SELECT id, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 51 AND 52 ORDER BY id;",
   hints: [
-    "返回 name 与 guard_total。",
+    "返回 id 与 guard_total。",
     "使用 COUNT(*) OVER (...)。",
     "按 master_id 分区。",
-    "完整写法：SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 51 AND 52 ORDER BY id;",
+    "完整写法：SELECT id, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 51 AND 52 ORDER BY id;",
   ],
   locks: ["OVER", "PARTITION BY"],
   requiredFeatures: ["over", "partition-by"],
@@ -1271,14 +1271,14 @@ const PRACTICE_GOBLIN: LessonStageDefinition = {
 
 const PRACTICE_ORC: LessonStageDefinition = {
   id: "practice-orc",
-  objective: "连接装备表，对 id 51 到 52 按 power 降序生成 pos，并按 pos 返回 name。",
+  objective: "连接装备表，对 id 51 到 52 按 power 降序生成 pos，并按 pos 返回 id。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 52 ORDER BY pos;",
+  answerSql: "SELECT m.id, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 52 ORDER BY pos;",
   hints: [
-    "返回 name 与 pos。",
+    "返回 id 与 pos。",
     "使用 ROW_NUMBER() OVER (...)。",
     "窗口按装备 power DESC、id 排序。",
-    "完整写法：SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 52 ORDER BY pos;",
+    "完整写法：SELECT m.id, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 52 ORDER BY pos;",
   ],
   locks: ["ROW_NUMBER", "ORDER BY"],
   requiredFeatures: ["row-number", "order-by"],
@@ -1287,14 +1287,14 @@ const PRACTICE_ORC: LessonStageDefinition = {
 
 const PRACTICE_KNIGHT: LessonStageDefinition = {
   id: "practice-knight",
-  objective: "连接装备表，查询 id 52 到 53 的 name、power 与 rank_no，按 power 降序排列。",
+  objective: "连接装备表，查询 id 52 到 53 的 id、power 与 rank_no，按 power 降序排列。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 52 AND 53 ORDER BY g.power DESC, m.id;",
+  answerSql: "SELECT m.id, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 52 AND 53 ORDER BY g.power DESC, m.id;",
   hints: [
-    "返回 name、power、rank_no。",
+    "返回 id、power、rank_no。",
     "rank_no 使用 RANK()。",
     "窗口按装备 power DESC。",
-    "完整写法：SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 52 AND 53 ORDER BY g.power DESC, m.id;",
+    "完整写法：SELECT m.id, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 52 AND 53 ORDER BY g.power DESC, m.id;",
   ],
   locks: ["RANK", "OVER"],
   requiredFeatures: ["rank", "over"],
@@ -1303,14 +1303,14 @@ const PRACTICE_KNIGHT: LessonStageDefinition = {
 
 const PRACTICE_TROLL: LessonStageDefinition = {
   id: "practice-troll",
-  objective: "连接装备表，查询 id 51 到 54 的 name 与 running_power，按 id 累计 power。",
+  objective: "连接装备表，查询 id 51 到 54 的 id 与 running_power，按 id 累计 power。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
+  answerSql: "SELECT m.id, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
   hints: [
-    "返回 name 与 running_power。",
+    "返回 id 与 running_power。",
     "使用 SUM(g.power) OVER (...)。",
     "写明从第一行到当前行的 ROWS Frame。",
-    "完整写法：SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
+    "完整写法：SELECT m.id, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
   ],
   locks: ["OVER", "ROWS FRAME"],
   requiredFeatures: ["over", "window-frame"],
@@ -1319,14 +1319,14 @@ const PRACTICE_TROLL: LessonStageDefinition = {
 
 const IRON_BOSS_SCAN: LessonStageDefinition = {
   id: "iron-boss-scan",
-  objective: "用 CTE 和 ROW_NUMBER 找出 id 51 到 54 中装备 power 最高的 name、power。",
+  objective: "用 CTE 和 ROW_NUMBER 找出 id 51 到 54 中装备 power 最高的 id、power。",
   queryTemplate: "",
-  answerSql: "WITH ranked AS (SELECT m.name, g.power, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54) SELECT name, power FROM ranked WHERE rn = 1;",
+  answerSql: "WITH ranked AS (SELECT m.id, g.power, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54) SELECT id, power FROM ranked WHERE rn = 1;",
   hints: [
     "先在 ranked CTE 内编号。",
     "窗口按装备 power DESC、id 排序。",
     "外层保留 rn = 1。",
-    "完整写法：WITH ranked AS (SELECT m.name, g.power, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54) SELECT name, power FROM ranked WHERE rn = 1;",
+    "完整写法：WITH ranked AS (SELECT m.id, g.power, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS rn FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54) SELECT id, power FROM ranked WHERE rn = 1;",
   ],
   locks: ["WITH", "ROW_NUMBER"],
   requiredFeatures: ["cte", "row-number"],
@@ -1335,14 +1335,14 @@ const IRON_BOSS_SCAN: LessonStageDefinition = {
 
 const IRON_BOSS_CORE: LessonStageDefinition = {
   id: "iron-boss-core",
-  objective: "连接装备表，查询 id 51 到 54 的 name 与 prev_power，用 LAG 按 id 读取上一行 power。",
+  objective: "连接装备表，查询 id 51 到 54 的 id 与 prev_power，用 LAG 按 id 读取上一行 power。",
   queryTemplate: "",
-  answerSql: "SELECT m.name, LAG(g.power) OVER (ORDER BY m.id) AS prev_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
+  answerSql: "SELECT m.id, LAG(g.power) OVER (ORDER BY m.id) AS prev_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
   hints: [
-    "返回 name 与 prev_power。",
+    "返回 id 与 prev_power。",
     "使用 LAG(g.power)。",
     "窗口和结果都按 id 排序。",
-    "完整写法：SELECT m.name, LAG(g.power) OVER (ORDER BY m.id) AS prev_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
+    "完整写法：SELECT m.id, LAG(g.power) OVER (ORDER BY m.id) AS prev_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id;",
   ],
   locks: ["LAG", "ORDER BY"],
   requiredFeatures: ["lag", "order-by"],
@@ -1658,32 +1658,32 @@ export const BIOME_ENCOUNTERS: readonly BiomeEncounterDefinition[] = [
   { monsterId: 30, floor: 3, biome: "grave-mire", role: "normal", randomEncounter: true, stages: [PRACTICE_ZOMBIE] },
   { monsterId: 31, floor: 3, biome: "spirit-crypt", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_SPIRIT, PRACTICE_SPIRIT_CORE] },
   { monsterId: 32, floor: 3, biome: "spirit-crypt", role: "normal", randomEncounter: true, stages: [PRACTICE_WRAITH] },
-  { monsterId: 33, floor: 3, biome: "spirit-crypt", role: "area-boss", randomEncounter: false, stages: [GRAVE_BOSS_SCAN, GRAVE_BOSS_CORE] },
+  { monsterId: 33, floor: 3, biome: "grave-mire", role: "area-boss", randomEncounter: false, stages: [GRAVE_BOSS_SCAN, GRAVE_BOSS_CORE] },
   { monsterId: 40, floor: 4, biome: "fire-forge", role: "normal", randomEncounter: true, stages: [PRACTICE_FIRE] },
   { monsterId: 41, floor: 4, biome: "frost-vault", role: "normal", randomEncounter: true, stages: [PRACTICE_ICE] },
   { monsterId: 42, floor: 4, biome: "storm-core", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_STORM, PRACTICE_STORM_CORE] },
   { monsterId: 43, floor: 4, biome: "storm-core", role: "normal", randomEncounter: true, stages: [PRACTICE_SPARK] },
-  { monsterId: 44, floor: 4, biome: "fire-forge", role: "area-boss", randomEncounter: false, stages: [FORGE_BOSS_SCAN, FORGE_BOSS_CORE] },
+  { monsterId: 44, floor: 4, biome: "frost-vault", role: "area-boss", randomEncounter: false, stages: [FORGE_BOSS_SCAN, FORGE_BOSS_CORE] },
   { monsterId: 51, floor: 5, biome: "iron-yard", role: "normal", randomEncounter: true, stages: [PRACTICE_GOBLIN] },
   { monsterId: 52, floor: 5, biome: "barracks", role: "normal", randomEncounter: true, stages: [PRACTICE_ORC] },
   { monsterId: 53, floor: 5, biome: "barracks", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_KNIGHT] },
   { monsterId: 54, floor: 5, biome: "black-citadel", role: "normal", randomEncounter: true, stages: [PRACTICE_TROLL] },
-  { monsterId: 55, floor: 5, biome: "black-citadel", role: "area-boss", randomEncounter: false, stages: [IRON_BOSS_SCAN, IRON_BOSS_CORE] },
+  { monsterId: 55, floor: 5, biome: "barracks", role: "area-boss", randomEncounter: false, stages: [IRON_BOSS_SCAN, IRON_BOSS_CORE] },
   { monsterId: 62, floor: 6, biome: "magma-nest", role: "normal", randomEncounter: true, stages: [PRACTICE_HATCHLING] },
   { monsterId: 63, floor: 6, biome: "magma-nest", role: "normal", randomEncounter: true, stages: [PRACTICE_WYVERN] },
   { monsterId: 64, floor: 6, biome: "crystal-cavern", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_THUNDER_DRAKE] },
   { monsterId: 65, floor: 6, biome: "crystal-cavern", role: "normal", randomEncounter: true, stages: [PRACTICE_CRYSTAL_DRAKE] },
-  { monsterId: 66, floor: 6, biome: "dragon-throne", role: "area-boss", randomEncounter: false, stages: [DRAGON_BOSS_SCAN, DRAGON_BOSS_CORE] },
+  { monsterId: 66, floor: 6, biome: "crystal-cavern", role: "area-boss", randomEncounter: false, stages: [DRAGON_BOSS_SCAN, DRAGON_BOSS_CORE] },
   { monsterId: 73, floor: 7, biome: "crystal-grove", role: "normal", randomEncounter: true, stages: [PRACTICE_BRANCH] },
   { monsterId: 74, floor: 7, biome: "root-maze", role: "normal", randomEncounter: true, stages: [PRACTICE_ROOT] },
   { monsterId: 75, floor: 7, biome: "index-heart", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_CRYSTAL] },
   { monsterId: 76, floor: 7, biome: "root-maze", role: "normal", randomEncounter: true, stages: [PRACTICE_VINE] },
-  { monsterId: 77, floor: 7, biome: "index-heart", role: "area-boss", randomEncounter: false, stages: [INDEX_BOSS_SCAN, INDEX_BOSS_CORE] },
+  { monsterId: 77, floor: 7, biome: "root-maze", role: "area-boss", randomEncounter: false, stages: [INDEX_BOSS_SCAN, INDEX_BOSS_CORE] },
   { monsterId: 85, floor: 8, biome: "obsidian-hall", role: "normal", randomEncounter: true, stages: [PRACTICE_DEMON] },
   { monsterId: 86, floor: 8, biome: "void-court", role: "normal", randomEncounter: true, stages: [PRACTICE_DARK_KNIGHT] },
   { monsterId: 87, floor: 8, biome: "void-court", role: "mini-elite", randomEncounter: true, stages: [PRACTICE_LICH] },
   { monsterId: 88, floor: 8, biome: "data-throne", role: "normal", randomEncounter: true, stages: [PRACTICE_GOLEM] },
-  { monsterId: 89, floor: 8, biome: "data-throne", role: "area-boss", randomEncounter: false, stages: [THRONE_BOSS_SCAN, THRONE_BOSS_CORE] },
+  { monsterId: 89, floor: 8, biome: "void-court", role: "area-boss", randomEncounter: false, stages: [THRONE_BOSS_SCAN, THRONE_BOSS_CORE] },
 ] as const;
 
 export const BIOME_PRACTICE_STAGES: Readonly<Record<number, readonly LessonStageDefinition[]>> =

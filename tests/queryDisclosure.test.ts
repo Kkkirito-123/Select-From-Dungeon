@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
 import { GameSession } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { redactUndiscoveredQueryIdentities } from "../src/domain/queryDisclosure";
@@ -41,7 +43,42 @@ function enterLesson(session: GameSession, lessonId: LessonId): void {
 }
 
 describe("查询结果披露等级", () => {
-  it("SQLite 执行前封存身份预言机，最终阶段也只允许直接投影 name", () => {
+  it("所有课程与区域战文案在击杀前只使用 ID，不提前写出对应怪物名字", () => {
+    const violations: string[] = [];
+    LESSONS.forEach((lesson) => {
+      const monster = INITIAL_MONSTERS.find(
+        (entry) => entry.id === lesson.primaryMonsterId,
+      );
+      if (!monster) return;
+      const copy = [
+        lesson.title,
+        lesson.intro,
+        ...lesson.stages.flatMap((stage) => [
+          stage.objective,
+          ...stage.hints,
+        ]),
+      ].join("\n");
+      if (copy.includes(monster.name)) {
+        violations.push(`${lesson.id}:${monster.name}`);
+      }
+    });
+    BIOME_ENCOUNTERS.forEach((encounter) => {
+      const monster = INITIAL_MONSTERS.find(
+        (entry) => entry.id === encounter.monsterId,
+      );
+      if (!monster) return;
+      const copy = encounter.stages.flatMap((stage) => [
+        stage.objective,
+        ...stage.hints,
+      ]).join("\n");
+      if (copy.includes(monster.name)) {
+        violations.push(`biome:${encounter.monsterId}:${monster.name}`);
+      }
+    });
+    expect(violations).toEqual([]);
+  });
+
+  it("SQLite 执行前封存身份预言机，致命一击也由结算揭名", () => {
     const session = new GameSession(null, null, "identity-query-preflight");
     enterLesson(session, "select");
 
@@ -63,7 +100,7 @@ describe("查询结果披露等级", () => {
       [{ weakness: "slash" }],
     ));
     expect(session.validateCombatQuery(
-      "SELECT name FROM monsters WHERE id = 1",
+      "SELECT id, status FROM monsters WHERE id = 1",
     )).toEqual({ ok: true });
     expect(session.validateCombatQuery(
       "SELECT name FROM monsters WHERE id = 1 AND name LIKE '史%'",
@@ -134,9 +171,10 @@ describe("查询结果披露等级", () => {
     expect(session.snapshot().profile.discoveredMonsterIds).not.toContain(1);
 
     const finishingBlow = session.resolveQuery(result(
-      "SELECT name FROM monsters WHERE id = 1",
-      ["name"],
-      [{ name: "史莱姆" }],
+      "SELECT id, status FROM monsters WHERE id = 1",
+      ["id", "status"],
+      [{ id: 1, status: "idle" }],
+      [1],
     ));
     expect(finishingBlow).toMatchObject({
       accepted: true,

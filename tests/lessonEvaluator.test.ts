@@ -199,31 +199,25 @@ describe("课程文案", () => {
     ]);
   });
 
-  it("F1 与 F2 身份查询只在最后一击读取 name，主表 id 不改名为 monster_id", () => {
+  it("F1 与 F2 标准答案始终只用 ID 定位，主表 id 不改名为 monster_id", () => {
     const select = LESSONS.find((lesson) => lesson.id === "select");
     const innerJoin = LESSONS.find((lesson) => lesson.id === "inner-join");
 
     expect(select?.stages.map((stage) => stage.answerSql)).toEqual([
       "SELECT weakness FROM monsters WHERE id = 1;",
-      "SELECT name FROM monsters WHERE id = 1;",
+      "SELECT id, status FROM monsters WHERE id = 1;",
     ]);
     expect(innerJoin?.stages.map((stage) => stage.answerSql)).toEqual([
       "SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;",
-      "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;",
+      "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;",
     ]);
     expect(innerJoin?.stages[0]?.answerSql).not.toMatch(/\bas\s+monster_id\b/i);
   });
 });
 
 describe("evaluateLesson stages", () => {
-  it("第一、二层全部官方答案都通过未揭名身份防火墙", () => {
-    const earlyMonsterIds = new Set(
-      INITIAL_MONSTERS
-        .filter((monster) => monster.floor <= 2)
-        .map((monster) => monster.id),
-    );
+  it("第一至八层全部官方答案都通过未揭名身份防火墙", () => {
     const curriculumStages = LESSONS
-      .filter((lesson) => earlyMonsterIds.has(lesson.primaryMonsterId))
       .flatMap((lesson) => lesson.stages.map((stage) => ({
         floor: INITIAL_MONSTERS.find(
           (monster) => monster.id === lesson.primaryMonsterId,
@@ -231,7 +225,6 @@ describe("evaluateLesson stages", () => {
         stage,
       })));
     const encounterStages = BIOME_ENCOUNTERS
-      .filter((encounter) => encounter.floor <= 2)
       .flatMap((encounter) => encounter.stages.map((stage) => ({
         floor: encounter.floor,
         stage,
@@ -250,7 +243,7 @@ describe("evaluateLesson stages", () => {
     }
   });
 
-  it("F1/F2 未揭名阶段拒绝 name/species 及其派生查询", () => {
+  it("F1–F8 未揭名阶段拒绝 name/species 及其派生查询", () => {
     const select = LESSONS.find((lesson) => lesson.id === "select");
     if (!select) throw new Error("缺少 SELECT 课程");
     const stage = select.stages[0];
@@ -267,15 +260,17 @@ describe("evaluateLesson stages", () => {
     ];
 
     probes.forEach((sql) => {
-      expect(evaluateUnrevealedIdentityQuery(1, stage, sql, false)).toMatchObject({
-        accepted: false,
-        kind: "wrong-result",
-        attackTargetIds: [],
-      });
+      for (let floor = 1; floor <= 8; floor += 1) {
+        expect(evaluateUnrevealedIdentityQuery(floor, stage, sql, false)).toMatchObject({
+          accepted: false,
+          kind: "wrong-result",
+          attackTargetIds: [],
+        });
+      }
     });
   });
 
-  it("身份防火墙不区分名字猜测，并保留最终合法 name 阶段", () => {
+  it("身份防火墙不区分名字猜测，最终阶段也由击杀结算揭名", () => {
     const select = LESSONS.find((lesson) => lesson.id === "select");
     const innerJoin = LESSONS.find((lesson) => lesson.id === "inner-join");
     if (!select || !innerJoin) throw new Error("缺少 F1/F2 身份课程");
@@ -296,7 +291,7 @@ describe("evaluateLesson stages", () => {
     expect(evaluateUnrevealedIdentityQuery(
       1,
       select.stages[1],
-      "SELECT name FROM monsters WHERE id = 1",
+      "SELECT id, status FROM monsters WHERE id = 1",
       false,
     )).toBeNull();
     const finalCorrectGuess = evaluateUnrevealedIdentityQuery(
@@ -369,11 +364,12 @@ describe("evaluateLesson stages", () => {
     expect(evaluateStage(stage, exact).accepted).toBe(true);
     expect(evaluateStage(stage, bypass).accepted).toBe(false);
   });
-  it("SELECT 两阶段先读弱点，再在最后一击读出怪物名字", () => {
-    const name = makeResult(
-      "select name from monsters where id=1",
-      ["name"],
-      [{ name: "史莱姆" }],
+  it("SELECT 两阶段先读弱点，再用公开字段完成致命一击", () => {
+    const identity = makeResult(
+      "select id, status from monsters where id=1",
+      ["id", "status"],
+      [{ id: 1, status: "idle" }],
+      [1],
     );
     const weakness = makeResult(
       "SELECT weakness FROM monsters WHERE id = 1",
@@ -381,7 +377,7 @@ describe("evaluateLesson stages", () => {
       [{ weakness: "slash" }],
     );
     expect(evaluateLesson("select", 0, weakness).accepted).toBe(true);
-    expect(evaluateLesson("select", 1, name).accepted).toBe(true);
+    expect(evaluateLesson("select", 1, identity).accepted).toBe(true);
     expect(evaluateLesson("select", 1, weakness).accepted).toBe(false);
   });
 
@@ -460,11 +456,12 @@ describe("evaluateLesson stages", () => {
     expect(evaluation.locksRemaining).toContain("IS NULL");
   });
 
-  it("IS NULL 第二阶段必须返回无主诅咒怪物的名字", () => {
+  it("IS NULL 第二阶段必须返回无主诅咒怪物的 id", () => {
     const actual = makeResult(
-      "SELECT name FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
-      ["name"],
-      [{ name: "毒史莱姆" }],
+      "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'cursed'",
+      ["id"],
+      [{ id: 3 }],
+      [3],
     );
     expect(evaluateLesson("is-null", 1, actual).accepted).toBe(true);
   });
@@ -578,16 +575,17 @@ describe("evaluateLesson stages", () => {
     expect(evaluation.message).not.toContain("改名为 monster_id");
   });
 
-  it("第二层 INNER JOIN 拒绝把 monsters.id 改名为 monster_id，最后一击才返回两个 name", () => {
+  it("第二层 INNER JOIN 拒绝把 monsters.id 改名为 monster_id，并明确房间 name 的别名", () => {
     const misleadingAlias = makeResult(
       "SELECT m.id AS monster_id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
       ["monster_id", "sector"],
       [{ monster_id: 12, sector: "forest" }],
     );
     const finalIdentity = makeResult(
-      "SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
-      ["name", "room_name"],
-      [{ name: "树妖", room_name: "古树桥" }],
+      "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12",
+      ["id", "room_name"],
+      [{ id: 12, room_name: "古树桥" }],
+      [12],
     );
 
     expect(evaluateLesson("inner-join", 0, misleadingAlias).accepted).toBe(false);
@@ -617,7 +615,7 @@ describe("evaluateLesson stages", () => {
     expect(evaluateLesson("join-boss", 0, exact).accepted).toBe(true);
   });
 
-  it("第二层区域 Boss 使用信号复合题，并在最终阶段返回蛙王与房间名", () => {
+  it("第二层区域 Boss 使用信号复合题，并在最终阶段返回 ID 与房间名", () => {
     const lakeStages = practiceStagesFor(21);
     const frogStages = practiceStagesFor(22);
     const lakeScan = makeResult(
@@ -631,9 +629,10 @@ describe("evaluateLesson stages", () => {
       [{ channel: "deep" }, { channel: "surge" }, { channel: "wake" }],
     );
     const frogIdentity = makeResult(
-      "SELECT DISTINCT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id",
-      ["name", "room_name"],
-      [{ name: "蛙王", room_name: "泥冠宫" }],
+      "SELECT DISTINCT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id",
+      ["id", "room_name"],
+      [{ id: 22, room_name: "泥冠宫" }],
+      [22],
     );
 
     expect(evaluateStage(lakeStages[0], lakeScan).accepted).toBe(true);

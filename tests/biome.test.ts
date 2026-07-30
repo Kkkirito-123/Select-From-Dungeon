@@ -109,6 +109,45 @@ describe("seeded biome plan", () => {
       });
     });
   });
+
+  it("第四层把炉主放在中段冰库，用它真实锁住后段区域交通", () => {
+    const current = fixture("floor-four-middle-boss", 4);
+    const middle = current.biome.regions[1];
+    const rearPortal = current.biome.portals.find(
+      (portal) => portal.id === "biome-portal:4:middle-rear",
+    );
+    expect(middle).toMatchObject({
+      kind: "frost-vault",
+      areaBossId: 44,
+    });
+    expect(rearPortal?.requiredBossId).toBe(44);
+  });
+
+  it("第三、五至八层都把区域首领放在中段并锁住后段交通", () => {
+    const expectations = [
+      { floor: 3, kind: "grave-mire", bossId: 33 },
+      { floor: 5, kind: "barracks", bossId: 55 },
+      { floor: 6, kind: "crystal-cavern", bossId: 66 },
+      { floor: 7, kind: "root-maze", bossId: 77 },
+      { floor: 8, kind: "void-court", bossId: 89 },
+    ] as const;
+
+    expectations.forEach(({ floor, kind, bossId }) => {
+      for (let index = 0; index < 30; index += 1) {
+        const current = fixture(`late-floor-middle-boss-${floor}-${index}`, floor);
+        const middle = current.biome.regions[1];
+        const rearPortal = current.biome.portals.find(
+          (portal) => portal.id === `biome-portal:${floor}:middle-rear`,
+        );
+        expect(middle).toMatchObject({
+          kind,
+          areaBossId: bossId,
+        });
+        expect(middle.areaBossPosition).not.toBeNull();
+        expect(rearPortal?.requiredBossId).toBe(bossId);
+      }
+    });
+  }, 30_000);
 });
 
 describe("biome encounter pools", () => {

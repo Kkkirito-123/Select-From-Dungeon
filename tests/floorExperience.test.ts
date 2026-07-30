@@ -7,7 +7,7 @@ import {
   validateFloorExperience,
 } from "../src/content/floorExperience";
 
-describe("two-floor experience contracts", () => {
+describe("eight-floor experience contracts", () => {
   it("keeps every content contract internally valid", () => {
     FLOOR_EXPERIENCES.forEach((experience) => {
       expect(validateFloorExperience(experience)).toEqual([]);
@@ -24,6 +24,8 @@ describe("two-floor experience contracts", () => {
       expect(experience.landmarks.filter((entry) => entry.kind === "campfire"))
         .toHaveLength(2);
       expect(experience.landmarks.filter((entry) => entry.kind === "spawn-anchor"))
+        .toHaveLength(1);
+      expect(experience.landmarks.filter((entry) => entry.kind === "sql-seal"))
         .toHaveLength(1);
     });
   });
@@ -44,6 +46,61 @@ describe("two-floor experience contracts", () => {
     expect(floorExperience(2).landmarks.map((entry) => entry.id)).toEqual(
       expect.arrayContaining(["f2-drowned-village", "f2-ship-lock", "f2-lighthouse-arena"]),
     );
+    expect(floorExperience(3).landmarks.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(["f3-relation-bridge", "f3-reliquary", "f3-burial-shaft"]),
+    );
+    expect(floorExperience(4).landmarks.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining([
+        "f4-forge-lord",
+        "f4-echo-gate",
+        "f4-echo-registry",
+        "f4-echo-ember",
+        "f4-echo-null-bed",
+        "f4-echo-return",
+        "f4-elemental-throne",
+      ]),
+    );
+    expect(floorExperience(5).landmarks.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(["f5-muster-board", "f5-sql-seal", "f5-command-clock"]),
+    );
+    expect(floorExperience(6).landmarks.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(["f6-state-bridge", "f6-sql-seal", "f6-dragon-throne"]),
+    );
+    expect(floorExperience(7).landmarks.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(["f7-index-road", "f7-sql-seal", "f7-plan-tree"]),
+    );
+    expect(floorExperience(8).landmarks.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(["f8-version-gallery", "f8-sql-seal", "f8-migration-dais"]),
+    );
+  });
+
+  it("第四层回燃残响同时要求前三类子查询和中层首领，并给出确定换装", () => {
+    expect(floorExperience(4).hiddenAreas[0]).toMatchObject({
+      gateId: "gate:floor-4-treasure",
+      requiredLessonIds: ["f4-scalar", "f4-in", "f4-exists"],
+      requiredMonsterIds: [44],
+      rewardArmorId: "ember-echo-robe",
+    });
+  });
+
+  it("第八层区分前七层历史证据与本层四类事故，并要求完整四课开启礼拜堂", () => {
+    const experience = floorExperience(8);
+    const incidentWings = experience.landmarks.find(
+      (entry) => entry.id === "f8-incident-wings",
+    );
+
+    expect(experience.signature).toContain("七扇前层证据窗");
+    expect(experience.signature).toContain("四座本层事故侧翼");
+    expect(incidentWings).toMatchObject({
+      name: "四事故证据台",
+      fallback: "four-incident-wings",
+    });
+    expect(experience.hiddenAreas[0].requiredLessonIds).toEqual([
+      "f8-mvcc",
+      "f8-lock",
+      "f8-isolation",
+      "f8-modeling",
+    ]);
   });
 
   it("每层只声明一个有课程前置、实体门与发现剧情的隐藏区域", () => {

@@ -55,11 +55,12 @@ complete SQLite query, and turn the correct result into an animated attack.
   to open its guidance in a centered game-stage record. Movement and patrols
   pause while it is open; press `E` again (`Escape` and the visible close action
   also work) to resume without replacing the persistent right-rail objective.
-- Floors one and two each contain one optional physical hidden room with its own
-  visual language: the sealed archive opens after `WHERE / IS NULL`, while the
-  wreck ledger opens after `ORDER BY / LIMIT / DISTINCT`. Inspect the entrance
-  with `E`; the gate remains open for the Run, but neither room is required for
-  story completion or curriculum progress.
+- All eight floors contain one optional physical hidden room with its own
+  evidence theme. Floors four through eight deterministically award visibly
+  distinct Ember Echo, Iron, Dragon, Crystal, and Royal armor. The late-floor
+  rooms are the Silent Roster, Uncommitted Rookery, Blind Index Garden, and
+  Zero-Row Chapel. Inspect an entrance with `E`; hidden rooms never gate story
+  completion or curriculum progress.
 - Move into a living curriculum monster's tile or trigger a step-based ambush to
   start a Pokémon-like single-target battle. Outside safe zones, eligible
   successful steps use a 2% base ambush chance after the safe window and
@@ -117,6 +118,12 @@ complete SQLite query, and turn the correct result into an animated attack.
   beats per floor unlock through required progress, rest, Boss contact, and
   completion; the local `失名录` distinguishes unknown evidence, confirmed
   `NULL`, and actual values.
+- Floors five through eight now have authored runtime landmarks rather than
+  macro-theme placeholders. Window queries split and number fortress rosters;
+  DML lessons compare original and candidate workshop states; index lessons
+  light a scan road, index road, covering lake, and query-plan tree; concurrency
+  and migration lessons restore version windows, a deadlock cycle, four
+  incident wings, and a seven-step migration dais.
 - Death no longer resets the Run. `YOU DIED` appears briefly, then the player
   returns at full HP to the last rested campfire or the floor entrance and
   automatically sees the battle that caused the defeat. Mastery, XP, gear,
@@ -126,11 +133,11 @@ complete SQLite query, and turn the correct result into an animated attack.
   stacks capped at five items each. Inventory pauses movement and patrols and
   cannot be opened during combat. Armor HP absorbs counters before base HP and
   is restored by campfire rest or respawn.
-- Stand beside either locked Boss gate and press `E` to attempt an optional
-  high-difficulty `QUERY BREACH`. Its fixed composite query can open that
-  physical gate early, but grants no mastery, XP, or loot. A wrong result or
-  syntax error deals one damage to armor first; empty input and safe exit cost
-  nothing.
+- Stand beside the locked Boss route and press `E` to read that floor's
+  physical SQL cipher. Its fixed composite query permanently opens only that
+  side route and visibly changes the seal, but grants no mastery, XP, or loot.
+  A wrong result or syntax error deals one damage to armor first; empty input
+  and safe exit cost nothing.
 - Start each Run with two hearts. Normal, elite, and Boss victories grant 1, 3,
   and 5 XP; levels unlock at 2, 4, 6, 8, then every four XP through 24, adding
   one maximum heart while restoring one heart. A post-battle card shows the
@@ -495,8 +502,11 @@ trailing save. Reduced Motion, a 640 px reflow proxy for desktop 200% zoom, and
 390×844 touch input all remained free of horizontal overflow; essential
 controls were at least 44 px, inventory focus landed on its close button, and
 the console reported zero warnings/errors. The production build now separates
-the approximately 474 kB startup entry, 1.38 MB cached Phaser runtime, and
-660 kB SQLite WASM without the previous generic main-chunk warning.
+the approximately 22 kB entry, 200 kB interface, 464 kB world-rules, and
+112 kB game-logic chunks from the approximately 40 kB `sql.js` runtime,
+1.38 MB cached Phaser runtime, and 660 kB SQLite WASM. Every first-party
+JavaScript chunk remains below 500 kB; the cacheable upstream runtime/WASM
+assets are not delivered as one monolithic application bundle.
 The v1.0.0 production-preview pass reran all 193 tests, type/build/rule gates,
 and verified the license/attribution copies. Desktop keyboard input increased
 the real movement counter. At 390×844 with Reduced Motion, 32 ordinary touch
