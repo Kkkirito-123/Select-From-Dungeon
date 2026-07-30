@@ -6,7 +6,7 @@ import type { GuidedMapPlan } from "./guidedMap";
 
 export const FLOOR_ONE_LEFT_SAFE_ROOM_ID = "floor-1-entry";
 export const FLOOR_ONE_RIGHT_SAFE_ROOM_ID = "floor-1-rest";
-export const FLOOR_ONE_LABYRINTH_SIGHT_RADIUS = 4;
+export const FLOOR_ONE_LABYRINTH_SIGHT_RADIUS = 3;
 export const FLOOR_ONE_HAZARD_COUNT = 2;
 
 export type FloorOneArea = "left-safe" | "labyrinth" | "right-safe";

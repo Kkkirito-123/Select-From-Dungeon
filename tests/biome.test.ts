@@ -170,7 +170,7 @@ describe("biome encounter pools", () => {
     }
   });
 
-  it("小型精英只在有基础怪物的生态内保持约 5% / 7% / 9% / 11% 权重", () => {
+  it("随机小型精英只在有基础怪物的生态内保持权重；宝箱怪只由宝箱触发", () => {
     const floorOne = weightedBiomeEncounterIds(
       1,
       "ember-cellar",
@@ -191,8 +191,7 @@ describe("biome encounter pools", () => {
       "storm-core",
       new Set(lessonsForFloor(4)),
     );
-    expect(floorOne.filter((id) => id === 9).length / floorOne.length)
-      .toBeCloseTo(0.05, 2);
+    expect(floorOne).not.toContain(9);
     expect(floorTwo.filter((id) => id === 18).length / floorTwo.length)
       .toBeCloseTo(0.07, 2);
     expect(floorThree.filter((id) => id === 31).length / floorThree.length)

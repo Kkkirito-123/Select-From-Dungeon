@@ -25,6 +25,7 @@ import {
   generateBiomePlan,
   type BiomePlan,
 } from "../domain/biome";
+import { isFloorOneChestMarker } from "../domain/floorOneTreasure";
 import {
   advanceCampaignProgress,
   createCampaignProgress,
@@ -587,7 +588,7 @@ function isConsumable(value: unknown): value is Consumable {
 function isPlayer(value: unknown, requireArmor: boolean): value is PlayerState {
   if (!isRecord(value) || !isNonNegativeInteger(value.xp)) return false;
   const xp = value.xp;
-  const levelThresholds = [0, 2, 4, 6, 8, 12, 16, 20, 24] as const;
+  const levelThresholds = [0, 2, 4, 6, 8, 14, 22, 32, 44, 58, 74, 92, 112] as const;
   const expectedLevel = levelThresholds.reduce(
     (level, threshold, index) => xp >= threshold ? index + 1 : level,
     1,
@@ -1091,8 +1092,12 @@ function isGroundItem(
     )) ||
     !(value.weapon === undefined || isWeapon(value.weapon))
   ) return false;
-  return (value.rewardId !== null || value.weapon !== undefined) &&
-    (value.weapon === undefined || value.kind === "weapon");
+  const isFloorOneChest = graph.floor === 1 && isFloorOneChestMarker(value.id);
+  return (
+    isFloorOneChest ||
+    value.rewardId !== null ||
+    value.weapon !== undefined
+  ) && (value.weapon === undefined || value.kind === "weapon");
 }
 
 function isDiscoveredCell(value: unknown, floor: MazeFloor): value is string {
@@ -1280,7 +1285,8 @@ function isSavedRunVersion(
       id === challengeGateId ||
       hiddenAreaGateIds.includes(id) ||
       guidedMap?.shortcuts.some((shortcut) => shortcut.id === id) ||
-      guidedMap?.deadEndCaches.some((cache) => cache.id === id)
+      guidedMap?.deadEndCaches.some((cache) => cache.id === id) ||
+      (run.floor === 1 && isFloorOneChestMarker(id))
     )) ||
     !hasUniqueValues(openedGateIds) ||
     !(activeGateChallengeId === null || (

@@ -141,7 +141,7 @@ describe("第一层双岸失名迷宫", () => {
     expect(session.snapshot().player.hp).toBe(1);
   });
 
-  it("安全区整房可见，迷宫当前视野保持半径四", () => {
+  it("安全区整房可见，迷宫当前视野保持半径三", () => {
     const graph = generateRoomGraph("f1-sight", 1);
     const floor = generateMazeFloor(graph);
     const left = floor.zones.find(

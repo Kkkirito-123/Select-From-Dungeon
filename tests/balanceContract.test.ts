@@ -34,7 +34,7 @@ describe("v0.11 balance contract", () => {
     const snapshot = new GameSession(null, createEmptyProfile(), "balance").snapshot();
     expect(snapshot.player.hp).toBe(2);
     expect(snapshot.player.maxHp).toBe(2);
-    expect(LEVEL_XP_THRESHOLDS).toEqual([0, 2, 4, 6, 8, 12, 16, 20, 24]);
+    expect(LEVEL_XP_THRESHOLDS).toEqual([0, 2, 4, 6, 8, 14, 22, 32, 44, 58, 74, 92, 112]);
     expect(AMBUSH_CHANCE).toBe(0.02);
     expect(AMBUSH_GUARANTEE_AT).toBe(30);
   });

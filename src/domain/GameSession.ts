@@ -42,6 +42,7 @@ import {
   generateMazeFloor,
   isMazeWalkable,
   mazeGateAt,
+  mazeTileAt,
   mazeZoneAt,
   revealAround,
   type MazeFloor,
@@ -62,6 +63,7 @@ import {
 import {
   generateRoomGraph,
   lessonsForFloor,
+  stableStringHash,
   type FloorNumber,
   type RoomGraph,
   type RoomNode,
@@ -80,6 +82,14 @@ import {
   generateFloorOneHazards,
   type FloorHazard,
 } from "./floorOneLabyrinth";
+import {
+  FLOOR_ONE_MIMIC_MONSTER_ID,
+  floorOneChestKind,
+  floorOneChestReward,
+  floorOneWalkableNeighborCount,
+  generateFloorOneChestItems,
+  isFloorOneChestItem,
+} from "./floorOneTreasure";
 import {
   evaluateStage,
   evaluateUnrevealedIdentityQuery,
@@ -221,7 +231,7 @@ const LESSON_ORDER: readonly LessonId[] = [
   "f8-security",
 ];
 
-export const LEVEL_XP_THRESHOLDS = [0, 2, 4, 6, 8, 12, 16, 20, 24] as const;
+export const LEVEL_XP_THRESHOLDS = [0, 2, 4, 6, 8, 14, 22, 32, 44, 58, 74, 92, 112] as const;
 
 const XP_BY_RANK: Readonly<Record<Monster["rank"], number>> = {
   normal: 1,
@@ -239,6 +249,10 @@ export function levelForXp(xp: number): number {
     (level, threshold, index) => safeXp >= threshold ? index + 1 : level,
     1,
   );
+}
+
+export function maxHpForLevel(level: number): number {
+  return 2 + Math.floor((Math.max(1, level) - 1) / 2);
 }
 
 function cloneMonsters(monsters: readonly Monster[]): Monster[] {
@@ -486,7 +500,12 @@ function restoredActorsForFloor(
   });
 }
 
-function initialGroundItems(graph: RoomGraph, floor: MazeFloor): GroundItem[] {
+function initialGroundItems(
+  graph: RoomGraph,
+  floor: MazeFloor,
+  campfires: readonly Campfire[] = [],
+  guidedMap?: GuidedMapPlan,
+): GroundItem[] {
   const items: GroundItem[] = [];
   graph.nodes.forEach((node) => {
     if (node.type === "rest" || !node.reward) return;
@@ -504,6 +523,9 @@ function initialGroundItems(graph: RoomGraph, floor: MazeFloor): GroundItem[] {
       rewardId: node.reward,
     });
   });
+  if (graph.floor === 1 && guidedMap && campfires.length > 0) {
+    items.push(...generateFloorOneChestItems(floor, campfires, guidedMap));
+  }
   return items;
 }
 
@@ -597,7 +619,12 @@ export class GameSession {
       this.monsters,
       this.biomePlan,
     );
-    this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.groundItems = initialGroundItems(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
     this.visitedRoomIds.add(this.currentRoomId);
     this.completedRoomIds.add(this.currentRoomId);
     this.revealAt(this.player);
@@ -671,6 +698,15 @@ export class GameSession {
       this.completedRoomIds = new Set(savedRun.completedRoomIds);
       this.completedLessons = new Set(savedRun.completedLessons);
       this.openedGateIds = new Set(savedRun.openedGateIds);
+      if (this.floorNumber === 1) {
+        const savedChestIds = new Set(this.groundItems.map((item) => item.id));
+        generateFloorOneChestItems(this.mazeFloor, this.campfires, this.guidedMap)
+          .filter((item) => (
+            !this.openedGateIds.has(item.id) &&
+            !savedChestIds.has(item.id)
+          ))
+          .forEach((item) => this.groundItems.push(item));
+      }
       this.activeGateChallengeId = savedRun.activeGateChallengeId;
       const masteredLessons = new Set([
         ...this.profile.masteredLessons,
@@ -1276,6 +1312,13 @@ export class GameSession {
     const nearbyGroundRoom = nearbyGroundItem
       ? this.graph.nodes.find((room) => room.id === nearbyGroundItem.sourceRoomId)
       : null;
+    if (
+      nearbyGroundItem &&
+      isFloorOneChestItem(nearbyGroundItem) &&
+      distance(nearbyGroundItem, this.player) === 0
+    ) {
+      return this.openFloorOneChest(nearbyGroundItem);
+    }
     if (nearbyGroundItem && distance(nearbyGroundItem, this.player) === 0) {
       return this.collectGroundItem(nearbyGroundItem, true);
     }
@@ -1902,7 +1945,8 @@ export class GameSession {
 
     if (evaluation.accepted) {
       const target = this.monsters.find((entry) => entry.id === this.combat?.targetId);
-      if (target && target.hp > 0 && evaluation.attackTargetIds.includes(target.id)) {
+      const mimicAccepted = target?.id === FLOOR_ONE_MIMIC_MONSTER_ID && evaluation.accepted;
+      if (target && target.hp > 0 && (evaluation.attackTargetIds.includes(target.id) || mimicAccepted)) {
         const nextSuccessStep = this.combat.successStep + 1;
         const minimumHp = nextSuccessStep < combatStages.length ? 1 : 0;
         const rawDamage = Math.max(1, this.player.weapon.damage - target.armor);
@@ -2131,7 +2175,12 @@ export class GameSession {
       this.monsters,
       this.biomePlan,
     );
-    this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.groundItems = initialGroundItems(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
     this.lootBundles = [];
     this.activeLootBundleId = null;
     this.discoveredCells = new Set();
@@ -2211,7 +2260,12 @@ export class GameSession {
       this.monsters,
       this.biomePlan,
     );
-    this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.groundItems = initialGroundItems(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
     this.lootBundles = [];
     this.equipmentInventory = [];
     this.consumables = [];
@@ -2458,10 +2512,13 @@ export class GameSession {
     const previousMaxHp = this.player.maxHp;
     this.player.xp += gained;
     this.player.level = levelForXp(this.player.xp);
-    const levelsGained = this.player.level - previousLevel;
-    if (levelsGained > 0) {
-      this.player.maxHp += levelsGained;
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + levelsGained);
+    const maxHpGained = Math.max(
+      0,
+      maxHpForLevel(this.player.level) - maxHpForLevel(previousLevel),
+    );
+    if (maxHpGained > 0) {
+      this.player.maxHp += maxHpGained;
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + maxHpGained);
     }
     return {
       monsterId: monster.id,
@@ -2477,9 +2534,11 @@ export class GameSession {
   }
 
   private describeExperience(experience: ExperienceSettlement): string {
-    const levelsGained = experience.currentLevel - experience.previousLevel;
-    if (levelsGained > 0) {
-      return `获得 ${experience.gained} XP，升至 LV.${experience.currentLevel}，生命上限 +${levelsGained}。`;
+    const maxHpGained = experience.currentMaxHp - experience.previousMaxHp;
+    if (experience.currentLevel > experience.previousLevel) {
+      return maxHpGained > 0
+        ? `获得 ${experience.gained} XP，升至 LV.${experience.currentLevel}，生命上限 +${maxHpGained}。`
+        : `获得 ${experience.gained} XP，升至 LV.${experience.currentLevel}。生命上限暂不变化。`;
     }
     return `获得 ${experience.gained} XP（${experience.currentXp} XP / LV.${experience.currentLevel}）。`;
   }
@@ -2711,6 +2770,11 @@ export class GameSession {
     events: CombatEvent[],
     experienceMessage: string,
   ): void {
+    const openedMimicChest = monster.id === FLOOR_ONE_MIMIC_MONSTER_ID;
+    if (openedMimicChest) {
+      this.groundItems = this.groundItems.filter((item) => item.id !== "chest:f1:mimic");
+      this.openedGateIds.add("chest:f1:mimic");
+    }
     const loot = this.spawnLootBundle(
       monster,
       this.currentRoomId,
@@ -2729,10 +2793,10 @@ export class GameSession {
     this.hintLevel = 0;
     this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
     this.banner = loot.bundleCount > 0
-      ? `${monster.name} 已清除。${experienceMessage} 掉落 1 个含 ${loot.bundleCount} 件物品的战利品包。`
+      ? `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} 掉落 1 个含 ${loot.bundleCount} 件物品的战利品包。`
       : loot.recoveryNames.length > 0
-        ? `${monster.name} 已清除。${experienceMessage} ${loot.recoveryNames.join("、")}已直接使用，不占背包。`
-        : `${monster.name} 已清除。${experienceMessage} 本次没有物品掉落；接下来 5 步不会再次遭遇。`;
+        ? `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} ${loot.recoveryNames.join("、")}已直接使用，不占背包。`
+        : `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} 本次没有物品掉落；接下来 5 步不会再次遭遇。`;
     const transferMessage = this.autoTransferAfterAreaBoss(monster);
     if (transferMessage) this.banner = `${this.banner} ${transferMessage}`;
   }
@@ -2869,7 +2933,12 @@ export class GameSession {
       this.monsters,
       this.biomePlan,
     );
-    this.groundItems = initialGroundItems(this.graph, this.mazeFloor);
+    this.groundItems = initialGroundItems(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    );
     this.lootBundles = [];
     this.discoveredCells = new Set();
     this.combat = null;
@@ -2945,8 +3014,13 @@ export class GameSession {
     ]);
     this.visitedRoomIds = new Set(progressedRoomIds);
     this.completedRoomIds = new Set(progressedRoomIds);
-    this.groundItems = initialGroundItems(this.graph, this.mazeFloor).filter(
-      (item) => !progressedRoomIds.has(item.sourceRoomId),
+    this.groundItems = initialGroundItems(
+      this.graph,
+      this.mazeFloor,
+      this.campfires,
+      this.guidedMap,
+    ).filter(
+      (item) => isFloorOneChestItem(item) || !progressedRoomIds.has(item.sourceRoomId),
     );
     this.lootBundles = [];
     this.ensureOpenedHiddenAreaRewards();
@@ -3100,6 +3174,110 @@ export class GameSession {
       suffix += 1;
     }
     return id;
+  }
+
+  private openFloorOneChest(item: GroundItem): InteractionResolution {
+    if (this.floorNumber !== 1 || !isFloorOneChestItem(item)) {
+      return this.interactionFailure("这个箱子不属于当前迷宫。 ");
+    }
+    const kind = floorOneChestKind(item.id);
+    if (!kind) return this.interactionFailure("箱子记录已经损坏。 ");
+    if (kind === "mimic") {
+      return this.engageMimicChest();
+    }
+
+    const itemIndex = this.groundItems.findIndex((entry) => entry.id === item.id);
+    if (itemIndex < 0) return this.interactionFailure("这个箱子已经被打开。 ");
+    this.groundItems.splice(itemIndex, 1);
+    this.openedGateIds.add(item.id);
+    this.completedRoomIds.add(item.sourceRoomId);
+
+    if (kind === "warp") {
+      const destination = this.floorOneWarpDestination(item.id);
+      if (!destination) {
+        this.banner = "偏移宝箱已经打开，但迷宫没有找到安全支路。请沿原路继续探索。";
+      } else {
+        const from = { x: this.player.x, y: this.player.y };
+        this.player.x = destination.x;
+        this.player.y = destination.y;
+        this.revealAt(destination);
+        this.updateCurrentRoom(destination);
+        this.banner = `打开偏移宝箱：坐标被重新写入（${from.x},${from.y} → ${destination.x},${destination.y}）。已传送到非死路迷宫支路。`;
+      }
+    } else {
+      const rewardId = floorOneChestReward(item.id);
+      const reward = rewardDetails(rewardId);
+      const previousHp = this.player.hp;
+      const previousHeat = this.player.heat;
+      if (rewardId) this.applyReward(rewardId);
+      this.banner = rewardId === "restore-12-hp"
+        ? `打开${item.name}：${reward?.name ?? "恢复品"}直接使用，生命 ${previousHp} → ${this.player.hp}。${reward?.description ?? ""}`
+        : `打开${item.name}：${reward?.name ?? "冷却片"}直接使用，热量 ${previousHeat} → ${this.player.heat}。${reward?.description ?? ""}`;
+    }
+    this.emit();
+    return { ok: true, kind: "reward", message: this.banner };
+  }
+
+  private engageMimicChest(): InteractionResolution {
+    if (this.mode !== "explore") {
+      return this.interactionFailure("当前不能打开宝箱怪。 ");
+    }
+    const monster = this.monsters.find((entry) => entry.id === FLOOR_ONE_MIMIC_MONSTER_ID);
+    const stages = monster ? practiceStagesFor(monster.id) : [];
+    if (!monster || monster.hp <= 0 || stages.length === 0) {
+      return this.interactionFailure("箱盖已经安静下来。 ");
+    }
+    this.beginBattleReview();
+    this.mode = "combat";
+    this.combat = {
+      targetId: monster.id,
+      kind: "ambush",
+      round: 1,
+      successStep: 0,
+      intent: {
+        name: monster.attackName,
+        damage: monster.damage,
+        locks: [...stages[0].locks],
+      },
+    };
+    this.selectedMonsterId = monster.id;
+    this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
+    this.banner = `沉默木箱突然合拢：ID #${String(monster.id).padStart(3, "0")} 宝箱怪苏醒。完成 ${stages.length} 道第一层基础题，才能打开箱腹。`;
+    this.emit();
+    return { ok: true, kind: "combat", message: this.banner };
+  }
+
+  private floorOneWarpDestination(chestId: string): Position | null {
+    const safeCells = safeZoneCellKeys(this.mazeFloor, this.campfires);
+    const occupied = new Set([
+      ...this.groundItems.map((item) => `${item.x}:${item.y}`),
+      ...this.lootBundles.map((bundle) => `${bundle.x}:${bundle.y}`),
+      ...this.worldActors
+        .filter((actor) => this.monsters.some((monster) => monster.id === actor.monsterId && monster.hp > 0))
+        .map((actor) => `${actor.x}:${actor.y}`),
+    ]);
+    const hazards = new Set(this.floorHazards().map((hazard) => `${hazard.x}:${hazard.y}`));
+    const candidates: Position[] = [];
+    for (let y = 2; y < this.mazeFloor.height - 2; y += 1) {
+      for (let x = 2; x < this.mazeFloor.width - 2; x += 1) {
+        const position = { x, y };
+        const key = `${x}:${y}`;
+        if (
+          mazeTileAt(this.mazeFloor, x, y) !== "." ||
+          mazeZoneAt(this.mazeFloor, position) !== null ||
+          safeCells.has(key) ||
+          occupied.has(key) ||
+          hazards.has(key) ||
+          floorOneWalkableNeighborCount(this.mazeFloor, position) < 2
+        ) continue;
+        candidates.push(position);
+      }
+    }
+    const ordered = candidates.sort((left, right) => (
+      stableStringHash(`${this.mazeFloor.seed}:${chestId}:${left.x}:${left.y}`) -
+      stableStringHash(`${this.mazeFloor.seed}:${chestId}:${right.x}:${right.y}`)
+    ));
+    return ordered.find((position) => distance(position, this.player) >= 8) ?? ordered[0] ?? null;
   }
 
   private collectGroundItem(item: GroundItem, shouldEmit: boolean): InteractionResolution {
@@ -3838,6 +4016,9 @@ export class GameSession {
       (item) => item.collection === "interact" && distance(item, this.player) <= 1,
     );
     if (interactItem && distance(interactItem, this.player) === 0) {
+      if (isFloorOneChestItem(interactItem)) {
+        return `E  ${interactItem.name} · 打开或唤醒`;
+      }
       return interactItem.id.startsWith("lesson-drop:") ||
         interactItem.id.startsWith("room-reward:")
         ? `E  打开战利品宝箱 · ${interactItem.name}`
@@ -3908,6 +4089,9 @@ export class GameSession {
     }
     if (lootBundle) return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
     if (interactItem) {
+      if (isFloorOneChestItem(interactItem)) {
+        return `E  ${interactItem.name} · 打开或唤醒`;
+      }
       return interactItem.id.startsWith("lesson-drop:") ||
         interactItem.id.startsWith("room-reward:")
         ? `E  打开战利品宝箱 · ${interactItem.name}`
