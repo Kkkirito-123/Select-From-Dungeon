@@ -166,8 +166,15 @@ MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确
 `src/content/floorLabyrinth.ts` 负责稳定的八层导航契约；`src/domain/floorLabyrinth.ts` 再把这些
 意图解析到当前已保存的 `MazeFloor`、篝火、引导方案与生态方案。不得把派生安全格、视野、
 陷阱坐标或入场确认重复写入存档。
-`src/content/floorContracts.ts` 是八层内容的权威 Schema；`src/domain/campaign.ts` 负责
-可序列化的有序楼层槽位，必须拒绝跳层、重复激活与 Seed 重抽，且不得把一层静默套用到另一层。
+`src/content/floorContracts.ts` 负责 Campaign 课程元数据及其可序列化 Schema；在已登记的
+`AUTH-003` 漂移关闭前，它不是楼层显示名称、生态或精确怪物名单的玩家文案权威。可执行怪物事实
+属于各层 Level 文件与 `biomeContent.ts`，玩家地点和事件属于 Floor Experience，导航边界属于
+Floor Labyrinth 与 Floor Map Blueprints。`src/domain/campaign.ts` 负责可序列化的有序楼层槽位，
+必须拒绝跳层、重复激活与 Seed 重抽，且不得把一层静默套用到另一层。权威登记表位于
+`docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`。
+
+八层剧情与怪物分布 V2 文档是已经锁定的实现目标，不是运行时完成声明。其怪物改名、Stage 曲线、
+区域映射和扩写剧情必须分别完成代码、自动化证据与真人 QA 后，才能逐项升级状态。
 
 ## 仓库地图
 

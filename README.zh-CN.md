@@ -4,6 +4,8 @@
 
 [八层课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [楼层地图与美术蓝图](docs/FLOOR_THEMES.zh-CN.md) |
+[八层剧情 V2](docs/product/narrative/EIGHT_FLOOR_NARRATIVE_DESIGN_V2.md) |
+[怪物分布 V2](docs/product/systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md) |
 [文档索引与版本路线](docs/README.md) |
 [English curriculum blueprint](docs/CURRICULUM.md) |
 [English map direction](docs/FLOOR_THEMES.md)

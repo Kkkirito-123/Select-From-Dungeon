@@ -2,13 +2,20 @@
 
 > 文档版本：`v0.1`
 >
-> 状态：`F1–F2 IMPLEMENTED / IMPLEMENTATION CONTRACT`
+> 状态：`F1–F2 HISTORICAL CONTRACT / CURRENT DRIFT REGISTERED`
 >
 > 适用版本：`MVP 2.1 — The First Two Records`
 >
 > 详细范围：第一、第二层完整生态；第三至八层宏观进阶
 >
 > 最近更新：`2026-07-26`
+
+> **V2 覆盖说明（2026-07-30）**：本文保留 F1–F2 垂直切片的设计来路，但精确 ID、区域、XP、
+> Stage 与掉落不得再从本文反向生成。当前区域首领为 3 XP，ID #009 为宝箱怪，随机池只保留
+> 2% / 5% / 10% 的即时恢复品，层主为 0%。下一版目标以
+> [`EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md`](./EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md) 为准，
+> 冲突与真源见
+> [`CONTENT_AUTHORITY_AND_TRACEABILITY.md`](../production/CONTENT_AUTHORITY_AND_TRACEABILITY.md)。
 
 ## 0. 文档职责与权威边界
 

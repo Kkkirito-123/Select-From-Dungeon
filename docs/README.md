@@ -62,9 +62,13 @@ README、代码和测试共同为准；`docs/product/` 是内容与制作契约�
 | 文档 | 状态 | 用途 |
 |---|---|---|
 | [八层差异化体验迭代](./design/EIGHT_FLOOR_EXPERIENCE_VARIETY_PLAN.md) | `APPROVED_FOR_DESIGN / NOT_IMPLEMENTED` | 定义八层独有动词、SQL 世界行为、非战斗玩法、回访、Boss、抄写员人物弧与疲劳预算 |
+| [八层剧情精细化设计 V2](./product/narrative/EIGHT_FLOOR_NARRATIVE_DESIGN_V2.md) | `DESIGN LOCK / IMPLEMENTATION PENDING` | 八层九拍、人物弧、跨层线索、终局回收与事件合同 |
+| [八层怪物分布设计 V2](./product/systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md) | `DESIGN LOCK / IMPLEMENTATION PENDING` | 稳定 ID、生态、题阶、区域首领、抗疲劳、身份与掉落边界 |
+| [内容权威与追踪矩阵](./product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md) | `CURRENT AUTHORITY REGISTER` | 区分运行事实、目标设计和历史参考，并登记现有跨真源漂移 |
 
 该迭代保留当前八层 47 组课程、`48×36 / generator-v5`、Phaser、离线 SQLite、确定 Seed 和
-唯一 `MIGRATE` 结局。运行时实施必须从第一、二层垂直切片建立新的批准范围和验收证据。
+唯一 `MIGRATE` 结局。V2 文档已锁定设计，不表示其中的改名、题阶、区域映射或剧情演出已经进入
+运行时；实施按权威矩阵先关闭 P0 漂移，再分 F1–2、F3–4、F5–6、F7–8 建立验收证据。
 
 ## 历史设计与兼容参考
 

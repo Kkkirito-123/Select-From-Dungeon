@@ -254,10 +254,22 @@ is not serialized.
 `src/domain/floorLabyrinth.ts` resolves that intent against the current saved
 `MazeFloor`, campfires, guided plan, and biome plan. It must not persist derived
 safe-cell, sight, hazard-position, or threshold-confirmation duplicates.
-`src/content/floorContracts.ts` is the canonical eight-floor content schema.
-`src/domain/campaign.ts` owns its serializable ordered floor slots and
-must reject skipped, duplicated, or rerolled transitions. This campaign
-must never route a floor through another floor's content.
+`src/content/floorContracts.ts` owns campaign curriculum metadata and its
+serializable schema; while registered drift `AUTH-003` remains open, it is not
+the player-facing authority for floor names, biomes, or exact monster rosters.
+Executable monster truth lives in the per-floor level files and
+`biomeContent.ts`; player-facing places and events live in Floor Experience;
+navigation boundaries live in Floor Labyrinth and Floor Map Blueprints.
+`src/domain/campaign.ts` owns the serializable ordered floor slots and must
+reject skipped, duplicated, or rerolled transitions. This campaign must never
+route a floor through another floor's content. The authority register is
+`docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`.
+
+The V2 eight-floor narrative and monster-distribution documents are
+design-locked implementation targets, not runtime claims. Their renamed
+monsters, stage curves, region mappings, and expanded story beats remain
+pending until code, automated evidence, and human QA advance each item
+independently.
 `src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
 complete canonical schema, current task context, and MVP SQL vocabulary. It may
 replace only the active token after explicit keyboard or pointer acceptance; it

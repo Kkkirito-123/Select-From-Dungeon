@@ -4,6 +4,8 @@
 
 [Eight-floor curriculum blueprint](docs/CURRICULUM.md) |
 [Floor map and art direction](docs/FLOOR_THEMES.md) |
+[Eight-floor narrative V2 (Chinese)](docs/product/narrative/EIGHT_FLOOR_NARRATIVE_DESIGN_V2.md) |
+[Monster distribution V2 (Chinese)](docs/product/systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md) |
 [Document index and roadmap](docs/README.md) |
 [中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
