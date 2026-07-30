@@ -1,10 +1,10 @@
 # 八层内容权威与追踪矩阵
 
-> 文档版本：`0.3`
+> 文档版本：`0.4`
 >
-> 日期：`2026-07-30`
+> 日期：`2026-07-31`
 >
-> 状态：`CURRENT AUTHORITY REGISTER / DESIGN REVIEW`
+> 状态：`CURRENT AUTHORITY REGISTER / AUTOMATED BASELINE`
 >
 > 适用范围：MVP 2.0 第一至第八层剧情、怪物、区域、课程与掉落设计
 
@@ -54,8 +54,8 @@
 - [`EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md`](../systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md)：
   八层怪物生态、区域职责、遭遇节奏、身份揭示和掉落边界。
 
-它们的状态是 `DESIGN LOCK / IMPLEMENTATION PENDING`。只有对应代码、自动化和人工体验证据完成后，
-单个条目才能改为 `IMPLEMENTED`。
+其中的区域映射、怪物身份/数值、三种剧情呈现、主线区域首领和七步 `MIGRATE` 已有运行时与
+自动化基线。这不代表整份目标稿已通过文字、音频、视觉或真人八层 Run QA；状态仍必须按条目和证据类型独立推进。
 
 ### 3.3 历史参考
 
@@ -73,11 +73,13 @@
 | `AUTH-002` | `CLOSED` | F5–F8 Blueprint 区名与 Experience 区名不完全一致 | Experience 继续拥有玩家文案，Blueprint 继续拥有几何槽位；所有展示区均通过 `navigationRegion` 显式落到三物理区 | 已由八层映射完整性测试覆盖 |
 | `AUTH-003` | `CLOSED` | `floorContracts.ts` 的部分楼层名、主题与 F7 怪物池仍是旧方向 | 合同已对齐真实课程 ID、Experience 标题、Labyrinth 拓扑和当前怪物集合；测试阻止它再次覆盖运行真源 | 已由跨真源合同测试覆盖 |
 | `AUTH-004` | `CLOSED` | 旧怪物规格写区域 Boss 5 XP、F1 ID #009 为旧怪物 | 当前运行时为区域 Boss 3 XP，ID #009 是宝箱怪；旧规格已标记为历史参考并指向本登记表 | 已完成：旧规格的运行时声明已撤销 |
-| `AUTH-005` | `OPEN` | 历史生态稿含 20% F8 精英与随机装备/保底掉落 | 当前小型精英 19%；随机掉落仅 2%/5%/10% 即时恢复，层主 0% | 历史稿加醒目标记，不改运行时 |
-| `AUTH-006` | `OPEN` | F1–F2 脚本远比 F5–F8 细，后期仅有短事件卡 | 本轮先统一设计节拍与交付模板，不直接扩写运行时代码 | 每层事件脚本达到同一字段完整度并经文字 QA |
+| `AUTH-005` | `CLOSED` | 历史生态稿含 20% F8 精英与随机装备/保底掉落 | 当前小型精英 19%；随机掉落仅 2%/5%/10% 即时恢复，层主 0% | 历史生态/阶级稿已有当前规则覆盖标记；Loot 测试锁定无保底、无随机装备 |
+| `AUTH-006` | `MITIGATED` | F1–F2 脚本远比 F5–F8 细，后期仅有短事件卡 | 八层现场事件已统一呈现合同，F5/F7 关键供述已进主线 | 各层逐事件脚本字段密度与文字仍需专项 QA，不以自动化冒充关闭 |
 | `AUTH-007` | `CLOSED` | 多个区域首领的 SQLite `room_id/sector` 与实际物理生态区不同 | 保持四表 DDL 不变，仅修正 rooms 初始化记录与怪物 `roomId/biome`，使地图生态和 SQLite 查询证据一致 | 已由怪物—房间—生态对照测试覆盖 |
-| `AUTH-008` | `OPEN` | 怪物 `hp/damage` 展示值与实际战斗轮数/扣血不一致 | 当前轮数由 Stage 数决定，错误查询固定扣 1 点；目标稿不用展示值推断难度 | 数值与战斗真源统一后关闭 |
-| `AUTH-009` | `MITIGATED` | 完成矩阵写“每层隐藏护甲”，实际只有 F4–F8 隐藏区配置 `rewardArmorId` | F1–F3 保持证据 / 探索奖励；完成矩阵已修订，不为表格对称强塞换装 | 增加奖励合同测试后关闭 |
+| `AUTH-008` | `CLOSED` | 怪物 `hp/damage` 展示值与实际战斗轮数/扣血不一致 | Stage 数与 `counterDamageForEncounter` 分别成为轮数/反击真源，结果错误与语法错误共用伤害规则 | `combatBalance` 与 GameSession 测试覆盖 89 只怪、四角色矩阵、Stage 与护甲先承伤 |
+| `AUTH-009` | `CLOSED` | 完成矩阵写“每层隐藏护甲”，实际只有 F4–F8 隐藏区配置 `rewardArmorId` | F1–F3 保持证据 / 探索奖励；F4–F8 只提供各层确定性换装 | 正反向奖励合同测试同时锁定 F1–F3 无隐藏护甲和 F4–F8 的稳定护甲 ID |
+
+> 证据边界：上表的 `CLOSED` 只表示当前代码与能失败的自动化已对齐。真人从新 Run 到 `MIGRATE`、文字/音频主观 QA 和 Pages 上线均未由此表宣告完成；私有仓库无法启用 Pages 时记为 `provider-blocked`。
 
 ## 5. 八层稳定追踪键
 

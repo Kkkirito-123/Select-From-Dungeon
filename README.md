@@ -307,6 +307,18 @@ pnpm dev
 Open the URL printed by Vite, normally `http://localhost:5173/`. Do not open
 `index.html` through `file://`; the SQLite WASM file must be fetched over HTTP.
 
+For a production-equivalent local check, build and serve `dist/` over HTTP:
+
+```bash
+pnpm build
+pnpm preview
+```
+
+The top-bar `⌘ 管理员` button opens the spoiler-heavy admin overview. It can
+load any floor, region, or authored entry/area-Boss/hidden/Boss preset, but the
+preview is memory-only and never overwrites the formal Run or permanent monster
+profile. Reload the page to leave admin preview and restore the last formal save.
+
 The first two attacks are:
 
 ```sql
@@ -431,6 +443,19 @@ python3 scripts/validate-rules.py
 The build also copies the authoritative root `LICENSE` and `ATTRIBUTIONS.md`
 into `dist/`; do not maintain separate hand-written copies. Deploy that directory
 to a static host that serves WASM with the correct MIME type.
+
+GitHub Pages is deliberately opt-in. `.github/workflows/deploy-pages.yml` runs
+only when the repository variable `GITHUB_PAGES_ENABLED=true`; it validates the
+rules, tests, and production build before publishing `dist`, and keeps Vite
+`base: "./"`. The current repository remains private. If its provider/plan does
+not allow a workflow-backed Pages site, publication is recorded as
+`provider-blocked`, the variable stays false or unset, and the repository must
+not be made public or moved to another host without separate authorization.
+
+MVP 2.0 retains the existing Phaser, SQLite WASM, world-rules, and application
+chunk split. Further bundle/startup optimization is deferred to the independent
+MVP 2.1 performance pass; this content release does not change engine,
+dependencies, schema, or save versions for that purpose.
 
 The current eight-floor labyrinth pass has automated evidence plus targeted browser QA.
 Content tests cross-check all eight contracts against map blueprints, curriculum

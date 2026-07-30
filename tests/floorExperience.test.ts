@@ -253,6 +253,21 @@ describe("eight-floor experience contracts", () => {
     });
   });
 
+  it("F1-F3 隐藏区不强塞护甲，F4-F8 只提供各层确定性换装", () => {
+    expect(FLOOR_EXPERIENCES.slice(0, 3).map(
+      (experience) => experience.hiddenAreas[0]?.rewardArmorId,
+    )).toEqual([undefined, undefined, undefined]);
+    expect(FLOOR_EXPERIENCES.slice(3).map(
+      (experience) => experience.hiddenAreas[0]?.rewardArmorId,
+    )).toEqual([
+      "ember-echo-robe",
+      "iron-armor",
+      "dragon-armor",
+      "crystal-armor",
+      "royal-armor",
+    ]);
+  });
+
   it("keeps every declared pack path and texture key aligned with public manifests", async () => {
     for (const experience of FLOOR_EXPERIENCES) {
       const manifestFile = new URL(
