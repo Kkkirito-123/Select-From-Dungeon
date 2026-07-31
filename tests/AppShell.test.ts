@@ -24,6 +24,119 @@ import {
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
 } from "../src/ui/AppShell";
+import {
+  FloorTransitionCoordinator,
+  floorTransitionPolicy,
+  type FloorTransitionClock,
+} from "../src/ui/FloorTransitionCoordinator";
+
+describe("楼层自动传送策略", () => {
+  it("第一至第七层的结算卡、钥匙卡或剧情队列只能遮住演出，不能阻止 transition 定时器", () => {
+    for (let floor = 1; floor <= 7; floor += 1) {
+      expect(floorTransitionPolicy({
+        mode: "transition",
+        floor,
+        finalVictoryReady: false,
+        presentationBlocked: true,
+      })).toEqual({
+        transitionVisible: false,
+        victoryVisible: false,
+        shouldScheduleAdvance: true,
+      });
+    }
+  });
+
+  it("没有临时卡片时仍显示传送演出并启动同一个定时器", () => {
+    expect(floorTransitionPolicy({
+      mode: "transition",
+      floor: 1,
+      finalVictoryReady: false,
+      presentationBlocked: false,
+    })).toEqual({
+      transitionVisible: true,
+      victoryVisible: false,
+      shouldScheduleAdvance: true,
+    });
+  });
+
+  it("普通探索和第八层胜利不会误触发下一层定时器", () => {
+    expect(floorTransitionPolicy({
+      mode: "explore",
+      floor: 1,
+      finalVictoryReady: false,
+      presentationBlocked: false,
+    }).shouldScheduleAdvance).toBe(false);
+    expect(floorTransitionPolicy({
+      mode: "victory",
+      floor: 8,
+      finalVictoryReady: true,
+      presentationBlocked: false,
+    })).toEqual({
+      transitionVisible: false,
+      victoryVisible: true,
+      shouldScheduleAdvance: false,
+    });
+  });
+});
+
+describe("楼层传送协调器", () => {
+  function fakeClock(): FloorTransitionClock & {
+    callbacks: Map<number, () => void>;
+    cleared: number[];
+  } {
+    let sequence = 0;
+    const callbacks = new Map<number, () => void>();
+    const cleared: number[] = [];
+    return {
+      callbacks,
+      cleared,
+      setTimeout(callback) {
+        sequence += 1;
+        callbacks.set(sequence, callback);
+        return sequence;
+      },
+      clearTimeout(timerId) {
+        callbacks.delete(timerId);
+        cleared.push(timerId);
+      },
+    };
+  }
+
+  it("重复 render 只保留一个切层时钟，触发后仅推进一次", () => {
+    const clock = fakeClock();
+    let advances = 0;
+    const coordinator = new FloorTransitionCoordinator(
+      clock,
+      () => { advances += 1; },
+    );
+
+    coordinator.sync(true, 1_500);
+    coordinator.sync(true, 1_500);
+    expect(clock.callbacks.size).toBe(1);
+
+    const [timerId, callback] = [...clock.callbacks.entries()][0];
+    clock.callbacks.delete(timerId);
+    callback();
+    expect(advances).toBe(1);
+    coordinator.sync(true, 1_500);
+    expect(clock.callbacks.size).toBe(1);
+  });
+
+  it("离开 transition 或销毁界面时会取消尚未触发的时钟", () => {
+    const clock = fakeClock();
+    const coordinator = new FloorTransitionCoordinator(clock, () => undefined);
+
+    coordinator.sync(true, 1_500);
+    coordinator.sync(false, 1_500);
+    expect(clock.callbacks.size).toBe(0);
+    expect(clock.cleared).toEqual([1]);
+
+    coordinator.sync(true, 1_500);
+    coordinator.destroy();
+    expect(clock.callbacks.size).toBe(0);
+    expect(clock.cleared).toEqual([1, 2]);
+  });
+});
 
 describe("玩家可见文本身份边界", () => {
   it("剧情、调查与管理员文本在击杀前只显示稳定 ID", () => {

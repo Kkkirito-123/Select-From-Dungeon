@@ -798,6 +798,21 @@ describe("GameSession SQL 魔王城 Run", () => {
 
     const beforePortal = session.snapshot();
     expect(beforePortal.floorReview.length).toBeGreaterThan(0);
+    const restoredTransition = new GameSession(
+      session.toSavedRun(),
+      session.toProfile(),
+      "restored-transition-fallback",
+    );
+    expect(restoredTransition.snapshot()).toMatchObject({
+      mode: "transition",
+      floor: 1,
+    });
+    expect(restoredTransition.advanceFloor()).toBe(true);
+    expect(restoredTransition.snapshot()).toMatchObject({
+      mode: "explore",
+      floor: 2,
+    });
+
     expect(session.advanceFloor()).toBe(true);
     expect(session.snapshot()).toMatchObject({
       mode: "explore",
