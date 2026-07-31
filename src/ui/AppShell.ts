@@ -2533,6 +2533,18 @@ export class AppShell {
       this.narrativeMomentQueue.ackPresented(nextMoment.id);
       nextMoment = this.narrativeMomentQueue.peekNext();
     }
+    // 层末传送是自动流程。战斗结算期间可能一次性解锁多条剧情，
+    // 其中的 blocking 节点不能把传送门永久卡在“已启动”状态；它们仍
+    // 会写入剧情档案，当前层结束时只消费展示队列。已经打开的主框
+    // （activeNarrativeMoment）仍然保留，避免打断玩家正在阅读的记录。
+    if (snapshot.mode === "transition" && nextMoment) {
+      while (nextMoment) {
+        this.executeStoryMomentActions(nextMoment, false);
+        this.narrativeMomentQueue.ackPresented(nextMoment.id);
+        nextMoment = this.narrativeMomentQueue.peekNext();
+      }
+      return;
+    }
     if (nextMoment) {
       if (!canPresentFinalMigrationStoryMoment(nextMoment, snapshot)) return;
       this.showNarrativeMomentCard(nextMoment, snapshot);
