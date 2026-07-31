@@ -80,6 +80,10 @@ import {
 import { NarrativeCodexView } from "./NarrativeCodexView";
 import { MonsterCodexView } from "./MonsterCodexView";
 import {
+  FloorTransitionCoordinator,
+  floorTransitionPolicy,
+} from "./FloorTransitionCoordinator";
+import {
   parseSchemaLines,
   SqlAutocompleteController,
 } from "./sqlAutocomplete";
@@ -580,7 +584,7 @@ export class AppShell {
   private narrativeBootstrapMode: "new" | "restored";
   private activeNarrativeMoment: FloorStoryMoment | null = null;
   private narrativeActionInFlight = false;
-  private floorTransitionTimer: number | null = null;
+  private readonly floorTransitionCoordinator: FloorTransitionCoordinator;
   private defeatRespawnTimer: number | null = null;
   private regionTransitionTimer: number | null = null;
   private lastRegionTransferSequence = 0;
@@ -849,6 +853,10 @@ export class AppShell {
     initialRunSource: "new" | "restored" = "new",
   ) {
     this.narrativeBootstrapMode = initialRunSource;
+    this.floorTransitionCoordinator = new FloorTransitionCoordinator({
+      setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: (timerId) => window.clearTimeout(timerId),
+    }, () => this.advanceFromFloorTransition());
   }
 
   mount(): void {
@@ -1602,8 +1610,7 @@ export class AppShell {
     this.activeNarrativeMoment = null;
     this.narrativeMomentQueue.clear();
     this.narrativeMomentQueuePrimed = false;
-    if (this.floorTransitionTimer !== null) window.clearTimeout(this.floorTransitionTimer);
-    this.floorTransitionTimer = null;
+    this.floorTransitionCoordinator.destroy();
     if (this.defeatRespawnTimer !== null) window.clearTimeout(this.defeatRespawnTimer);
     this.defeatRespawnTimer = null;
     if (this.regionTransitionTimer !== null) window.clearTimeout(this.regionTransitionTimer);
@@ -3580,7 +3587,6 @@ export class AppShell {
       portal,
       "#floor-victory-actions",
     );
-    const transitioning = snapshot.mode === "transition" && snapshot.floor < 8;
     const finalVictoryReady = finalVictoryPortalReady(snapshot);
     const narrativePending = this.activeNarrativeMoment !== null ||
       this.narrativeMomentQueue.pendingIds.length > 0;
@@ -3589,8 +3595,17 @@ export class AppShell {
       this.isLootMenuOpen() ||
       this.isInspectionOpen() ||
       narrativePending;
-    const transitionVisible = transitioning && !presentationBlocked;
-    const victoryVisible = finalVictoryReady && !presentationBlocked;
+    const policy = floorTransitionPolicy({
+      mode: snapshot.mode,
+      floor: snapshot.floor,
+      finalVictoryReady,
+      presentationBlocked,
+    });
+    const {
+      transitionVisible,
+      victoryVisible,
+      shouldScheduleAdvance,
+    } = policy;
     portal.hidden = !transitionVisible && !victoryVisible;
     portal.inert = !transitionVisible && !victoryVisible;
     portal.setAttribute("aria-hidden", String(!transitionVisible && !victoryVisible));
@@ -3642,31 +3657,35 @@ export class AppShell {
       portal.removeAttribute("aria-modal");
       portal.removeAttribute("aria-labelledby");
     }
-    if (!transitionVisible) {
-      if (this.floorTransitionTimer !== null) {
-        window.clearTimeout(this.floorTransitionTimer);
-        this.floorTransitionTimer = null;
-      }
-      return;
-    }
-    if (this.floorTransitionTimer !== null) return;
     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? 650
       : 1_500;
-    this.floorTransitionTimer = window.setTimeout(() => {
-      this.floorTransitionTimer = null;
-      const current = this.session.snapshot();
-      if (current.mode !== "transition" || current.floor >= 8) return;
-      if (!this.session.advanceFloor()) return;
-      const nextSnapshot = this.session.snapshot();
-      this.sql.reset(nextSnapshot.monsters);
-      this.clearQueryArtifacts();
-      this.audio.setScene({
-        floor: nextSnapshot.floor,
-        region: 0,
-        mode: "explore",
-      });
-    }, delay);
+    this.floorTransitionCoordinator.sync(shouldScheduleAdvance, delay);
+  }
+
+  private advanceFromFloorTransition(): void {
+    const current = this.session.snapshot();
+    if (current.mode !== "transition" || current.floor >= 8) return;
+    this.hidePickupCard();
+    this.hideCombatSettlement();
+    this.hideNarrativeBeatCard();
+    if (
+      this.isInspectionOpen() &&
+      this.inspectionOverlay.dataset.recordKind !== "migration"
+    ) {
+      this.closeInspection(false, false);
+    }
+    this.activeNarrativeMoment = null;
+    this.narrativeMomentQueue.clear();
+    if (!this.session.advanceFloor()) return;
+    const nextSnapshot = this.session.snapshot();
+    this.sql.reset(nextSnapshot.monsters);
+    this.clearQueryArtifacts();
+    this.audio.setScene({
+      floor: nextSnapshot.floor,
+      region: 0,
+      mode: "explore",
+    });
   }
 
   private isVictoryPortalOpen(): boolean {
