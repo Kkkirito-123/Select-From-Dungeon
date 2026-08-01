@@ -59,6 +59,7 @@ export type LessonStageId =
   | "f3-union-patrol"
   | "f3-audit-groups"
   | "f3-audit-core"
+  | "f3-audit-verdict"
   | "f4-scalar-first"
   | "f4-in-frost"
   | "f4-exists-gear"
@@ -402,6 +403,39 @@ export interface LessonStageDefinition {
   attackTargetIds: number[];
 }
 
+export type LessonTaskTier =
+  | "foundation"
+  | "reinforcement"
+  | "composite"
+  | "boss";
+
+export interface LessonTaskFieldGuide {
+  expression: string;
+  meaning: string;
+}
+
+/**
+ * Player-facing explanation of one SQL combat stage. This is derived content:
+ * it is never persisted in SavedRun/ProfileProgress and therefore does not
+ * participate in save-version compatibility.
+ */
+export interface LessonTaskBrief {
+  tier: LessonTaskTier;
+  tierLabel: string;
+  situation: string;
+  queryGoal: string;
+  outputColumns: string[];
+  fieldGuide: LessonTaskFieldGuide[];
+  relations: string[];
+  constraints: string[];
+  successEffect: string;
+  primaryTable: string | null;
+  relatedTables: string[];
+  focusTopics: string[];
+  reviewTopics: string[];
+  hints: string[];
+}
+
 export interface LessonDefinition {
   id: LessonId;
   concept: string;
@@ -554,6 +588,7 @@ export interface GameSnapshot {
   missionTitle: string;
   missionBody: string;
   lessonIntro: string;
+  taskBrief: LessonTaskBrief | null;
   schema: string[];
   queryTemplate: string;
   hints: string[];

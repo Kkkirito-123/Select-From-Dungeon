@@ -314,13 +314,14 @@ export function schemaRenderSignature(
     | "locks"
     | "missionBody"
     | "schema"
-  >,
+  > & Partial<Pick<GameSnapshot, "taskBrief">>,
 ): string {
   return [
     String(snapshot.focusMonsterId ?? ""),
     snapshot.lessonStageId,
     snapshot.lessonIntro,
     snapshot.missionBody,
+    JSON.stringify(snapshot.taskBrief),
     snapshot.locks.join("\u0000"),
     snapshot.schema.join("\u0000"),
   ].join("\u0001");
@@ -330,8 +331,16 @@ export function schemaTaskTableRoles(
   snapshot: Pick<
     GameSnapshot,
     "focusMonsterId" | "lessonIntro" | "lessonStageId" | "missionBody" | "schema"
-  >,
+  > & Partial<Pick<GameSnapshot, "taskBrief">>,
 ): ReadonlyMap<string, SchemaTaskRole> {
+  if (snapshot.taskBrief?.primaryTable) {
+    const roles = new Map<string, SchemaTaskRole>();
+    roles.set(snapshot.taskBrief.primaryTable.toLocaleLowerCase(), "primary");
+    snapshot.taskBrief.relatedTables.forEach((table) => {
+      roles.set(table.toLocaleLowerCase(), "related");
+    });
+    return roles;
+  }
   const authoredStage = LESSONS
     .flatMap((lesson) => lesson.stages)
     .find((stage) => stage.id === snapshot.lessonStageId);
@@ -1054,7 +1063,8 @@ export class AppShell {
                 <div class="terminal-grid">
                   <section class="terminal-brief">
                     <div class="card-heading"><span>本回合任务</span><span id="query-counter">查询 0 次</span></div>
-                    <p id="terminal-objective"></p>
+                    <p id="terminal-objective" class="sr-only"></p>
+                    <div id="terminal-task-brief" class="terminal-task-brief"></div>
                     <blockquote id="final-migration-argument" class="scribe-recap" hidden>
                       <strong id="final-migration-argument-title">ID #084 的论点</strong>
                       <p id="final-migration-argument-evidence"></p>
@@ -3382,6 +3392,7 @@ export class AppShell {
     requiredElement(this.root, "#query-counter").textContent = `查询 ${snapshot.queryCount} 次`;
     requiredElement(this.root, "#terminal-title").textContent = `${snapshot.lessonId.toUpperCase()} · 阶段 ${snapshot.lessonStageIndex + 1} · 回合 ${snapshot.combat?.round ?? 1}`;
     requiredElement(this.root, "#terminal-objective").textContent = snapshot.missionBody;
+    this.renderTaskBrief(snapshot);
     this.renderFinalMigrationArgument(snapshot);
     requiredElement(this.root, "#victory-count").textContent = `通关 ${snapshot.profile.victories}`;
     requiredElement(this.root, ".game-stage").classList.toggle("is-combat", snapshot.mode === "combat");
@@ -3813,6 +3824,55 @@ export class AppShell {
       chip.textContent = lock;
       root.append(chip);
     });
+  }
+
+  private renderTaskBrief(snapshot: GameSnapshot): void {
+    const root = requiredElement(this.root, "#terminal-task-brief");
+    root.replaceChildren();
+    const brief = snapshot.taskBrief;
+    if (!brief) {
+      const fallback = document.createElement("p");
+      fallback.className = "task-brief__fallback";
+      fallback.textContent = snapshot.missionBody;
+      root.append(fallback);
+      return;
+    }
+
+    const heading = document.createElement("div");
+    heading.className = `task-brief__tier task-brief__tier--${brief.tier}`;
+    heading.textContent = brief.tierLabel;
+    root.append(heading);
+
+    const appendSection = (
+      label: string,
+      values: readonly string[],
+      className = "",
+    ): void => {
+      if (values.length === 0) return;
+      const section = document.createElement("section");
+      section.className = `task-brief__section ${className}`.trim();
+      const title = document.createElement("strong");
+      title.textContent = label;
+      section.append(title);
+      values.forEach((value) => {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = value;
+        section.append(paragraph);
+      });
+      root.append(section);
+    };
+
+    appendSection("当前局面", [brief.situation], "task-brief__section--situation");
+    appendSection("这次要做", [brief.queryGoal], "task-brief__section--goal");
+    appendSection("必须返回", brief.outputColumns);
+    appendSection(
+      "字段说明",
+      brief.fieldGuide.map((field) => `${field.expression} → ${field.meaning}`),
+      "task-brief__section--fields",
+    );
+    appendSection("连接关系", brief.relations, "task-brief__section--relation");
+    appendSection("查询条件", brief.constraints);
+    appendSection("成功后", [brief.successEffect], "task-brief__section--effect");
   }
 
   private renderSchema(snapshot: GameSnapshot): void {

@@ -155,7 +155,12 @@ SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，
 `src/content/floor8Level.ts`；房间氛围与局内奖励位于
 `src/content/runContent.ts`；可选 Boss 门题目与语义结果约束位于
 `src/content/gateChallenges.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL
-阶段都从空编辑器开始。`src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
+阶段都从空编辑器开始。`src/content/lessonTaskBrief.ts` 是面向玩家的 SQL 任务展示边界：
+它根据关卡阶段与 `sqlSchema` 统一生成当前局面、精确返回列、权威字段含义、JOIN 关系、查询
+条件、世界效果、难度标签和四级提示；`AppShell` 只负责渲染，不得重新猜测 SQL 语义。普通
+遭遇第一击只包含当前章节和基础投影/过滤；小型精英只能从第二击起增加至多一个已掌握章节；
+楼层 Boss 从单章确认逐步升级到最终二至三章审计。完整 SQL 只能出现在第四级提示。
+`src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
 MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得
 生成完整答案、提交查询或绕过课程判定。
 `src/content/inventoryCatalog.ts` 负责背包容量、当前武器/防具/恢复品目录和生态可选候选概率；

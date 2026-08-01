@@ -241,6 +241,15 @@ the concept lock. Shared curriculum data and fixed room-chest rewards live in
 `src/content/runContent.ts`; optional Boss-gate questions and semantic result
 contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
+`src/content/lessonTaskBrief.ts` is the player-facing SQL-task presentation
+boundary. It derives the current situation, exact output columns, canonical
+field meanings, JOIN relation, clauses, world effect, difficulty tier, and a
+four-step hint ladder from the authored stage plus `sqlSchema`; `AppShell` only
+renders that contract and must not rediscover SQL semantics. Ordinary encounter
+stage one contains one current chapter plus baseline projection/filtering;
+mini-elites may add at most one mastered chapter from stage two onward, and
+floor Bosses progress from a single chapter to a final two- or three-chapter
+audit. A complete SQL answer appears only in hint four.
 `src/content/inventoryCatalog.ts` owns inventory capacities, the current
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls and

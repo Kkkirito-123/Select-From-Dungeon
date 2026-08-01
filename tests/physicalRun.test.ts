@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";
-import { INITIAL_MONSTERS, LESSONS, lessonById } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
 import { GameSession } from "../src/domain/GameSession";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
@@ -846,32 +846,44 @@ function clearLessonByWalking(
   engine?: SqlEngine,
 ): void {
   engageLessonByWalking(session, lessonId);
-  const queries = engine
-    ? lessonById(lessonId).stages.map((stage) => (
-      engine.execute(stage.answerSql, session.snapshot().floor)
-    ))
-    : LESSON_QUERIES[lessonId];
-  if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
   let finalResolution: ReturnType<GameSession["resolveQuery"]> | null = null;
-  queries.forEach((query) => {
-    const resolution = session.resolveQuery(query);
-    expect(resolution.accepted, resolution.message).toBe(true);
-    finalResolution = resolution;
-  });
   let repeatCount = 0;
-  while (session.snapshot().mode === "combat" && repeatCount < 10) {
-    const activeStageId = session.snapshot().lessonStageId;
-    const activeStage = LESSONS
-      .flatMap((lesson) => lesson.stages)
-      .find((stage) => stage.id === activeStageId);
-    const reviewQuery = engine && activeStage
-      ? engine.execute(activeStage.answerSql, session.snapshot().floor)
-      : queries.at(-1)!;
-    const resolution = session.resolveQuery(reviewQuery);
-    expect(resolution.accepted, resolution.message).toBe(true);
-    finalResolution = resolution;
-    repeatCount += 1;
+
+  if (engine) {
+    while (session.snapshot().mode === "combat" && repeatCount < 10) {
+      const snapshot = session.snapshot();
+      const activeStage = LESSONS
+        .flatMap((lesson) => lesson.stages)
+        .find((stage) => stage.id === snapshot.lessonStageId);
+      if (!activeStage) {
+        throw new Error(
+          `${lessonId} 的当前阶段没有权威题目：${snapshot.lessonStageId}`,
+        );
+      }
+      const resolution = session.resolveQuery(
+        engine.execute(activeStage.answerSql, snapshot.floor),
+      );
+      expect(resolution.accepted, resolution.message).toBe(true);
+      finalResolution = resolution;
+      repeatCount += 1;
+    }
+  } else {
+    const queries = LESSON_QUERIES[lessonId];
+    if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
+    queries.forEach((query) => {
+      const resolution = session.resolveQuery(query);
+      expect(resolution.accepted, resolution.message).toBe(true);
+      finalResolution = resolution;
+    });
+    while (session.snapshot().mode === "combat" && repeatCount < 10) {
+      const resolution = session.resolveQuery(queries.at(-1)!);
+      expect(resolution.accepted, resolution.message).toBe(true);
+      finalResolution = resolution;
+      repeatCount += 1;
+    }
   }
+
+  expect(session.snapshot().mode).not.toBe("combat");
   expect(finalResolution?.lessonCompleted).toBe(lessonId);
   const snapshot = session.snapshot();
   const lessonRoom = snapshot.roomGraph.nodes.find(

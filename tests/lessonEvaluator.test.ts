@@ -9,6 +9,7 @@ import {
 import {
   INITIAL_MONSTERS,
   LESSONS,
+  lessonById,
   practiceStageFor,
   practiceStagesFor,
 } from "../src/content/mvpLevel";
@@ -63,7 +64,7 @@ describe("课程文案", () => {
       ...LESSONS.flatMap((lesson) => lesson.stages),
       ...BIOME_ENCOUNTERS.flatMap((encounter) => encounter.stages),
     ];
-    expect(stages).toHaveLength(118);
+    expect(stages).toHaveLength(119);
     stages.forEach((stage) => {
       expect(stage.answerSql).toMatch(/^(?:SELECT|WITH|INSERT|UPDATE|DELETE|BEGIN)\b/i);
       expect(stage.answerSql.endsWith(";")).toBe(true);
@@ -701,17 +702,19 @@ describe("evaluateLesson stages", () => {
     expect(evaluateLesson("left-join", 0, exact).accepted).toBe(true);
   });
 
-  it("第二层综合 Boss 要求 JOIN、GROUP BY、HAVING 与 ORDER BY 同时成立", () => {
+  it("第二层 Boss 第一击只检查明确的房间连接，第二击才进入复合题", () => {
     const exact = makeResult(
-      "SELECT r.sector, COUNT(*) AS total FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 3 ORDER BY total DESC, r.sector ASC",
-      ["sector", "total"],
-      [
-        { sector: "lake", total: 4 },
-        { sector: "swamp", total: 4 },
-        { sector: "forest", total: 3 },
-      ],
+      "SELECT m.id, r.sector FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 14",
+      ["id", "sector"],
+      [{ id: 14, sector: "lighthouse" }],
     );
     expect(evaluateLesson("join-boss", 0, exact).accepted).toBe(true);
+    expect(lessonById("join-boss").stages[0].requiredFeatures).toEqual(["join", "on"]);
+    expect(lessonById("join-boss").stages[1].requiredFeatures).toEqual([
+      "join",
+      "order-by",
+      "limit",
+    ]);
   });
 
   it("第二层区域 Boss 使用信号复合题，并在最终阶段返回 ID 与房间名", () => {
