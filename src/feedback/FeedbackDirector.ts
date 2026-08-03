@@ -1,3 +1,4 @@
+/** 将领域事件映射为一次通知和一次音效，避免 UI 与音频分别重复解释事件。 */
 import type { ArcadeAudio, ArcadeSfx } from "../audio/ArcadeAudio";
 
 export type FeedbackEvent =
@@ -26,6 +27,7 @@ export const PLAYER_STEP_MIN_INTERVAL_MS = 180;
 type FeedbackListener = (event: FeedbackEvent, notice: FeedbackNotice | null) => void;
 
 function cueFor(event: FeedbackEvent): ArcadeSfx {
+  // 一个语义事件只映射一个音效，避免多个 UI 分支重复播放。
   switch (event.type) {
     case "player-step": return "step";
     case "wall-bump": return "bump";
@@ -48,6 +50,7 @@ function cueFor(event: FeedbackEvent): ArcadeSfx {
 }
 
 function noticeFor(event: FeedbackEvent): FeedbackNotice | null {
+  // 只为需要玩家注意的事件创建短通知，其余事件保持安静。
   switch (event.type) {
     case "wall-bump":
       return event.message ? { message: event.message, tone: "info" } : null;
@@ -87,6 +90,7 @@ function noticeFor(event: FeedbackEvent): FeedbackNotice | null {
  * `dispatch` 的准确帧；导演器不会根据之后的快照猜测反馈。
  */
 export class FeedbackDirector {
+  /** 将领域反馈统一路由到通知订阅者和音频服务。 */
   private readonly listeners = new Set<FeedbackListener>();
   private lastBumpAt = -Infinity;
   private lastStepAt = -Infinity;
@@ -99,6 +103,7 @@ export class FeedbackDirector {
   }
 
   dispatch(event: FeedbackEvent, now = performance.now()): void {
+    // 玩家移动反馈有最小间隔，防止连续碰撞或巡逻声淹没交互音效。
     if (event.type === "wall-bump") {
       if (now - this.lastBumpAt < 150) return;
       this.lastBumpAt = now;

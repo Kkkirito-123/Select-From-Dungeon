@@ -1,3 +1,4 @@
+/** 跟踪 Q+S 组合键，避免单个按键直接打开 SQL 终端。 */
 export class SqlChordTracker {
   private qDown = false;
   private sDown = false;

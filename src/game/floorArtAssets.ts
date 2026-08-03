@@ -1,3 +1,4 @@
+/** 第一、二层运行时素材清单与加载状态；不在这里决定地图布局或碰撞。 */
 import Phaser from "phaser";
 import type { GameSnapshot } from "../domain/types";
 
@@ -127,10 +128,12 @@ export const FLOOR_ART_ASSETS: Readonly<Record<ArtFloor, readonly RuntimeTexture
 };
 
 export function supportsFloorArt(floor: GameSnapshot["floor"]): floor is ArtFloor {
+  /** 判断楼层是否拥有当前版本的真实素材包。 */
   return floor === 1 || floor === 2;
 }
 
 export function floorArtReady(scene: Phaser.Scene, floor: GameSnapshot["floor"]): boolean {
+  /** 检查素材关键帧是否已载入，避免布景层访问不存在的纹理。 */
   if (!supportsFloorArt(floor)) return false;
   return FLOOR_ART_ASSETS[floor].every((asset) => scene.textures.exists(asset.key));
 }
@@ -139,6 +142,7 @@ export function queueFloorArtAssets(
   scene: Phaser.Scene,
   floor: GameSnapshot["floor"],
 ): boolean {
+  /** 向 Phaser Loader 注册素材；实际加载时机由场景生命周期决定。 */
   if (!supportsFloorArt(floor)) return false;
   let queued = false;
   FLOOR_ART_ASSETS[floor].forEach((asset) => {

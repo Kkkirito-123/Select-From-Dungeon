@@ -1,3 +1,4 @@
+/** 验证玩家、抄写员和怪物共享像素角色配方及身份显示边界。 */
 import { describe, expect, it } from "vitest";
 import {
   MONSTER_ACTOR_PROFILES,

@@ -1,3 +1,4 @@
+/** 音乐数据目录：把楼层、场景和运动参数映射为确定性的程序化乐句。 */
 export type DungeonFloor = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type ArcadeMusicMode = "explore" | "combat" | "boss";
 export type ScoreFocus = "world" | "thinking" | "resolving";
@@ -542,10 +543,12 @@ export const FLOOR_SCORE_PROFILES = [
 ] as const satisfies readonly FloorScoreProfile[];
 
 export function floorScoreProfile(floor: DungeonFloor): FloorScoreProfile {
+  /** 返回指定楼层的固定音乐运动配置。 */
   return FLOOR_SCORE_PROFILES[floor - 1];
 }
 
 export function normalizeScoreScene(scene: ScoreScene): ScoreScene {
+  /** 将外部场景值收敛为音乐层可处理的有限枚举。 */
   return {
     floor: scene.floor,
     region: Math.max(0, Math.floor(Number.isFinite(scene.region) ? scene.region : 0)),
@@ -559,6 +562,7 @@ export function classifyScoreSceneTransition(
   previous: ScoreScene,
   next: ScoreScene,
 ): ScoreSceneTransition {
+  /** 判断场景变化是继续、换目标还是需要重启乐句。 */
   if (
     previous.floor === next.floor &&
     previous.region === next.region &&
@@ -593,6 +597,7 @@ function renderDegrees(
 }
 
 export function musicPatternsForScene(scene: ScoreScene): readonly MusicPattern[] {
+  /** 根据场景生成确定性的探索、战斗或 Boss 乐句集合。 */
   const normalized = normalizeScoreScene(scene);
   const profile = floorScoreProfile(normalized.floor);
   const movementProfile = profile.movements[normalized.mode];

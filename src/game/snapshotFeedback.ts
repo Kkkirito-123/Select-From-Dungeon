@@ -1,3 +1,4 @@
+/** 从相邻快照提取拾取、开门等一次性反馈，避免渲染帧重复播放提示。 */
 import type {
   GameSnapshot,
   GroundItem,

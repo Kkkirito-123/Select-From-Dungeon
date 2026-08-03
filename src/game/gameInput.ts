@@ -1,3 +1,4 @@
+/** 输入边界工具：区分游戏快捷键和被 UI/输入框消费的键盘事件。 */
 import type { Position } from "../domain/types";
 
 const UI_CAPTURE_SELECTOR = [

@@ -1,3 +1,4 @@
+/** 验证渐进引导的推进、跳过、重播和本地持久化。 */
 import { describe, expect, it } from "vitest";
 import {
   ONBOARDING_SAVE_KEY,

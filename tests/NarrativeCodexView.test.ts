@@ -1,3 +1,4 @@
+/** 验证失名录模型和故事视图的解锁、锁定与证据展示。 */
 import { describe, expect, it } from "vitest";
 import {
   NARRATIVE_ENDINGS,

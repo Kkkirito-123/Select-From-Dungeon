@@ -1,3 +1,4 @@
+/** 验证快捷键在游戏画布与输入控件之间的捕获边界。 */
 import { describe, expect, it } from "vitest";
 import {
   isGameplayShortcutCaptured,

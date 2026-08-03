@@ -1,3 +1,4 @@
+/** 验证快照差异只产生一次拾取、开门和故事反馈。 */
 import { describe, expect, it } from "vitest";
 import type { GameSnapshot, GroundItem } from "../src/domain/types";
 import type { MazeGate } from "../src/domain/mazeGenerator";

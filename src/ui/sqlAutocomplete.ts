@@ -1,3 +1,4 @@
+/** SQL 补全控制器：只提供词法/Schema 建议，不生成完整答案或自动提交查询。 */
 export type SqlSuggestionKind =
   | "keyword"
   | "function"
@@ -116,6 +117,7 @@ function sqlFunction(label: string, detail: string): SqlSuggestion {
 }
 
 export function parseSchemaLines(lines: readonly string[]): SchemaTable[] {
+  /** 将权威 Schema Codex 文本解析为补全索引。 */
   const tables = new Map<string, Set<string>>();
   lines.forEach((line) => {
     const match = line.match(/^\s*([A-Za-z_][\w]*)\s*\(([^)]+)\)/);
@@ -134,6 +136,7 @@ export function parseSchemaLines(lines: readonly string[]): SchemaTable[] {
 }
 
 export function parseSchemaRelations(lines: readonly string[]): SchemaRelation[] {
+  /** 解析 JOIN 关系，供别名和字段建议排序使用。 */
   return lines.flatMap((line) => {
     const match = line.match(
       /([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)\s*=\s*([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)/,
@@ -364,6 +367,7 @@ export function getSqlCompletions(
   force = false,
   preferredKeywords: readonly string[] = [],
 ): SqlCompletionResult {
+  /** 根据光标上下文返回有限建议，绝不生成或提交完整答案。 */
   const cursor = Math.max(0, Math.min(selectionStart, sql.length));
   const replaceEnd = Math.max(cursor, Math.min(selectionEnd, sql.length));
   const token = currentToken(sql, cursor);
@@ -426,6 +430,7 @@ export function applySqlSuggestion(
   completion: Pick<SqlCompletionResult, "replaceStart" | "replaceEnd">,
   suggestion: SqlSuggestion,
 ): { value: string; cursor: number } {
+  /** 只替换当前 token，保持用户其余 SQL 原文不变。 */
   const value = `${sql.slice(0, completion.replaceStart)}${suggestion.insertText}${
     sql.slice(completion.replaceEnd)
   }`;
@@ -445,6 +450,7 @@ const KIND_LABELS: Record<SqlSuggestionKind, string> = {
 };
 
 export class SqlAutocompleteController {
+  /** 管理终端补全列表的键盘、指针和无障碍状态。 */
   private schemaLines: string[] = [];
   private preferredKeywords: string[] = [];
   private completion: SqlCompletionResult = {

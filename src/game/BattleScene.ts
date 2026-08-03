@@ -1,3 +1,7 @@
+/**
+ * 独立战斗场景。
+ * 只负责渲染回合结算、动画和音效，伤害、判题与奖励仍由 GameSession 负责。
+ */
 import Phaser from "phaser";
 import { ArcadeAudio } from "../audio/ArcadeAudio";
 import {
@@ -251,6 +255,7 @@ const BIOME_ARENA: Readonly<Record<BiomeKind, {
 };
 
 export class BattleScene extends Phaser.Scene {
+  /** 渲染单目标 SQL 对战，不在场景内部计算伤害或奖励。 */
   private snapshot: GameSnapshot;
   private unsubscribe: (() => void) | null = null;
   private monsterContainer!: Phaser.GameObjects.Container;
@@ -306,6 +311,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   animateTurn(resolution: TurnResolution): Promise<void> {
+    // 按领域结算事件顺序播放动画，保证视觉结果与 GameSession 快照一致。
     if (!this.scene.isActive()) {
       if (resolution.mode !== "combat") this.abortEncounter();
       return Promise.resolve();

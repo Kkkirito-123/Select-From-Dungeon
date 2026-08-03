@@ -1,3 +1,4 @@
+/** 游戏主界面静态模板与 Schema/题目统计占位符。 */
 export interface AppShellTemplateMetrics {
   schemaTableCount: number;
   schemaFieldCount: number;
@@ -12,6 +13,7 @@ export function appShellTemplate({
   schemaTableCount,
   schemaFieldCount,
 }: AppShellTemplateMetrics): string {
+  /** 生成主界面静态 DOM；动态状态由 AppShell 后续同步。 */
   return `
       <div class="page-frame">
         <header class="masthead">

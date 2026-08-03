@@ -1,3 +1,4 @@
+/** 浏览器本地渐进引导控制器；只持久化引导进度，不干预正式 Run 存档。 */
 import {
   onboardingStep,
   type OnboardingMilestone,
@@ -52,6 +53,7 @@ function parseSave(raw: string | null): OnboardingSave | null {
 }
 
 export class OnboardingController {
+  /** 维护可跳过、可重播且与正式 Run 分离的入门步骤。 */
   private stepId: OnboardingStepId;
   private finishedValue: boolean;
   private skippedValue: boolean;

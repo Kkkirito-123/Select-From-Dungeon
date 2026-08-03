@@ -1,3 +1,4 @@
+/** 怪物图鉴视图：根据永久发现记录展示身份和生态信息，不提前揭示未知怪物。 */
 import {
   biomeEncounterFor,
   type BiomeKind,
@@ -121,6 +122,7 @@ export function buildMonsterCodexModel(
   state: MonsterCodexRenderState,
   monsters: readonly Monster[] = INITIAL_MONSTERS,
 ): MonsterCodexModel {
+  /** 只为已发现身份生成完整图鉴，其余条目继续显示稳定编号。 */
   const discovered = new Set(state.discoveredMonsterIds);
   const uniqueMonsters = [...new Map(
     monsters.map((monster) => [monster.id, monster] as const),
@@ -178,6 +180,7 @@ export interface MonsterCodexViewOptions {
 }
 
 export class MonsterCodexView {
+  /** 管理怪物图鉴的键盘可访问打开、关闭和渲染状态。 */
   readonly element: HTMLElement;
   readonly closeButton: HTMLButtonElement;
 

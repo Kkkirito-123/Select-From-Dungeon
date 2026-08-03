@@ -1,3 +1,4 @@
+/** 验证导航状态在 GameSession 快照中的派生和重置边界。 */
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/GameSession";
 import { biomeGuardianIdForStep } from "../src/domain/biome";

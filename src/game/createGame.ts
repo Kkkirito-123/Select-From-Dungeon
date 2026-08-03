@@ -1,3 +1,4 @@
+/** 创建 Phaser 游戏实例并注入事实会话、音频和事件反馈依赖。 */
 import Phaser from "phaser";
 import type { ArcadeAudio } from "../audio/ArcadeAudio";
 import type { FeedbackDirector } from "../feedback/FeedbackDirector";
@@ -11,6 +12,7 @@ export function createGame(
   audio: ArcadeAudio,
   feedback: FeedbackDirector,
 ): Phaser.Game {
+  /** 创建并启动 Phaser 根实例，场景仅通过注入依赖访问游戏事实。 */
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game-root",

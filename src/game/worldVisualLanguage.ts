@@ -1,3 +1,4 @@
+/** 将地标类型映射为统一的视觉/交互词汇，避免每个场景自行定义文案。 */
 import type { FloorLandmarkKind } from "../content/floorExperience";
 
 /**

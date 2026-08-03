@@ -1,3 +1,4 @@
+/** 验证路线信标、护送高亮和死路补给的导航表现契约。 */
 import { describe, expect, it } from "vitest";
 import { generateCampfires } from "../src/domain/campfire";
 import {

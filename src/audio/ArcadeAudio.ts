@@ -1,3 +1,7 @@
+/**
+ * 程序化 Web Audio 播放器。
+ * 负责探索/战斗音乐和事件音效的调度，不决定游戏事件，只响应已确认的场景状态。
+ */
 import {
   classifyScoreSceneTransition,
   floorScoreProfile,
@@ -65,6 +69,7 @@ export function chooseNextTrackIndex(
   currentIndex: number,
   randomValue: number,
 ): number {
+  /** 选择下一首曲目，避免在相同场景中连续重复。 */
   if (trackCount <= 1) return 0;
   const slot = Math.min(trackCount - 2, Math.floor(clamp(randomValue, 0, 0.999999) * (trackCount - 1)));
   return slot >= currentIndex ? slot + 1 : slot;
@@ -96,6 +101,7 @@ function audioContextConstructor(): AudioContextConstructor | null {
  * 因此应用销毁时只需调用一次 `dispose()`。
  */
 export class ArcadeAudio {
+  /** 管理程序化音乐调度、页面隐藏暂停和离散事件音效。 */
   private context: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private musicGain: GainNode | null = null;

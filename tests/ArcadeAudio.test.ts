@@ -1,3 +1,4 @@
+/** 验证程序化音频场景切换、静音和页面生命周期行为。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ARCADE_MUSIC_CREDITS,

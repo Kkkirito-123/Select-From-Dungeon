@@ -1,3 +1,4 @@
+/** 验证主界面模板包含所有必需面板和动态数据占位符。 */
 import { describe, expect, it } from "vitest";
 import { APP_SHELL_DOM_SELECTORS } from "../src/ui/appShellDom";
 import { appShellTemplate } from "../src/ui/appShellTemplate";

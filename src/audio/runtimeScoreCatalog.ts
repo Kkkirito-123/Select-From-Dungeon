@@ -1,3 +1,4 @@
+/** 静态音频资源目录；只负责根据场景解析资源，不管理播放生命周期。 */
 import {
   normalizeScoreScene,
   type ArcadeMusicMode,
@@ -74,6 +75,7 @@ export const RUNTIME_SCORE_ASSETS = [
 export function runtimeScoreForScene(
   scene: ScoreScene,
 ): RuntimeScoreAsset | null {
+  /** 查找与楼层、模式和场景完全匹配的录音资源。 */
   const normalized = normalizeScoreScene(scene);
   if (normalized.floor > 2) return null;
   return RUNTIME_SCORE_ASSETS.find((candidate) => (
@@ -85,6 +87,7 @@ export function runtimeScoreForScene(
 export function runtimeScoresForFloor(
   floor: DungeonFloor,
 ): readonly RuntimeScoreAsset[] {
+  /** 返回某楼层可用的全部录音资源，供预加载或回退选择。 */
   return RUNTIME_SCORE_ASSETS.filter((candidate) => candidate.floor === floor);
 }
 
@@ -92,6 +95,7 @@ export function resolveRuntimeScoreUrl(
   source: RuntimeScoreSource,
   baseUrl = import.meta.env.BASE_URL,
 ): string {
+  /** 将资源路径解析为当前部署根路径下的静态 URL。 */
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return `${normalizedBase}${source.path}`;
 }

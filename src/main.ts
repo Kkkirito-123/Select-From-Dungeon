@@ -1,3 +1,4 @@
+/** 浏览器启动入口：组装存储、GameSession、Agent、Phaser 和 AppShell。 */
 import "./style.css";
 import type Phaser from "phaser";
 import { ArcadeAudio } from "./audio/ArcadeAudio";

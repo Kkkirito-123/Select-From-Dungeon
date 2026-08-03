@@ -1,3 +1,4 @@
+/** 验证主界面文案、面板状态、Agent 输出和用户交互边界。 */
 import { describe, expect, it } from "vitest";
 import { COMPLETE_SCHEMA_LINES } from "../src/content/sqlSchema";
 import { GameSession } from "../src/domain/GameSession";

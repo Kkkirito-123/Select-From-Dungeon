@@ -1,3 +1,4 @@
+/** 管理楼层结算后的延迟推进，确保传送只发生一次且可被销毁取消。 */
 import type { GameSnapshot } from "../domain/types";
 
 export interface FloorTransitionPolicyInput {
@@ -30,6 +31,7 @@ export function floorTransitionPolicy({
   finalVictoryReady,
   presentationBlocked,
 }: FloorTransitionPolicyInput): FloorTransitionPolicy {
+  /** 根据当前快照计算是否允许自动进入下一层或显示最终胜利。 */
   const transitioning = mode === "transition" && floor < 8;
   return {
     transitionVisible: transitioning && !presentationBlocked,
@@ -43,6 +45,7 @@ export function floorTransitionPolicy({
  * AppShell 负责把权威状态同步进来，并在回调中执行界面清理与领域推进。
  */
 export class FloorTransitionCoordinator {
+  /** 对楼层推进定时器做幂等调度，并在页面销毁时取消。 */
   private timerId: number | null = null;
 
   constructor(

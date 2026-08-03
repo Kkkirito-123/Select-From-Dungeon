@@ -1,3 +1,4 @@
+/** 每层固定地标、隐藏房和故事布景的渲染层；位置从已保存地图和内容契约派生。 */
 import Phaser from "phaser";
 import {
   floorExperience,
@@ -137,6 +138,7 @@ function discoveredRoom(snapshot: GameSnapshot, roomNodeId: string): boolean {
 }
 
 export class FloorSetpieceLayer {
+  /** 管理楼层地标、隐藏房、抄写员和 SQL 密门的可视表现。 */
   private root: Phaser.GameObjects.Container | null = null;
   private scribe: ScribeView | null = null;
   private waterLayer: Phaser.GameObjects.Container | null = null;
@@ -189,6 +191,7 @@ export class FloorSetpieceLayer {
   ) {}
 
   build(snapshot: GameSnapshot): void {
+    // 只根据楼层体验契约创建布景，不能借渲染层新增游戏机制。
     this.destroy();
     if (!hasFloorExperience(snapshot.floor)) return;
     this.root = this.scene.add.container(0, 0).setDepth(12);
@@ -203,6 +206,7 @@ export class FloorSetpieceLayer {
   }
 
   sync(snapshot: GameSnapshot): void {
+    // 随快照更新标签和世界状态，避免重复创建 Phaser 对象。
     if (!this.root || !hasFloorExperience(snapshot.floor)) return;
     const world = floorWorldStateFromSnapshot(snapshot);
     if (!world) return;

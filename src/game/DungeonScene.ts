@@ -1,3 +1,7 @@
+/**
+ * 连续迷宫探索场景。
+ * 读取 GameSession 快照渲染地图、迷雾、角色、交互物和巡逻，不拥有游戏规则。
+ */
 import Phaser from "phaser";
 import { TILE_SIZE } from "../content/mvpLevel";
 import { playerActorProfile } from "../content/actorVisuals";
@@ -407,6 +411,7 @@ function emitMilestone(type: string): void {
 }
 
 export class DungeonScene extends Phaser.Scene {
+  /** 渲染连续探索世界，并把玩家输入委托给 GameSession。 */
   private snapshot: GameSnapshot;
   private unsubscribe: (() => void) | null = null;
   private terrain!: Phaser.GameObjects.Graphics;
@@ -553,6 +558,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   create(): void {
+    // 场景创建只建立渲染对象和订阅，不生成第二份游戏事实。
     this.snapshot = this.session.snapshot();
     this.cameras.main.setBackgroundColor(COLORS.void);
     this.terrain = this.add.graphics().setDepth(0);
@@ -583,6 +589,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   update(time: number): void {
+    // 每帧同步可见对象；巡逻和移动规则由会话的事件流程控制。
     if (
       this.snapshot.navigationGuidance.level === 3 &&
       time >= this.nextGuidanceEscortAt &&
@@ -689,6 +696,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private receiveSnapshot(snapshot: GameSnapshot): void {
+    // 用最新只读快照重建视图，避免场景本地状态成为第二事实源。
     const previous = this.snapshot;
     this.snapshot = snapshot;
     if (previous.floor !== snapshot.floor) {
@@ -2171,6 +2179,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private tryMove(dx: number, dy: number): void {
+    // 输入只请求移动，碰撞、门、危险和遭遇由 GameSession 判定。
     if (this.moveLocked || this.snapshot.mode !== "explore") return;
     this.moveLocked = true;
     let resolution: MoveResolution;

@@ -1,3 +1,4 @@
+/** AppShell 所需 DOM 节点的选择器和绑定入口，集中防止 UI 选择器漂移。 */
 function requireElement<T extends HTMLElement>(
   root: ParentNode,
   selector: string,
@@ -55,6 +56,7 @@ export interface AppShellDom {
 }
 
 export function bindAppShellDom(root: ParentNode): AppShellDom {
+  /** 一次性解析主界面所有固定节点，缺失节点立即抛出开发错误。 */
   return {
     textarea: requireElement(root, APP_SHELL_DOM_SELECTORS.textarea),
     gateTextarea: requireElement(root, APP_SHELL_DOM_SELECTORS.gateTextarea),

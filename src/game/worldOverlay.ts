@@ -1,3 +1,4 @@
+/** 探索世界上的距离、教学目标和交互标签计算，不负责实际移动或传送。 */
 import type { GameSnapshot, LessonId, Position } from "../domain/types";
 import { WORLD_UI_RUNTIME_CONFIG } from "../config/runtimeConfig";
 

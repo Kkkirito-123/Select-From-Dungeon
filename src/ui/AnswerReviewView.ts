@@ -1,3 +1,4 @@
+/** 答题复盘面板：只展示本地作答证据，不执行查询也不改变战斗状态。 */
 import type { AnswerAttemptRecord, GameSnapshot } from "../domain/types";
 
 export type AnswerReviewScope = "all" | "battle" | "floor";
@@ -13,6 +14,7 @@ export interface AnswerReviewSummary {
 export function answerReviewSummary(
   records: readonly AnswerAttemptRecord[],
 ): AnswerReviewSummary {
+  /** 从本地记录计算复盘摘要；不重新执行 SQL。 */
   const correct = records.filter((record) => record.result === "correct").length;
   const hintUses = records.filter((record) => record.hintLevel > 0).length;
   return {
@@ -37,6 +39,7 @@ function reviewSummaryCopy(summary: AnswerReviewSummary): string {
 }
 
 export class AnswerReviewView {
+  /** 管理战斗、本层和全局三种复盘范围的 DOM 展示。 */
   readonly element: HTMLElement;
   readonly closeButton: HTMLButtonElement;
   private scope: AnswerReviewScope = "all";

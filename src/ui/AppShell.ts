@@ -1,3 +1,7 @@
+/**
+ * DOM 主界面协调器。
+ * 负责输入、面板和视图同步；GameSession、SqlEngine 与 Agent 才是各自领域的事实权威。
+ */
 import { ArcadeAudio } from "../audio/ArcadeAudio";
 import type { AgentContentSource } from "../../agent/runtime/AgentCoordinator";
 import { buildAgentPrepareRequest } from "../../agent/runtime/context";
@@ -548,6 +552,7 @@ export function combatSettlementCopy(
 }
 
 export class AppShell {
+  /** 连接 DOM、GameSession、SQL、Agent、音频和 Phaser 的主界面协调器。 */
   private textarea!: HTMLTextAreaElement;
   private gateTextarea!: HTMLTextAreaElement;
   private queryStatus!: HTMLElement;

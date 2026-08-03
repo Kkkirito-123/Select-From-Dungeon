@@ -1,3 +1,4 @@
+/** 共享的像素角色工厂，保证地图角色与战斗角色使用同一套身份视觉配方。 */
 import Phaser from "phaser";
 import {
   SCRIBE_ACTOR_PROFILE,
@@ -72,6 +73,7 @@ export function createPlayerActor(
   profile: PlayerActorProfile,
   options: PixelActorOptions,
 ): PixelActorView {
+  /** 创建玩家地图/战斗共用的像素角色。 */
   const parts: Phaser.GameObjects.GameObject[] = [];
   const longCoatHeight = profile.hasLongCoat ? 27 : 22;
   const coatY = profile.hasLongCoat ? 7 : 4;
@@ -143,6 +145,7 @@ export function createScribeActor(
   scene: Phaser.Scene,
   options: PixelActorOptions,
 ): PixelActorView {
+  /** 创建抄写员角色，保持其与篝火和路线地标的视觉区分。 */
   const palette = SCRIBE_ACTOR_PROFILE;
   const parts: Phaser.GameObjects.GameObject[] = [
     triangle(scene, 0, 8, 29, 39, palette.robe)
@@ -170,6 +173,7 @@ export function createMonsterActor(
   monster: Pick<Monster, "kind" | "species" | "isBoss">,
   options: PixelActorOptions,
 ): PixelActorView {
+  /** 创建怪物主体；身份文字是否显示由上层发现状态决定。 */
   const profile = monsterActorProfile(monster);
   const parts = createMonsterActorParts(scene, monster);
   const container = actorContainer(scene, options, parts);
@@ -183,6 +187,7 @@ export function createMonsterActorParts(
   scene: Phaser.Scene,
   monster: Pick<Monster, "kind" | "species" | "isBoss">,
 ): Phaser.GameObjects.GameObject[] {
+  /** 返回可单独动画的怪物部件，供战斗和探索共用。 */
   return monsterParts(scene, monsterActorProfile(monster));
 }
 

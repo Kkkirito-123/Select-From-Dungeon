@@ -1,3 +1,4 @@
+/** 验证故事触发、世界变化和楼层结算的前端呈现依据。 */
 import { describe, expect, it } from "vitest";
 import {
   NARRATIVE_BEAT_KINDS,

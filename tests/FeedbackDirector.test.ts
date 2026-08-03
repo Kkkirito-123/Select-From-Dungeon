@@ -1,3 +1,4 @@
+/** 验证领域反馈到通知与音效的一对一映射和节流规则。 */
 import { describe, expect, it, vi } from "vitest";
 import type { ArcadeSfx } from "../src/audio/ArcadeAudio";
 import { FeedbackDirector } from "../src/feedback/FeedbackDirector";

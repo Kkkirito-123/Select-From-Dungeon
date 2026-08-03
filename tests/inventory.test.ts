@@ -1,3 +1,4 @@
+/** 验证背包、装备、丢弃和掉落卡片的用户界面可见状态。 */
 import { describe, expect, it } from "vitest";
 import {
   ARMORS,

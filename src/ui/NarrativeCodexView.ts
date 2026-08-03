@@ -1,3 +1,4 @@
+/** 失名录视图：渲染已解锁故事、证据和迁移进度，所有状态来自只读快照。 */
 import {
   NARRATIVE_BEAT_KINDS,
   NARRATIVE_ENDINGS,
@@ -129,6 +130,7 @@ function setFrom(values: readonly string[] | undefined): ReadonlySet<string> {
 export function buildNarrativeCodexModel(
   state: NarrativeCodexRenderState,
 ): NarrativeCodexModel {
+  /** 将剧情进度投影为失名录页面模型，不改变故事解锁状态。 */
   const floor = narrativeFloorFor(state.floor);
   const floorMonsters = INITIAL_MONSTERS.filter(
     (monster) => monster.floor === state.floor,
@@ -269,6 +271,7 @@ function canFocus(value: Element | null): value is HTMLElement {
 }
 
 export class NarrativeCodexView {
+  /** 管理故事、证据、上升和 MIGRATE 页面展示。 */
   readonly element: HTMLElement;
   readonly closeButton: HTMLButtonElement;
 

@@ -1,3 +1,4 @@
+/** 负责播放已授权的录音曲目，并在楼层或场景切换时安全交叉淡化。 */
 import {
   resolveRuntimeScoreUrl,
   runtimeScoreForScene,
@@ -36,6 +37,7 @@ async function defaultFetchAudioBytes(url: string): Promise<ArrayBuffer> {
  * 因此浏览器计时器抖动不会在音符之间插入空隙。
  */
 export class RecordedScorePlayer {
+  /** 管理录音曲目的懒加载、交叉淡化和资源释放。 */
   private readonly buffers = new Map<string, Promise<AudioBuffer | null>>();
   private readonly fetchAudioBytes: (url: string) => Promise<ArrayBuffer>;
   private active: ActivePlayback | null = null;

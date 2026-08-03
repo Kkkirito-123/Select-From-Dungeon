@@ -1,3 +1,4 @@
+/** 验证迷路计数的方向、路线高亮和护送等级阈值。 */
 import { describe, expect, it } from "vitest";
 import { NAVIGATION_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
 import { GameSession } from "../src/domain/GameSession";
