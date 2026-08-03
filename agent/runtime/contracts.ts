@@ -2,18 +2,41 @@ import type { AnswerResult, BattleOutcome } from "../../src/domain/types";
 import type { FloorNumber, RunLessonId } from "../../src/domain/runGraph";
 import { AGENT_RUNTIME_CONFIG } from "../../src/config/runtimeConfig";
 
-export const AGENT_OUTPUT_CACHE_KEY = "select-from-dungeon:agent-output:v1";
-export const AGENT_REQUEST_VERSION = 1 as const;
-export const AGENT_OUTPUT_VERSION = 1 as const;
+export const AGENT_OUTPUT_CACHE_KEY = "select-from-dungeon:agent-output:v2";
+export const AGENT_REQUEST_VERSION = 2 as const;
+export const AGENT_OUTPUT_VERSION = 2 as const;
 export const MAX_AGENT_ATTEMPTS = AGENT_RUNTIME_CONFIG.maxEvidenceAttempts;
+
+export type AgentHookType = "floor-start" | "route-guidance" | "elite-defeated" | "floor-end";
+export type AgentHookPhase = "opening" | "route" | "ending";
+
+export interface AgentHookPayload {
+  type: AgentHookType;
+  phase: AgentHookPhase;
+  floor: FloorNumber;
+  objectiveRoomId?: string | null;
+  objectiveTitle?: string | null;
+  level?: 0 | 1 | 2 | 3;
+  direction?: "north" | "east" | "south" | "west" | null;
+  distance?: number | null;
+  monsterId?: number;
+  mode?: "transition" | "victory";
+}
+
+export interface AgentNavigationEvidence {
+  objectiveRoomId: string | null;
+  objectiveTitle: string | null;
+  level: 0 | 1 | 2 | 3;
+  direction: "north" | "east" | "south" | "west" | null;
+  distance: number | null;
+}
 
 export interface AgentAttemptEvidence {
   attemptId: number;
   lessonId: RunLessonId;
   stageId: string;
   objective: string;
-  submittedSql: string;
-  referenceSql: string;
+  sqlFeatures: readonly string[];
   result: AnswerResult;
   outcome: BattleOutcome;
   hintLevel: number;
@@ -36,6 +59,10 @@ export interface AgentPrepareRequest {
   runId: string;
   floor: FloorNumber;
   evidenceHash: string;
+  trigger: AgentHookPayload;
+  navigation: AgentNavigationEvidence;
+  campfireUnlocked: boolean;
+  defeatedEliteIds: readonly number[];
   attempts: readonly AgentAttemptEvidence[];
   completedLessons: readonly RunLessonId[];
   worldChanges: readonly string[];
@@ -44,6 +71,7 @@ export interface AgentPrepareRequest {
 }
 
 export interface CampfireOutput {
+  available: boolean;
   headline: string;
   facts: readonly string[];
   focusConcept: string | null;
@@ -117,11 +145,13 @@ function stringArray(
 function campfireOutput(value: unknown): CampfireOutput | null {
   const data = objectValue(value);
   if (!data || !hasExactKeys(data, [
+    "available",
     "headline",
     "facts",
     "focusConcept",
     "nextAction",
   ])) return null;
+  if (typeof data.available !== "boolean") return null;
   const headline = shortPlainText(data.headline, 120);
   const facts = stringArray(data.facts, 3, 180);
   const focusConcept = shortPlainText(data.focusConcept, 100, true);
@@ -132,7 +162,7 @@ function campfireOutput(value: unknown): CampfireOutput | null {
     focusConcept === undefined ||
     typeof nextAction !== "string"
   ) return null;
-  return { headline, facts, focusConcept, nextAction };
+  return { available: data.available, headline, facts, focusConcept, nextAction };
 }
 
 function scribeOutput(

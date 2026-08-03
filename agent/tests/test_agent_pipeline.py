@@ -8,12 +8,35 @@ from sql_dungeon_agent.contracts import AgentContext, ScribeOutput
 from sql_dungeon_agent.pipeline import AgentPipeline
 
 
-def request_payload(*, attempts: list[dict[str, object]] | None = None) -> dict[str, object]:
+def request_payload(
+    *,
+    attempts: list[dict[str, object]] | None = None,
+    campfire_unlocked: bool = False,
+) -> dict[str, object]:
     return {
-        "requestVersion": 1,
+        "requestVersion": 2,
         "runId": "run-abcd1234",
         "floor": 1,
         "evidenceHash": "ev-1234abcd",
+        "trigger": {
+            "type": "route-guidance",
+            "phase": "route",
+            "floor": 1,
+            "objectiveRoomId": "floor-1-lesson-1",
+            "objectiveTitle": "筛选门",
+            "level": 1,
+            "direction": "east",
+            "distance": 10,
+        },
+        "navigation": {
+            "objectiveRoomId": "floor-1-lesson-1",
+            "objectiveTitle": "筛选门",
+            "level": 1,
+            "direction": "east",
+            "distance": 10,
+        },
+        "campfireUnlocked": campfire_unlocked,
+        "defeatedEliteIds": [4] if campfire_unlocked else [],
         "attempts": attempts or [],
         "completedLessons": ["select"],
         "worldChanges": ["wheel:stalled→turning"],
@@ -43,8 +66,7 @@ def attempt(
         "lessonId": "where",
         "stageId": "where-target",
         "objective": "只保留目标记录",
-        "submittedSql": "SELECT id FROM monsters",
-        "referenceSql": "SELECT id FROM monsters WHERE id = 1",
+        "sqlFeatures": ["SELECT", "FROM"],
         "result": result,
         "outcome": "countered" if result != "correct" else "hit",
         "hintLevel": hint_level,
@@ -93,7 +115,7 @@ class AgentContractTests(unittest.TestCase):
 
 class CampfireAnalyzerTests(unittest.TestCase):
     def test_empty_evidence_has_actionable_local_output(self) -> None:
-        output = analyze_campfire(AgentContext.from_value(request_payload()))
+        output = analyze_campfire(AgentContext.from_value(request_payload(campfire_unlocked=True)))
         self.assertEqual(output.focus_concept, None)
         self.assertIn("没有可复盘", output.headline)
         self.assertIn("完成一次", output.facts[0])
@@ -101,6 +123,7 @@ class CampfireAnalyzerTests(unittest.TestCase):
     def test_recap_counts_correct_and_hint_evidence_without_sql(self) -> None:
         context = AgentContext.from_value(
             request_payload(
+                campfire_unlocked=True,
                 attempts=[
                     attempt(1, result="wrong-result", hint_level=2),
                     attempt(2, result="correct", hint_level=0),
@@ -120,7 +143,7 @@ class CampfireAnalyzerTests(unittest.TestCase):
         attempts = [attempt(index, result="wrong-result", hint_level=0) for index in range(1, 9)]
         attempts[0] = attempt(1, result="correct", hint_level=0)
         output = analyze_campfire(
-            AgentContext.from_value(request_payload(attempts=attempts))
+            AgentContext.from_value(request_payload(attempts=attempts, campfire_unlocked=True))
         )
         self.assertIn("正确率 13%", output.facts[0])
 
@@ -139,7 +162,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
             ensure_ascii=False,
         )
         model = FakeModel(response)
-        context = AgentContext.from_value(request_payload(attempts=[attempt()]))
+        context = AgentContext.from_value(request_payload(attempts=[attempt()], campfire_unlocked=True))
         output = await AgentPipeline(model).prepare(context)
 
         self.assertEqual(output.source, "openzl")
@@ -149,7 +172,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_malformed_model_output_falls_back_without_failure(self) -> None:
         model = FakeModel("```json\n{}\n```")
-        context = AgentContext.from_value(request_payload(attempts=[attempt()]))
+        context = AgentContext.from_value(request_payload(attempts=[attempt()], campfire_unlocked=True))
         output = await AgentPipeline(model).prepare(context)
 
         self.assertEqual(output.source, "local")

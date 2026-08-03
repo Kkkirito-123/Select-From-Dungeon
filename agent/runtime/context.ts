@@ -9,6 +9,7 @@ import {
   type AgentPrepareRequest,
   type AgentStorySource,
 } from "./contracts";
+import { displayHook, type AgentHook } from "./hooks";
 
 function stableHash(value: string): string {
   let hash = 0x811c9dc5;
@@ -21,6 +22,16 @@ function stableHash(value: string): string {
 
 function boundedText(value: string, maximum: number): string {
   return value.length <= maximum ? value : value.slice(0, maximum);
+}
+
+function sqlFeatures(sql: string): readonly string[] {
+  const vocabulary = [
+    "SELECT", "FROM", "WHERE", "AND", "IS NULL", "COUNT", "GROUP BY",
+    "HAVING", "ORDER BY", "LIMIT", "DISTINCT", "JOIN", "LEFT JOIN", "UNION",
+    "WITH", "EXISTS", "IN",
+  ];
+  const normalized = sql.toUpperCase();
+  return vocabulary.filter((feature) => normalized.includes(feature)).slice(0, 12);
 }
 
 function storySource(snapshot: GameSnapshot): AgentStorySource | null {
@@ -70,7 +81,10 @@ function worldChanges(snapshot: GameSnapshot): readonly string[] {
     .slice(0, 16);
 }
 
-export function buildAgentPrepareRequest(snapshot: GameSnapshot): AgentPrepareRequest {
+export function buildAgentPrepareRequest(
+  snapshot: GameSnapshot,
+  trigger: AgentHook = displayHook(snapshot),
+): AgentPrepareRequest {
   const lessonFrequency = new Map<RunLessonId, number>();
   snapshot.floorReview.forEach((record) => {
     lessonFrequency.set(record.lessonId, (lessonFrequency.get(record.lessonId) ?? 0) + 1);
@@ -93,8 +107,7 @@ export function buildAgentPrepareRequest(snapshot: GameSnapshot): AgentPrepareRe
     lessonId: record.lessonId,
     stageId: boundedText(record.stageId, 100),
     objective: boundedText(record.stageObjective, 500),
-    submittedSql: boundedText(record.sql, 4_000),
-    referenceSql: boundedText(record.answerSql, 4_000),
+    sqlFeatures: sqlFeatures(record.sql),
     result: record.result,
     outcome: record.outcome,
     hintLevel: record.hintLevel,
@@ -102,6 +115,22 @@ export function buildAgentPrepareRequest(snapshot: GameSnapshot): AgentPrepareRe
   const evidence = {
     floor: snapshot.floor,
     attempts,
+    trigger,
+    navigation: {
+      objectiveRoomId: snapshot.navigationGuidance.objectiveRoomId,
+      objectiveTitle: snapshot.navigationGuidance.objectiveTitle
+        ? boundedText(snapshot.navigationGuidance.objectiveTitle, 160)
+        : null,
+      level: snapshot.navigationGuidance.level,
+      direction: snapshot.navigationGuidance.direction,
+      distance: snapshot.navigationGuidance.distance,
+    },
+    campfireUnlocked: snapshot.monsters.some((monster) => (
+      monster.floor === snapshot.floor && monster.rank === "elite" && monster.hp <= 0
+    )),
+    defeatedEliteIds: snapshot.monsters
+      .filter((monster) => monster.floor === snapshot.floor && monster.rank === "elite" && monster.hp <= 0)
+      .map((monster) => monster.id),
     completedLessons: snapshot.completedLessons.slice(0, 48),
     worldChanges: worldChanges(snapshot),
     relics: snapshot.relics.slice(0, 8).map((relic) => ({
@@ -123,11 +152,4 @@ export function agentRequestKey(
   request: Pick<AgentPrepareRequest, "runId" | "floor" | "evidenceHash">,
 ): string {
   return `${request.runId}:${request.floor}:${request.evidenceHash}`;
-}
-
-export function hasMeaningfulAgentEvidence(request: AgentPrepareRequest): boolean {
-  return request.attempts.length > 0 ||
-    request.completedLessons.length > 0 ||
-    request.worldChanges.length > 0 ||
-    request.relics.length > 0;
 }

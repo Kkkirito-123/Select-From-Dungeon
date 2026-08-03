@@ -68,7 +68,7 @@ describe("Agent evidence projection", () => {
     );
   });
 
-  it("发送前截断超长 SQL 与题目文本", () => {
+  it("发送前只保留 SQL 特征与有界题目文本", () => {
     const request = buildAgentPrepareRequest(snapshot({
       floorReview: [attempt(1, {
         sql: "S".repeat(5_000),
@@ -77,8 +77,8 @@ describe("Agent evidence projection", () => {
       })],
     }));
 
-    expect(request.attempts[0].submittedSql).toHaveLength(4_000);
-    expect(request.attempts[0].referenceSql).toHaveLength(4_000);
+    expect(request.attempts[0].sqlFeatures).toEqual([]);
+    expect(JSON.stringify(request)).not.toContain("S".repeat(100));
     expect(request.attempts[0].objective).toHaveLength(500);
   });
 
@@ -97,8 +97,10 @@ describe("Agent evidence projection", () => {
       attempt(2, { stageId: "where-weakness", stageObjective: "筛选南侧记录", hintLevel: 1 }),
       attempt(3, { stageId: "where-target", stageObjective: "筛选北侧记录", hintLevel: 1 }),
     ];
+    const base = snapshot({ floorReview: records });
     const output = buildLocalCampfireOutput(buildAgentPrepareRequest(snapshot({
-      floorReview: records,
+      ...base,
+      monsters: base.monsters.map((monster) => monster.id === 4 ? { ...monster, hp: 0 } : monster),
     })));
 
     expect(output.facts.find((fact) => fact.includes("提示作答"))).toContain(

@@ -11,10 +11,20 @@ from sql_dungeon_agent.pipeline import AgentPipeline
 
 def payload() -> dict[str, object]:
     return {
-        "requestVersion": 1,
+        "requestVersion": 2,
         "runId": "run-api-test",
         "floor": 1,
         "evidenceHash": "ev-api-test",
+        "trigger": {"type": "floor-start", "phase": "opening", "floor": 1},
+        "navigation": {
+            "objectiveRoomId": None,
+            "objectiveTitle": None,
+            "level": 0,
+            "direction": None,
+            "distance": None,
+        },
+        "campfireUnlocked": False,
+        "defeatedEliteIds": [],
         "attempts": [],
         "completedLessons": [],
         "worldChanges": [],

@@ -1,4 +1,4 @@
-"""Output-only Agent adapter for SELECT * FROM DUNGEON."""
+"""Output-only Agent for Scribe route guidance and Campfire review."""
 
 from .contracts import AgentContext, PreparedAgentOutput
 from .pipeline import AgentPipeline

@@ -126,16 +126,17 @@ complete SQLite query, and turn the correct result into an animated attack.
   latest battle or current floor. The complete browser-local log keeps at most
   200 SQL turns and never records movement or key presses. If the optional
   output Agent is explicitly enabled, only a bounded projection of at most
-  eight current-floor attempts—including submitted and reference SQL—is sent
-  directly from the browser to DeepSeek. It never passes through the project
-  server.
+  eight current-floor attempts—including result categories, objectives, hint
+  levels, and derived SQL feature tags—is sent directly from the browser to
+  DeepSeek. Raw submitted and reference SQL never leave the browser and the
+  projection never passes through the project server.
 - Find two seeded physical campfires on every floor, in the middle and rear
   learning phases; the entrance is the front safe/respawn anchor. Their visibly bounded tiles and the floor entrance
   are safe zones with no ambushes, enemy spawns, or patrol entry. Stand beside a
   fire and press `E` to choose `在此休息` or `答案复盘`. Resting restores maximum
-  HP and makes that fire the checkpoint; the fire also shows an immediate,
-  deterministic learning recap with accuracy, hint use, the current focus, and
-  a next action.
+  HP and makes that fire the checkpoint. The recap action unlocks after the
+  current-floor elite is defeated; before then, the fire remains fully usable
+  for rest and checkpointing but the review action is disabled.
 - Meet one physical Scribe on each floor, separately from the campfires. She has
   no chat box: inspecting her reveals an already prepared, short character
   response plus authored route guidance. The local fallback is always ready;
@@ -332,9 +333,11 @@ keeps the Key only in tab memory and calls the fixed official DeepSeek origin.
 Refresh or close the tab to remove it. Model output can only replace the
 Scribe's wording after strict validation; it cannot change gameplay.
 
-The Python/OpenZLAgent adapter in [agent/README.md](agent/README.md) is retained
-only for local prompt evaluation and regression. The deployed BYOK path does
-not proxy a player's Key through Python or the project server.
+The Python/OpenZLAgent adapter in [agent/README.md](agent/README.md) is a
+controlled output service with a loopback-only default. It is suitable for
+online deployment only behind an explicitly configured HTTPS/authenticated
+boundary; the deployed browser BYOK path does not proxy a player's Key through
+Python or the project server.
 
 The top-bar `⌘ 管理员` button opens the spoiler-heavy admin overview. It can
 load any floor, region, or authored entry/area-Boss/hidden/Boss preset, but the
@@ -462,7 +465,7 @@ Browser-local storage is split into:
   attempts, victories, and best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
-- `select-from-dungeon:agent-output:v1`: a small bounded set of validated
+- `select-from-dungeon:agent-output:v2`: a small bounded set of validated
   prepared outputs, keyed independently by opaque Run fingerprint, floor, and
   evidence hash. It stores no submitted or reference SQL and is outside Run
   migration.

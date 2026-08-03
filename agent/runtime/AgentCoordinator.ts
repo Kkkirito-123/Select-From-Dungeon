@@ -4,9 +4,9 @@ import type { AgentPreparationClient } from "./AgentClient";
 import {
   agentRequestKey,
   buildAgentPrepareRequest,
-  hasMeaningfulAgentEvidence,
 } from "./context";
 import type { AgentPrepareRequest, PreparedAgentOutput } from "./contracts";
+import { detectAgentHook, displayHook } from "./hooks";
 import { buildLocalPreparedOutput } from "./localFallback";
 
 export interface AgentSnapshotSource {
@@ -34,8 +34,10 @@ export class AgentCoordinator implements AgentContentSource {
   private unsubscribeSnapshot: (() => void) | null = null;
   private currentKey: string | null = null;
   private currentOutput: PreparedAgentOutput | null = null;
+  private currentRequest: AgentPrepareRequest | null = null;
   private pendingRequest: AgentPrepareRequest | null = null;
   private timerId: number | null = null;
+  private previousSnapshot: GameSnapshot | null = null;
   private destroyed = false;
 
   constructor(
@@ -54,9 +56,11 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   preparedFor(snapshot: GameSnapshot): PreparedAgentOutput {
-    const request = buildAgentPrepareRequest(snapshot);
-    const key = agentRequestKey(request);
-    if (this.currentKey === key && this.currentOutput) return this.currentOutput;
+    const request = buildAgentPrepareRequest(snapshot, displayHook(snapshot));
+    if (this.currentOutput && this.currentOutput.runId === snapshot.runInstanceId &&
+      this.currentOutput.floor === snapshot.floor && this.currentRequest?.trigger.type === request.trigger.type) {
+      return this.currentOutput;
+    }
     return this.cache.get(request) ?? buildLocalPreparedOutput(request);
   }
 
@@ -72,12 +76,17 @@ export class AgentCoordinator implements AgentContentSource {
     if (this.timerId !== null) this.clock.clearTimeout(this.timerId);
     this.timerId = null;
     this.pendingRequest = null;
+    this.previousSnapshot = null;
+    this.currentRequest = null;
     this.listeners.clear();
   }
 
   private ingest(snapshot: GameSnapshot): void {
     if (this.destroyed) return;
-    const request = buildAgentPrepareRequest(snapshot);
+    const hook = detectAgentHook(this.previousSnapshot, snapshot);
+    this.previousSnapshot = snapshot;
+    if (!hook) return;
+    const request = buildAgentPrepareRequest(snapshot, hook);
     const key = agentRequestKey(request);
     if (key !== this.currentKey) {
       if (this.timerId !== null) this.clock.clearTimeout(this.timerId);
@@ -85,6 +94,7 @@ export class AgentCoordinator implements AgentContentSource {
       this.pendingRequest = null;
       const cached = this.cache.get(request);
       this.currentKey = key;
+      this.currentRequest = request;
       this.currentOutput = cached ?? buildLocalPreparedOutput(request);
       if (cached && (cached.source === "openzl" || cached.source === "deepseek")) {
         this.settledKeys.add(key);
@@ -92,11 +102,7 @@ export class AgentCoordinator implements AgentContentSource {
       if (!cached) this.cache.put(this.currentOutput);
       this.notify();
     }
-    if (!hasMeaningfulAgentEvidence(request) || this.settledKeys.has(key)) return;
-    if (snapshot.mode === "combat" || snapshot.mode === "challenge") {
-      this.pendingRequest = request;
-      return;
-    }
+    if (request.trigger.type === "floor-start" || this.settledKeys.has(key)) return;
     if (this.timerId !== null) return;
     this.pendingRequest = request;
     this.timerId = this.clock.setTimeout(() => {
@@ -124,9 +130,31 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   refresh(snapshot: GameSnapshot): void {
-    const request = buildAgentPrepareRequest(snapshot);
+    const request = buildAgentPrepareRequest(snapshot, displayHook(snapshot));
     const key = agentRequestKey(request);
     this.settledKeys.delete(key);
-    this.ingest(snapshot);
+    this.previousSnapshot = snapshot;
+    this.schedule(request);
+  }
+
+  private schedule(request: AgentPrepareRequest): void {
+    const key = agentRequestKey(request);
+    if (this.currentKey !== key) {
+      if (this.timerId !== null) this.clock.clearTimeout(this.timerId);
+      this.timerId = null;
+      this.pendingRequest = null;
+      this.currentKey = key;
+      this.currentRequest = request;
+      this.currentOutput = this.cache.get(request) ?? buildLocalPreparedOutput(request);
+      this.notify();
+    }
+    if (request.trigger.type === "floor-start" || this.settledKeys.has(key) || this.timerId !== null) return;
+    this.pendingRequest = request;
+    this.timerId = this.clock.setTimeout(() => {
+      this.timerId = null;
+      const pending = this.pendingRequest;
+      this.pendingRequest = null;
+      if (pending) void this.prepare(pending);
+    }, this.debounceMs);
   }
 }

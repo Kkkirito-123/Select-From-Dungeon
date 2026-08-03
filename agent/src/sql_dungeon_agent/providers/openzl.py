@@ -1,4 +1,4 @@
-"""Optional adapter over OpenZLAgent's public model-client boundary."""
+"""Minimal OpenZLAgent adapter with no tools, memory, or game write access."""
 
 from __future__ import annotations
 
@@ -7,14 +7,12 @@ from typing import Any
 
 
 class OpenZLAgentModelAdapter:
-    """Use the pinned OpenZLAgent model client without enabling tools or memory."""
-
     def __init__(self, client: Any, message_type: type[Any]) -> None:
         self._client = client
         self._message_type = message_type
 
     @classmethod
-    def from_environment(cls) -> OpenZLAgentModelAdapter | None:
+    def from_environment(cls) -> "OpenZLAgentModelAdapter | None":
         base_url = os.environ.get("SQL_DUNGEON_AGENT_MODEL_BASE_URL", "").strip()
         model = os.environ.get("SQL_DUNGEON_AGENT_MODEL_NAME", "").strip()
         if not base_url and not model:
@@ -31,12 +29,11 @@ class OpenZLAgentModelAdapter:
             )
         except ImportError:
             return None
-        timeout = float(os.environ.get("SQL_DUNGEON_AGENT_MODEL_TIMEOUT", "3.0"))
         client = OpenAICompatibleModelClient(
             base_url=base_url,
             model=model,
             api_key=os.environ.get("SQL_DUNGEON_AGENT_API_KEY", ""),
-            timeout_seconds=timeout,
+            timeout_seconds=float(os.environ.get("SQL_DUNGEON_AGENT_MODEL_TIMEOUT", "3.0")),
             temperature=0.2,
             max_tokens=360,
         )

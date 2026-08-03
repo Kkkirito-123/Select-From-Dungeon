@@ -2013,9 +2013,11 @@ export class AppShell {
         ? "中段篝火"
         : "后段篝火";
     requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
-    requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
-      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；篝火只负责恢复、复活与打开复盘页。`;
+    const reviewButton = requiredElement<HTMLButtonElement>(this.campfireMenu, "#review-at-campfire");
     const recap = this.preparedAgentOutput(snapshot).campfire;
+    requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
+      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；${recap.available ? "本层精英记录已解锁复盘。" : "击败本层精英后才会解锁复盘。"}`;
+    reviewButton.disabled = !recap.available;
     requiredElement(this.campfireMenu, "#campfire-recap-headline").textContent =
       recap.headline;
     const facts = requiredElement(this.campfireMenu, "#campfire-recap-facts");

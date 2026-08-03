@@ -48,8 +48,10 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 复活时恢复。`v1.1` 的可选随机池只保留自动使用的恢复品：普通怪 2%、小型精英 5%、
 区域首领 10%、层主 0%；不再为精英或 Boss 补足随机掉落。课程奖励、明确宝箱与钥匙保持确定。
 满背包必须显式替换，普通物品丢弃后在当前层可重新拾取，基础/课程/钥匙类保护物品不能丢弃。
-篝火与抄写员是两个独立消费者。篝火立即根据受限的当前层证据显示确定性学习复盘；每层另有一名
-实体抄写员，她的纯输出短回复会在后台预生成，只有玩家调查她时才出现。浏览器始终提供本地降级。
+篝火与抄写员是两个独立消费者。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
+复盘按钮保持禁用。精英击败 Hook 发生后，篝火立即根据受限的当前层证据显示确定性复盘。每层另有一名
+实体抄写员，她的纯输出短回复由四类语义 Hook 驱动：入层、寻路升级、精英击败和层末；开头、路线和
+结束分别负责开场、指路和收束。普通移动、巡逻、提示按钮和渲染帧不会调用模型。浏览器始终提供本地降级。
 玩家明确同意后，可在密码框输入 DeepSeek API Key；专用 Worker 只在当前标签页内存保存 Key，
 并把受限证据直接发送到 `https://api.deepseek.com`。严格校验通过的回复只能替换抄写员措辞。玩家不能输入提示词，
 Agent 输出也不能改变游戏状态。每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
@@ -65,7 +67,8 @@ Agent 输出也不能改变游戏状态。每层五个短叙事拍和两条固�
 顶栏 `答题复盘` 读取浏览器本地答案记录，分别展示最近一场战斗和当前楼层。每条记录包含玩家
 SQL、明确参考 SQL、结果分类、提示等级和战斗结果；最多保留 200 个 SQL 回合，不记录移动
 或按键。完整日志仍只保存在浏览器；只有显式启用浏览器 BYOK 时，最多八条当前层作答投影
-才会由浏览器直接发送到 DeepSeek，不经过项目服务器代理。
+才会由浏览器直接发送到 DeepSeek。投影只包含结果分类、提示等级、题目目标和 SQL 特征，不包含原始
+玩家 SQL 或参考 SQL，也不经过项目服务器代理。
 怪物显示名必须直白且容易输入：统一使用“史莱姆”“水胶怪”“幼龙”这类二到三个汉字，
 不得添加间隔点称号或 SQL 概念后缀。新增内容也遵守同一规则；SQL 含义放在字段、任务与
 遭遇机制中，不塞进显示名。
@@ -111,7 +114,7 @@ index.html -> src/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> agent/runtime（受限证据、确定性篝火、缓存与后台调度）
   -> agent/browser（DeepSeek 内存 Worker、严格抄写员输出与设置 UI）
-  -> 可选 agent/src Python 适配器（只用于本机 OpenZLAgent 评测）
+  -> agent/src Python 输出服务（默认回环，可选 OpenZLAgent Provider）
   -> QuestionBankLoader/LearningLedger（经校验 SQLite 题库与 IndexedDB 证据）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
   -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
@@ -161,8 +164,8 @@ index.html -> src/main.ts
 
 所有 Agent 代码都位于 `agent/`。`agent/runtime/` 负责只读证据投影、稳定证据 Hash、确定性
 篝火/抄写员降级、独立输出缓存与后台合并；`agent/browser/` 负责只支持 DeepSeek 的 BYOK Worker
-和设置 UI。`agent/src/` 保留 Python 3.11+ 回环适配器，仅用于本机 OpenZLAgent 提示词评测与
-回归；正式网页不会让 Key 经过它。不得启用工具、记忆、MCP、游戏写入、请求日志、自由提示词
+和设置 UI。`agent/src/` 保留默认回环的 Python 输出服务，可选 OpenZLAgent Provider，但不会接收浏览器
+BYOK Key；正式网页 BYOK 不会让 Key 经过它。不得启用工具、记忆、MCP、游戏写入、请求日志、自由提示词
 或持久化 Provider 凭证。
 
 `src/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
@@ -260,8 +263,8 @@ python3 scripts/validate-rules.py
 ## 运行与安全边界
 
 - SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行，Agent 默认关闭。明确同意后，浏览器
-  可以把最多八条当前层作答（包含玩家 SQL 与参考 SQL），以及受限课程、世界变化、遗物和已解锁
-  剧情证据直接发送到 DeepSeek。Key 只存在于专用 Worker 内存，不写入浏览器存储、日志、导出、
+  可以把最多八条当前层作答的结果分类、提示等级、题目目标与 SQL 特征，以及受限课程、世界变化、遗物、
+  导航、触发器和已解锁剧情证据直接发送到 DeepSeek，不包含原始玩家 SQL 或参考 SQL。Key 只存在于专用 Worker 内存，不写入浏览器存储、日志、导出、
   URL、遥测或项目服务器；刷新或关闭标签页即消失。部署 CSP 只允许同源和
   `https://api.deepseek.com` 网络请求。
 - 战斗终端只接受一条只读 `SELECT` 或 `WITH`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面
@@ -292,7 +295,7 @@ python3 scripts/validate-rules.py
   `select-from-dungeon:profile:v3`
   （47 项已掌握课程、已回收怪物编号、练习次数、通关数、
   最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。预生成 Agent
-  输出独立保存在 `select-from-dungeon:agent-output:v1`；其中只有经校验的输出与受限身份/Hash
+  输出独立保存在 `select-from-dungeon:agent-output:v2`；其中只有经校验的输出与受限身份/Hash
   元数据，不保存玩家 SQL 或参考 SQL，也不参与 Run 迁移。有效的
   `select-from-dungeon:run:v11` 会在内存中迁移为 v12；有效 `run:v10`、`run:v9`、`run:v8` 会继续经过
   兼容链补上确定性的八层

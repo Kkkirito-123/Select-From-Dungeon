@@ -12,7 +12,7 @@ from typing import Any
 
 from .contracts import AgentContext
 from .pipeline import AgentPipeline
-from .zlagent_adapter import OpenZLAgentModelAdapter
+from .providers import OpenZLAgentModelAdapter
 
 MAX_REQUEST_BYTES = 96 * 1024
 LOOPBACK_ORIGIN = re.compile(r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$")

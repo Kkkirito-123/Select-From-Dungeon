@@ -15,10 +15,36 @@ class JsonModel(Protocol):
 
 
 def fallback_scribe(context: AgentContext, campfire: CampfireOutput) -> ScribeOutput:
+    if context.trigger.phase == "opening":
+        return ScribeOutput(
+            greeting="你来了。",
+            observation="这一层的记录还没有写满，路会先替你保留方向。",
+            guidance=_route_guidance(context),
+            relationship_line=None,
+            source_beat_id=context.story.beat_id if context.story else None,
+            evidence_refs=(),
+        )
+    if context.trigger.phase == "ending":
+        return ScribeOutput(
+            greeting="这一层的路已经走完。",
+            observation=(
+                "精英战斗留下的记录已经交给篝火，下一层会从这些页边继续。"
+                if context.campfire_unlocked
+                else "这一层已经结束，但篝火还没有收到精英战斗的记录。"
+            ),
+            guidance=(
+                "回到篝火查看本层复盘，再进入下一层。"
+                if context.campfire_unlocked
+                else "进入下一层，沿新的路线继续记录。"
+            ),
+            relationship_line="路有尽头，记录不会替你遗忘。",
+            source_beat_id=context.story.beat_id if context.story else None,
+            evidence_refs=tuple(attempt.evidence_ref for attempt in context.attempts[-2:]),
+        )
     latest = context.attempts[-1] if context.attempts else None
     if latest is None:
-        greeting = "旅人，火还记得你来过。"
-        observation = "你的答题页仍是空白，我暂时只替你守住这一层的路。"
+        greeting = "沿这条路走。"
+        observation = _route_guidance(context)
         refs: tuple[str, ...] = ()
     elif latest.result == "correct":
         greeting = "你回来了，我已经把新的一页压平。"
@@ -37,7 +63,7 @@ def fallback_scribe(context: AgentContext, campfire: CampfireOutput) -> ScribeOu
     return ScribeOutput(
         greeting=greeting,
         observation=observation[:180],
-        guidance=campfire.next_action,
+        guidance=_route_guidance(context),
         relationship_line=(
             "你留下的页数渐渐多了，我已能从墨迹认出你的归途。"
             if len(context.attempts) >= 3
@@ -46,6 +72,20 @@ def fallback_scribe(context: AgentContext, campfire: CampfireOutput) -> ScribeOu
         source_beat_id=context.story.beat_id if context.story else None,
         evidence_refs=refs,
     )
+
+
+def _route_guidance(context: AgentContext) -> str:
+    direction = {
+        "north": "北",
+        "east": "东",
+        "south": "南",
+        "west": "西",
+    }.get(context.navigation.direction or "north", "前方")
+    if context.navigation.objective_title and context.navigation.distance is not None:
+        return f"朝{direction}前进，目标「{context.navigation.objective_title}」约 {context.navigation.distance} 步。"
+    if context.navigation.objective_title:
+        return f"沿当前道路前进，目标是「{context.navigation.objective_title}」。"
+    return "沿已经显现的道路前进；路线会在需要时再次显形。"
 
 
 async def compose_scribe(

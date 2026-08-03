@@ -86,7 +86,7 @@ function attempt(id: number): AnswerAttemptRecord {
 }
 
 describe("AgentCoordinator", () => {
-  it("战斗内合并证据，离开战斗后只准备一次，移动不触发新请求", async () => {
+  it("普通作答与移动不触发请求，寻路升级后只准备一次", async () => {
     const source = new SnapshotSource();
     const clock = new FakeClock();
     const client = new FakeClient();
@@ -104,7 +104,19 @@ describe("AgentCoordinator", () => {
     source.emit({ ...base, mode: "combat", floorReview: [attempt(1), attempt(2)] });
     expect(clock.callbacks.size).toBe(0);
 
-    const exploring = { ...base, mode: "explore" as const, floorReview: [attempt(1), attempt(2)] };
+    const exploring = {
+      ...base,
+      mode: "explore" as const,
+      floorReview: [attempt(1), attempt(2)],
+      navigationGuidance: {
+        ...base.navigationGuidance,
+        level: 1 as const,
+        objectiveRoomId: "floor-1-lesson-1",
+        objectiveTitle: "筛选门",
+        direction: "east" as const,
+        distance: 10,
+      },
+    };
     source.emit(exploring);
     expect(clock.callbacks.size).toBe(1);
     clock.runAll();
@@ -128,6 +140,14 @@ describe("AgentCoordinator", () => {
     const current = {
       ...new GameSession(null, null, "agent-cache-upgrade").snapshot(),
       floorReview: [attempt(1)],
+      navigationGuidance: {
+        ...new GameSession(null, null, "agent-cache-upgrade").snapshot().navigationGuidance,
+        level: 1 as const,
+        objectiveRoomId: "floor-1-lesson-1",
+        objectiveTitle: "筛选门",
+        direction: "east" as const,
+        distance: 10,
+      },
     };
     const request = buildAgentPrepareRequest(current);
     cache.put(buildLocalPreparedOutput(request));

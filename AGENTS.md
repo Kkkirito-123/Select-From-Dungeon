@@ -80,15 +80,20 @@ minimum count; course rewards, explicit chests, and keys stay deterministic.
 Full bags require explicit replacement, ordinary discards remain
 recoverable on the current floor, and protected base/course/key items cannot be
 discarded.
-Campfires and the Scribe are separate consumers. A campfire renders an
-immediate deterministic learning recap from bounded current-floor evidence;
-each floor also has one physical Scribe whose short output-only response is
-prepared in the background and appears only when the player inspects her. The
-browser always has a local fallback. After explicit consent, a player may enter
-a DeepSeek API Key into the password field; a dedicated Worker keeps it only in
-tab memory and sends bounded evidence directly to `https://api.deepseek.com`.
-A strictly validated DeepSeek response may replace only the Scribe wording. There is no
-player prompt box and Agent output cannot mutate gameplay. Five short narrative
+Campfires and the Scribe are separate consumers. A physical campfire always
+handles rest/checkpoint actions, but its learning recap stays unavailable until
+the current-floor elite is defeated. After that Hook, the campfire renders an
+immediate deterministic recap from bounded current-floor evidence; its review
+button is disabled before the Hook. Each floor also has one physical Scribe.
+Her short output-only response is prepared by four semantic hooks: floor start,
+route-guidance escalation, elite defeat, and floor end. The opening, route, and
+ending hooks supply direction or closure; ordinary movement, patrols, hints, and
+render frames do not call a model. The browser always has a local fallback.
+After explicit consent, a player may enter a DeepSeek API Key into the password
+field; a dedicated Worker keeps it only in tab memory and sends bounded evidence
+directly to `https://api.deepseek.com`. A strictly validated DeepSeek response
+may replace only the Scribe wording. There is no player prompt box and Agent
+output cannot mutate gameplay. Five short narrative
 beats and two fixed Lost Name evidence entries per floor still unlock from
 existing Run progress; the local `失名录` distinguishes unknown, confirmed
 `NULL`, and actual values. The eighth floor resolves the sole MVP 2.0 ending,
@@ -117,7 +122,9 @@ reference SQL, result category, hint level, and battle outcome. The log is
 capped at 200 SQL turns and never records movement or key presses. The complete
 log remains browser-local. When browser BYOK is explicitly enabled, a projection
 of at most eight current-floor attempts is sent directly from the browser to
-DeepSeek; it is never proxied through the project server.
+DeepSeek; the Agent projection contains SQL feature tags and result categories,
+not raw submitted or reference SQL, and is never proxied through the project
+server.
 Authored monster display names stay direct and easy to type: two or three
 Chinese characters such as `史莱姆`, `水胶怪`, or `幼龙`, without middle-dot
 epithets or SQL-concept suffixes. New content must follow the same rule; SQL
@@ -193,7 +200,7 @@ index.html -> src/main.ts
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> agent/runtime (bounded evidence, deterministic campfire, cache, coordination)
   -> agent/browser (DeepSeek memory-only Worker, strict Scribe output, settings UI)
-  -> Optional agent/src Python adapter (local OpenZLAgent evaluation only)
+  -> agent/src Python output service (default loopback, optional OpenZLAgent provider)
   -> QuestionBankLoader/LearningLedger (verified SQLite content + IndexedDB evidence)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
@@ -247,14 +254,14 @@ optional notice, `EncounterDirector` makes repeatable successful-step ambush
 decisions without rerolling on reload, and `OnboardingController` owns the
 separately persisted step-by-step tutorial.
 
-`agent/` owns all Agent code. `agent/runtime/` owns the read-only evidence
+`agent/` owns all Agent code. `agent/runtime/` owns the semantic hooks, read-only evidence
 projection, stable evidence hash, deterministic campfire/Scribe fallback,
 independent output cache, and background coalescing. `agent/browser/` owns the
 DeepSeek-only BYOK Worker and settings UI. `agent/src/` remains a Python 3.11+
-loopback adapter for local OpenZLAgent prompt evaluation and regression only;
-the deployed web path never sends keys through it. Tools, memory, MCP, gameplay
-writes, request logging, free prompts, and persisted provider credentials are
-forbidden.
+controlled output service; it defaults to loopback and can use the optional
+OpenZLAgent provider without receiving a browser BYOK Key. The deployed BYOK
+path never sends keys through it. Tools, memory, MCP, gameplay writes, request
+logging, free prompts, and persisted provider credentials are forbidden.
 
 `src/config/` owns Chinese-commented runtime tuning values such as map size,
 encounter rates, navigation thresholds, storage limits, and DeepSeek defaults.
@@ -399,9 +406,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 
 - SQL execution remains entirely in the browser through `sql.js`/SQLite WASM,
   and Agent is disabled by default. With explicit consent, the browser may send
-  at most eight current-floor attempts—including submitted and reference
-  SQL—plus bounded lesson, world-change, relic, and unlocked-story evidence
-  directly to DeepSeek. The Key exists only in a dedicated Worker's memory and
+  at most eight current-floor attempts with result categories, hint levels,
+  objectives, and derived SQL feature tags, plus bounded lesson, world-change,
+  relic, navigation, trigger, and unlocked-story evidence directly to DeepSeek.
+  Raw submitted/reference SQL is not in the Agent request. The Key exists only in a dedicated Worker's memory and
   is never written to browser storage, logs, exports, URLs, telemetry, or the
   project server. Refreshing or closing the tab removes it. The deployed CSP
   allows only same-origin requests and `https://api.deepseek.com`.
@@ -453,7 +461,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   attempts, victories, and best query count), and
   `select-from-dungeon:onboarding:v1` (finished/skipped guide state). Prepared
   Agent output is stored separately under
-  `select-from-dungeon:agent-output:v1`; it contains only validated output and
+  `select-from-dungeon:agent-output:v2`; it contains only validated output and
   bounded identity/hash metadata, never raw submitted or reference SQL, and is
   not part of Run migration. A valid
   `select-from-dungeon:run:v11` is migrated in memory into v12;

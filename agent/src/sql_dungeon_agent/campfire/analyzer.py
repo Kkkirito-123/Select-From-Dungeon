@@ -50,9 +50,18 @@ def _hint_fact(context: AgentContext) -> str | None:
 
 
 def analyze_campfire(context: AgentContext) -> CampfireOutput:
+    if not context.campfire_unlocked:
+        return CampfireOutput(
+            available=False,
+            headline="篝火尚未收录本层复盘",
+            facts=("击败本层精英后，篝火才会整理当前楼层的作答记录。",),
+            focus_concept=None,
+            next_action="沿抄写员指引的路线寻找本层精英。",
+        )
     attempts = context.attempts
     if not attempts:
         return CampfireOutput(
+            available=True,
             headline="本层还没有可复盘的作答",
             facts=("完成一次 SQL 作答后，篝火会在这里整理事实。",),
             focus_concept=None,
@@ -86,6 +95,7 @@ def analyze_campfire(context: AgentContext) -> CampfireOutput:
         facts.append(f"本层已有 {len(context.world_changes)} 项环境变化被记录。")
 
     return CampfireOutput(
+        available=True,
         headline=f"本层作答：{correct}/{len(attempts)} 次正确",
         facts=tuple(facts[:3]),
         focus_concept=_short_label(focus.objective, 80) if focus else None,
