@@ -1,3 +1,4 @@
+/** 汇总八层楼层体验配置，并提供按楼层读取的内容入口。 */
 import { FLOOR_ONE_EXPERIENCE } from "./floor01";
 import { FLOOR_TWO_EXPERIENCE } from "./floor02";
 import { FLOOR_THREE_EXPERIENCE } from "./floor03";

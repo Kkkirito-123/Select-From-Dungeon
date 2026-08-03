@@ -1,3 +1,4 @@
+/** 从存档进度派生楼层世界变化，避免把重复的渲染状态写入存档。 */
 import type { FloorNumber, RunLessonId } from "./runGraph";
 
 export interface FloorWorldProgressInput {

@@ -1,3 +1,4 @@
+/** 八层宏观地图蓝图：定义区域轮廓和固定房间槽位，不存运行时派生几何。 */
 import type { FloorNumber } from "../domain/runGraph";
 
 export const MVP2_MAZE_WIDTH = 48;

@@ -1,3 +1,4 @@
+/** 第四层子查询、CTE 与递归课程内容及其固定遭遇。 */
 import type {
   LessonDefinition,
   Monster,

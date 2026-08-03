@@ -1,3 +1,4 @@
+/** 验证篝火休息、检查点、复活和安全单元格的领域规则。 */
 import { describe, expect, it } from "vitest";
 import {
   CAMPFIRE_SAFE_RADIUS,

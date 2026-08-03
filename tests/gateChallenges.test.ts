@@ -1,3 +1,4 @@
+/** 验证物理 SQL 密门的查询特征、结果语义和只改变对应路线的约束。 */
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { FLOOR_TWO_MONSTERS } from "../src/content/floor2Level";

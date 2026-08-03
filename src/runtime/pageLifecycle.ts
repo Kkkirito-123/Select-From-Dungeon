@@ -1,3 +1,4 @@
+/** 页面可见性生命周期契约：暂停渲染、音频和定时任务，并在恢复时安全唤醒。 */
 export interface RuntimeLoop {
   running: boolean;
   sleep(): void;

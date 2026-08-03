@@ -1,3 +1,4 @@
+/** 遭遇导演：依据成功移动步数和稳定随机值决定是否触发普通遭遇或精英遭遇。 */
 import { ENCOUNTER_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import { stableStringHash } from "./runGraph";
 

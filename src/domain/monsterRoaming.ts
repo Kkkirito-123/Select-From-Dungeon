@@ -1,3 +1,4 @@
+/** 普通怪物巡逻决策：只在探索快照允许时缓慢移动，且不进入安全区。 */
 import { legacyMonsterIdForCurrent } from "../content/monsterIds";
 import type { LessonId, Position } from "./types";
 import { createSeededRandom } from "./runGraph";

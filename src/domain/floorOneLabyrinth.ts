@@ -1,3 +1,4 @@
+/** 第一层连续迷宫的专属导航规则，保持其不使用区域传送的例外语义。 */
 import { safeZoneCellKeys } from "./campfire";
 import { mazeTileAt, mazeZoneAt, type MazeFloor } from "./mazeGenerator";
 import { stableStringHash } from "./runGraph";

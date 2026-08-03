@@ -1,3 +1,4 @@
+/** 浏览器本地存档适配层：负责版本化 Run/Profile 的读写、迁移、校验和恢复。 */
 import {
   LEGACY_MAZE_CHUNK_SIZE,
   LEGACY_MAZE_HEIGHT,
@@ -1689,6 +1690,7 @@ function isSavedRunVersion(
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
+  // 存档校验必须拒绝未知结构，不能让 UI 直接信任 localStorage 中的任意 JSON。
   return isSavedRunVersion(value, 12);
 }
 
@@ -2088,6 +2090,7 @@ function migrateV2Profile(value: unknown): ProfileProgress | null {
 }
 
 export function loadRun(storage: StorageLike): SavedRun | null {
+  // 先读当前版本，再按降序尝试内存迁移；旧键保留但永不覆盖当前键。
   const readRun = (key: string): unknown => (
     migrateLegacyVictoryCampaign(
       migrateLegacyMonsterIds(parseJson(safeGetItem(storage, key))),
@@ -2107,6 +2110,7 @@ export function loadRun(storage: StorageLike): SavedRun | null {
 }
 
 export function loadProfile(storage: StorageLike): ProfileProgress {
+  // Profile 迁移只保留学习进度和发现记录，缺失或损坏时从空档开始。
   const value = parseJson(safeGetItem(storage, PROFILE_SAVE_KEY));
   if (isProfileProgress(value)) return value;
   const migratedCurrent = migrateV2Profile(value);
@@ -2120,6 +2124,7 @@ export function loadProfile(storage: StorageLike): ProfileProgress {
 }
 
 export function saveRun(storage: StorageLike, run: SavedRun): void {
+  // Run 写入失败不应让游戏崩溃；内存状态继续作为当前会话事实。
   try {
     storage.setItem(RUN_SAVE_KEY, JSON.stringify(run));
   } catch {
@@ -2128,6 +2133,7 @@ export function saveRun(storage: StorageLike, run: SavedRun): void {
 }
 
 export function saveProfile(storage: StorageLike, profile: ProfileProgress): boolean {
+  // 返回成功标记，供防抖协调器保留最后一次真正写入的 JSON 指纹。
   try {
     storage.setItem(PROFILE_SAVE_KEY, JSON.stringify(profile));
     return true;

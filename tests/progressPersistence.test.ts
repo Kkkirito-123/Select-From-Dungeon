@@ -1,3 +1,4 @@
+/** 验证高频移动快照合并和关键状态立即落盘的写入策略。 */
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/GameSession";
 import type { GameSnapshot } from "../src/domain/types";

@@ -1,3 +1,4 @@
+/** 叙事领域：依据已完成课程、证据和世界状态计算可展示的故事节点。 */
 import { lessonById } from "../content/mvpLevel";
 import {
   NARRATIVE_BEAT_KINDS,

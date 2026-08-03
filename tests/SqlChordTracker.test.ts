@@ -1,3 +1,4 @@
+/** 验证 SQL 连击/学习节奏的前端展示状态不会越过领域判题边界。 */
 import { describe, expect, it } from "vitest";
 import { SqlChordTracker } from "../src/ui/SqlChordTracker";
 

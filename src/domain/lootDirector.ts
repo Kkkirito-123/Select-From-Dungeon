@@ -1,3 +1,4 @@
+/** 掉落导演：用稳定随机值生成可选消耗品，并保证同一场战斗不重复结算。 */
 import { CONSUMABLES, type LootCandidate } from "../content/inventoryCatalog";
 import { legacyMonsterIdForCurrent } from "../content/monsterIds";
 import type { LootItem, Monster } from "./types";

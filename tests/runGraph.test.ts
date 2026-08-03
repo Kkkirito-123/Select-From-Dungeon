@@ -1,3 +1,4 @@
+/** 验证课程图的先修关系、目标顺序和物理兴趣点推导。 */
 import { describe, expect, it } from "vitest";
 import {
   createSeededRandom,

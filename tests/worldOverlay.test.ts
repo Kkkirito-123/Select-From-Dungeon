@@ -1,3 +1,4 @@
+/** 验证探索世界叠加层的方向、距离和教学目标文案计算。 */
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/GameSession";
 import {

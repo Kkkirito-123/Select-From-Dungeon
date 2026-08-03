@@ -1,3 +1,4 @@
+/** 第一层隐藏宝藏和固定奖励的物理位置派生，不改变主路线可达性。 */
 import { safeZoneCellKeys } from "./campfire";
 import { mazeTileAt, mazeZoneAt, type MazeFloor } from "./mazeGenerator";
 import { stableStringHash } from "./runGraph";

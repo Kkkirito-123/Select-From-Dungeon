@@ -1,3 +1,4 @@
+/** 验证第一层隐藏宝藏的固定位置、前置条件和主路线不越权。 */
 import { describe, expect, it } from "vitest";
 import { generateCampfires, safeZoneCellKeys } from "../src/domain/campfire";
 import { generateGuidedMapPlan } from "../src/domain/guidedMap";

@@ -1,3 +1,4 @@
+/** 将许可明确的古典素材转换为运行时音频，并写入可复现的资源清单。 */
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";

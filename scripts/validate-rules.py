@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 仓库规则验证入口，只依赖 Python 标准库和 Git，供本地与 CI 共用。
 """Validate the portable rules package using Python's standard library and Git."""
 
 from __future__ import annotations

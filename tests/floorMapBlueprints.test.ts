@@ -1,3 +1,4 @@
+/** 验证八层宏观地图蓝图的区域、房间槽位和拓扑签名。 */
 import { describe, expect, it } from "vitest";
 import {
   FLOOR_MAP_BLUEPRINTS,

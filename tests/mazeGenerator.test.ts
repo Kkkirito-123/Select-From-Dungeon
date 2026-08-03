@@ -1,3 +1,4 @@
+/** 验证迷宫生成的尺寸、连通性、稳定性和旧版本地图兼容契约。 */
 import { describe, expect, it } from "vitest";
 import legacyV11Fixture from "./fixtures/legacy-v11-before-mvp2-1.json";
 import {

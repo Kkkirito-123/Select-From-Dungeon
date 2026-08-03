@@ -1,3 +1,4 @@
+/** 验证 GameSession 对移动、战斗、掉落、存档快照和事件流的综合约束。 */
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/floorExperience";
 import { ARMORS } from "../src/content/inventoryCatalog";

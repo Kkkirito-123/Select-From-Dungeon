@@ -1,3 +1,4 @@
+/** 八层生物群系与遭遇内容：集中定义敌人池、精英权重和场景练习。 */
 import type {
   LessonStageDefinition,
   Monster,

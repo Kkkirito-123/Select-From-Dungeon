@@ -1,3 +1,4 @@
+/** 验证成功移动步数、安区域间和稳定随机值驱动的遭遇触发规则。 */
 import { describe, expect, it } from "vitest";
 import {
   AMBUSH_CHANCE,

@@ -1,3 +1,4 @@
+/** 验证本地 Run/Profile 存档的版本迁移、恢复和校验边界。 */
 import { describe, expect, it } from "vitest";
 import legacyV11Fixture from "./fixtures/legacy-v11-before-mvp2-1.json";
 import { legacyMonsterIdForCurrent } from "../src/content/monsterIds";

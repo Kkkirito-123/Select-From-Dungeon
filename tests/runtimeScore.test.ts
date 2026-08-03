@@ -1,3 +1,4 @@
+/** 验证录音资源清单、哈希和楼层场景到静态 URL 的解析。 */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";

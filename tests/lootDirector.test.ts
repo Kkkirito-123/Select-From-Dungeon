@@ -1,3 +1,4 @@
+/** 验证随机掉落的稳定性、概率、同战斗去重和可选性。 */
 import { describe, expect, it } from "vitest";
 import {
   ARMORS,

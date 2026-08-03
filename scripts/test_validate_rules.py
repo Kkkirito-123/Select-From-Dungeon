@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 验证规则脚本的回归测试，覆盖路径安全、命令边界和跨平台行为。
 """Regression tests for validate-rules.py security and portability boundaries."""
 
 from __future__ import annotations

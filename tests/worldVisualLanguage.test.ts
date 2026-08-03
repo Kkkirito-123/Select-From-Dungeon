@@ -1,3 +1,4 @@
+/** 验证地标类型到统一视觉/交互词汇的映射。 */
 import { describe, expect, it } from "vitest";
 import {
   landmarkActionVerb,

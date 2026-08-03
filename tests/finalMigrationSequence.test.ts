@@ -1,3 +1,4 @@
+/** 验证终局页面序列只依赖已确认的课程和故事进度。 */
 import { describe, expect, it } from "vitest";
 import {
   FINAL_HISTORY_PAGES,

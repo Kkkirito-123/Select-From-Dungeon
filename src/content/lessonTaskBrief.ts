@@ -1,3 +1,4 @@
+/** 面向玩家的课程任务摘要，负责把领域 lesson ID 转成简短目标说明。 */
 import type { FloorNumber } from "../domain/runGraph";
 import type {
   LessonDefinition,

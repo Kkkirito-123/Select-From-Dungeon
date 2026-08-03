@@ -1,3 +1,4 @@
+/** 第一层 MVP 课程、固定怪物、房间奖励和教学目标的内容权威。 */
 import type {
   LessonDefinition,
   LessonId,

@@ -1,3 +1,4 @@
+/** Run 内房间风味、固定奖励和楼层结算内容。 */
 import type { RoomReward, RoomType } from "../domain/runGraph";
 import type { ClaimableReward, Position, Relic } from "../domain/types";
 

@@ -1,3 +1,4 @@
+/** 八层战役内容契约：统一课程、角色、主题、奖励和存档所需的元数据形状。 */
 import type { RunLessonId } from "../domain/runGraph";
 
 export const CAMPAIGN_FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const;

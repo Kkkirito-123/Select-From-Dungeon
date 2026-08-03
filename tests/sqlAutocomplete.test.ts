@@ -1,3 +1,4 @@
+/** 验证 SQL 补全只替换当前 token，不生成答案、不提交查询。 */
 import { describe, expect, it } from "vitest";
 import {
   applySqlSuggestion,

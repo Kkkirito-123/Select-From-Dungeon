@@ -1,3 +1,4 @@
+/** 怪物身份披露规则：击败前只展示稳定编号，击败后才恢复永久图鉴名称。 */
 import type { Monster, ProfileProgress } from "./types";
 
 export interface MonsterIdentityPresentation {

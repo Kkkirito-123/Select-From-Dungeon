@@ -1,3 +1,4 @@
+/** 验证八层战斗数值、经验阈值和课程内容之间的平衡契约。 */
 import { describe, expect, it } from "vitest";
 import {
   MINI_ELITE_PERCENT_BY_FLOOR,

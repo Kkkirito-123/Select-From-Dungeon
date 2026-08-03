@@ -1,3 +1,4 @@
+/** 游戏运行时的唯一事实会话：拥有移动、战斗、题目、奖励、存档快照和事件流。 */
 import {
   JOIN_CHAIN,
   SORT_SABER,
@@ -594,6 +595,10 @@ function initialGroundItems(
   return items;
 }
 
+/**
+ * 运行时领域会话。
+ * 所有会改变玩家事实的操作都应经过这里，场景和 Agent 只能读取快照或提交受限意图。
+ */
 export class GameSession {
   private runInstanceId: string;
   private questionBankVersion: string;

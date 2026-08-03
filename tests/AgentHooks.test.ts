@@ -1,3 +1,4 @@
+/** 验证探索、精英结算、篝火和楼层事件到 Agent Hook 的映射。 */
 import { describe, expect, it } from "vitest";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { detectAgentHook } from "../agent/runtime/hooks";

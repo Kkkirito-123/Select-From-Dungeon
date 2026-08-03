@@ -1,3 +1,4 @@
+/** 下载并校验项目允许使用的 CC0 素材，失败时保留可诊断的文件状态。 */
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";

@@ -1,3 +1,4 @@
+/** 战斗数值权威：集中定义不同楼层、角色和结果对应的伤害与经验。 */
 import { biomeEncounterFor } from "../content/biomeContent";
 import type { LessonStageDefinition, Monster } from "./types";
 import type { FloorNumber } from "./runGraph";

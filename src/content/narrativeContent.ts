@@ -1,3 +1,4 @@
+/** 叙事内容目录：提供楼层故事、失名录证据和结局文本，不推进游戏状态。 */
 import type { FloorNumber } from "../domain/runGraph";
 
 export const NARRATIVE_BEAT_KINDS = [

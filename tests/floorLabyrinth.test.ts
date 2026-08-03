@@ -1,3 +1,4 @@
+/** 验证楼层迷宫契约解析出的危险、视野、边界和安全区。 */
 import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_FLOORS,

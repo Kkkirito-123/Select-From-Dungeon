@@ -1,3 +1,4 @@
+/** 验证巡逻怪物的确定性移动、速度和安全区拒入规则。 */
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/GameSession";
 import { generateMazeFloor } from "../src/domain/mazeGenerator";

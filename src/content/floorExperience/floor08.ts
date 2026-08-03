@@ -1,3 +1,4 @@
+/** 第八层固定地标、隐藏房、故事触发和终局前世界变化配置。 */
 import type {
   FloorAnchorDefinition,
   FloorExperienceDefinition,

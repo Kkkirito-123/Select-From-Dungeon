@@ -1,3 +1,4 @@
+/** 验证 Agent 协调器按触发时机预处理、缓存和取消后台请求。 */
 import { describe, expect, it } from "vitest";
 import { AgentCache } from "../agent/runtime/AgentCache";
 import type { AgentPreparationClient } from "../agent/runtime/AgentClient";

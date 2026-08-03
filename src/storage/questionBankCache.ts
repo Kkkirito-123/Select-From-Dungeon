@@ -2,10 +2,6 @@
  * 浏览器 IndexedDB 题库缓存。
  * 只缓存通过 Manifest 校验的版本化字节，保证进行中的 Run 不被半更新题库替换。
  */
-/**
- * 浏览器 IndexedDB 题库缓存。
- * 只缓存通过 Manifest 校验的版本化字节，保证进行中的 Run 不被半更新题库替换。
- */
 export const CONTENT_DATABASE_NAME = "select-from-dungeon-content";
 export const CONTENT_DATABASE_VERSION = 1;
 

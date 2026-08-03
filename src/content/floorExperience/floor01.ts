@@ -1,3 +1,4 @@
+/** 第一层固定地标、隐藏房、故事触发和世界变化配置。 */
 import type {
   FloorAnchorDefinition,
   FloorExperienceDefinition,

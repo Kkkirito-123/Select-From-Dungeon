@@ -1,3 +1,4 @@
+/** 终局 MIGRATE 页面和步骤文案，内容层不负责推进状态或执行 SQL。 */
 import {
   NARRATIVE_ENDINGS,
   NARRATIVE_FLOORS,

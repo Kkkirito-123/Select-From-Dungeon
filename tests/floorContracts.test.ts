@@ -1,3 +1,4 @@
+/** 验证八层内容契约的课程、遭遇、主题和奖励字段完整且一致。 */
 import { describe, expect, it } from "vitest";
 import {
   FLOOR_CONTRACTS,

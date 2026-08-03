@@ -1,3 +1,4 @@
+/** 验证 Agent 输入上下文只包含筛选后的作答证据和稳定摘要。 */
 import { describe, expect, it } from "vitest";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { buildLocalCampfireOutput } from "../agent/runtime/localFallback";

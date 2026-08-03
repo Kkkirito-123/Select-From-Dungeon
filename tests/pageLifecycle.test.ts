@@ -1,3 +1,4 @@
+/** 验证页面隐藏/恢复时渲染循环、音频和存档刷新的生命周期边界。 */
 import { describe, expect, it, vi } from "vitest";
 import { applyPageVisibilityRuntime } from "../src/runtime/pageLifecycle";
 

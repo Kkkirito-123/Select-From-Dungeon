@@ -1,3 +1,4 @@
+/** 课程与物理兴趣点图：描述先修关系和路线目标，不直接拥有地图几何。 */
 export const FLOOR_ONE_LESSONS = [
   "select",
   "where",

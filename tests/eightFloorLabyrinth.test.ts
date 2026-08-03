@@ -1,3 +1,4 @@
+/** 验证八层迷宫契约全部解析，并保持入口、Boss 门和安全区的意图一致。 */
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/floorExperience";
 import { floorLabyrinth } from "../src/content/floorLabyrinth";

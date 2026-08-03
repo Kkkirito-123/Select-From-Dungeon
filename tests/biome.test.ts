@@ -1,3 +1,4 @@
+/** 验证生物群系派生、区域 Boss、传送点和安全区边界。 */
 import { describe, expect, it } from "vitest";
 import {
   BIOME_ENCOUNTERS,

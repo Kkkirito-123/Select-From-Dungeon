@@ -1,3 +1,4 @@
+/** 校验运行时素材清单、哈希和文件存在性，防止发布缺失或篡改资源。 */
 import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";

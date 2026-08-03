@@ -1,3 +1,4 @@
+/** 验证 DeepSeek BYOK Worker 的官方域名、内存密钥和浏览器安全边界。 */
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";

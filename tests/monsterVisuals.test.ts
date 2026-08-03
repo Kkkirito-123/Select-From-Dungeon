@@ -1,3 +1,4 @@
+/** 验证怪物视觉配方按种类稳定生成，并与身份显示逻辑解耦。 */
 import { describe, expect, it } from "vitest";
 import {
   MONSTER_KIND_VISUALS,

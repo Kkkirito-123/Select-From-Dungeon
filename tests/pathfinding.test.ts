@@ -1,3 +1,4 @@
+/** 验证网格寻路的最短路线、不可达结果和护送路线高亮基础。 */
 import { describe, expect, it } from "vitest";
 import { findGridPath } from "../src/domain/pathfinding";
 

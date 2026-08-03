@@ -1,3 +1,4 @@
+/** 验证第一层连续路线的专属迷宫规则和安全边界。 */
 import { describe, expect, it } from "vitest";
 import { generateCampfires, safeZoneCellKeys } from "../src/domain/campfire";
 import {

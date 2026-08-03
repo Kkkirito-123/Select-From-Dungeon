@@ -1,3 +1,4 @@
+/** 验证怪物击败前后的身份披露、图鉴恢复和稳定编号。 */
 import { describe, expect, it } from "vitest";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
 import {

@@ -1,3 +1,4 @@
+/** 验证课程进度如何派生可见的楼层世界状态和环境变化。 */
 import { describe, expect, it } from "vitest";
 import { deriveFloorWorldState } from "../src/domain/floorWorldState";
 import type { RunLessonId } from "../src/domain/runGraph";

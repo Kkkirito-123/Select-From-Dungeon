@@ -1,3 +1,4 @@
+/** 第二层课程与固定怪物内容，排序和题目语义由领域评估器解释。 */
 import type {
   LessonDefinition,
   LessonId,

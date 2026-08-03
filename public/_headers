@@ -1,4 +1,5 @@
 /*
+  安全边界：仅允许本站资源和 DeepSeek 官方 API，禁止项目服务器接收玩家 Key。
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self' https://api.deepseek.com; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()

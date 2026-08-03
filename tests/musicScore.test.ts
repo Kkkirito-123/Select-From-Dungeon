@@ -1,3 +1,4 @@
+/** 验证楼层音乐配置、场景归一化和乐句切换的确定性。 */
 import { describe, expect, it } from "vitest";
 import {
   FLOOR_SCORE_PROFILES,

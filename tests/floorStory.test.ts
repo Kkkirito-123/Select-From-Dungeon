@@ -1,3 +1,4 @@
+/** 验证楼层故事的阻塞、环境和检查触发类型及其确认行为。 */
 import { describe, expect, it } from "vitest";
 import {
   FloorStoryMomentQueue,

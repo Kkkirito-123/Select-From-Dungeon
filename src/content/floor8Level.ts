@@ -1,3 +1,4 @@
+/** 第八层数据库事故课程内容和终局前的固定遭遇。 */
 import type {
   LessonDefinition,
   Monster,

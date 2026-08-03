@@ -1,3 +1,4 @@
+/** 第七层索引与查询计划课程内容及其固定遭遇。 */
 import type {
   LessonDefinition,
   Monster,

@@ -1,3 +1,4 @@
+/** 验证 Agent 严格 JSON 输出契约拒绝 Markdown、HTML、未知字段和未知证据。 */
 import { describe, expect, it } from "vitest";
 import { parsePreparedAgentOutput } from "../agent/runtime/contracts";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";

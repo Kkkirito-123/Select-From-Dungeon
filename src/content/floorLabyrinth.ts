@@ -1,3 +1,4 @@
+/** 八层迷宫导航意图：定义稳定入口、出口、Boss 门、安全区和危险主题。 */
 import type { FloorNumber } from "../domain/runGraph";
 
 export type FloorHazardKind =

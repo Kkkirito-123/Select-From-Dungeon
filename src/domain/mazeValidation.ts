@@ -1,3 +1,4 @@
+/** 地图契约验证器：检查入口、区域、房间、门和路径是否满足运行时安全边界。 */
 import type { LessonId, Position } from "./types";
 import {
   LEGACY_MAZE_CHUNK_SIZE,
@@ -85,6 +86,7 @@ function computeCycleRank(floor: MazeFloor): number {
 }
 
 export function validateMazeFloor(floor: MazeFloor, graph: RoomGraph): MazeValidationResult {
+  // 验证器只报告问题，不修补输入；修补会掩盖生成器或迁移逻辑的根因。
   const errors: string[] = [];
   if (
     floor.version !== 4 ||

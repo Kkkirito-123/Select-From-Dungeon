@@ -1,3 +1,4 @@
+/** 怪物视觉配方：仅描述像素外观，不决定身份披露、战斗伤害或题目。 */
 import type { Monster, MonsterKind } from "../domain/types";
 
 export type MonsterVisualArchetype =

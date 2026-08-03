@@ -1,3 +1,4 @@
+/** 验证 Worker 客户端的配置、连接、复盘请求和敏感字段隔离。 */
 import { describe, expect, it } from "vitest";
 import { DeepSeekWorkerClient, type WorkerLike } from "../agent/browser/deepseek/DeepSeekWorkerClient";
 import type {

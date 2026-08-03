@@ -1,3 +1,4 @@
+/** 物理 SQL 密门题目与结果契约；成功只改变对应门，不授予课程精通。 */
 import type {
   FloorNumber,
 } from "../domain/runGraph";

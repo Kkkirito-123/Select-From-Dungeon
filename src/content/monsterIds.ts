@@ -1,3 +1,4 @@
+/** 兼容用怪物 ID 与楼层映射；这些 ID 是存档和图鉴的稳定键。 */
 import type { FloorNumber } from "../domain/runGraph";
 
 export const MONSTER_ID_COUNT = 89;

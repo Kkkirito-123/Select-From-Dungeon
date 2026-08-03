@@ -1,3 +1,4 @@
+/** 验证角色、楼层和战斗结果对应的确定性伤害与经验结算。 */
 import { describe, expect, it } from "vitest";
 import { INITIAL_MONSTERS, lessonById, practiceStagesFor } from "../src/content/mvpLevel";
 import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";

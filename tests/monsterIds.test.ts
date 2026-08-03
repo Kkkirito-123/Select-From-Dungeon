@@ -1,3 +1,4 @@
+/** 验证怪物 ID、楼层映射和存档兼容键不会漂移。 */
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";

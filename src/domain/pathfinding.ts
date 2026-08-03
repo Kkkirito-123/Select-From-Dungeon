@@ -1,3 +1,4 @@
+/** 网格寻路基础设施：为路线提示、护送高亮和可达性验证提供纯函数。 */
 import type { Position } from "./types";
 
 const DIRECTIONS: readonly Position[] = [

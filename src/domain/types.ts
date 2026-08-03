@@ -1,3 +1,4 @@
+/** 领域共享类型：约束存档、快照、战斗、地图和内容之间的稳定数据契约。 */
 import type {
   FloorNumber,
   RoomGraph,

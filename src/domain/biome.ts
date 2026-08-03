@@ -1,3 +1,4 @@
+/** 根据楼层地图和种子派生生物群系、区域 Boss 与区域传送点。 */
 import {
   BIOME_ENCOUNTERS,
   type BiomeKind,
@@ -436,6 +437,7 @@ export function generateBiomePlan(
   campfires: readonly Campfire[],
   guidedMap: GuidedMapPlan,
 ): BiomePlan {
+  // 区域和 Boss 坐标从已保存地图派生，不能另起一套与物理世界不一致的随机布局。
   const templates = TEMPLATES_BY_FLOOR[graph.floor];
   const regionLessonIds = V6_REGION_LESSONS[graph.floor];
   const regionNames = floorMapBlueprint(graph.floor).regionNames;

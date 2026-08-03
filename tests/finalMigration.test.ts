@@ -1,3 +1,4 @@
+/** 验证终局 MIGRATE 的步骤解锁、证据和结束条件。 */
 import { describe, expect, it } from "vitest";
 import { NARRATIVE_ENDINGS } from "../src/content/narrativeContent";
 import {

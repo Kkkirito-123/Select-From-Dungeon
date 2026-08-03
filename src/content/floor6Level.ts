@@ -1,3 +1,4 @@
+/** 第六层 DML 与事务沙箱课程内容；危险操作仍由 SQL 策略层拦截。 */
 import type {
   LessonDefinition,
   Monster,

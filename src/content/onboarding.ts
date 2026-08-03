@@ -1,3 +1,4 @@
+/** 新玩家渐进式引导文案和步骤契约；完成状态由存储层管理。 */
 export type OnboardingStepId =
   | "move"
   | "find-monster"

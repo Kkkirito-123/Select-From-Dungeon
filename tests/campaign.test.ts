@@ -1,3 +1,4 @@
+/** 验证八层战役只能按顺序推进，且不会跳层、重复或重掷楼层。 */
 import { describe, expect, it } from "vitest";
 import {
   advanceCampaignProgress,

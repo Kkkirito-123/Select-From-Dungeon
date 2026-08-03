@@ -1,3 +1,4 @@
+/** 存档写入协调器：合并高频移动快照，并对战斗、背包和拓扑变化立即落盘。 */
 import type { GameSession } from "../domain/GameSession";
 import type { GameSnapshot } from "../domain/types";
 import { STORAGE_RUNTIME_CONFIG } from "../config/runtimeConfig";
@@ -35,6 +36,7 @@ type ProgressSource = Pick<
 export function persistenceFingerprint(
   snapshot: GameSnapshot,
 ): PersistenceFingerprint {
+  // 指纹只包含需要立即保存的关键字段，不记录移动轨迹或按键。
   return {
     mode: snapshot.mode,
     queryCount: snapshot.queryCount,
@@ -62,6 +64,7 @@ export function isCriticalPersistenceChange(
   previous: PersistenceFingerprint | null,
   current: PersistenceFingerprint,
 ): boolean {
+  // 关键状态变化立即刷盘，普通移动则交给尾随防抖写入。
   return previous === null ||
     current.mode !== previous.mode ||
     current.queryCount !== previous.queryCount ||

@@ -1,3 +1,4 @@
+/** 楼层体验内容类型：描述地标、隐藏房、故事触发和派生世界状态。 */
 import type { Armor } from "../../domain/types";
 import type { FloorNumber, RunLessonId } from "../../domain/runGraph";
 

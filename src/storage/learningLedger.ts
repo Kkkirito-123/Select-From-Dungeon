@@ -2,10 +2,6 @@
  * 浏览器本地学习账本。
  * 完整作答和永久聚合只进入独立 IndexedDB，不上传服务器，也不记录移动或按键。
  */
-/**
- * 浏览器本地学习账本。
- * 完整作答和永久聚合只进入独立 IndexedDB，不上传服务器，也不记录移动或按键。
- */
 import type {
   AnswerAttemptRecord,
   GameSnapshot,

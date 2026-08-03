@@ -1,3 +1,4 @@
+/** 验证楼层素材清单、许可元数据和运行时资源路径可被发布流程识别。 */
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {

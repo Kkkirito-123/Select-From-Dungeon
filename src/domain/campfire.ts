@@ -1,3 +1,4 @@
+/** 篝火与安全区领域规则：处理休息、检查点、复活位置和安全单元格。 */
 import { findGridPath } from "./pathfinding";
 import { floorLabyrinth } from "../content/floorLabyrinth";
 import { mazeTileAt, mazeZoneAt, type MazeFloor, type MazeZone } from "./mazeGenerator";

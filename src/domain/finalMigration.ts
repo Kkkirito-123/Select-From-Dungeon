@@ -1,3 +1,4 @@
+/** 终局 MIGRATE 流程的步骤、解锁状态和结束条件。 */
 import {
   NARRATIVE_ENDINGS,
   type NarrativeEndingStep,

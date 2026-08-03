@@ -1,3 +1,4 @@
+/** 验证真实 Run 跨移动、战斗、楼层和存档边界的集成不变量。 */
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";

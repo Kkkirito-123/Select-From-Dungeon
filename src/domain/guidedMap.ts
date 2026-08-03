@@ -1,3 +1,4 @@
+/** 路线引导领域：生成信标、死路补给、钥匙和双向捷径，不负责传送玩家。 */
 import { NAVIGATION_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import { mazeTileAt, mazeZoneAt, type MazeFloor } from "./mazeGenerator";
 import { findGridPath } from "./pathfinding";
@@ -583,6 +584,7 @@ export function generateGuidedMapPlan(
   floor: MazeFloor,
   campfires: readonly Campfire[],
 ): GuidedMapPlan {
+  // 引导信息由地图派生并可重复重建，不重复写入 Run 存档，避免地图与路线漂移。
   const shortcuts = createShortcuts(graph, floor, campfires);
   return {
     version: GUIDED_MAP_VERSION,

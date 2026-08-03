@@ -1,3 +1,4 @@
+/** 装备、护甲、消耗品和随机掉落候选的静态目录。 */
 import type {
   Armor,
   Consumable,

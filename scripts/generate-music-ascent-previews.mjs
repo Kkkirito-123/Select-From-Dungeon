@@ -1,3 +1,4 @@
+/** 生成楼层上升段音乐预览，供音频内容验收而非浏览器运行时生成。 */
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";

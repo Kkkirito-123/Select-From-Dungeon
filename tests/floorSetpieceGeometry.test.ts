@@ -1,3 +1,4 @@
+/** 验证固定地标几何只影响布景，不侵入可行走地图和碰撞区域。 */
 import { describe, expect, it } from "vitest";
 import {
   anchoredWaterBandGeometry,

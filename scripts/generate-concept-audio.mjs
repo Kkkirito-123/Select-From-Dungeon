@@ -1,3 +1,4 @@
+/** 生成课程概念提示音的离线脚本；产物进入静态资源目录供运行时加载。 */
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -1,3 +1,4 @@
+/** 迷宫生成与地图数据结构：构建可保存、可验证、可从旧版本迁移的物理世界。 */
 import {
   MVP2_MAZE_CHUNK_SIZE,
   MVP2_MAZE_HEIGHT,
@@ -814,6 +815,7 @@ export function generateMazeFloor(
   graph: RoomGraph,
   options: MazeGenerationOptions = {},
 ): MazeFloor {
+  // 生成结果必须由楼层、种子和版本确定，不能依赖浏览器随机数或渲染顺序。
   const blueprint = compactBlueprint(graph);
   const topologyRandom = createSeededRandom(
     `select-from-dungeon:maze:v7:floor-${graph.floor}:${graph.seed}:phase:topology`,

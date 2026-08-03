@@ -1,3 +1,4 @@
+/** 八层战役状态机：校验楼层顺序、迁移条件和不可跳层约束。 */
 import {
   CAMPAIGN_FLOORS,
   type CampaignFloorNumber,
@@ -43,6 +44,7 @@ export function createCampaignProgress(
   seed: string,
   currentFloor: CampaignFloorNumber = 1,
 ): CampaignProgress {
+  // 新 Run 只创建一个连续战役；每个楼层的稳定种子由同一基准种子派生。
   const baseSeed = normalizeBaseSeed(seed);
   return {
     version: CAMPAIGN_PROGRESS_VERSION,
@@ -71,6 +73,7 @@ export function cloneCampaignProgress(
 export function advanceCampaignProgress(
   progress: CampaignProgress,
 ): CampaignTransition {
+  // 只允许从当前活动楼层结算，防止 UI 重复点击或旧快照重复推进。
   const from = progress.currentFloor;
   if (progress.status === "completed") {
     return {

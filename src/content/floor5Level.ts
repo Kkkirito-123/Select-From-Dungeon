@@ -1,3 +1,4 @@
+/** 第五层窗口函数课程内容及其固定遭遇。 */
 import type {
   LessonDefinition,
   Monster,

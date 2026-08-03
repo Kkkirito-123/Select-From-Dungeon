@@ -1,3 +1,4 @@
+/** 验证 Agent 预处理结果的缓存键、命中和失效边界。 */
 import { describe, expect, it } from "vitest";
 import { AgentCache } from "../agent/runtime/AgentCache";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";

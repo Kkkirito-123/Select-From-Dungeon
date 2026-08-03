@@ -1,3 +1,4 @@
+/** 验证课程任务摘要能从稳定 lesson ID 生成一致的玩家目标。 */
 import { describe, expect, it } from "vitest";
 import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
 import {

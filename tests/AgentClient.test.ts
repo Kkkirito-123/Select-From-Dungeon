@@ -1,3 +1,4 @@
+/** 验证 Agent 客户端只允许受限 loopback 端点并正确处理失败回退。 */
 import { describe, expect, it, vi } from "vitest";
 import { AgentClient, loopbackAgentEndpoint } from "../agent/runtime/AgentClient";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";

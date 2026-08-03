@@ -1,3 +1,4 @@
+/** 验证八层固定地标、隐藏房、故事触发和世界变化内容可追溯。 */
 import { access, readFile } from "node:fs/promises";
 import { posix } from "node:path";
 import { describe, expect, it } from "vitest";

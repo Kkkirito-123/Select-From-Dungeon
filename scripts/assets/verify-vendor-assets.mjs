@@ -1,3 +1,4 @@
+/** 校验第三方运行时资源是否符合仓库许可、路径和哈希边界。 */
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";

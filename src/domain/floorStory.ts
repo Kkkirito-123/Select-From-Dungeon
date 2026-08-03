@@ -1,3 +1,4 @@
+/** 楼层故事触发领域：把内容契约转换为阻塞、环境和检查三类事件。 */
 import {
   floorExperience,
   type FloorEnvironmentRuleDefinition,

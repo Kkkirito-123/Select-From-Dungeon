@@ -1,3 +1,4 @@
+/** 将楼层迷宫契约解析为运行时边界、视野、安全区、危险和入口确认。 */
 import {
   floorLabyrinth,
   type FloorHazardKind,
