@@ -1,3 +1,7 @@
+/**
+ * 可选的 Python/OpenZLAgent 回环客户端。
+ * 浏览器 BYOK 不经过这里；此客户端只允许连接本机服务。
+ */
 import {
   parsePreparedAgentOutput,
   type AgentPrepareRequest,
@@ -5,6 +9,7 @@ import {
 } from "./contracts";
 
 export interface AgentPreparationClient {
+  /** 模型是否可用；关闭时协调器仍使用本地确定性输出。 */
   readonly enabled: boolean;
   prepare(request: AgentPrepareRequest): Promise<PreparedAgentOutput | null>;
 }
@@ -15,6 +20,7 @@ type FetchLike = (
 ) => Promise<Response>;
 
 export function loopbackAgentEndpoint(value: string | undefined): string | null {
+  // 拒绝公网地址，避免把游戏证据误发到未授权的第三方服务。
   const normalized = value?.trim();
   if (!normalized) return null;
   try {
@@ -30,6 +36,7 @@ export function loopbackAgentEndpoint(value: string | undefined): string | null 
 }
 
 export class AgentClient implements AgentPreparationClient {
+  /** 通过受限回环 HTTP 服务获取可选的抄写员措辞。 */
   private readonly endpoint: string | null;
 
   constructor(
@@ -45,6 +52,7 @@ export class AgentClient implements AgentPreparationClient {
   }
 
   async prepare(request: AgentPrepareRequest): Promise<PreparedAgentOutput | null> {
+    // 请求超时或解析失败统一降级为 null，由协调器保留本地输出。
     if (!this.endpoint) return null;
     const controller = new AbortController();
     const timeout = globalThis.setTimeout(() => controller.abort(), this.timeoutMs);

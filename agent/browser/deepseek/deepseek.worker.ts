@@ -15,15 +15,18 @@ import type {
 const DEEPSEEK_ORIGIN = DEEPSEEK_RUNTIME_CONFIG.origin;
 const FETCH_TIMEOUT_MS = DEEPSEEK_RUNTIME_CONFIG.requestTimeoutMs;
 const worker = self as DedicatedWorkerGlobalScope;
+// 凭据只存在 Worker 私有内存，不能进入消息返回值、缓存、日志或页面存储。
 let credential: string | null = null;
 let configuredOnce = false;
 let allowedModels = new Set<string>();
 
 function response(value: DeepSeekWorkerResponse): void {
+  // Worker 对外只返回协议允许的状态和内容，不返回认证信息。
   worker.postMessage(value);
 }
 
 function errorCode(status: number): DeepSeekErrorCode {
+  // 将供应商状态码压缩为页面可处理的有限错误集合。
   if (status === 401) return "invalid-key";
   if (status === 402) return "insufficient-balance";
   if (status === 429) return "rate-limit";
@@ -31,6 +34,7 @@ function errorCode(status: number): DeepSeekErrorCode {
 }
 
 async function safeFetch(input: string, init: RequestInit): Promise<Response> {
+  // 固定官方 origin，并统一施加无缓存、无重定向和超时策略。
   const url = new URL(input);
   if (url.origin !== DEEPSEEK_ORIGIN) {
     throw new Error("forbidden-origin");
@@ -52,6 +56,7 @@ async function safeFetch(input: string, init: RequestInit): Promise<Response> {
 }
 
 async function configure(message: Extract<DeepSeekWorkerRequest, { type: "configure" }>) {
+  // configure 只允许一次；重新连接必须销毁当前 Worker 后创建新实例。
   if (configuredOnce) {
     response({ type: "error", requestId: message.requestId, code: "not-configured" });
     return;
@@ -103,6 +108,7 @@ async function configure(message: Extract<DeepSeekWorkerRequest, { type: "config
 }
 
 async function prepare(message: Extract<DeepSeekWorkerRequest, { type: "prepare" }>) {
+  // 模型只能处理已由游戏筛选的证据，返回内容还要经过主线程协议校验。
   if (!credential) {
     response({ type: "error", requestId: message.requestId, code: "not-configured" });
     return;
@@ -188,6 +194,7 @@ worker.addEventListener("message", (event: MessageEvent<DeepSeekWorkerRequest>) 
     void prepare(message);
     return;
   }
+  // clear 是唯一的通用分支，用于撤销凭据并释放允许的模型集合。
   credential = null;
   allowedModels.clear();
   response({ type: "cleared", requestId: message.requestId });

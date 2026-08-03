@@ -1,4 +1,4 @@
-"""Fixed prompt for the output-only Scribe task."""
+"""只读抄写员任务的固定提示词和用户数据序列化。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ SYSTEM_PROMPT = """你是《SQL 魔王城》的无名抄写员：安静、克制
 
 
 def build_user_prompt(context: AgentContext, campfire: CampfireOutput) -> str:
+    """只发送契约允许的证据，避免把完整游戏状态交给模型。"""
     payload = context.prompt_value()
     payload["campfireFacts"] = campfire.to_dict()
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

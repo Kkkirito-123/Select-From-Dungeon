@@ -1,4 +1,4 @@
-"""Compose a bounded Scribe response, with deterministic fallback."""
+"""组合有界的抄写员响应，并在模型失败时使用确定性降级内容。"""
 
 from __future__ import annotations
 
@@ -10,11 +10,14 @@ from .prompt import SYSTEM_PROMPT, build_user_prompt
 
 
 class JsonModel(Protocol):
+    """模型提供方的最小接口，不暴露工具、记忆或游戏写入能力。"""
+
     async def complete_json(self, *, system: str, user: str) -> str:
-        """Return one JSON object as text."""
+        """返回一个 JSON 文本对象；具体提供方不能改变协议边界。"""
 
 
 def fallback_scribe(context: AgentContext, campfire: CampfireOutput) -> ScribeOutput:
+    """按 Hook 阶段生成开场、寻路或收尾文本，保证离线时仍可用。"""
     if context.trigger.phase == "opening":
         return ScribeOutput(
             greeting="你来了。",
@@ -75,6 +78,7 @@ def fallback_scribe(context: AgentContext, campfire: CampfireOutput) -> ScribeOu
 
 
 def _route_guidance(context: AgentContext) -> str:
+    """把导航投影翻译成短路线提示，不自行推断地图坐标。"""
     direction = {
         "north": "北",
         "east": "东",
@@ -93,6 +97,7 @@ async def compose_scribe(
     campfire: CampfireOutput,
     model: JsonModel | None,
 ) -> tuple[ScribeOutput, bool]:
+    """模型输出先过 JSON 守卫；任何异常都回退到本地文本。"""
     fallback = fallback_scribe(context, campfire)
     if model is None:
         return fallback, False
@@ -102,5 +107,5 @@ async def compose_scribe(
             user=build_user_prompt(context, campfire),
         )
         return parse_scribe_json(raw, context), True
-    except Exception:  # The game-facing boundary always degrades to local output.
+    except Exception:  # 游戏边界必须始终降级到本地输出。
         return fallback, False

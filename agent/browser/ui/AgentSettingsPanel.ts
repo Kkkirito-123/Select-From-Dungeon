@@ -1,3 +1,7 @@
+/**
+ * DeepSeek BYOK 设置面板。
+ * 这里只持久化同意版本和模型 ID；Key 在输入框清空后只交给 Worker。
+ */
 import type { DeepSeekWorkerClient } from "../deepseek/DeepSeekWorkerClient";
 import type { DeepSeekErrorCode } from "../deepseek/protocol";
 import type { LearningLedger } from "../../../src/storage/learningLedger";
@@ -6,6 +10,7 @@ const SETTINGS_KEY = "select-from-dungeon:agent-provider-settings:v1";
 const CONSENT_VERSION = 1;
 
 interface SafeAgentSettings {
+  // 该结构刻意没有 apiKey 字段，防止把密钥写入浏览器存储。
   consentVersion: number;
   model: string | null;
 }
@@ -21,6 +26,7 @@ const ERROR_COPY: Record<DeepSeekErrorCode, string> = {
 };
 
 function readSettings(storage: Storage | null): SafeAgentSettings {
+  // 非敏感偏好读取失败时回到离线复盘，不影响游戏启动。
   if (!storage) return { consentVersion: 0, model: null };
   try {
     const value: unknown = JSON.parse(storage.getItem(SETTINGS_KEY) ?? "null");
@@ -39,11 +45,12 @@ function writeSettings(storage: Storage | null, value: SafeAgentSettings): void 
   try {
     storage?.setItem(SETTINGS_KEY, JSON.stringify(value));
   } catch {
-    // Non-secret preferences are optional; the Agent remains session-only.
+    // 非敏感偏好是可选项；Agent 的密钥状态始终只存在当前会话。
   }
 }
 
 function downloadJson(value: string): void {
+  // 学习账本导出由账本层脱敏；设置面板不接触 API Key。
   const url = URL.createObjectURL(new Blob([value], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
@@ -53,6 +60,7 @@ function downloadJson(value: string): void {
 }
 
 export class AgentSettingsPanel {
+  /** 负责授权提示、模型选择、学习账本操作和 Worker 生命周期绑定。 */
   private readonly settings: SafeAgentSettings;
   private readonly dialog = document.createElement("dialog");
   private readonly openButton = document.createElement("button");
@@ -68,6 +76,7 @@ export class AgentSettingsPanel {
   }
 
   mount(): void {
+    // 设置面板只创建一次，避免重复挂载导致多个连接按钮同时工作。
     if (this.mounted) return;
     this.mounted = true;
     this.openButton.type = "button";
@@ -121,6 +130,7 @@ export class AgentSettingsPanel {
         return;
       }
       const key = keyInput.value;
+      // 先清空 DOM 输入框，再把一次性值交给 Worker。
       keyInput.value = "";
       status.textContent = "正在由浏览器直连 DeepSeek…";
       status.dataset.kind = "pending";

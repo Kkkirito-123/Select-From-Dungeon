@@ -1,3 +1,7 @@
+/**
+ * 将 GameSnapshot 投影为最小 Agent 请求。
+ * 这里是数据边界：只发送有限作答证据、路线、剧情和遗物，不发送完整存档或原始 SQL。
+ */
 import { floorStoryProgress } from "../../src/domain/floorStory";
 import { floorWorldStateFromSnapshot } from "../../src/domain/floorWorldState";
 import { redactUndiscoveredMonsterIdentityText } from "../../src/domain/monsterIdentity";
@@ -12,6 +16,7 @@ import {
 import { displayHook, type AgentHook } from "./hooks";
 
 function stableHash(value: string): string {
+  // 证据 Hash 只用于缓存和请求去重，不承担密码学身份认证。
   let hash = 0x811c9dc5;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
@@ -25,6 +30,7 @@ function boundedText(value: string, maximum: number): string {
 }
 
 function sqlFeatures(sql: string): readonly string[] {
+  // 将玩家 SQL 压缩成教学特征，避免把不可信的原文交给模型。
   const vocabulary = [
     "SELECT", "FROM", "WHERE", "AND", "IS NULL", "COUNT", "GROUP BY",
     "HAVING", "ORDER BY", "LIMIT", "DISTINCT", "JOIN", "LEFT JOIN", "UNION",
@@ -35,6 +41,7 @@ function sqlFeatures(sql: string): readonly string[] {
 }
 
 function storySource(snapshot: GameSnapshot): AgentStorySource | null {
+  // 只取当前进度已解锁的一条抄写员故事，并再次遮蔽未发现的怪物身份。
   const progress = floorStoryProgress({
     floor: snapshot.floor,
     mode: snapshot.mode,
@@ -60,6 +67,7 @@ function storySource(snapshot: GameSnapshot): AgentStorySource | null {
 }
 
 function worldChanges(snapshot: GameSnapshot): readonly string[] {
+  // 用空白基线计算确定性的环境差异，避免把整个世界状态上传。
   const current = floorWorldStateFromSnapshot(snapshot);
   const baseline = floorWorldStateFromSnapshot({
     floor: snapshot.floor,
@@ -85,6 +93,7 @@ export function buildAgentPrepareRequest(
   snapshot: GameSnapshot,
   trigger: AgentHook = displayHook(snapshot),
 ): AgentPrepareRequest {
+  // 先按错误、提示和重复练习次数排序，再截断到固定证据上限。
   const lessonFrequency = new Map<RunLessonId, number>();
   snapshot.floorReview.forEach((record) => {
     lessonFrequency.set(record.lessonId, (lessonFrequency.get(record.lessonId) ?? 0) + 1);
@@ -151,5 +160,6 @@ export function buildAgentPrepareRequest(
 export function agentRequestKey(
   request: Pick<AgentPrepareRequest, "runId" | "floor" | "evidenceHash">,
 ): string {
+  // 请求身份绑定 Run、楼层和证据版本，防止跨层复用输出。
   return `${request.runId}:${request.floor}:${request.evidenceHash}`;
 }

@@ -1,3 +1,5 @@
+"""验证 Agent 回环 HTTP 服务的来源、绑定和输出边界。"""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +12,7 @@ from sql_dungeon_agent.pipeline import AgentPipeline
 
 
 def payload() -> dict[str, object]:
+    """构造不含 Key 和原始 SQL 的健康请求样本。"""
     return {
         "requestVersion": 2,
         "runId": "run-api-test",
@@ -34,6 +37,7 @@ def payload() -> dict[str, object]:
 
 
 class AgentApiTests(unittest.TestCase):
+    """验证本机服务可用，但不会接受公网来源或公网绑定。"""
     def setUp(self) -> None:
         self.server = build_server(
             host="127.0.0.1",

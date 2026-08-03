@@ -1,4 +1,4 @@
-"""Python-side closed protocol for the four output-only Agent hooks."""
+"""Python 端四类只读 Agent Hook 的闭合协议与输入输出守卫。"""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ DIRECTIONS = {"north", "east", "south", "west"}
 
 
 def _object(value: object, label: str) -> Mapping[str, Any]:
+    """把外部值限制为字符串键的普通对象，拒绝数组和非字符串键。"""
     if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
         raise ValueError(f"{label} must be an object")
     return value
@@ -27,6 +28,7 @@ def _closed_keys(
     optional: Optional[set[str]] = None,
     label: str,
 ) -> None:
+    """执行必填/可选字段检查，防止未知字段绕过协议边界。"""
     optional = optional or set()
     missing = required.difference(value)
     unknown = set(value).difference(required | optional)
@@ -44,6 +46,7 @@ def _text(
     allow_empty: bool = False,
     single_line: bool = False,
 ) -> str:
+    """校验文本长度、空值和单行限制，供所有外部字符串复用。"""
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
     normalized = value.strip()
@@ -57,6 +60,7 @@ def _text(
 
 
 def _integer(value: object, label: str, *, minimum: int, maximum: int) -> int:
+    """校验整数范围，并明确拒绝 Python 中的 bool 子类型。"""
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{label} must be an integer")
     if value < minimum or value > maximum:
@@ -71,6 +75,7 @@ def _string_list(
     maximum_items: int,
     item_maximum: int,
 ) -> Tuple[str, ...]:
+    """校验有界字符串列表，并统一返回不可变元组。"""
     if not isinstance(value, list) or len(value) > maximum_items:
         raise ValueError(f"{label} must contain at most {maximum_items} items")
     return tuple(
@@ -81,6 +86,7 @@ def _string_list(
 
 @dataclass(frozen=True)
 class AgentHook:
+    """描述一次开场、路线、精英结算或楼层结束触发。"""
     type: str
     phase: str
     floor: int
@@ -94,6 +100,7 @@ class AgentHook:
 
     @classmethod
     def from_value(cls, value: object) -> "AgentHook":
+        """从浏览器 JSON 解析并校验 Hook 的阶段和可选字段。"""
         data = _object(value, "request.trigger")
         _closed_keys(
             data,
@@ -148,6 +155,7 @@ class AgentHook:
         )
 
     def to_dict(self) -> dict[str, object]:
+        """转换为浏览器协议使用的驼峰字段对象。"""
         result: dict[str, object] = {"type": self.type, "phase": self.phase, "floor": self.floor}
         optional = {
             "objectiveRoomId": self.objective_room_id,
@@ -164,6 +172,7 @@ class AgentHook:
 
 @dataclass(frozen=True)
 class NavigationEvidence:
+    """仅包含路线目标和方向的导航证据，不包含玩家坐标。"""
     objective_room_id: Optional[str]
     objective_title: Optional[str]
     level: int
@@ -172,6 +181,7 @@ class NavigationEvidence:
 
     @classmethod
     def from_value(cls, value: object) -> "NavigationEvidence":
+        """解析并限制导航等级、方向和距离。"""
         data = _object(value, "request.navigation")
         _closed_keys(
             data,
@@ -201,6 +211,7 @@ class NavigationEvidence:
         )
 
     def to_dict(self) -> dict[str, object]:
+        """返回提示词可使用的导航投影。"""
         return {
             "objectiveRoomId": self.objective_room_id,
             "objectiveTitle": self.objective_title,
@@ -212,6 +223,7 @@ class NavigationEvidence:
 
 @dataclass(frozen=True)
 class AttemptEvidence:
+    """单条作答证据；保留 SQL 特征而不是 SQL 原文。"""
     attempt_id: int
     lesson_id: str
     stage_id: str
@@ -223,6 +235,7 @@ class AttemptEvidence:
 
     @classmethod
     def from_value(cls, value: object) -> "AttemptEvidence":
+        """解析结果类别、战斗结果和有限教学字段。"""
         data = _object(value, "attempt")
         _closed_keys(
             data,
@@ -246,9 +259,11 @@ class AttemptEvidence:
 
     @property
     def evidence_ref(self) -> str:
+        """返回可被抄写员引用的稳定证据 ID。"""
         return f"attempt:{self.attempt_id}"
 
     def to_dict(self) -> dict[str, object]:
+        """序列化为模型提示词使用的安全投影。"""
         return {
             "attemptId": self.attempt_id,
             "lessonId": self.lesson_id,
@@ -263,12 +278,14 @@ class AttemptEvidence:
 
 @dataclass(frozen=True)
 class StorySource:
+    """一条已由游戏解锁并遮蔽身份的故事来源。"""
     beat_id: str
     title: str
     lines: Tuple[str, ...]
 
     @classmethod
     def from_value(cls, value: object) -> "StorySource":
+        """解析故事来源并限制标题和行数。"""
         data = _object(value, "request.story")
         _closed_keys(data, required={"beatId", "title", "lines"}, label="request.story")
         return cls(
@@ -278,17 +295,20 @@ class StorySource:
         )
 
     def to_dict(self) -> dict[str, object]:
+        """序列化故事证据，保持浏览器协议字段名。"""
         return {"beatId": self.beat_id, "title": self.title, "lines": list(self.lines)}
 
 
 @dataclass(frozen=True)
 class RelicEvidence:
+    """已获得遗物的有限展示信息，不包含可变游戏对象。"""
     relic_id: str
     name: str
     description: str
 
     @classmethod
     def from_value(cls, value: object) -> "RelicEvidence":
+        """解析遗物 ID、名称和短说明。"""
         data = _object(value, "relic")
         _closed_keys(data, required={"id", "name", "description"}, label="relic")
         return cls(
@@ -298,11 +318,13 @@ class RelicEvidence:
         )
 
     def to_dict(self) -> dict[str, str]:
+        """转换为提示词可读取的遗物对象。"""
         return {"id": self.relic_id, "name": self.name, "description": self.description}
 
 
 @dataclass(frozen=True)
 class AgentContext:
+    """一次 Agent 准备请求的完整只读上下文。"""
     request_version: int
     run_id: str
     floor: int
@@ -319,6 +341,7 @@ class AgentContext:
 
     @classmethod
     def from_value(cls, value: object) -> "AgentContext":
+        """解析顶层请求，并限制证据、遗物和课程列表的数量。"""
         data = _object(value, "request")
         _closed_keys(
             data,
@@ -362,9 +385,11 @@ class AgentContext:
 
     @property
     def allowed_evidence_refs(self) -> frozenset[str]:
+        """返回本次请求允许抄写员引用的证据集合。"""
         return frozenset(attempt.evidence_ref for attempt in self.attempts)
 
     def prompt_value(self) -> dict[str, object]:
+        """构建不含运行时内部字段的模型提示词投影。"""
         return {
             "floor": self.floor,
             "trigger": self.trigger.to_dict(),
@@ -381,6 +406,7 @@ class AgentContext:
 
 @dataclass(frozen=True)
 class CampfireOutput:
+    """确定性篝火复盘结果及其是否已解锁状态。"""
     available: bool
     headline: str
     facts: Tuple[str, ...]
@@ -388,6 +414,7 @@ class CampfireOutput:
     next_action: str
 
     def to_dict(self) -> dict[str, object]:
+        """转换为浏览器和模型提示词共用的输出结构。"""
         return {
             "available": self.available,
             "headline": self.headline,
@@ -399,6 +426,7 @@ class CampfireOutput:
 
 @dataclass(frozen=True)
 class ScribeOutput:
+    """抄写员短文本及其证据/故事引用。"""
     greeting: str
     observation: str
     guidance: str
@@ -408,6 +436,7 @@ class ScribeOutput:
 
     @classmethod
     def from_value(cls, value: object, context: AgentContext) -> "ScribeOutput":
+        """校验模型输出只能引用当前请求中的证据和故事。"""
         data = _object(value, "scribe")
         _closed_keys(
             data,
@@ -432,6 +461,7 @@ class ScribeOutput:
         )
 
     def to_dict(self) -> dict[str, object]:
+        """序列化为前端严格输出契约。"""
         return {
             "greeting": self.greeting,
             "observation": self.observation,
@@ -444,6 +474,7 @@ class ScribeOutput:
 
 @dataclass(frozen=True)
 class PreparedAgentOutput:
+    """一次 Agent 请求的最终结果，包含本地事实和抄写员文本。"""
     run_id: str
     floor: int
     evidence_hash: str
@@ -452,6 +483,7 @@ class PreparedAgentOutput:
     scribe: ScribeOutput
 
     def to_dict(self) -> dict[str, object]:
+        """附加统一输出版本并转换所有嵌套数据。"""
         return {
             "version": OUTPUT_VERSION,
             "runId": self.run_id,

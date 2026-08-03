@@ -1,3 +1,7 @@
+/**
+ * 离线确定性 Agent 输出。
+ * 篝火事实和抄写员基础内容必须在没有网络、Key 或模型时仍然可用。
+ */
 import {
   AGENT_OUTPUT_VERSION,
   type AgentPrepareRequest,
@@ -23,6 +27,7 @@ function shortLabel(value: string, maximum = 24): string {
 }
 
 function hintFact(attempts: AgentPrepareRequest["attempts"]): string | null {
+  // 提示统计按题目阶段聚合，只报告有限数量的可行动事实。
   const hinted = attempts.filter((attempt) => attempt.hintLevel > 0);
   if (hinted.length === 0) return null;
   const byStage = new Map<string, {
@@ -53,6 +58,7 @@ function hintFact(attempts: AgentPrepareRequest["attempts"]): string | null {
 }
 
 export function buildLocalCampfireOutput(request: AgentPrepareRequest): CampfireOutput {
+  // 先处理精英门槛，再处理空记录和普通复盘，保证 UI 状态与规则一致。
   if (!request.campfireUnlocked) {
     return {
       available: false,
@@ -115,6 +121,7 @@ export function buildLocalCampfireOutput(request: AgentPrepareRequest): Campfire
 export function buildLocalScribeOutput(
   request: AgentPrepareRequest,
 ): ScribeOutput {
+  // 根据 Hook 阶段生成不同语气：开场给方向、途中给路线、结束给收束。
   if (request.trigger.phase === "opening") {
     return {
       greeting: "你来了。",
@@ -174,6 +181,7 @@ export function buildLocalScribeOutput(
 }
 
 function routeGuidance(request: AgentPrepareRequest): string {
+  // 路线文本只来自导航投影，Agent 不自行推测地图路径。
   const navigation = request.navigation;
   const direction = {
     north: "北",
@@ -191,6 +199,7 @@ function routeGuidance(request: AgentPrepareRequest): string {
 export function buildLocalPreparedOutput(
   request: AgentPrepareRequest,
 ): PreparedAgentOutput {
+  // 先同步生成完整本地输出，远端成功后只替换允许的抄写员字段。
   const campfire = buildLocalCampfireOutput(request);
   return {
     version: AGENT_OUTPUT_VERSION,
@@ -204,6 +213,7 @@ export function buildLocalPreparedOutput(
 }
 
 export function scribeInspectionMessage(output: ScribeOutput): string {
+  // UI 只需要一段可读文本，字段顺序固定且不引入额外叙事。
   return [
     `抄写员：${output.greeting}`,
     output.observation,

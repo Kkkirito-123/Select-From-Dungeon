@@ -1,4 +1,4 @@
-"""Deterministic learning recap derived from bounded local answer evidence."""
+"""篝火复盘分析：从有界的本地作答证据生成确定性学习事实。"""
 
 from __future__ import annotations
 
@@ -20,10 +20,12 @@ _ERROR_ACTIONS = {
 
 
 def _short_label(value: str, maximum: int = 24) -> str:
+    """截断题目目标，避免复盘卡片被单条文本撑大。"""
     return value if len(value) <= maximum else f"{value[: maximum - 1]}…"
 
 
 def _hint_fact(context: AgentContext) -> str | None:
+    """按阶段聚合提示使用情况，只保留最需要关注的两个阶段。"""
     hinted = [attempt for attempt in context.attempts if attempt.hint_level > 0]
     if not hinted:
         return None
@@ -50,6 +52,7 @@ def _hint_fact(context: AgentContext) -> str | None:
 
 
 def analyze_campfire(context: AgentContext) -> CampfireOutput:
+    """生成篝火复盘；精英未击败时只返回锁定状态，不泄露未授权复盘。"""
     if not context.campfire_unlocked:
         return CampfireOutput(
             available=False,

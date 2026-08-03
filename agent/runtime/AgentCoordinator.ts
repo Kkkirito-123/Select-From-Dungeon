@@ -1,3 +1,7 @@
+/**
+ * Agent 运行时协调器。
+ * 它监听只读游戏快照，在语义 Hook 发生时准备输出；普通移动不会触发模型请求。
+ */
 import type { GameSnapshot } from "../../src/domain/types";
 import { AgentCache } from "./AgentCache";
 import type { AgentPreparationClient } from "./AgentClient";
@@ -10,15 +14,18 @@ import { detectAgentHook, displayHook } from "./hooks";
 import { buildLocalPreparedOutput } from "./localFallback";
 
 export interface AgentSnapshotSource {
+  /** 游戏事实源只提供快照，不允许 Agent 反向写入状态。 */
   subscribe(listener: (snapshot: GameSnapshot) => void): () => void;
 }
 
 export interface AgentContentSource {
+  /** UI 读取当前上下文对应的已校验输出。 */
   preparedFor(snapshot: GameSnapshot): PreparedAgentOutput;
   subscribe(listener: () => void): () => void;
 }
 
 interface AgentCoordinatorClock {
+  /** 抽象计时器，便于测试退避与去抖逻辑。 */
   setTimeout(callback: () => void, delayMs: number): number;
   clearTimeout(timerId: number): void;
 }
@@ -29,6 +36,7 @@ const DEFAULT_CLOCK: AgentCoordinatorClock = {
 };
 
 export class AgentCoordinator implements AgentContentSource {
+  /** 连接快照、缓存和可选模型客户端，并维护当前输出状态。 */
   private readonly listeners = new Set<() => void>();
   private readonly settledKeys = new Set<string>();
   private unsubscribeSnapshot: (() => void) | null = null;
@@ -49,6 +57,7 @@ export class AgentCoordinator implements AgentContentSource {
   ) {}
 
   start(): void {
+    // 订阅是幂等的，避免页面重新初始化时重复消费快照。
     if (this.unsubscribeSnapshot || this.destroyed) return;
     this.unsubscribeSnapshot = this.snapshots.subscribe(
       (snapshot) => this.ingest(snapshot),
@@ -56,6 +65,7 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   preparedFor(snapshot: GameSnapshot): PreparedAgentOutput {
+    // UI 随时可能读取输出；没有远端结果时立即返回本地版本。
     const request = buildAgentPrepareRequest(snapshot, displayHook(snapshot));
     if (this.currentOutput && this.currentOutput.runId === snapshot.runInstanceId &&
       this.currentOutput.floor === snapshot.floor && this.currentRequest?.trigger.type === request.trigger.type) {
@@ -70,6 +80,7 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   destroy(): void {
+    // 销毁时取消定时器、订阅和等待状态，避免晚到的模型响应更新页面。
     this.destroyed = true;
     this.unsubscribeSnapshot?.();
     this.unsubscribeSnapshot = null;
@@ -82,6 +93,7 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   private ingest(snapshot: GameSnapshot): void {
+    // 只有 Hook 变化进入这里的后续流程，连续移动快照直接忽略。
     if (this.destroyed) return;
     const hook = detectAgentHook(this.previousSnapshot, snapshot);
     this.previousSnapshot = snapshot;
@@ -114,6 +126,7 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   private async prepare(request: AgentPrepareRequest): Promise<void> {
+    // 每个证据 Hash 最多尝试一次；失败不重试，游戏继续使用本地内容。
     const key = agentRequestKey(request);
     if (this.settledKeys.has(key) || this.destroyed) return;
     if (!this.client.enabled) return;
@@ -130,6 +143,7 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   refresh(snapshot: GameSnapshot): void {
+    // 连接设置变化后允许当前证据重新请求一次远端措辞。
     const request = buildAgentPrepareRequest(snapshot, displayHook(snapshot));
     const key = agentRequestKey(request);
     this.settledKeys.delete(key);
@@ -138,6 +152,7 @@ export class AgentCoordinator implements AgentContentSource {
   }
 
   private schedule(request: AgentPrepareRequest): void {
+    // 先切换到本地输出，再以短延迟异步替换，避免阻塞探索界面。
     const key = agentRequestKey(request);
     if (this.currentKey !== key) {
       if (this.timerId !== null) this.clock.clearTimeout(this.timerId);

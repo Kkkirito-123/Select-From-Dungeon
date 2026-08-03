@@ -1,4 +1,4 @@
-"""Deterministic campfire recap analysis."""
+"""篝火复盘子模块：只根据受限作答证据生成确定性事实。"""
 
 from .analyzer import analyze_campfire
 

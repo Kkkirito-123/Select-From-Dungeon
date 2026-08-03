@@ -1,3 +1,5 @@
+"""验证 Agent 协议、篝火事实和模型失败降级边界。"""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +15,7 @@ def request_payload(
     attempts: list[dict[str, object]] | None = None,
     campfire_unlocked: bool = False,
 ) -> dict[str, object]:
+    """构造与浏览器协议一致的最小测试请求。"""
     return {
         "requestVersion": 2,
         "runId": "run-abcd1234",
@@ -61,6 +64,7 @@ def attempt(
     result: str = "wrong-result",
     hint_level: int = 1,
 ) -> dict[str, object]:
+    """构造不包含原始 SQL 的单条作答证据。"""
     return {
         "attemptId": attempt_id,
         "lessonId": "where",
@@ -74,6 +78,7 @@ def attempt(
 
 
 class FakeModel:
+    """记录调用并返回固定文本，避免测试依赖真实模型服务。"""
     def __init__(self, response: str) -> None:
         self.response = response
         self.calls: list[tuple[str, str]] = []
@@ -84,6 +89,7 @@ class FakeModel:
 
 
 class AgentContractTests(unittest.TestCase):
+    """验证闭合字段、证据引用和八条证据上限。"""
     def test_input_is_closed_and_bounded_to_eight_attempts(self) -> None:
         payload = request_payload(attempts=[attempt(index) for index in range(9)])
         with self.assertRaisesRegex(ValueError, "at most 8"):
@@ -114,6 +120,7 @@ class AgentContractTests(unittest.TestCase):
 
 
 class CampfireAnalyzerTests(unittest.TestCase):
+    """验证篝火复盘的确定性事实与精英解锁门槛。"""
     def test_empty_evidence_has_actionable_local_output(self) -> None:
         output = analyze_campfire(AgentContext.from_value(request_payload(campfire_unlocked=True)))
         self.assertEqual(output.focus_concept, None)
@@ -149,6 +156,7 @@ class CampfireAnalyzerTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.IsolatedAsyncioTestCase):
+    """验证模型成功和模型异常时的输出来源。"""
     async def test_valid_model_output_is_used(self) -> None:
         response = json.dumps(
             {

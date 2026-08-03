@@ -1,3 +1,7 @@
+/**
+ * 浏览器端 DeepSeek 客户端：只负责和专用 Worker 通信，不接触游戏规则。
+ * API Key 由 Worker 持有，页面层只能看到连接状态、模型列表和经过校验的输出。
+ */
 import {
   parsePreparedAgentOutput,
   type AgentPrepareRequest,
@@ -13,6 +17,7 @@ import type {
 } from "./protocol";
 
 export interface WorkerLike {
+  /** 向 Worker 发送一条不含返回通道的命令。 */
   postMessage(message: DeepSeekWorkerRequest): void;
   addEventListener(
     type: "message",
@@ -26,12 +31,14 @@ export interface WorkerLike {
 }
 
 export interface DeepSeekConnectionResult {
+  /** 连接结果只暴露非敏感状态，绝不回传 Key。 */
   ok: boolean;
   models: readonly string[];
   error: DeepSeekErrorCode | null;
 }
 
 interface PendingRequest {
+  /** 页面请求与 Worker 响应之间的临时等待槽位。 */
   resolve: (message: DeepSeekWorkerResponse | null) => void;
   timer: ReturnType<typeof globalThis.setTimeout>;
 }
@@ -43,6 +50,7 @@ type DeepSeekWorkerCommand = DeepSeekWorkerRequest extends infer Request
   : never;
 
 function defaultWorker(): WorkerLike {
+  // Worker 隔离 Key 和网络请求，页面主线程只处理结构化响应。
   return new Worker(new URL("./deepseek.worker.ts", import.meta.url), {
     type: "module",
     name: "sql-dungeon-deepseek",
@@ -50,6 +58,9 @@ function defaultWorker(): WorkerLike {
 }
 
 export class DeepSeekWorkerClient implements AgentPreparationClient {
+  /**
+   * 管理 Worker 生命周期、模型选择和超时；业务内容仍由 runtime 层准备。
+   */
   private worker: WorkerLike | null = null;
   private sequence = 0;
   private configured = false;
@@ -82,6 +93,7 @@ export class DeepSeekWorkerClient implements AgentPreparationClient {
   }
 
   async connect(key: string, preferredModel?: string | null): Promise<DeepSeekConnectionResult> {
+    // 每次连接先销毁旧 Worker，避免旧凭据和新凭据同时存在。
     this.disconnect();
     const message = await this.send({ type: "configure", key });
     if (!message || message.type === "error") {
@@ -113,6 +125,7 @@ export class DeepSeekWorkerClient implements AgentPreparationClient {
   }
 
   async prepare(request: AgentPrepareRequest): Promise<PreparedAgentOutput | null> {
+    // 篝火事实由本地确定性逻辑生成，模型只尝试替换抄写员措辞。
     if (!this.enabled || !this.selectedModel) return null;
     const message = await this.send({
       type: "prepare",
@@ -125,6 +138,7 @@ export class DeepSeekWorkerClient implements AgentPreparationClient {
   }
 
   disconnect(): void {
+    // clear 命令和 terminate 双重执行，确保 Worker 内存中的凭据尽快失效。
     this.configured = false;
     this.selectedModel = null;
     this.models = [];
@@ -156,6 +170,7 @@ export class DeepSeekWorkerClient implements AgentPreparationClient {
   private send(
     value: DeepSeekWorkerCommand,
   ): Promise<DeepSeekWorkerResponse | null> {
+    // 所有 Worker 请求都有有限等待时间，网络异常不能阻塞游戏主循环。
     const requestId = ++this.sequence;
     return new Promise((resolve) => {
       const timer = globalThis.setTimeout(() => {

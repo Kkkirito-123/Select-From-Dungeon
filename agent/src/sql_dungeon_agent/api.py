@@ -1,4 +1,4 @@
-"""Small loopback HTTP adapter for browser-side output preparation."""
+"""回环 HTTP 适配器：接收脱敏证据并返回经过契约校验的 Agent 输出。"""
 
 from __future__ import annotations
 
@@ -20,14 +20,17 @@ LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost"})
 
 
 class AgentRequestHandler(BaseHTTPRequestHandler):
+    """仅提供健康检查和一次性准备接口，不记录请求内容。"""
+
     pipeline: AgentPipeline
     allowed_origin: str | None = None
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002
-        # Never place answer evidence or provider data in default request logs.
+        # 默认 HTTP 日志不得写入作答证据或模型提供方数据。
         return
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        """处理浏览器预检，只允许受控来源继续请求。"""
         if not self._origin_allowed():
             self._write_json(HTTPStatus.FORBIDDEN, {"error": "origin-not-allowed"})
             return
@@ -39,12 +42,14 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        """提供不含敏感信息的健康检查。"""
         if self.path != "/health":
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "not-found"})
             return
         self._write_json(HTTPStatus.OK, {"status": "ok", "version": 1})
 
     def do_POST(self) -> None:  # noqa: N802
+        """解析有界请求，交给流水线并统一返回 JSON 错误。"""
         if self.path != "/v1/prepare":
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "not-found"})
             return
@@ -74,6 +79,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         self._write_json(HTTPStatus.OK, result.to_dict())
 
     def _origin_allowed(self) -> bool:
+        """默认只接受回环网页；公开部署必须显式配置允许来源。"""
         origin = self.headers.get("Origin")
         if origin is None:
             return True
@@ -82,12 +88,14 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
         return LOOPBACK_ORIGIN.fullmatch(origin) is not None
 
     def _cors_headers(self) -> None:
+        """只为已通过来源检查的请求回写 CORS 头。"""
         origin = self.headers.get("Origin")
         if origin and self._origin_allowed():
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
 
     def _write_json(self, status: HTTPStatus, value: dict[str, Any]) -> None:
+        """以禁止缓存的 JSON 响应结束请求，避免输出残留在代理缓存。"""
         body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.send_response(status)
         self._cors_headers()
@@ -105,6 +113,7 @@ def build_server(
     pipeline: AgentPipeline,
     allowed_origin: str | None,
 ) -> ThreadingHTTPServer:
+    """创建回环服务；拒绝绑定公网地址，防止误把开发服务公开。"""
     if host not in LOOPBACK_HOSTS:
         raise ValueError("Agent server host must be 127.0.0.1 or localhost")
 
@@ -117,6 +126,7 @@ def build_server(
 
 
 def main() -> None:
+    """读取受控命令行参数并启动 Agent 服务。"""
     parser = argparse.ArgumentParser(description="Run the SQL Dungeon output-only Agent.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
