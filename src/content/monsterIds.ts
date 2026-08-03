@@ -120,10 +120,8 @@ export function currentMasterIdForLegacyMonster(
 }
 
 /**
- * Stable internal identity for seeded systems that existed before the 1..89
- * presentation/database renumbering. This prevents an upgraded Run from
- * rerolling future patrol paths or optional loot only because its visible ID
- * changed.
+ * 为早于 1..89 展示层和数据库重编号的种子系统保留稳定内部身份。这样升级后的
+ * Run 不会仅因可见 ID 变化，就重新抽取未来巡逻路线或可选战利品。
  */
 export function legacyMonsterIdForCurrent(id: number): number {
   return CURRENT_TO_LEGACY_MONSTER_ID.get(id) ?? id;

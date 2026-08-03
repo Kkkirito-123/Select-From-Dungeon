@@ -845,7 +845,6 @@ function stageMatches(stageId: AuthoredLessonStageId, result: SqlQueryResult): b
         /^select\s+distinct\s+(?:\w+\.)?channel\b/i.test(normalizedSql) &&
         /\bfrom\s+monster_signals\b/i.test(normalizedSql) &&
         columnEqualsNumber(whereClause, "monster_id", 11) &&
-        /\border\s+by\s+(?:\w+\.)?channel(?:\s+asc)?\b/i.test(normalizedSql) &&
         hasExactOrderedRows(result, ["channel"], [["echo"], ["mirror"]])
       );
     case "inner-join-room":
@@ -875,15 +874,8 @@ function stageMatches(stageId: AuthoredLessonStageId, result: SqlQueryResult): b
     case "join-boss-groups":
       return (
         joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
-        columnEqualsNumber(whereClause, "floor", 2) &&
-        new RegExp(qualifiedColumn("sector"), "i").test(groupClause) &&
-        /\b(?:count\s*\([^)]*\)|total)\s*(?:>=\s*3\b|>\s*2\b)/i.test(havingClause) &&
-        /\border\s+by\s+(?:\w+\.)?total\s+desc\s*,\s*(?:\w+\.)?sector(?:\s+asc)?\b/i.test(normalizedSql) &&
-        hasExactOrderedRows(result, ["sector", "total"], [
-          ["lake", 4],
-          ["swamp", 4],
-          ["forest", 3],
-        ])
+        columnEqualsNumber(whereClause, "id", 14) &&
+        hasExactOrderedRows(result, ["id", "sector"], [[14, "lighthouse"]])
       );
     case "join-boss-core":
       return (
@@ -927,9 +919,11 @@ function stageMatches(stageId: AuthoredLessonStageId, result: SqlQueryResult): b
       );
     case "practice-left-core":
       return (
+        joinsTables(normalizedSql, "monsters", "monster_gear", "id", "monster_id", true) &&
         projectsOnlyColumn(normalizedSql, "id") &&
         columnEqualsNumber(whereClause, "id", 18) &&
         columnEqualsString(whereClause, "status", "toxic") &&
+        columnIsNull(whereClause, "monster_id") &&
         hasExactColumns(result.columns, ["id"]) &&
         sameIds(result.targetIds, [18])
       );
@@ -1028,6 +1022,12 @@ function stageMatches(stageId: AuthoredLessonStageId, result: SqlQueryResult): b
       ]);
     case "f3-audit-groups":
       return (
+        joinsTables(normalizedSql, "monsters", "rooms", "room_id", "id") &&
+        columnEqualsNumber(whereClause, "id", 28) &&
+        hasExactOrderedRows(result, ["id", "sector"], [[28, "throne"]])
+      );
+    case "f3-audit-verdict":
+      return (
         /\bbetween\s+41\s+and\s+46\b/i.test(whereClause) &&
         hasExactOrderedRows(result, ["sector", "total"], [
           ["crypt", 2],
@@ -1058,9 +1058,10 @@ function stageMatches(stageId: AuthoredLessonStageId, result: SqlQueryResult): b
       );
     case "practice-spirit-core":
       return (
+        result.features.includes("self-join") &&
         columnEqualsNumber(whereClause, "id", 31) &&
         columnEqualsString(whereClause, "status", "haunting") &&
-        hasSingleValue(result, "id", 31)
+        hasExactOrderedRows(result, ["child_id", "master_id"], [[31, 33]])
       );
     case "grave-boss-scan":
       return hasExactOrderedRows(result, ["id", "room_name", "power"], [
@@ -1394,17 +1395,17 @@ const WRONG_RESULT_MESSAGE: Record<AuthoredLessonStageId, string> = {
   "practice-group-core": "没有按 id 读出 ID #009。",
   "order-peak": "没有取出 charge 最高的 surge；检查 DESC 与 LIMIT 1。",
   "order-top-two": "前两行应依次是 surge = 13、arc = 11；检查排序方向与 LIMIT 2。",
-  "distinct-status": "去重结果应只有 echo、mirror；检查 DISTINCT 与排序。",
+  "distinct-status": "去重结果应只有 echo、mirror；本题只检查 DISTINCT，不需要排序。",
   "inner-join-room": "没有用 m.id 与 r.name AS room_name 返回 ID #012 和“古树桥”。",
   "inner-join-sector": "连接结果应只返回 ID #012 的 m.id = 12 与 rooms 表的 r.sector = forest；检查投影列和 WHERE 条件。",
   "left-join-unarmed": "没有找到右表缺失的 #13；检查 LEFT JOIN 与 g.monster_id IS NULL。",
-  "join-boss-groups": "综合结果应依次为 lake = 4、swamp = 4、forest = 3；检查 JOIN、HAVING 与双重排序。",
+  "join-boss-groups": "第一层护盾只要求用 m.room_id = r.id 返回 ID #014 与 lighthouse 区域。",
   "join-boss-core": "没有定位 ID #014 的 power = 21 最强装备；检查 JOIN、DESC 与 LIMIT 1。",
   "practice-order": "没有取出 ID #015 的最高 surge 信号；检查 DESC 与 LIMIT。",
   "practice-distinct": "ID #016 的信号应去重为 echo、mirror。",
   "practice-inner-join": "没有把 ID #017 与泥沼石径正确连接。",
   "practice-left-join": "没有找出 room_id = 34 且无装备记录的 ID #018。",
-  "practice-left-core": "没有按 id 与 toxic 状态读出 ID #018。",
+  "practice-left-core": "第二击仍需 LEFT JOIN，同时按 toxic 状态找出无装备的 ID #018。",
   "practice-forest-order": "没有按 hp 降序取出 ID #019 的记录。",
   "practice-forest-join": "没有用 id 与 room_name 把 ID #020 和盘根林地正确连接。",
   "practice-forest-join-core": "没有返回 ID #020 的 id 与 forest 区域。",
@@ -1416,13 +1417,14 @@ const WRONG_RESULT_MESSAGE: Record<AuthoredLessonStageId, string> = {
   "f3-left-unarmed": "没有用 LEFT JOIN 找出 42 号房间中无装备的 ID #024。",
   "f3-self-master": "没有用两个别名返回 ID #025 与其 master_id。",
   "f3-chain-gear": "没有串联三张表返回骑士墓、ID #026 与 power = 18。",
-  "f3-union-patrol": "合并结果应依次为 ID #023 与 #025；检查两侧字段和 ORDER BY。",
-  "f3-audit-groups": "第三层分区统计应得到 crypt、grave、throne 各 2 只。",
+  "f3-union-patrol": "合并结果应为 ID #023 与 #025；本题只检查 UNION，不要求排序。",
+  "f3-audit-groups": "第一层封印只要求用 m.room_id = r.id 返回 ID #028 与 throne 区域。",
   "f3-audit-core": "没有找出 ID #028 的最高装备 power = 24。",
+  "f3-audit-verdict": "最终分区审计应得到 crypt、grave、throne 各 2 条证词。",
   "practice-bone": "没有连接 ID #029 与遗骨荒地。",
   "practice-zombie": "没有用 LEFT JOIN 找出无装备的 ID #030。",
   "practice-spirit": "没有用自连接返回 ID #031 与其 master_id。",
-  "practice-spirit-core": "没有按 id 与 haunting 状态返回 ID #031。",
+  "practice-spirit-core": "第二击仍需自连接，并按 haunting 状态返回 ID #031 与其 master_id。",
   "practice-wraith": "没有用自连接返回 ID #032 与其 master_id。",
   "grave-boss-scan": "三表连接应返回 ID #033、墓主祭坛与 power = 22。",
   "grave-boss-core": "没有用自连接返回 ID #033 与其 master_id。",

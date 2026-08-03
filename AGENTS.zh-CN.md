@@ -180,7 +180,15 @@ SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，
 `src/content/floor8Level.ts`；房间氛围与局内奖励位于
 `src/content/runContent.ts`；可选 Boss 门题目与语义结果约束位于
 `src/content/gateChallenges.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL
-阶段都从空编辑器开始。`src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
+阶段都从空编辑器开始。`src/content/lessonTaskBrief.ts` 是面向玩家的 SQL 任务展示边界：
+它根据关卡阶段与 `sqlSchema` 统一生成当前局面、精确返回列、权威字段含义、JOIN 关系、查询
+条件、世界效果、难度标签和四级提示；`AppShell` 只负责渲染，不得重新猜测 SQL 语义。普通
+遭遇第一击只包含当前章节和基础投影/过滤；小型精英只能从第二击起增加至多一个已掌握章节；
+楼层 Boss 从单章确认逐步升级到最终二至三章审计。完整 SQL 只能出现在第四级提示。
+`src/ui/appShellTemplate.ts` 独占 AppShell 静态页面骨架，`src/ui/appShellDom.ts` 统一绑定会被
+运行时重复使用的稳定节点；状态渲染和事件处理不得复制整份模板，也不得为同一个持久节点维护
+第二套静默选择器。
+`src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
 MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得
 生成完整答案、提交查询或绕过课程判定。
 `src/content/inventoryCatalog.ts` 负责背包容量、当前武器/防具/恢复品目录和生态可选候选概率；
@@ -191,7 +199,7 @@ MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确
 生态计划在加载时重建，不进入存档。
 `src/content/floorLabyrinth.ts` 负责稳定的八层导航契约；`src/domain/floorLabyrinth.ts` 再把这些
 意图解析到当前已保存的 `MazeFloor`、篝火、引导方案与生态方案。不得把派生安全格、视野、
-陷阱坐标或入场确认重复写入存档。
+陷阱坐标重复写入存档。
 `src/content/floorContracts.ts` 负责 Campaign 课程元数据及其可序列化 Schema；在已登记的
 `AUTH-003` 已由跨真源测试关闭，但它仍不是楼层显示名称、生态或精确怪物名单的玩家文案权威。可执行怪物事实
 属于各层 Level 文件与 `biomeContent.ts`，玩家地点和事件属于 Floor Experience，导航边界属于
@@ -218,8 +226,8 @@ src/feedback/       把语义游戏事件路由到通知和音频提示
 src/game/           连续迷宫探索、战斗场景与游戏启动
 src/runtime/        页面隐藏/恢复时协调渲染、音频与存档
 src/sql/            SQLite WASM 初始化、Schema、执行和 HP 同步
-src/storage/        Run/Profile 校验，以及题库缓存与学习账本 IndexedDB
-src/ui/             DOM 界面、《失名录》、新手引导与游戏编排
+src/storage/        带版本的 Run/Profile 校验、恢复、写入合并，以及题库缓存与学习账本 IndexedDB
+src/ui/             静态页面模板、稳定 DOM 契约、视图、《失名录》、新手引导与游戏编排
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
 docs/               双语蓝图、活跃路线图、docs/design/ 后续候选设计与历史报告
 .agents/skills/     需求、初始化、交付、实现、指南同步和显式发布工作流
@@ -296,8 +304,8 @@ python3 scripts/validate-rules.py
   `progressPersistence` 会合并非关键移动/巡逻快照，但查询、战利品、背包、模式与拓扑变化
   仍立即落盘；改变结构时必须处理版本或恢复。
 - 迷宫契约不新增独立存档字段。陷阱坐标、安全格掩码与
-  当前视野都从现有楼层数据重建；已触发陷阱复用 `openedGateIds`，入场确认则由玩家位置、已探索
-  格与已访问房间恢复。
+  当前视野都从现有楼层数据重建；已触发陷阱复用 `openedGateIds`。视觉上开放的房间边界直接
+  通行，不需要保存入场确认状态。
 - 核心学习装备与钥匙必须确定性掉落。可选随机物品只保留按来源概率判定并立即使用的恢复品，
   不按怪物阶级补足最低件数；随机性不得阻塞课程。战斗伤害保持确定，
   便于检查 SQL 锁定。

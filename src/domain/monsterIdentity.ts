@@ -76,6 +76,9 @@ export function monsterIdentityPresentation(
     monster.id,
     discoveredMonsterIds,
   );
+
+  // 世界与战斗界面始终使用稳定 ID。姓名恢复只属于击杀结算和怪物图鉴，
+  // 避免旧存档中的已发现身份重新泄露到遭遇标签、任务横幅或目标面板。
   return {
     discovered,
     idLabel,
@@ -88,46 +91,38 @@ export function monsterIdentityPresentation(
 
 export function monsterIntentName(
   monster: Pick<Monster, "id" | "attackName" | "isBoss">,
-  discoveredMonsterIds: readonly number[],
+  _discoveredMonsterIds: readonly number[],
 ): string {
-  void discoveredMonsterIds;
+  // 招式名称也可能暗示怪物身份，因此运行时只展示通用反击状态。
   return monster.isBoss ? "规则反击正在蓄力" : "攻击正在蓄力";
 }
 
 /**
- * 最后一层展示边界：内容脚本可以继续持有 canonical 名称，但未恢复身份时，
- * 任何进入玩家 UI 的自由文本都只能留下稳定 ID，species 也必须隐藏。
+ * 最后一层展示边界：内容脚本可以继续持有 canonical 名称，但任何进入
+ * 探索或战斗 UI 的自由文本都只能留下稳定 ID，species 也必须隐藏。
+ * 姓名恢复后的展示由击杀结算与怪物图鉴单独负责。
  */
 export function redactUndiscoveredMonsterIdentityText(
   value: string,
   monsters: readonly Pick<Monster, "id" | "name" | "species" | "kind">[],
-  discoveredMonsterIds: readonly number[],
+  _discoveredMonsterIds: readonly number[],
 ): string {
-  const hidden = monsters
-    .filter((monster) => !isMonsterIdentityDiscovered(
-      monster.id,
-      discoveredMonsterIds,
-    ))
+  const hidden = [...monsters]
     .sort((left, right) => (
       right.name.length - left.name.length || left.id - right.id
     ));
   return hidden.reduce((text, monster) => {
-    const identity = monsterIdentityPresentation(monster, discoveredMonsterIds);
-    const withoutName = text.split(monster.name).join(identity.idLabel);
+    const withoutName = text.split(monster.name).join(monsterIdLabel(monster.id));
     return withoutName.split(monster.species).join("未识别类型");
   }, value);
 }
 
 export function monsterNameForProfile(
   monster: Pick<Monster, "id" | "name">,
-  profile: Pick<ProfileProgress, "discoveredMonsterIds">,
+  _profile: Pick<ProfileProgress, "discoveredMonsterIds">,
 ): string {
-  return isMonsterIdentityDiscovered(
-    monster.id,
-    profile.discoveredMonsterIds,
-  )
-    ? monster.name
-    : monsterIdLabel(monster.id);
+  // 运行态提示不再根据永久图鉴进度切换姓名，保证新旧 Run 行为一致。
+  return monsterIdLabel(monster.id);
 }
 
 export function recoverMonsterIdentity(

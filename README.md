@@ -517,12 +517,12 @@ dependencies, schema, or save versions for that purpose.
 The current eight-floor labyrinth pass has automated evidence plus targeted browser QA.
 Content tests cross-check all eight contracts against map blueprints, curriculum
 Boss gates, authored landmarks, shortcuts, and hidden rooms. Physical acceptance
-then covers F1-F8 across six Seeds each: ordered required anchors, unskippable
+then covers the canonical F1-F8 maps: ordered required anchors, unskippable
 floor and area-Boss boundaries, reachable shortcut keys and hidden entrances,
 safe zones without curriculum monsters/area Bosses/traps, distinct floor
-topologies, and Seed-dependent non-critical variation. Browser QA additionally
+topologies, and deterministic non-critical variation. Browser QA additionally
 previewed F2, F4, and F8, dismissed their story cards, confirmed distinct floor and
-hazard silhouettes, and found no console warnings or errors. Every threshold dialog,
+hazard silhouettes, and found no console warnings or errors. Direct safe-room crossings,
 live patrol disappearance outside sight, Reduced Motion, and a complete eight-floor
 Run still require a longer human pass; automated rules and a successful build do not replace it.
 

@@ -31,11 +31,10 @@ export interface FloorLabyrinthHiddenArea {
 }
 
 /**
- * Stable, non-persistent navigation contract shared by all eight floors.
+ * 八层共享的稳定、非持久化导航合同。
  *
- * It intentionally contains content intent rather than generated coordinates or
- * Run state. Runtime systems may resolve the referenced room/gate IDs against
- * the current seeded maze without adding another save-data shape.
+ * 它只保存内容意图，不保存生成坐标或 Run 状态。运行时系统可以在当前种子
+ * 迷宫中解析所引用的房间和门 ID，而无需增加另一种存档数据结构。
  */
 export interface FloorLabyrinthContract {
   floor: FloorNumber;

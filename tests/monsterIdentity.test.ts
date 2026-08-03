@@ -41,14 +41,14 @@ describe("monster identity archive", () => {
     expect(profile.discoveredMonsterIds).toEqual([1, 3]);
   });
 
-  it("自由文本在身份恢复前把 canonical 名称与 species 收敛为稳定 ID", () => {
+  it("自由文本无论身份是否恢复都收敛为稳定 ID", () => {
     const monster = INITIAL_MONSTERS.find((entry) => entry.id === 84);
     if (!monster) throw new Error("缺少 ID #084 测试怪物");
     const text = `目标是${monster.name}，内部类型 ${monster.species}。`;
     expect(redactUndiscoveredMonsterIdentityText(text, [monster], []))
       .toBe("目标是ID #084，内部类型 未识别类型。");
     expect(redactUndiscoveredMonsterIdentityText(text, [monster], [84]))
-      .toBe(text);
+      .toBe("目标是ID #084，内部类型 未识别类型。");
   });
 
   it("图鉴不会从未击败条目泄露名字、物种或课程概念", () => {

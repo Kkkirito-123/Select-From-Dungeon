@@ -190,6 +190,7 @@ complete SQL or MySQL interview curriculum.
 ```text
 index.html -> src/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
+  -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> agent/runtime (bounded evidence, deterministic campfire, cache, coordination)
   -> agent/browser (DeepSeek memory-only Worker, strict Scribe output, settings UI)
   -> Optional agent/src Python adapter (local OpenZLAgent evaluation only)
@@ -277,6 +278,19 @@ the concept lock. Shared curriculum data and fixed room-chest rewards live in
 `src/content/runContent.ts`; optional Boss-gate questions and semantic result
 contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
 `src/content/onboarding.ts`. SQL stages intentionally start blank.
+`src/content/lessonTaskBrief.ts` is the player-facing SQL-task presentation
+boundary. It derives the current situation, exact output columns, canonical
+field meanings, JOIN relation, clauses, world effect, difficulty tier, and a
+four-step hint ladder from the authored stage plus `sqlSchema`; `AppShell` only
+renders that contract and must not rediscover SQL semantics. Ordinary encounter
+stage one contains one current chapter plus baseline projection/filtering;
+mini-elites may add at most one mastered chapter from stage two onward, and
+floor Bosses progress from a single chapter to a final two- or three-chapter
+audit. A complete SQL answer appears only in hint four.
+`src/ui/appShellTemplate.ts` exclusively owns the static AppShell markup;
+`src/ui/appShellDom.ts` owns reusable stable selector bindings. Runtime renderers
+and event handlers must not duplicate that markup or silently query a second
+selector for the same persistent node.
 `src/content/inventoryCatalog.ts` owns inventory capacities, the current
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls and
@@ -290,7 +304,7 @@ is not serialized.
 `src/content/floorLabyrinth.ts` owns the stable eight-floor navigation contract;
 `src/domain/floorLabyrinth.ts` resolves that intent against the current saved
 `MazeFloor`, campfires, guided plan, and biome plan. It must not persist derived
-safe-cell, sight, hazard-position, or threshold-confirmation duplicates.
+safe-cell, sight, or hazard-position duplicates.
 `src/content/floorContracts.ts` owns campaign curriculum metadata and its
 serializable schema. Registered drift `AUTH-003` is closed by cross-authority
 tests, but this file is still not

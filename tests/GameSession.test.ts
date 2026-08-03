@@ -643,15 +643,18 @@ describe("GameSession SQL 魔王城 Run", () => {
     }
   });
 
-  it("地图房名会在对应怪物身份恢复后显示 canonical 姓名", () => {
+  it("地图房名在身份恢复后仍不显示 canonical 姓名", () => {
     const profile = new GameSession(null, null, "identity-map-profile").toProfile();
     profile.discoveredMonsterIds = [28];
     const session = new GameSession(null, profile, "identity-map-recovered");
     expect(session.enableAdminMode()).toMatchObject({ ok: true });
     expect(session.adminLoadFloor(3)).toMatchObject({ ok: true });
 
+    expect(session.snapshot().roomGraph.nodes.every((room) => (
+      !room.title.includes("死灵王")
+    ))).toBe(true);
     expect(session.snapshot().roomGraph.nodes.some((room) => (
-      room.title.includes("死灵王")
+      room.title.includes("ID #028")
     ))).toBe(true);
   });
 
@@ -1334,6 +1337,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot()).toMatchObject({
       mode: "challenge",
       activeGateChallenge: { id: "aggregate-breach", gateId: bossGate.id },
+      taskBrief: null,
       openedGateIds: [],
     });
     const restoredInChallenge = new GameSession(session.toSavedRun());

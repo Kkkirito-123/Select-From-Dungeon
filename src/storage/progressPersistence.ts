@@ -71,8 +71,8 @@ export function isCriticalPersistenceChange(
 }
 
 /**
- * Coalesces movement and patrol snapshots into one trailing write while still
- * flushing combat, inventory, loot, query, and floor changes immediately.
+ * 将移动与巡逻快照合并为一次尾随写入，同时让战斗、背包、战利品、查询和
+ * 楼层变化继续立即落盘。
  */
 export function startProgressPersistence(
   source: ProgressSource,

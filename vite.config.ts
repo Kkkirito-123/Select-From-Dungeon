@@ -24,9 +24,9 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: false,
-    // Phaser ships as one upstream ESM module and cannot be split internally.
-    // Keep it in a separately cached lazy chunk; this limit applies to that
-    // known vendor boundary, while the first-party entry remains much smaller.
+    // Phaser 以单个上游 ESM 模块发布，内部无法继续拆分。
+    // 将它保留为单独缓存的懒加载分块；此阈值只覆盖这个已知依赖边界，
+    // 项目自身的首屏入口仍保持更小体积。
     chunkSizeWarningLimit: 1_800,
     rolldownOptions: {
       output: {

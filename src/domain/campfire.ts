@@ -50,10 +50,9 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
 }
 
 /**
- * Every floor keeps two physical checkpoints: one around the middle of the
- * route and one before the rear/Boss segment. The entry zone is already a
- * safe recovery anchor, so an additional front fire only adds visual clutter.
- * Exact corners remain seeded.
+ * 每层保留两个实体检查点：一个位于路线中段，另一个位于后区或 Boss 段前。
+ * 入口区本身已经是安全复活锚点，额外的前区篝火只会造成视觉拥挤。
+ * 具体角落仍由种子确定。
  */
 export function generateCampfires(
   graph: RoomGraph,

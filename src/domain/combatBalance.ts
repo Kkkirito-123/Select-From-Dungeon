@@ -63,9 +63,8 @@ function retargetStage(
 }
 
 /**
- * Keeps authored stages authoritative and only fills missing elite/boss stages
- * with already introduced review questions. Stable stage IDs are preserved so
- * old answer history remains readable without a save-version migration.
+ * 设计好的阶段始终具有权威性，只使用已经教授过的复习题补齐缺失的精英或
+ * Boss 阶段。稳定阶段 ID 会被保留，使旧答题记录无需迁移存档版本也能读取。
  */
 export function stagesForEncounter(
   monster: Monster,
@@ -74,8 +73,11 @@ export function stagesForEncounter(
 ): LessonStageDefinition[] {
   if (authoredStages.length === 0) return [];
   const requiredCount = stageCountForEncounter(monster, authoredStages.length);
-  const result = authoredStages
-    .slice(0, requiredCount)
+  const selectedAuthored = authoredStages.slice(0, requiredCount);
+  const finalAuthored = selectedAuthored.length >= 2
+    ? selectedAuthored.at(-1) ?? null
+    : null;
+  const result = (finalAuthored ? selectedAuthored.slice(0, -1) : selectedAuthored)
     .map((stage) => retargetStage(stage, monster.id));
   const authoredIds = new Set(authoredStages.map((stage) => stage.id));
   const supplements = [...reviewStages]
@@ -83,11 +85,13 @@ export function stagesForEncounter(
     .filter((stage) => !authoredIds.has(stage.id));
 
   let supplementIndex = 0;
-  while (result.length < requiredCount) {
+  const supplementTarget = requiredCount - (finalAuthored ? 1 : 0);
+  while (result.length < supplementTarget) {
     const source = supplements[supplementIndex]
       ?? authoredStages[result.length % authoredStages.length];
     result.push(retargetStage(source, monster.id));
     supplementIndex += 1;
   }
+  if (finalAuthored) result.push(retargetStage(finalAuthored, monster.id));
   return result;
 }

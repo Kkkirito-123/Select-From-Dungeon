@@ -16,7 +16,7 @@ export interface PageVisibilityRuntime {
   flushProgress(): void;
 }
 
-/** Applies the same visibility boundary to persistence, rendering, and audio. */
+/** 对持久化、渲染和音频统一应用同一套页面可见性边界。 */
 export async function applyPageVisibilityRuntime(
   runtime: PageVisibilityRuntime,
 ): Promise<void> {

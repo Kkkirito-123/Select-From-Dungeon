@@ -105,8 +105,8 @@ const PRIMITIVE_RUN_SAVE_KEY = "select-from-dungeon:run:v5";
 const ORIGINAL_RUN_SAVE_KEY = "select-from-dungeon:run:v4";
 const LEGACY_PROFILE_V2_SAVE_KEY = "select-from-dungeon:profile:v2";
 const LEGACY_PROFILE_SAVE_KEY = "select-from-dungeon:profile:v1";
-// v9 through v4 are read as compatible baselines and upgraded in memory.
-// Legacy keys are never deleted, so v10 recovery cannot mutate a previous Run.
+// v9 到 v4 会作为兼容基线读取，并在内存中升级。
+// 旧存储键永不删除，因此 v10 恢复流程不会修改更早的 Run。
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -433,10 +433,9 @@ function migratedMonsterReference(
 }
 
 /**
- * MVP 2.0 numbers the canonical monsters 1..89 in floor/content order.
- * Existing v4-v10 Runs used a sparse first-two-floor scheme followed by 1..67.
- * A floor's old and current ID sets are disjoint, so migration is deterministic
- * and idempotent without changing the storage key or save schema.
+ * MVP 2.0 按楼层和内容顺序将权威怪物编号为 1..89。旧 v4-v10 Run 的
+ * 前两层使用稀疏编号，后续则使用 1..67。每层的新旧 ID 集合互不相交，
+ * 因此无需修改存储键或存档结构，就能进行确定且幂等的迁移。
  */
 function migrateLegacyMonsterIds(value: unknown): unknown {
   if (
@@ -523,9 +522,8 @@ function migrateLegacyMonsterIds(value: unknown): unknown {
 }
 
 /**
- * Early v10 builds entered victory before committing the eighth campaign slot.
- * Repair only that one internally valid historical shape; every other mismatch
- * is left untouched for the strict save validator to reject.
+ * 早期 v10 构建会在提交第八个战役槽位前进入胜利状态。这里只修复这一种
+ * 内部仍合法的历史结构；其他不匹配保持原样，交由严格存档校验器拒绝。
  */
 function migrateLegacyVictoryCampaign(value: unknown): unknown {
   if (
@@ -2125,7 +2123,7 @@ export function saveRun(storage: StorageLike, run: SavedRun): void {
   try {
     storage.setItem(RUN_SAVE_KEY, JSON.stringify(run));
   } catch {
-    // Sandboxed iframes and privacy modes may reject localStorage writes.
+    // 沙箱 iframe 和隐私模式可能拒绝 localStorage 写入。
   }
 }
 
@@ -2134,14 +2132,14 @@ export function saveProfile(storage: StorageLike, profile: ProfileProgress): boo
     storage.setItem(PROFILE_SAVE_KEY, JSON.stringify(profile));
     return true;
   } catch {
-    // The in-memory GameSession stays playable without persistence.
+    // 即使无法持久化，内存中的 GameSession 仍应保持可玩。
     return false;
   }
 }
 
 /**
- * Returns the confirmed persisted JSON. A failed write deliberately keeps the
- * previous value so a later debounce, visibility change, or pagehide can retry.
+ * 返回已经确认持久化的 JSON。写入失败时刻意保留旧值，便于后续防抖、
+ * 可见性变化或 pagehide 事件再次尝试。
  */
 export function persistProfileIfChanged(
   storage: StorageLike,
@@ -2157,6 +2155,6 @@ export function clearRun(storage: StorageLike): void {
   try {
     storage.removeItem(RUN_SAVE_KEY);
   } catch {
-    // A blocked storage area already behaves like an empty persisted Run.
+    // 被阻止访问的存储区域本身就等价于一个空的已持久化 Run。
   }
 }

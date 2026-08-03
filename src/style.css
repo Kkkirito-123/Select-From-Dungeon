@@ -2605,9 +2605,10 @@ h1 span {
 
 .terminal-grid {
   display: grid;
-  /* Expanded evidence must extend terminal scrolling, never shrink over action buttons. */
+  /* 展开的证据只能延长终端滚动区域，不能向下压缩并覆盖操作按钮。 */
   flex: 1 0 auto;
-  grid-template-columns: minmax(180px, 0.72fr) minmax(330px, 1.48fr);
+  grid-template-columns: minmax(300px, 0.9fr) minmax(420px, 1.1fr);
+  align-items: start;
   gap: 10px;
   min-height: 0;
 }
@@ -2628,6 +2629,24 @@ h1 span {
 .terminal-editor {
   display: flex;
   flex-direction: column;
+}
+
+@media (min-width: 781px) {
+  /* 桌面端限制右侧输入区高度，避免空编辑器吞掉整块战斗画面。 */
+  .terminal-editor {
+    align-self: start;
+  }
+
+  .terminal-editor .sql-editor-shell {
+    flex: 0 0 auto;
+    height: clamp(280px, 38vh, 420px);
+    min-height: 0;
+  }
+
+  .terminal-editor #sql-editor,
+  .terminal-editor #gate-sql-editor {
+    min-height: 0;
+  }
 }
 
 .card-heading {
@@ -2651,6 +2670,77 @@ h1 span {
   color: #c2c4cb;
   font-size: 14px;
   line-height: 1.55;
+}
+
+.terminal-task-brief {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.task-brief__tier {
+  width: fit-content;
+  border: 1px solid var(--query-deep);
+  padding: 3px 7px;
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.task-brief__tier--composite,
+.task-brief__tier--boss {
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
+
+.task-brief__section {
+  border-left: 2px solid #4a5262;
+  padding: 5px 7px;
+  background: rgba(7, 10, 14, 0.55);
+}
+
+.task-brief__section > strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.task-brief__section > p,
+.task-brief__fallback {
+  margin: 0;
+  color: #d7d9df;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.task-brief__section > p + p {
+  margin-top: 3px;
+}
+
+.task-brief__section--situation {
+  border-left-color: var(--query);
+  background: rgba(120, 201, 184, 0.07);
+}
+
+.task-brief__section--goal {
+  border-left-color: var(--gold);
+  background: rgba(215, 173, 85, 0.08);
+}
+
+.task-brief__section--fields > p,
+.task-brief__section--relation > p {
+  color: #a9e3d8;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.task-brief__section--effect {
+  border-left-color: #b77adf;
+  background: rgba(183, 122, 223, 0.08);
 }
 
 .lock-list {

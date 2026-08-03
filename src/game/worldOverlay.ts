@@ -24,8 +24,8 @@ export function isNearPlayer(
 }
 
 /**
- * The tutorial marker must resolve from the current actor position on every
- * render. World actors can move between snapshots, while room anchors cannot.
+ * 每次渲染都必须根据角色当前位置解析教学标记。世界角色可以在快照之间移动，
+ * 房间锚点则保持不变。
  */
 export function tutorialObjective(snapshot: GameSnapshot): TutorialObjective | null {
   const tutorialRoom = snapshot.roomGraph.nodes.find((room) => room.type === "tutorial");

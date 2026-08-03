@@ -66,9 +66,8 @@ export interface FloorMapBlueprint {
   floor: FloorNumber;
   layoutName: string;
   /**
-   * Previously shipped v11 topology identities. These names are validation-only:
-   * new maps always hash `layoutName`, while local save recovery may accept one
-   * of these exact historical names without rewriting the saved maze.
+   * 已发布的 v11 拓扑标识。这些名称只用于校验：新地图始终对 `layoutName`
+   * 取哈希，本地存档恢复则可以接受其中一个精确历史名称，而不重写已保存迷宫。
    */
   legacyLayoutNames?: readonly string[];
   regionNames: readonly [string, string, string];
@@ -89,10 +88,8 @@ function slot(
 }
 
 /**
- * MVP 2.0 keeps each floor's macro silhouette authored and stable. Every slot
- * names its RoomGraph node explicitly, so reordering graph nodes cannot silently
- * exchange lesson locations. The graph still owns lesson identity,
- * prerequisites and physical connections.
+ * MVP 2.0 保持每层宏观轮廓经过设计且稳定。每个槽位都显式命名其 RoomGraph
+ * 节点，避免节点重排时悄悄交换课程位置。课程身份、前置条件和物理连接仍由图负责。
  */
 export const FLOOR_MAP_BLUEPRINTS = {
   1: {

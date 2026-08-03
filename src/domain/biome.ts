@@ -508,10 +508,9 @@ export function biomeRegionAt(
 }
 
 /**
- * Returns the living area guardian that blocks a non-walking cross-region
- * transit such as a shortcut. Adjacent maze steps must never be stopped by the
- * abstract nearest-region partition because that boundary has no visible wall.
- * Visible portals enforce their own requiredBossId during interaction.
+ * 返回阻挡非步行跨区交通（例如捷径）的存活区域首领。
+ * 相邻迷宫步行不能被不可见的抽象区域边界阻挡；可见传送门会在交互时
+ * 单独检查 requiredBossId，因此玩家也不能借跨区交通绕过中区首领。
  */
 export function biomeGuardianIdForStep(
   plan: BiomePlan,

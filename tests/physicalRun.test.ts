@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";
-import { INITIAL_MONSTERS, LESSONS, lessonById } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
 import { GameSession } from "../src/domain/GameSession";
 import { biomeGuardianIdForStep } from "../src/domain/biome";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
@@ -634,33 +634,30 @@ function clearLessonByWalking(
   engine?: SqlEngine,
 ): void {
   if (!engine) throw new Error(`${lessonId} 的物理通关测试缺少 SQL 引擎`);
+  if (!LESSON_QUERIES[lessonId]) throw new Error(`课程没有测试查询：${lessonId}`);
   engageLessonByWalking(session, lessonId, engine);
-  const queries = engine
-    ? lessonById(lessonId).stages.map((stage) => (
-      engine.execute(stage.answerSql, session.snapshot().floor)
-    ))
-    : LESSON_QUERIES[lessonId];
-  if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
   let finalResolution: ReturnType<GameSession["resolveQuery"]> | null = null;
-  queries.forEach((query) => {
-    const resolution = session.resolveQuery(query);
-    expect(resolution.accepted, resolution.message).toBe(true);
-    finalResolution = resolution;
-  });
   let repeatCount = 0;
+
   while (session.snapshot().mode === "combat" && repeatCount < 10) {
-    const activeStageId = session.snapshot().lessonStageId;
+    const snapshot = session.snapshot();
     const activeStage = LESSONS
       .flatMap((lesson) => lesson.stages)
-      .find((stage) => stage.id === activeStageId);
-    const reviewQuery = engine && activeStage
-      ? engine.execute(activeStage.answerSql, session.snapshot().floor)
-      : queries.at(-1)!;
-    const resolution = session.resolveQuery(reviewQuery);
+      .find((stage) => stage.id === snapshot.lessonStageId);
+    if (!activeStage) {
+      throw new Error(
+        `${lessonId} 的当前阶段没有权威题目：${snapshot.lessonStageId}`,
+      );
+    }
+    const resolution = session.resolveQuery(
+      engine.execute(activeStage.answerSql, snapshot.floor),
+    );
     expect(resolution.accepted, resolution.message).toBe(true);
     finalResolution = resolution;
     repeatCount += 1;
   }
+
+  expect(session.snapshot().mode).not.toBe("combat");
   expect(finalResolution?.lessonCompleted).toBe(lessonId);
   const snapshot = session.snapshot();
   const lessonRoom = snapshot.roomGraph.nodes.find(

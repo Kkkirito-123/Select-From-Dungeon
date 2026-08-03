@@ -28,6 +28,7 @@ import {
   biomeEncounterFor,
   weightedBiomeEncounterCandidates,
 } from "../content/biomeContent";
+import { lessonTaskBriefFor } from "../content/lessonTaskBrief";
 import {
   QUESTION_BANK_VERSION,
   practiceStageForQuestion,
@@ -933,6 +934,34 @@ export class GameSession {
               : room.lessonId && roomTarget && roomTarget.hp > 0
               ? stage.objective
               : roomFlavor(room.type, this.floorNumber);
+    const taskMonster = target ?? this.monsters.find(
+      (monster) => monster.id === lesson.primaryMonsterId,
+    );
+    const rawTaskBrief = !activeGateChallenge && (this.combat || room.lessonId) && taskMonster
+      ? lessonTaskBriefFor({
+        floor: this.floorNumber,
+        lesson,
+        stage,
+        monster: taskMonster,
+        stageIndex,
+      })
+      : null;
+    const taskBrief = rawTaskBrief ? {
+      ...rawTaskBrief,
+      situation: redactIdentity(rawTaskBrief.situation),
+      queryGoal: redactIdentity(rawTaskBrief.queryGoal),
+      outputColumns: rawTaskBrief.outputColumns.map(redactIdentity),
+      fieldGuide: rawTaskBrief.fieldGuide.map((field) => ({
+        expression: redactIdentity(field.expression),
+        meaning: redactIdentity(field.meaning),
+      })),
+      relations: rawTaskBrief.relations.map(redactIdentity),
+      constraints: rawTaskBrief.constraints.map(redactIdentity),
+      successEffect: redactIdentity(rawTaskBrief.successEffect),
+      focusTopics: rawTaskBrief.focusTopics.map(redactIdentity),
+      reviewTopics: rawTaskBrief.reviewTopics.map(redactIdentity),
+      hints: rawTaskBrief.hints.map(redactIdentity),
+    } : null;
     const visibleCombat = cloneCombat(this.combat);
     if (visibleCombat && target) {
       visibleCombat.intent.name = monsterIntentName(
@@ -1050,13 +1079,16 @@ export class GameSession {
       lessonIntro: activeGateChallenge
         ? "可选越级机关：破解只打开当前物理门，不授予课程掌握、经验或战利品。"
         : this.combat || room.lessonId ? redactIdentity(lesson.intro) : "",
+      taskBrief,
       schema: activeGateChallenge
         ? [...activeGateChallenge.schema]
         : this.combat || room.lessonId
         ? [...lesson.schema]
         : ["当前区域没有强制查询。继续探索迷宫或调查发光核心。"],
       queryTemplate: redactIdentity(stage.queryTemplate),
-      hints: stage.hints.slice(0, this.hintLevel).map(redactIdentity),
+      hints: (taskBrief?.hints ?? stage.hints)
+        .slice(0, this.hintLevel)
+        .map(redactIdentity),
       locks: [...stage.locks],
       banner: redactIdentity(this.banner),
       interactionPrompt: redactIdentity(this.interactionPrompt()),
@@ -4783,8 +4815,7 @@ export class GameSession {
     this.activeCampfireId = null;
     this.activeLootBundleId = null;
     if (source !== "combat") {
-      // Gate challenges do not create battle answer records. Clearing this
-      // prevents an unrelated previous battle from appearing after respawn.
+      // 门题不会创建战斗答题记录。清除此状态可避免复活后显示无关的上一场战斗。
       this.reviewBattleId = null;
     }
     this.banner += " YOU DIED。正在返回最近休息的篝火；局内进度与怪物剩余生命都会保留。";
