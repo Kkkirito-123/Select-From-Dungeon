@@ -34,7 +34,7 @@ export type ArcadeSfx =
   | "gate"
   | "victory"
   | "defeat"
-  // Compatibility aliases for the first MVP call sites.
+  // 为第一版 MVP 的调用位置保留兼容别名。
   | "room"
   | "attack"
   | "hit"
@@ -86,14 +86,14 @@ function audioContextConstructor(): AudioContextConstructor | null {
     };
     return browserWindow.AudioContext ?? browserWindow.webkitAudioContext ?? null;
   } catch {
-    // Embedded browsers can expose `window` while denying audio APIs.
+    // 嵌入式浏览器可能暴露 `window`，却拒绝提供音频 API。
     return null;
   }
 }
 
 /**
- * Small Web Audio score for the dungeon. It owns every timer and audio node it
- * creates, so one `dispose()` call is enough when the app is torn down.
+ * 地牢使用的轻量 Web Audio 配乐器。它持有自己创建的全部计时器和音频节点，
+ * 因此应用销毁时只需调用一次 `dispose()`。
  */
 export class ArcadeAudio {
   private context: AudioContext | null = null;
@@ -186,8 +186,8 @@ export class ArcadeAudio {
   }
 
   /**
-   * Arms pointer, keyboard and touch listeners. The returned function removes
-   * them; listeners also remove themselves after a successful gesture attempt.
+   * 注册鼠标、键盘和触摸监听器。返回函数可以统一移除它们；成功捕获一次
+   * 用户手势后，监听器也会自行移除。
    */
   armFirstGesture(target?: EventTarget): () => void {
     this.gestureCleanup?.();
@@ -210,8 +210,8 @@ export class ArcadeAudio {
     const handleGesture = (): void => {
       cleanup();
       void this.initialize().then((running) => {
-        // Safari can require a second gesture after an interrupted/suspended
-        // context. Re-arm only when audio is actually supported.
+        // Safari 在音频上下文被中断或挂起后可能要求第二次用户手势；
+        // 只有环境确实支持音频时才重新注册监听器。
         if (!running && !this.disposed && ArcadeAudio.isSupported()) {
           this.armFirstGesture(gestureTarget);
         }
@@ -225,7 +225,7 @@ export class ArcadeAudio {
     return cleanup;
   }
 
-  /** Call directly from a user gesture when the host already owns that event. */
+  /** 宿主已经持有用户手势事件时，可直接调用此方法。 */
   async initialize(): Promise<boolean> {
     if (this.disposed || this.pageHiddenValue) return false;
     if (this.context) return this.resume();
@@ -240,7 +240,7 @@ export class ArcadeAudio {
     }
   }
 
-  /** Retries a suspended AudioContext, normally from a fresh user gesture. */
+  /** 重试挂起的 AudioContext，通常应由一次新的用户手势触发。 */
   async resume(): Promise<boolean> {
     if (this.disposed || this.pageHiddenValue) return false;
     if (!this.context) return this.initialize();
@@ -260,8 +260,8 @@ export class ArcadeAudio {
   }
 
   /**
-   * Atomically changes the score target. Floor or mode changes restart once;
-   * same-floor region changes retarget at the next phrase when audio is live.
+   * 原子切换配乐目标。楼层或模式变化只重启一次；音频播放期间，同层区域变化
+   * 会在下一个乐句重新定向。
    */
   setScene(scene: ScoreScene): void {
     if (this.disposed) return;
@@ -360,8 +360,7 @@ export class ArcadeAudio {
       return;
     }
 
-    // A short fade-out/fade-in avoids hard-stopping an oscillator at a
-    // non-zero crossing. The complete mode hand-off is nominally 100 ms.
+    // 短暂淡出和淡入可避免在非零交点硬停振荡器；完整模式交接约为 100 毫秒。
     this.clearModeTransition();
     this.stopMusicScheduler(false);
     const now = context.currentTime;
@@ -418,7 +417,7 @@ export class ArcadeAudio {
     this.applyMasterVolume();
   }
 
-  /** Stops all scheduled audio work while the page is hidden. */
+  /** 页面隐藏时停止所有已调度的音频工作。 */
   async setPageHidden(hidden: boolean): Promise<void> {
     if (this.disposed) return;
     this.pageHiddenValue = hidden;
@@ -432,7 +431,7 @@ export class ArcadeAudio {
         try {
           await context.suspend();
         } catch {
-          // Embedded browsers may reject suspension during lifecycle changes.
+          // 嵌入式浏览器可能在生命周期变化期间拒绝挂起音频。
         }
       }
       if (!this.pageHiddenValue && !this.mutedValue) await this.resume();
@@ -482,7 +481,7 @@ export class ArcadeAudio {
       try {
         await context.close();
       } catch {
-        // Some WebKit builds throw if close races with an interrupted context.
+        // 某些 WebKit 构建在关闭操作与上下文中断竞争时会抛出异常。
       }
     }
   }
@@ -987,12 +986,12 @@ export class ArcadeAudio {
       try {
         source.disconnect();
       } catch {
-        // Disconnect is best-effort when a context closes mid-callback.
+        // 上下文在回调中途关闭时，断开节点只能尽力完成。
       }
       try {
         envelope.disconnect();
       } catch {
-        // The envelope may already be detached by a disposing context.
+        // 正在销毁的上下文可能已经断开包络节点。
       }
     };
     sourceSet.add(source);
@@ -1008,7 +1007,7 @@ export class ArcadeAudio {
       try {
         source.stop(stopAt);
       } catch {
-        // A source can finish between scheduling the transition and this call.
+        // 音源可能在安排过渡和本次调用之间自然结束。
       }
     });
   }
@@ -1018,7 +1017,7 @@ export class ArcadeAudio {
       try {
         source.stop();
       } catch {
-        // A source may have naturally ended between the copy and stop call.
+        // 音源可能在复制引用与调用停止之间自然结束。
       }
       const cleanup = this.sourceCleanups.get(source);
       if (cleanup) cleanup();

@@ -973,8 +973,8 @@ export class DungeonScene extends Phaser.Scene {
       }
       parts.forEach((part) => this.entityLayer.add(part));
     });
-    // Route diamonds remain on the minimap. Rendering the same route in-world
-    // made passive guidance look like a field of interactable objects.
+    // 路线菱形只保留在小地图中；若在世界中重复绘制，会让被动引导看起来
+    // 像铺满一地的可交互对象。
     this.snapshot.biomePlan.features.forEach((feature, index) => {
       if (!shouldRenderPassiveFeature(index)) return;
       const pixel = gridToPixels(feature);

@@ -1242,7 +1242,7 @@ export class GameSession {
     return true;
   }
 
-  /** @deprecated Kept for the shipped F1 UI/test contract. */
+  /** @deprecated 为已经发布的第一层 UI 与测试合同保留。 */
   confirmFloorOneLabyrinthEntry(): boolean {
     return this.confirmLabyrinthEntry();
   }
@@ -4386,8 +4386,7 @@ export class GameSession {
     this.activeCampfireId = null;
     this.activeLootBundleId = null;
     if (source !== "combat") {
-      // Gate challenges do not create battle answer records. Clearing this
-      // prevents an unrelated previous battle from appearing after respawn.
+      // 门题不会创建战斗答题记录。清除此状态可避免复活后显示无关的上一场战斗。
       this.reviewBattleId = null;
     }
     this.banner += " YOU DIED。正在返回最近休息的篝火；局内进度与怪物剩余生命都会保留。";

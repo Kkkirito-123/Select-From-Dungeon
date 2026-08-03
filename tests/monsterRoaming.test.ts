@@ -122,7 +122,7 @@ describe("advanceMonsterPatrol", () => {
       }
     }
     expect(checkedPositions).toBe(500 * 80 * 5);
-  // This is a topology invariant, not a performance assertion. Keep all
-  // 200,000 positions while allowing for slower CPU-constrained runners.
+  // 这里验证的是拓扑不变量，而不是性能指标。保留全部 200,000 个位置，
+  // 同时为 CPU 资源受限的较慢执行环境预留足够时间。
   }, 120_000);
 });

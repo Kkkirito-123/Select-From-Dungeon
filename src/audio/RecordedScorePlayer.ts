@@ -32,8 +32,8 @@ async function defaultFetchAudioBytes(url: string): Promise<ArrayBuffer> {
 }
 
 /**
- * Plays the F1/F2 project-rendered mixes. Each source is a single long looping
- * buffer, so browser timer jitter cannot insert gaps between musical notes.
+ * 播放项目渲染的第一、二层混音。每个音源都是一段完整的长循环缓冲区，
+ * 因此浏览器计时器抖动不会在音符之间插入空隙。
  */
 export class RecordedScorePlayer {
   private readonly buffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -165,8 +165,8 @@ export class RecordedScorePlayer {
         const decoded = await this.context.decodeAudioData(encoded.slice(0));
         if (decoded.duration >= 30) return decoded;
       } catch {
-        // OGG is intentionally first; Safari and restrictive embeds can fall
-        // back to the project-generated MP3 without interrupting the game.
+        // 优先使用 OGG；Safari 或受限嵌入环境可以回退到项目生成的 MP3，
+        // 且不会中断游戏。
       }
     }
     return null;
@@ -185,12 +185,12 @@ export class RecordedScorePlayer {
     try {
       playback.source.disconnect();
     } catch {
-      // The source may already have been detached during context shutdown.
+      // 音频上下文关闭时，音源可能已经被断开。
     }
     try {
       playback.gain.disconnect();
     } catch {
-      // The transition can finish while the entire graph is being disposed.
+      // 整个音频图销毁期间，过渡也可能恰好结束。
     }
   }
 
@@ -199,7 +199,7 @@ export class RecordedScorePlayer {
       if (when === undefined) source.stop();
       else source.stop(when);
     } catch {
-      // A source can finish while a page-hide or mode transition is handled.
+      // 处理页面隐藏或模式切换时，音源可能自然播放结束。
     }
   }
 }

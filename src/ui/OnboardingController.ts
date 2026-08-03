@@ -46,7 +46,7 @@ function parseSave(raw: string | null): OnboardingSave | null {
       typeof value.skipped === "boolean"
     ) return value as OnboardingSave;
   } catch {
-    // A malformed optional guide must never prevent the game from starting.
+    // 格式错误的可选引导绝不能阻止游戏启动。
   }
   return null;
 }
@@ -113,7 +113,7 @@ export class OnboardingController {
     try {
       this.storage.removeItem(ONBOARDING_SAVE_KEY);
     } catch {
-      // In-memory replay still works in privacy-restricted iframes.
+      // 在限制隐私访问的 iframe 中，内存回放仍应可用。
     }
     this.emit();
   }
@@ -127,7 +127,7 @@ export class OnboardingController {
     try {
       this.storage.setItem(ONBOARDING_SAVE_KEY, JSON.stringify(save));
     } catch {
-      // The guide remains usable for the current page without persistence.
+      // 即使无法持久化，引导在当前页面内仍应可用。
     }
   }
 

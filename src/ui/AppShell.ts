@@ -1277,7 +1277,7 @@ export class AppShell {
               <div id="admin-preset-list" class="admin-preset-list"></div>
             </section>
             <div id="admin-region-list" class="admin-region-list"></div>
-            <p class="admin-menu__warning">管理员模式只用于 Debug，包含未击败怪物真名、Boss 与剧情状态剧透。关闭面板仍保持全图可见；刷新页面才退出预览并恢复正式进度。</p>
+            <p class="admin-menu__warning">管理员模式只用于 Debug，会展示 Boss 位置与剧情状态，但怪物仍只显示稳定 ID。关闭面板仍保持全图可见；刷新页面才退出预览并恢复正式进度。</p>
           </div>
         </section>
 
