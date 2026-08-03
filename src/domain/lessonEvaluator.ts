@@ -2,7 +2,7 @@ import { lessonById } from "../content/mvpLevel";
 import type {
   LessonId,
   LessonStageDefinition,
-  LessonStageId,
+  AuthoredLessonStageId,
   QueryEvaluation,
   QueryFeature,
   SqlQueryResult,
@@ -473,7 +473,7 @@ export function detectQueryFeatures(sql: string): QueryFeature[] {
   if (/\bfrom\b/i.test(normalized)) features.push("from");
   if (/\bwhere\b/i.test(normalized)) features.push("where");
   if (/\band\b/i.test(normalized)) features.push("and");
-  if (/\bis\s+null\b/i.test(normalized)) features.push("is-null");
+  if (/\bis\s+(?:not\s+)?null\b/i.test(normalized)) features.push("is-null");
   if (/\bcount\s*\(/i.test(normalized)) features.push("count");
   if (/\bgroup\s+by\b/i.test(normalized)) features.push("group-by");
   if (/\bhaving\b/i.test(normalized)) features.push("having");
@@ -590,7 +590,7 @@ function hasExactOrderedRows(
   );
 }
 
-const NON_FLAT_STAGES = new Set<LessonStageId>([
+const NON_FLAT_STAGES = new Set<AuthoredLessonStageId>([
   "f3-union-patrol",
   "grave-boss-scan",
   "f4-scalar-first",
@@ -686,7 +686,7 @@ function joinsTables(
   return new RegExp(`(?:${relation})`, "i").test(onClause);
 }
 
-function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
+function stageMatches(stageId: AuthoredLessonStageId, result: SqlQueryResult): boolean {
   if (!NON_FLAT_STAGES.has(stageId) && !isFlatBeginnerSelect(result.sql)) return false;
   const normalizedSql = normalizeStructure(result.sql);
   const whereClause = clauseBetween(normalizedSql, "where");
@@ -1378,7 +1378,7 @@ function stageMatches(stageId: LessonStageId, result: SqlQueryResult): boolean {
   }
 }
 
-const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
+const WRONG_RESULT_MESSAGE: Record<AuthoredLessonStageId, string> = {
   "select-name": "结果没有精确读出 ID #001 的 id 与 status。检查投影列、来源表和 id = 1。",
   "select-weakness": "结果没有精确读出 ID #001 的 weakness。检查完整 SELECT。",
   "where-target": "结果没有唯一锁定 ID #002。检查 room_id、status 和多余行。",
@@ -1501,7 +1501,7 @@ const WRONG_RESULT_MESSAGE: Record<LessonStageId, string> = {
 };
 
 function wrongResultMessage(
-  stageId: LessonStageId,
+  stageId: AuthoredLessonStageId,
   result: SqlQueryResult,
 ): string {
   if (
@@ -1533,6 +1533,46 @@ export function evaluateLesson(
   return evaluateStage(stage, result);
 }
 
+function encodedRow(row: readonly unknown[]): string {
+  return JSON.stringify(row, (_key, value) => (
+    value instanceof Uint8Array ? [...value] : value
+  ));
+}
+
+function questionExpectationMatches(
+  stage: LessonStageDefinition,
+  result: SqlQueryResult,
+): boolean {
+  const expectation = stage.questionExpectation;
+  if (!expectation) return false;
+  if (expectation.flatSelect && !isFlatBeginnerSelect(result.sql)) return false;
+  if (
+    result.columns.length !== expectation.columns.length ||
+    result.columns.some((column, index) => (
+      column.toLowerCase() !== expectation.columns[index]?.toLowerCase()
+    ))
+  ) return false;
+  const actualRows = result.rows.map((row) => (
+    result.columns.map((column) => row[column] ?? null)
+  ));
+  const actual = actualRows.map(encodedRow);
+  const expected = expectation.rows.map(encodedRow);
+  if (!expectation.rowsOrdered) {
+    actual.sort();
+    expected.sort();
+  }
+  if (
+    actual.length !== expected.length ||
+    actual.some((row, index) => row !== expected[index])
+  ) return false;
+  const plan = result.plan.join(" ").toUpperCase();
+  return expectation.planInclude.every((fragment) => (
+    plan.includes(fragment.toUpperCase())
+  )) && expectation.planExclude.every((fragment) => (
+    !plan.includes(fragment.toUpperCase())
+  ));
+}
+
 export function evaluateStage(
   stage: LessonStageDefinition,
   result: SqlQueryResult,
@@ -1555,11 +1595,45 @@ export function evaluateStage(
     };
   }
 
-  if (!stageMatches(stage.id, result)) {
+  if (stage.questionExpectation) {
+    if (!questionExpectationMatches(stage, result)) {
+      return {
+        accepted: false,
+        kind: "wrong-result",
+        message: "查询结构已接近，但结果列、行值、顺序或计划证据与本题目标不一致。",
+        locksBroken,
+        locksRemaining: [],
+        attackTargetIds: [],
+      };
+    }
+    return {
+      accepted: true,
+      kind: "exact",
+      message: `查询正确，${stage.locks.join(" + ")} 锁全部破除。`,
+      locksBroken,
+      locksRemaining: [],
+      attackTargetIds: [...stage.attackTargetIds],
+    };
+  }
+
+  const evaluationStageId = stage.evaluationStageId ?? (
+    stage.id.startsWith("question:") ? null : stage.id as AuthoredLessonStageId
+  );
+  if (!evaluationStageId) {
     return {
       accepted: false,
       kind: "wrong-result",
-      message: wrongResultMessage(stage.id, result),
+      message: "练习题缺少可验证的基础题契约，已停止本回合结算。",
+      locksBroken,
+      locksRemaining: [],
+      attackTargetIds: [],
+    };
+  }
+  if (!stageMatches(evaluationStageId, result)) {
+    return {
+      accepted: false,
+      kind: "wrong-result",
+      message: wrongResultMessage(evaluationStageId, result),
       locksBroken,
       locksRemaining: [],
       attackTargetIds: [],

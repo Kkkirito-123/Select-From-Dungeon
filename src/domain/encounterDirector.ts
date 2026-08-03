@@ -1,10 +1,11 @@
+import { ENCOUNTER_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import { stableStringHash } from "./runGraph";
 
-export const INITIAL_SAFE_STEPS = 5;
-export const POST_BATTLE_SAFE_STEPS = 5;
-export const AMBUSH_ROLL_START = 1;
-export const AMBUSH_CHANCE = 0.02;
-export const AMBUSH_GUARANTEE_AT = 30;
+export const INITIAL_SAFE_STEPS: number = ENCOUNTER_RUNTIME_CONFIG.initialSafeSteps;
+export const POST_BATTLE_SAFE_STEPS: number = ENCOUNTER_RUNTIME_CONFIG.postBattleSafeSteps;
+export const AMBUSH_ROLL_START: number = ENCOUNTER_RUNTIME_CONFIG.ambushRollStart;
+export const AMBUSH_CHANCE: number = ENCOUNTER_RUNTIME_CONFIG.ambushChance;
+export const AMBUSH_GUARANTEE_AT: number = ENCOUNTER_RUNTIME_CONFIG.ambushGuaranteeAt;
 
 export interface EncounterMeter {
   totalMoves: number;

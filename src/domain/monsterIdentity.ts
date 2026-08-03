@@ -82,6 +82,7 @@ export function monsterIdentityPresentation(
   return {
     discovered,
     idLabel,
+    // 已写入图鉴的名字也不回流到活体标签，避免新 Run 提前泄露身份。
     nameLabel: idLabel,
     worldLabel: idLabel,
     speciesLabel: "类型 = 未识别",

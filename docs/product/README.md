@@ -106,6 +106,8 @@
   重平衡表。
 - [UI、UX 与可访问性规格](./systems/UX_UI_AND_ACCESSIBILITY_SPEC.md)：完整界面状态、输入、反馈与
   响应式边界。
+- [纯输出 Agent MVP](./systems/OUTPUT_ONLY_AGENT_SPEC.md)：定义篝火与实体抄写员的独立输出、
+  最多八条当前层证据、DeepSeek 浏览器 BYOK、内存密钥边界、独立缓存与本地降级。
 
 ### 3.5 视听
 

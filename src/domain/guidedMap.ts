@@ -1,3 +1,4 @@
+import { NAVIGATION_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import { mazeTileAt, mazeZoneAt, type MazeFloor } from "./mazeGenerator";
 import { findGridPath } from "./pathfinding";
 import {
@@ -14,7 +15,7 @@ import type {
 } from "./types";
 
 export const GUIDED_MAP_VERSION = 1 as const;
-export const ROUTE_MARKER_SPACING = 14;
+export const ROUTE_MARKER_SPACING = NAVIGATION_RUNTIME_CONFIG.routeMarkerSpacing;
 
 export interface GuidedRouteMarker extends Position {
   id: string;
@@ -172,7 +173,7 @@ function isShortcutEndpointCandidate(
   position: Position,
 ): boolean {
   if (!isFloor(floor, position) || mazeZoneAt(floor, position)) return false;
-  if (floor.gates.some((gate) => distance(gate, position) <= 1)) return false;
+  if (floor.gates.some((gate) => distance(gate, position) <= 3)) return false;
   return !campfires.some((campfire) => (
     distance(campfire, position) <= 2 ||
     distance(campfire.restPosition, position) <= 1
@@ -206,10 +207,11 @@ function createShortcut(
   keyRoomNodeId: string,
   keyPosition: Position,
 ): GuidedShortcut | null {
+  const minimumDetour = floor.generatorVersion >= 7 ? 12 : 18;
   // 捷径必须服务主课程路线；钥匙所在的可选房间可能离出生点很近，
   // 不能再拿“出生点 → 钥匙”这段短路来决定水闸是否存在。
   const route = stitchedCourseRoute(graph, floor);
-  if (route.length < 24) return null;
+  if (route.length < minimumDetour + 6) return null;
   const preferredEntryIndex = graph.floor === 1
     ? Math.min(route.length - 3, 6)
     : Math.max(3, Math.floor(route.length * 0.16));
@@ -237,7 +239,7 @@ function createShortcut(
 
   // 某些复合楼层会让 16% / 84% 两点在空间上意外靠近。此时在课程
   // 前、后段中寻找真正能缩短折返的端点，而不是让整个 Seed 丢掉捷径。
-  if (detour.length < 18) {
+  if (detour.length < minimumDetour) {
     const candidates = route
       .map((position, index) => ({ position, index }))
       .filter(({ position }) => (
@@ -262,7 +264,7 @@ function createShortcut(
           positionKey(left.position) === positionKey(right.position)
         ) continue;
         const candidateDetour = pathBetween(floor, left.position, right.position);
-        if (candidateDetour.length < 18) continue;
+        if (candidateDetour.length < minimumDetour) continue;
         const score =
           candidateDetour.length * 100 -
           Math.abs(left.index - preferredEntryIndex) * 3 -
@@ -281,7 +283,7 @@ function createShortcut(
     exit = best?.exit ?? null;
     detour = best?.detour ?? [];
   }
-  if (!entry || !exit || detour.length < 18) return null;
+  if (!entry || !exit || detour.length < minimumDetour) return null;
   const keyRoom = graph.nodes.find((node) => node.id === keyRoomNodeId);
   return {
     id: `shortcut:${graph.floor}:return`,
@@ -294,6 +296,158 @@ function createShortcut(
     requires: [...(keyRoom?.prerequisiteLessons ?? [])],
     detourDistance: detour.length - 1,
   };
+}
+
+function chooseRegionalKeyRoom(
+  graph: RoomGraph,
+  progress: number,
+  excluded: ReadonlySet<string>,
+): string {
+  const candidates = graph.nodes.filter((node) => (
+    node.id !== graph.entryId &&
+    node.id !== graph.bossId &&
+    node.depth >= 2 &&
+    !excluded.has(node.id)
+  ));
+  const maximumDepth = Math.max(1, ...graph.nodes.map((node) => node.depth));
+  return candidates.sort((left, right) => (
+    Math.abs(left.depth / maximumDepth - progress) -
+      Math.abs(right.depth / maximumDepth - progress) ||
+    stableStringHash(`${graph.seed}:regional-key:${left.id}`) -
+      stableStringHash(`${graph.seed}:regional-key:${right.id}`)
+  ))[0]?.id ?? chooseKeyRoom(graph);
+}
+
+function createRegionalShortcut(
+  graph: RoomGraph,
+  floor: MazeFloor,
+  campfires: readonly Campfire[],
+  route: readonly Position[],
+  region: "middle" | "rear",
+  entryProgress: number,
+  exitProgress: number,
+  keyRoomNodeId: string,
+): GuidedShortcut | null {
+  const minimumDetour = floor.generatorVersion >= 7 ? 12 : 18;
+  const progressPairs = [
+    [Math.max(0.04, entryProgress - 0.16), Math.min(0.97, exitProgress + 0.16)],
+    [entryProgress, exitProgress],
+    [Math.max(0.04, entryProgress - 0.16), exitProgress],
+    [entryProgress, Math.min(0.97, exitProgress + 0.16)],
+  ] as const;
+  let selected: { entry: Position; exit: Position; detour: Position[] } | null = null;
+  for (const [fromProgress, toProgress] of progressPairs) {
+    const entry = nearestEligiblePathCell(
+      route,
+      Math.floor((route.length - 1) * fromProgress),
+      floor,
+      campfires,
+    );
+    const exit = nearestEligiblePathCell(
+      route,
+      Math.floor((route.length - 1) * toProgress),
+      floor,
+      campfires,
+    );
+    if (!entry || !exit || positionKey(entry) === positionKey(exit)) continue;
+    const detour = pathBetween(floor, entry, exit);
+    if (detour.length >= minimumDetour) {
+      selected = { entry, exit, detour };
+      break;
+    }
+  }
+  if (!selected) {
+    const expectedEntry = Math.floor((route.length - 1) * entryProgress);
+    const expectedExit = Math.floor((route.length - 1) * exitProgress);
+    const eligible = route
+      .map((position, index) => ({ position, index }))
+      .filter(({ position }) => isShortcutEndpointCandidate(floor, campfires, position));
+    let best: {
+      entry: Position;
+      exit: Position;
+      detour: Position[];
+      score: number;
+    } | null = null;
+    for (const from of eligible) {
+      for (const to of eligible) {
+        if (
+          from.index >= to.index ||
+          positionKey(from.position) === positionKey(to.position)
+        ) continue;
+        const detour = pathBetween(floor, from.position, to.position);
+        if (detour.length < minimumDetour) continue;
+        const score =
+          Math.abs(from.index - expectedEntry) * 2 +
+          Math.abs(to.index - expectedExit);
+        if (!best || score < best.score) {
+          best = {
+            entry: { ...from.position },
+            exit: { ...to.position },
+            detour,
+            score,
+          };
+        }
+      }
+    }
+    selected = best;
+  }
+  if (!selected) return null;
+  const keyRoom = graph.nodes.find((node) => node.id === keyRoomNodeId);
+  const regionLabel = region === "middle" ? "中段" : "后段";
+  return {
+    id: `shortcut:${graph.floor}:${region}`,
+    keyId: `shortcut-key:${graph.floor}:${region}`,
+    name: `${shortcutNameForFloor(graph.floor)}·${regionLabel}`,
+    entry: selected.entry,
+    exit: selected.exit,
+    keyPosition: chooseKeyPosition(graph, floor, campfires, keyRoomNodeId),
+    keyRoomNodeId,
+    requires: [...(keyRoom?.prerequisiteLessons ?? [])],
+    detourDistance: selected.detour.length - 1,
+  };
+}
+
+function createShortcuts(
+  graph: RoomGraph,
+  floor: MazeFloor,
+  campfires: readonly Campfire[],
+): GuidedShortcut[] {
+  const primaryKeyRoom = chooseKeyRoom(graph);
+  const primary = createShortcut(
+    graph,
+    floor,
+    campfires,
+    primaryKeyRoom,
+    chooseKeyPosition(graph, floor, campfires, primaryKeyRoom),
+  );
+  if (floor.generatorVersion < 6) return primary ? [primary] : [];
+  const route = stitchedCourseRoute(graph, floor);
+  const excluded = new Set(primary ? [primary.keyRoomNodeId] : []);
+  const middleKeyRoom = chooseRegionalKeyRoom(graph, 0.5, excluded);
+  excluded.add(middleKeyRoom);
+  const rearKeyRoom = chooseRegionalKeyRoom(graph, 0.75, excluded);
+  const middle = createRegionalShortcut(
+    graph,
+    floor,
+    campfires,
+    route,
+    "middle",
+    0.24,
+    0.52,
+    middleKeyRoom,
+  );
+  const rear = createRegionalShortcut(
+    graph,
+    floor,
+    campfires,
+    route,
+    "rear",
+    0.58,
+    0.9,
+    rearKeyRoom,
+  );
+  return [primary, middle, rear]
+    .filter((shortcut): shortcut is GuidedShortcut => shortcut !== null);
 }
 
 function stitchedCourseRoute(graph: RoomGraph, floor: MazeFloor): Position[] {
@@ -321,13 +475,16 @@ function createRouteMarkers(
   graph: RoomGraph,
   floor: MazeFloor,
   campfires: readonly Campfire[],
-  shortcut: GuidedShortcut | null,
+  shortcuts: readonly GuidedShortcut[],
 ): GuidedRouteMarker[] {
   const route = stitchedCourseRoute(graph, floor);
   const occupied = new Set([
     ...campfires.map(positionKey),
     ...floor.gates.map(positionKey),
-    ...(shortcut ? [positionKey(shortcut.entry), positionKey(shortcut.exit)] : []),
+    ...shortcuts.flatMap((shortcut) => [
+      positionKey(shortcut.entry),
+      positionKey(shortcut.exit),
+    ]),
   ]);
   const markers: GuidedRouteMarker[] = [];
   for (
@@ -380,18 +537,18 @@ function createDeadEndCaches(
   graph: RoomGraph,
   floor: MazeFloor,
   campfires: readonly Campfire[],
-  shortcut: GuidedShortcut | null,
+  shortcuts: readonly GuidedShortcut[],
 ): GuidedDeadEndCache[] {
   const occupied = new Set([
     positionKey(floor.spawn),
     ...campfires.map(positionKey),
     ...campfires.map((campfire) => positionKey(campfire.restPosition)),
     ...floor.gates.map(positionKey),
-    ...(shortcut ? [
+    ...shortcuts.flatMap((shortcut) => [
       positionKey(shortcut.entry),
       positionKey(shortcut.exit),
       positionKey(shortcut.keyPosition),
-    ] : []),
+    ]),
   ]);
   const candidates: Position[] = [];
   for (let y = 1; y < floor.height - 1; y += 1) {
@@ -426,27 +583,14 @@ export function generateGuidedMapPlan(
   floor: MazeFloor,
   campfires: readonly Campfire[],
 ): GuidedMapPlan {
-  const keyRoomNodeId = chooseKeyRoom(graph);
-  const keyPosition = chooseKeyPosition(
-    graph,
-    floor,
-    campfires,
-    keyRoomNodeId,
-  );
-  const shortcut = createShortcut(
-    graph,
-    floor,
-    campfires,
-    keyRoomNodeId,
-    keyPosition,
-  );
+  const shortcuts = createShortcuts(graph, floor, campfires);
   return {
     version: GUIDED_MAP_VERSION,
     seed: graph.seed,
     floor: graph.floor,
-    routeMarkers: createRouteMarkers(graph, floor, campfires, shortcut),
-    deadEndCaches: createDeadEndCaches(graph, floor, campfires, shortcut),
-    shortcuts: shortcut ? [shortcut] : [],
+    routeMarkers: createRouteMarkers(graph, floor, campfires, shortcuts),
+    deadEndCaches: createDeadEndCaches(graph, floor, campfires, shortcuts),
+    shortcuts,
   };
 }
 
@@ -501,9 +645,17 @@ export function validateGuidedMapPlan(
   ) {
     errors.push("引导地图版本、Seed 或楼层不匹配。");
   }
-  if (plan.shortcuts.length !== 1) {
-    errors.push("当前 MVP 每层必须生成 1 道钥匙捷径。");
+  const expectedShortcutCount = floor.generatorVersion >= 6 ? 3 : 1;
+  if (plan.shortcuts.length !== expectedShortcutCount) {
+    errors.push(floor.generatorVersion >= 6
+      ? "每层三个探索区域必须各生成 1 道钥匙捷径。"
+      : "旧版迷宫必须保留 1 道兼容捷径。");
   }
+  if (
+    new Set(plan.shortcuts.map((shortcut) => shortcut.id)).size !== plan.shortcuts.length ||
+    new Set(plan.shortcuts.map((shortcut) => shortcut.keyId)).size !== plan.shortcuts.length ||
+    new Set(plan.shortcuts.map((shortcut) => shortcut.keyRoomNodeId)).size !== plan.shortcuts.length
+  ) errors.push("区域捷径的 ID、钥匙或钥匙房间发生重复。");
   plan.shortcuts.forEach((shortcut) => {
     if (
       !isFloor(floor, shortcut.entry) ||
@@ -512,7 +664,8 @@ export function validateGuidedMapPlan(
     ) {
       errors.push(`捷径 ${shortcut.id} 的端点或钥匙不可达。`);
     }
-    if (shortcut.detourDistance < 17) {
+    const minimumDetourDistance = floor.generatorVersion >= 7 ? 11 : 17;
+    if (shortcut.detourDistance < minimumDetourDistance) {
       errors.push(`捷径 ${shortcut.id} 没有形成足够明显的折返缩减。`);
     }
     const keyRoom = graph.nodes.find((node) => node.id === shortcut.keyRoomNodeId);

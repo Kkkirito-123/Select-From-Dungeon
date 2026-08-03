@@ -14,19 +14,20 @@ export function findGridPath(
 ): Position[] {
   const key = (position: Position) => `${position.x},${position.y}`;
   const queue: Position[] = [start];
+  let queueIndex = 0;
   const previous = new Map<string, Position | null>([[key(start), null]]);
 
-  while (queue.length > 0) {
-    const current = queue.shift();
+  while (queueIndex < queue.length) {
+    const current = queue[queueIndex++];
     if (!current) break;
     if (current.x === target.x && current.y === target.y) {
       const path: Position[] = [];
       let cursor: Position | null = current;
       while (cursor) {
-        path.unshift(cursor);
+        path.push(cursor);
         cursor = previous.get(key(cursor)) ?? null;
       }
-      return path;
+      return path.reverse();
     }
 
     for (const direction of DIRECTIONS) {

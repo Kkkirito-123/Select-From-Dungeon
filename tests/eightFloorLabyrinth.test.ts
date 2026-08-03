@@ -353,41 +353,36 @@ describe("eight-floor physical labyrinth acceptance", () => {
           violations.push(`${current.seed} 中后区门方向与区域顺序不一致`);
         }
 
-        // 生成后的区域首领仍处于存活状态。玩家必须可以走到首领和门前，
-        // 但不能仅沿底层步行网格绕进后区；否则 requiredBossId 只是 UI 元数据。
-        const beforeAreaBoss = reachableMazeCells(
-          current.maze,
-          new Set(lessonsForFloor(floorNumber)),
-          new Set<string>(),
-          (from, to) => (
-            biomeGuardianIdForStep(current.biome, from, to) !== middle.areaBossId
-          ),
-        );
-        if (!beforeAreaBoss.has(positionKey(middle.areaBossPosition))) {
-          violations.push(`${current.seed} 无法步行到达中区首领`);
-        }
-        if (!beforeAreaBoss.has(positionKey(middleRear.entry))) {
-          violations.push(`${current.seed} 无法步行到达中后区门前`);
-        }
-        if (
-          beforeAreaBoss.has(positionKey(rear.anchor)) ||
-          beforeAreaBoss.has(positionKey(middleRear.exit))
-        ) {
-          violations.push(
-            `${current.seed} 中区首领存活时仍能沿步行网格进入后区`,
-          );
-        }
-        const afterAreaBoss = reachableMazeCells(
+        // 抽象区域边界没有对应素材，不能再形成空气墙。玩家可以提前探索
+        // 后区走廊，但可见传送设施和跨区捷径仍由 requiredBossId 封锁。
+        const walkingReachable = reachableMazeCells(
           current.maze,
           new Set(lessonsForFloor(floorNumber)),
           new Set<string>(),
           () => true,
         );
+        if (!walkingReachable.has(positionKey(middle.areaBossPosition))) {
+          violations.push(`${current.seed} 无法步行到达中区首领`);
+        }
+        if (!walkingReachable.has(positionKey(middleRear.entry))) {
+          violations.push(`${current.seed} 无法步行到达中后区门前`);
+        }
         if (
-          !afterAreaBoss.has(positionKey(rear.anchor)) ||
-          !afterAreaBoss.has(positionKey(middleRear.exit))
+          !walkingReachable.has(positionKey(rear.anchor)) ||
+          !walkingReachable.has(positionKey(middleRear.exit))
         ) {
-          violations.push(`${current.seed} 击败中区首领后仍无法进入后区`);
+          violations.push(
+            `${current.seed} 抽象区域边界仍阻断后区步行探索`,
+          );
+        }
+        if (
+          biomeGuardianIdForStep(
+            current.biome,
+            middleRear.entry,
+            middleRear.exit,
+          ) !== middle.areaBossId
+        ) {
+          violations.push(`${current.seed} 可见中后区交通没有绑定区域首领`);
         }
       }
     }
@@ -395,7 +390,7 @@ describe("eight-floor physical labyrinth acceptance", () => {
     expect(violations).toEqual([]);
   }, 30_000);
 
-  it("每层唯一捷径、钥匙和隐藏入口都能由正常步行路线触达", () => {
+  it("每层三道区域捷径、钥匙和隐藏入口都能由正常步行路线触达", () => {
     const violations: string[] = [];
 
     for (const floorNumber of FLOORS) {
@@ -403,22 +398,23 @@ describe("eight-floor physical labyrinth acceptance", () => {
         const current = fixture(floorNumber, seedName);
         const allLessons = new Set(lessonsForFloor(floorNumber));
         const allReachable = reachableMazeCells(current.maze, allLessons);
-        if (current.guidedMap.shortcuts.length !== 1) {
-          violations.push(`${current.seed} 捷径数量不是 1`);
+        if (current.guidedMap.shortcuts.length !== 3) {
+          violations.push(`${current.seed} 捷径数量不是 3`);
         } else {
-          const shortcut = current.guidedMap.shortcuts[0];
-          if (shortcut.id !== `shortcut:${floorNumber}:return`) {
-            violations.push(`${current.seed} 捷径 ID 不稳定：${shortcut.id}`);
-          }
-          for (const [label, position] of [
-            ["捷径入口", shortcut.entry],
-            ["捷径出口", shortcut.exit],
-            ["捷径钥匙", shortcut.keyPosition],
-          ] as const) {
-            if (!allReachable.has(positionKey(position))) {
-              violations.push(`${current.seed} ${label}不可由出生点步行触达`);
+          current.guidedMap.shortcuts.forEach((shortcut, shortcutIndex) => {
+            if (shortcutIndex === 0 && shortcut.id !== `shortcut:${floorNumber}:return`) {
+              violations.push(`${current.seed} 主捷径 ID 不稳定：${shortcut.id}`);
             }
-          }
+            for (const [label, position] of [
+              ["捷径入口", shortcut.entry],
+              ["捷径出口", shortcut.exit],
+              ["捷径钥匙", shortcut.keyPosition],
+            ] as const) {
+              if (!allReachable.has(positionKey(position))) {
+                violations.push(`${current.seed} ${label}不可由出生点步行触达`);
+              }
+            }
+          });
         }
 
         const hiddenArea = current.experience.hiddenAreas[0];

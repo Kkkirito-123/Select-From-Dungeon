@@ -1,12 +1,13 @@
 import type { GameSession } from "../domain/GameSession";
 import type { GameSnapshot } from "../domain/types";
+import { STORAGE_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import {
   persistProfileIfChanged,
   saveRun,
   type StorageLike,
 } from "./localProgress";
 
-export const PROGRESS_SAVE_DEBOUNCE_MS = 350;
+export const PROGRESS_SAVE_DEBOUNCE_MS = STORAGE_RUNTIME_CONFIG.progressSaveDebounceMs;
 
 export interface PersistenceFingerprint {
   mode: string;

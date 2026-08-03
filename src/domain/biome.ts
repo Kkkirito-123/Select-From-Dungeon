@@ -147,6 +147,25 @@ const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTem
   8: FLOOR_EIGHT_TEMPLATES,
 };
 
+/**
+ * Generator-v6+ regions follow the authored guardian split instead of a numeric
+ * third of the lesson list. The middle anchor is the last lesson before the
+ * area guardian; the rear anchor is the first lesson that guardian protects.
+ */
+const V6_REGION_LESSONS: Readonly<Record<
+  RoomGraph["floor"],
+  readonly [RunLessonId, RunLessonId, RunLessonId]
+>> = {
+  1: ["select", "group-by", "having"],
+  2: ["order-by", "left-join", "join-boss"],
+  3: ["f3-inner", "f3-chain", "f3-union"],
+  4: ["f4-scalar", "f4-in", "f4-exists"],
+  5: ["f5-over", "f5-lag-lead", "f5-frame"],
+  6: ["f6-insert", "f6-constraint", "f6-transaction"],
+  7: ["f7-btree", "f7-invalid", "f7-plan"],
+  8: ["f8-mvcc", "f8-modeling", "f8-replication"],
+};
+
 function positionKey(position: Position): string {
   return `${position.x}:${position.y}`;
 }
@@ -418,10 +437,14 @@ export function generateBiomePlan(
   guidedMap: GuidedMapPlan,
 ): BiomePlan {
   const templates = TEMPLATES_BY_FLOOR[graph.floor];
+  const regionLessonIds = V6_REGION_LESSONS[graph.floor];
   const regionNames = floorMapBlueprint(graph.floor).regionNames;
   const seed = `select-from-dungeon:biome:v1:floor-${graph.floor}:${graph.seed}`;
   const regions: BiomeRegion[] = templates.map((template, index) => {
-    const node = graph.nodes.find((entry) => entry.lessonId === template.lessonId);
+    const sourceLessonId = floor.generatorVersion >= 6
+      ? regionLessonIds[index]
+      : template.lessonId;
+    const node = graph.nodes.find((entry) => entry.lessonId === sourceLessonId);
     const anchor = node ? floor.anchors[node.id] : floor.zones[index]?.center;
     if (!node || !anchor) {
       throw new Error(`生态 ${template.kind} 缺少课程锚点。`);
@@ -485,10 +508,9 @@ export function biomeRegionAt(
 }
 
 /**
- * 返回阻挡本次跨区域移动的存活区域首领。
- *
- * 生成后的迷宫仍是一张连通的可行走图。该纯规则同时作为运行时移动和
- * 可达性测试的权威边界，确保玩家不能绕过传送门画面来避开中区首领。
+ * 返回阻挡非步行跨区交通（例如捷径）的存活区域首领。
+ * 相邻迷宫步行不能被不可见的抽象区域边界阻挡；可见传送门会在交互时
+ * 单独检查 requiredBossId，因此玩家也不能借跨区交通绕过中区首领。
  */
 export function biomeGuardianIdForStep(
   plan: BiomePlan,
@@ -496,6 +518,7 @@ export function biomeGuardianIdForStep(
   to: Position,
 ): number | null {
   if (!regionPortalsEnabledForFloor(plan.floor)) return null;
+  if (Math.abs(from.x - to.x) + Math.abs(from.y - to.y) <= 1) return null;
   const rearPortal = plan.portals.find(
     (portal) => portal.id === `biome-portal:${plan.floor}:middle-rear`,
   );

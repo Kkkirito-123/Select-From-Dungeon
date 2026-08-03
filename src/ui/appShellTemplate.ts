@@ -22,7 +22,7 @@ export function appShellTemplate({
           </div>
           <div class="run-console">
             <div><span>FLOOR</span><strong id="floor-value">01 / 08</strong></div>
-            <div><span>SEED</span><strong id="seed-value">—</strong></div>
+            <div><span>LAYOUT</span><strong>固定地图</strong></div>
             <button id="open-admin" type="button" class="admin-toggle">⌘ 管理员</button>
             <button id="open-monster-codex" type="button" class="monster-codex-toggle">◆ 怪物图鉴 0/0</button>
             <button id="open-narrative" type="button" class="narrative-toggle">▧ 剧情档案 1/5</button>
@@ -54,7 +54,6 @@ export function appShellTemplate({
                   <h2 id="inspection-title">现场调查</h2>
                   <p id="inspection-message"></p>
                   <div class="inspection-overlay__actions">
-                    <button id="confirm-labyrinth-entry" type="button" hidden>E · 进入迷宫</button>
                     <button id="close-inspection" type="button">E · 关闭记录</button>
                   </div>
                 </article>
@@ -117,9 +116,11 @@ export function appShellTemplate({
                 <span>CAMPFIRE / SAFE ZONE</span>
                 <h2 id="campfire-menu-title">篝火</h2>
                 <p id="campfire-menu-status">选择接下来的行动。</p>
-                <blockquote class="scribe-recap">
-                  <strong>复盘页 · 抄写员留存</strong>
-                  <p id="scribe-recap">这里保存抄写员此前整理的本层事实，不代表她就在篝火旁。</p>
+                <blockquote class="campfire-recap">
+                  <strong id="campfire-recap-headline">篝火记录 · 学习复盘</strong>
+                  <ul id="campfire-recap-facts"></ul>
+                  <p id="campfire-recap-focus" hidden></p>
+                  <small id="campfire-recap-next">完成一次作答后，这里会整理下一步。</small>
                 </blockquote>
                 <div class="campfire-menu__actions">
                   <button id="rest-at-campfire" type="button" class="primary-action">在此休息</button>
@@ -372,7 +373,7 @@ export function appShellTemplate({
               <button id="replay-onboarding-control" type="button" class="guide-replay">↺ 重新教学</button>
             </section>
 
-            <button id="reset-game" type="button" class="reset-action">生成新迷宫 / 开始新 Run</button>
+            <button id="reset-game" type="button" class="reset-action">重置固定地图 / 开始新 Run</button>
           </aside>
         </main>
 
@@ -382,7 +383,7 @@ export function appShellTemplate({
               <div>
                 <span>LOCAL REVIEW / 本地记录</span>
                 <h2 id="answer-review-title">答题复盘</h2>
-                <p id="answer-review-description">只保存在本地：记录提交的 SQL 回合，不记录移动或按键，也不会上传。</p>
+                <p id="answer-review-description">完整复盘只保存在浏览器，不记录移动或按键；启用可选输出 Agent 时，最多 8 条当前层 SQL 与参考答案证据会发送到你配置的 Agent / 模型服务用于预生成。</p>
               </div>
               <button id="close-review" type="button" class="icon-action" aria-label="关闭答题复盘">ESC ×</button>
             </header>
@@ -432,7 +433,7 @@ export function appShellTemplate({
 
         <footer class="page-footer">
           <span>真实执行：SQLite WASM</span>
-          <span>地图：48×36 八层手工轮廓 + Seeded 支路</span>
+          <span>地图：56×42 八层紧凑迷宫 + 三区域捷径</span>
           <span>音乐：公共领域古典主题电子改编 · 无外部录音</span>
           <span>奖励：课程宝箱固定 · 随机恢复品低概率</span>
         </footer>

@@ -3,9 +3,15 @@ import {
   LEGACY_MAZE_CHUNK_SIZE,
   LEGACY_MAZE_HEIGHT,
   LEGACY_MAZE_WIDTH,
+  LARGE_MAZE_CHUNK_SIZE,
+  LARGE_MAZE_HEIGHT,
+  LARGE_MAZE_WIDTH,
   MAZE_CHUNK_SIZE,
   MAZE_HEIGHT,
   MAZE_WIDTH,
+  PREVIOUS_MAZE_CHUNK_SIZE,
+  PREVIOUS_MAZE_HEIGHT,
+  PREVIOUS_MAZE_WIDTH,
   isMazeWalkable,
   mazeTileAt,
   type MazeFloor,
@@ -82,9 +88,14 @@ export function validateMazeFloor(floor: MazeFloor, graph: RoomGraph): MazeValid
   const errors: string[] = [];
   if (
     floor.version !== 4 ||
-    (floor.generatorVersion !== 4 && floor.generatorVersion !== 5)
+    (
+      floor.generatorVersion !== 4 &&
+      floor.generatorVersion !== 5 &&
+      floor.generatorVersion !== 6 &&
+      floor.generatorVersion !== 7
+    )
   ) {
-    errors.push("迷宫结构版本必须是 v4，生成器版本必须是 v4 或 v5。");
+    errors.push("迷宫结构版本必须是 v4，生成器版本必须是 v4、v5、v6 或 v7。");
   }
   const expectedDimensions = floor.generatorVersion === 4
     ? {
@@ -92,11 +103,23 @@ export function validateMazeFloor(floor: MazeFloor, graph: RoomGraph): MazeValid
         height: LEGACY_MAZE_HEIGHT,
         chunkSize: LEGACY_MAZE_CHUNK_SIZE,
       }
-    : {
-        width: MAZE_WIDTH,
-        height: MAZE_HEIGHT,
-        chunkSize: MAZE_CHUNK_SIZE,
-      };
+    : floor.generatorVersion === 5
+      ? {
+          width: PREVIOUS_MAZE_WIDTH,
+          height: PREVIOUS_MAZE_HEIGHT,
+          chunkSize: PREVIOUS_MAZE_CHUNK_SIZE,
+        }
+      : floor.generatorVersion === 6
+        ? {
+            width: LARGE_MAZE_WIDTH,
+            height: LARGE_MAZE_HEIGHT,
+            chunkSize: LARGE_MAZE_CHUNK_SIZE,
+          }
+        : {
+            width: MAZE_WIDTH,
+            height: MAZE_HEIGHT,
+            chunkSize: MAZE_CHUNK_SIZE,
+          };
   if (
     floor.width !== expectedDimensions.width ||
     floor.height !== expectedDimensions.height ||

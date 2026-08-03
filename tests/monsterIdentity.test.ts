@@ -11,7 +11,7 @@ import { createEmptyProfile } from "../src/storage/localProgress";
 import { buildMonsterCodexModel } from "../src/ui/MonsterCodexView";
 
 describe("monster identity archive", () => {
-  it("探索与战斗界面始终只公开补零 ID", () => {
+  it("活体始终只公开补零 ID，已恢复名字只进入图鉴", () => {
     const monster = INITIAL_MONSTERS.find((entry) => entry.id === 1);
     if (!monster) throw new Error("缺少 ID #001 测试怪物");
 

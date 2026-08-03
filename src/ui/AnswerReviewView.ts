@@ -159,6 +159,7 @@ export class AnswerReviewView {
       objective.textContent = record.stageObjective;
 
       const meta = document.createElement("small");
+      meta.classList.toggle("is-hint-used", record.hintLevel > 0);
       meta.textContent =
         `第 ${record.round} 回合 · 提示 ${record.hintLevel} 级 · ${record.stageId}`;
 

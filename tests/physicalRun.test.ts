@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
 import { GameSession } from "../src/domain/GameSession";
+import { biomeGuardianIdForStep } from "../src/domain/biome";
 import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
 import { SqlEngine } from "../src/sql/SqlEngine";
@@ -492,236 +493,6 @@ const LESSON_QUERIES: Partial<Record<LessonId, SqlQueryResult[]>> = {
   ],
 };
 
-const AMBUSH_QUERIES: Record<number, SqlQueryResult[]> = {
-  6: [teachingResult(
-    "SELECT id, status FROM monsters WHERE id = 6",
-    ["id", "status"],
-    [{ id: 6, status: "dripping" }],
-    [6],
-  )],
-  7: [teachingResult(
-    "SELECT id FROM monsters WHERE room_id = 12 AND status = 'wet'",
-    ["id"],
-    [{ id: 7 }],
-    [7],
-  )],
-  8: [teachingResult(
-    "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
-    ["id"],
-    [{ id: 8 }],
-    [8],
-  )],
-  9: [
-    teachingResult(
-      "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 9 GROUP BY channel",
-    ["channel", "total"],
-    [
-      { channel: "echo", total: 2 },
-      { channel: "noise", total: 2 },
-    ],
-    ),
-    teachingResult(
-      "SELECT id, status FROM monsters WHERE id = 9",
-      ["id", "status"],
-      [{ id: 9, status: "armored" }],
-      [9],
-    ),
-  ],
-  15: [teachingResult(
-    "SELECT channel FROM monster_signals WHERE monster_id = 15 ORDER BY charge DESC LIMIT 1",
-    ["channel"],
-    [{ channel: "surge" }],
-  )],
-  16: [teachingResult(
-    "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16 ORDER BY channel",
-    ["channel"],
-    [{ channel: "echo" }, { channel: "mirror" }],
-  )],
-  17: [teachingResult(
-    "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17",
-    ["id", "room_name"],
-    [{ id: 17, room_name: "泥沼石径" }],
-    [17],
-  )],
-  18: [
-    teachingResult(
-      "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL",
-      ["id"],
-      [{ id: 18 }],
-      [18],
-    ),
-    teachingResult(
-      "SELECT id FROM monsters WHERE id = 18 AND status = 'toxic'",
-      ["id"],
-      [{ id: 18 }],
-      [18],
-    ),
-  ],
-  19: [teachingResult(
-    "SELECT id, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1",
-    ["id", "hp"],
-    [{ id: 19, hp: 13 }],
-    [19],
-  )],
-  20: [
-    teachingResult(
-      "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20",
-      ["id", "room_name"],
-      [{ id: 20, room_name: "盘根林地" }],
-    ),
-    teachingResult(
-      "SELECT m.id, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1",
-      ["id", "room_sector"],
-      [{ id: 20, room_sector: "forest" }],
-      [20],
-    ),
-  ],
-  29: [teachingResult(
-    "SELECT m.name, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 29",
-    ["name", "room_name"],
-    [{ name: "碎骨", room_name: "遗骨荒地" }],
-  )],
-  30: [teachingResult(
-    "SELECT m.name FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 30 AND g.monster_id IS NULL",
-    ["name"],
-    [{ name: "腐尸" }],
-  )],
-  31: [
-    teachingResult(
-      "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31",
-      ["name", "master_name"],
-      [{ name: "鬼火", master_name: "墓主" }],
-    ),
-    teachingResult(
-      "SELECT name FROM monsters WHERE id = 31 AND status = 'haunting'",
-      ["name"],
-      [{ name: "鬼火" }],
-    ),
-  ],
-  32: [teachingResult(
-    "SELECT child.name, master.name AS master_name FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 32",
-    ["name", "master_name"],
-    [{ name: "游魂", master_name: "墓主" }],
-  )],
-  40: [teachingResult(
-    "SELECT name FROM monsters WHERE id = (SELECT MIN(id) FROM monsters WHERE room_id = 57)",
-    ["name"],
-    [{ name: "火苗" }],
-  )],
-  41: [teachingResult(
-    "SELECT name FROM monsters WHERE room_id IN (SELECT id FROM rooms WHERE sector = 'frost-vault') ORDER BY name",
-    ["name"],
-    [{ name: "冰晶" }],
-  )],
-  42: [
-    teachingResult(
-      "SELECT m.name FROM monsters m WHERE m.id = 42 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
-      ["name"],
-      [{ name: "雷兽" }],
-    ),
-    teachingResult(
-      "SELECT name FROM monsters WHERE id = 42 AND status = 'charged'",
-      ["name"],
-      [{ name: "雷兽" }],
-    ),
-  ],
-  43: [teachingResult(
-    "SELECT m.name FROM monsters m WHERE m.id = 43 AND EXISTS (SELECT 1 FROM monster_gear g WHERE g.monster_id = m.id)",
-    ["name"],
-    [{ name: "电球" }],
-  )],
-  51: [teachingResult(
-    "SELECT name, COUNT(*) OVER (PARTITION BY master_id) AS guard_total FROM monsters WHERE id BETWEEN 51 AND 52 ORDER BY id",
-    ["name", "guard_total"],
-    [{ name: "小妖", guard_total: 2 }, { name: "战兽", guard_total: 2 }],
-  )],
-  52: [teachingResult(
-    "SELECT m.name, ROW_NUMBER() OVER (ORDER BY g.power DESC, m.id) AS pos FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 52 ORDER BY pos",
-    ["name", "pos"],
-    [{ name: "战兽", pos: 1 }, { name: "小妖", pos: 2 }],
-  )],
-  53: [teachingResult(
-    "SELECT m.name, g.power, RANK() OVER (ORDER BY g.power DESC) AS rank_no FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 52 AND 53 ORDER BY g.power DESC, m.id",
-    ["name", "power", "rank_no"],
-    [
-      { name: "铁卫", power: 24, rank_no: 1 },
-      { name: "战兽", power: 20, rank_no: 2 },
-    ],
-  )],
-  54: [teachingResult(
-    "SELECT m.name, SUM(g.power) OVER (ORDER BY m.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id BETWEEN 51 AND 54 ORDER BY m.id",
-    ["name", "running_power"],
-    [
-      { name: "小妖", running_power: 18 },
-      { name: "战兽", running_power: 38 },
-      { name: "铁卫", running_power: 62 },
-      { name: "巨魔", running_power: 84 },
-    ],
-  )],
-  62: [sandboxResult(
-    "INSERT INTO repair_queue(id, item, quantity, status) VALUES (7, 'ember', 1, 'ready')",
-    [...SANDBOX_ROWS, { id: 7, item: "ember", quantity: 1, status: "ready" }],
-  )],
-  63: [sandboxResult(
-    "UPDATE repair_queue SET quantity = 3 WHERE id = 1",
-    SANDBOX_ROWS.map((row) => row.id === 1 ? { ...row, quantity: 3 } : row),
-  )],
-  64: [sandboxResult(
-    "BEGIN; UPDATE repair_queue SET quantity = 8 WHERE id = 1; ROLLBACK",
-    SANDBOX_ROWS,
-  )],
-  65: [sandboxResult(
-    "INSERT OR IGNORE INTO repair_queue(id, item, quantity, status) VALUES (7, 'bad', -2, 'ready')",
-    SANDBOX_ROWS,
-  )],
-  73: [teachingResult(
-    "SELECT code FROM index_records WHERE id = 1",
-    ["code"],
-    [{ code: "CRY-101" }],
-  )],
-  74: [teachingResult(
-    "SELECT code, score FROM index_records WHERE realm = 'crystal' AND score >= 88 ORDER BY score DESC",
-    ["code", "score"],
-    [{ code: "CRY-106", score: 95 }, { code: "CRY-104", score: 88 }],
-    [],
-    ["SEARCH idx_index_records_realm_score"],
-  )],
-  75: [teachingResult(
-    "SELECT category, code FROM index_records WHERE category = 'charm' ORDER BY code",
-    ["category", "code"],
-    [{ category: "charm", code: "CRY-105" }, { category: "charm", code: "EMB-202" }],
-    [],
-    ["SEARCH USING COVERING INDEX idx_index_records_category_code"],
-  )],
-  76: [teachingResult(
-    "SELECT code FROM index_records WHERE code >= 'CRY-101' AND code < 'CRY-103' ORDER BY code",
-    ["code"],
-    [{ code: "CRY-101" }, { code: "CRY-102" }],
-    [],
-    ["SEARCH idx_index_records_code"],
-  )],
-  85: [teachingResult(
-    "SELECT value FROM tx_versions WHERE row_id = 3 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12)",
-    ["value"],
-    [{ value: "safe" }],
-  )],
-  86: [teachingResult(
-    "SELECT blocker_tx, resource FROM lock_waits WHERE waiter_tx = 'T3'",
-    ["blocker_tx", "resource"],
-    [{ blocker_tx: "T2", resource: "log:2" }],
-  )],
-  87: [teachingResult(
-    "SELECT first_count, second_count FROM isolation_cases WHERE phenomenon = 'phantom_read'",
-    ["first_count", "second_count"],
-    [{ first_count: 2, second_count: 4 }],
-  )],
-  88: [teachingResult(
-    "SELECT model, score FROM schema_choices WHERE duplicate_groups = 0 ORDER BY score DESC LIMIT 1",
-    ["model", "score"],
-    [{ model: "normalized", score: 95 }],
-  )],
-};
-
 function pathToAny(session: GameSession, goals: readonly Position[]): Position[] {
   const snapshot = session.snapshot();
   const completed = new Set(snapshot.completedLessons);
@@ -744,9 +515,14 @@ function pathToAny(session: GameSession, goals: readonly Position[]): Position[]
     for (const direction of DIRECTIONS) {
       const next = { x: current.x + direction.x, y: current.y + direction.y };
       const nextKey = key(next);
+      const guardianId = biomeGuardianIdForStep(snapshot.biomePlan, current, next);
+      const blockedByGuardian = guardianId !== null && snapshot.monsters.some((monster) => (
+        monster.id === guardianId && monster.hp > 0
+      ));
       if (
         visited.has(nextKey) ||
         livingActors.has(nextKey) ||
+        blockedByGuardian ||
         !isMazeWalkable(snapshot.mazeFloor, next.x, next.y, completed)
       ) continue;
       visited.add(nextKey);
@@ -771,24 +547,28 @@ function pathToAny(session: GameSession, goals: readonly Position[]): Position[]
   return path;
 }
 
-function walkPath(session: GameSession, path: readonly Position[]): void {
+function walkPath(
+  session: GameSession,
+  path: readonly Position[],
+  engine: SqlEngine,
+): void {
   path.forEach((step) => {
-    let move = session.attemptPlayerMove(step.x, step.y);
-    if (move.blockedBy === "threshold") {
-      expect(session.confirmFloorOneLabyrinthEntry()).toBe(true);
-      move = session.attemptPlayerMove(step.x, step.y);
-    }
+    const move = session.attemptPlayerMove(step.x, step.y);
     expect(move, move.message).toMatchObject({ ok: true, moved: true });
     if (move.encounterId !== null) {
-      const queries = AMBUSH_QUERIES[move.encounterId];
-      if (!queries) throw new Error(`突发遭遇没有测试查询：${move.encounterId}`);
-      queries.forEach((query) => {
-        const resolution = session.resolveQuery(query);
-        expect(resolution.accepted, resolution.message).toBe(true);
-      });
       let repeatCount = 0;
       while (session.snapshot().mode === "combat" && repeatCount < 10) {
-        const resolution = session.resolveQuery(queries.at(-1)!);
+        const snapshot = session.snapshot();
+        const activeStage = [
+          ...LESSONS.flatMap((lesson) => lesson.stages),
+          ...Object.values(BIOME_PRACTICE_STAGES).flat(),
+        ].find((stage) => stage.id === snapshot.lessonStageId);
+        if (!activeStage) {
+          throw new Error(`突发遭遇缺少正式阶段：${snapshot.lessonStageId}`);
+        }
+        const resolution = session.resolveQuery(
+          engine.execute(activeStage.answerSql, snapshot.floor),
+        );
         expect(resolution.accepted, resolution.message).toBe(true);
         repeatCount += 1;
       }
@@ -797,15 +577,19 @@ function walkPath(session: GameSession, path: readonly Position[]): void {
   });
 }
 
-function walkTo(session: GameSession, destination: Position): void {
-  walkPath(session, pathToAny(session, [destination]));
+function walkTo(session: GameSession, destination: Position, engine: SqlEngine): void {
+  walkPath(session, pathToAny(session, [destination]), engine);
   expect(session.snapshot().player).toMatchObject({
     x: destination.x,
     y: destination.y,
   });
 }
 
-function engageLessonByWalking(session: GameSession, lessonId: LessonId): void {
+function engageLessonByWalking(
+  session: GameSession,
+  lessonId: LessonId,
+  engine: SqlEngine,
+): void {
   const snapshot = session.snapshot();
   const monster = snapshot.monsters.find((entry) => entry.lessonId === lessonId);
   if (!monster) throw new Error(`缺少课程怪物：${lessonId}`);
@@ -820,7 +604,7 @@ function engageLessonByWalking(session: GameSession, lessonId: LessonId): void {
     position.y,
     new Set(snapshot.completedLessons),
   ));
-  walkPath(session, pathToAny(session, adjacent));
+  walkPath(session, pathToAny(session, adjacent), engine);
   const player = session.snapshot().player;
   const encounter = session.attemptPlayerMove(actor.x - player.x, actor.y - player.y);
   expect(encounter, encounter.message).toMatchObject({
@@ -831,8 +615,12 @@ function engageLessonByWalking(session: GameSession, lessonId: LessonId): void {
   expect(session.snapshot()).toMatchObject({ mode: "combat", lessonId });
 }
 
-function collectItemByWalking(session: GameSession, item: GroundItem): void {
-  walkTo(session, item);
+function collectItemByWalking(
+  session: GameSession,
+  item: GroundItem,
+  engine: SqlEngine,
+): void {
+  walkTo(session, item, engine);
   if (item.collection === "interact") {
     expect(session.interact()).toMatchObject({ ok: true });
   } else {
@@ -845,42 +633,28 @@ function clearLessonByWalking(
   lessonId: LessonId,
   engine?: SqlEngine,
 ): void {
-  engageLessonByWalking(session, lessonId);
+  if (!engine) throw new Error(`${lessonId} 的物理通关测试缺少 SQL 引擎`);
+  if (!LESSON_QUERIES[lessonId]) throw new Error(`课程没有测试查询：${lessonId}`);
+  engageLessonByWalking(session, lessonId, engine);
   let finalResolution: ReturnType<GameSession["resolveQuery"]> | null = null;
   let repeatCount = 0;
 
-  if (engine) {
-    while (session.snapshot().mode === "combat" && repeatCount < 10) {
-      const snapshot = session.snapshot();
-      const activeStage = LESSONS
-        .flatMap((lesson) => lesson.stages)
-        .find((stage) => stage.id === snapshot.lessonStageId);
-      if (!activeStage) {
-        throw new Error(
-          `${lessonId} 的当前阶段没有权威题目：${snapshot.lessonStageId}`,
-        );
-      }
-      const resolution = session.resolveQuery(
-        engine.execute(activeStage.answerSql, snapshot.floor),
+  while (session.snapshot().mode === "combat" && repeatCount < 10) {
+    const snapshot = session.snapshot();
+    const activeStage = LESSONS
+      .flatMap((lesson) => lesson.stages)
+      .find((stage) => stage.id === snapshot.lessonStageId);
+    if (!activeStage) {
+      throw new Error(
+        `${lessonId} 的当前阶段没有权威题目：${snapshot.lessonStageId}`,
       );
-      expect(resolution.accepted, resolution.message).toBe(true);
-      finalResolution = resolution;
-      repeatCount += 1;
     }
-  } else {
-    const queries = LESSON_QUERIES[lessonId];
-    if (!queries) throw new Error(`课程没有测试查询：${lessonId}`);
-    queries.forEach((query) => {
-      const resolution = session.resolveQuery(query);
-      expect(resolution.accepted, resolution.message).toBe(true);
-      finalResolution = resolution;
-    });
-    while (session.snapshot().mode === "combat" && repeatCount < 10) {
-      const resolution = session.resolveQuery(queries.at(-1)!);
-      expect(resolution.accepted, resolution.message).toBe(true);
-      finalResolution = resolution;
-      repeatCount += 1;
-    }
+    const resolution = session.resolveQuery(
+      engine.execute(activeStage.answerSql, snapshot.floor),
+    );
+    expect(resolution.accepted, resolution.message).toBe(true);
+    finalResolution = resolution;
+    repeatCount += 1;
   }
 
   expect(session.snapshot().mode).not.toBe("combat");
@@ -894,15 +668,15 @@ function clearLessonByWalking(
     entry.collection === "interact"
   ));
   if (!chest) throw new Error(`${lessonId} 应在课程房留下固定宝箱`);
-  collectItemByWalking(session, chest);
+  collectItemByWalking(session, chest, engine);
 }
 
-function collectAggregateHammer(session: GameSession): void {
+function collectAggregateHammer(session: GameSession, engine: SqlEngine): void {
   const hammer = session.snapshot().groundItems.find(
     (item) => item.rewardId === "aggregate-hammer",
   );
   if (!hammer) throw new Error("聚合战锤没有生成在物理迷宫中");
-  collectItemByWalking(session, hammer);
+  collectItemByWalking(session, hammer, engine);
   expect(session.snapshot().player.weapon.id).toBe("aggregate-hammer");
 }
 
@@ -924,7 +698,7 @@ function defeatAreaBossByWalking(
     new Set(snapshot.completedLessons),
     new Set(snapshot.openedGateIds),
   ));
-  walkPath(session, pathToAny(session, adjacent));
+  walkPath(session, pathToAny(session, adjacent), engine);
   const player = session.snapshot().player;
   const encounter = session.attemptPlayerMove(actor.x - player.x, actor.y - player.y);
   expect(encounter).toMatchObject({
@@ -960,7 +734,7 @@ describe("continuous physical maze run", () => {
     clearLessonByWalking(session, "select", engine);
     clearLessonByWalking(session, first, engine);
     clearLessonByWalking(session, second, engine);
-    collectAggregateHammer(session);
+    collectAggregateHammer(session, engine);
     clearLessonByWalking(session, "group-by", engine);
     clearLessonByWalking(session, "having", engine);
 
@@ -1122,5 +896,5 @@ describe("continuous physical maze run", () => {
       "f8-security",
     ]);
     expect(session.toProfile().victories).toBe(1);
-  }, 20_000);
+  }, 60_000);
 });

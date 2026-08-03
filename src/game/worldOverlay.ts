@@ -1,7 +1,8 @@
 import type { GameSnapshot, LessonId, Position } from "../domain/types";
+import { WORLD_UI_RUNTIME_CONFIG } from "../config/runtimeConfig";
 
-export const INTERACTION_LABEL_DISTANCE = 1;
-export const MONSTER_LABEL_DISTANCE = 2;
+export const INTERACTION_LABEL_DISTANCE = WORLD_UI_RUNTIME_CONFIG.interactionLabelDistance;
+export const MONSTER_LABEL_DISTANCE = WORLD_UI_RUNTIME_CONFIG.monsterLabelDistance;
 export const OBJECTIVE_HIDE_DISTANCE = MONSTER_LABEL_DISTANCE;
 
 export interface TutorialObjective {

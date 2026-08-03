@@ -73,6 +73,13 @@ describe("generateRoomGraph", () => {
     );
   });
 
+  it("第一层只生成一把过滤弓，WHERE 不再重复装备", () => {
+    const graph = generateRoomGraph("unique-filter-bow");
+    expect(graph.nodes.find((node) => node.lessonId === "select")?.reward).toBe("filter-rune");
+    expect(graph.nodes.find((node) => node.lessonId === "where")?.reward).toBe("cool-8-heat");
+    expect(graph.nodes.filter((node) => node.reward === "filter-rune")).toHaveLength(1);
+  });
+
   it("第二层使用独立课程图并按顺序解锁 JOIN 综合 Boss", () => {
     const graph = generateRoomGraph("curriculum-safe", 2);
     expect(graph).toMatchObject({ floor: 2, version: 2 });

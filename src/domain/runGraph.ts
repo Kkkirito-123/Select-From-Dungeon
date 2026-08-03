@@ -325,7 +325,7 @@ function generateFloorOneGraph(rawSeed: string): RoomGraph {
       required: true,
       lessonId: "where",
       prerequisiteLessons: ["select"],
-      reward: "filter-rune",
+      reward: "cool-8-heat",
       next: [HUB_ID],
     }),
     room({

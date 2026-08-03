@@ -14,10 +14,11 @@ import type {
 } from "../content/biomeContent";
 import type { BiomePlan } from "./biome";
 import type { FloorHazard } from "./floorLabyrinth";
+import { STORAGE_RUNTIME_CONFIG } from "../config/runtimeConfig";
 
 export type LessonId = RunLessonId;
 
-export type LessonStageId =
+export type AuthoredLessonStageId =
   | "select-name"
   | "select-weakness"
   | "where-target"
@@ -137,6 +138,8 @@ export type LessonStageId =
   | "practice-golem"
   | "throne-boss-scan"
   | "throne-boss-core";
+
+export type LessonStageId = AuthoredLessonStageId | `question:${string}`;
 
 export type PlayMode =
   | "explore"
@@ -394,6 +397,17 @@ export interface PlayerState extends Position {
 
 export interface LessonStageDefinition {
   id: LessonStageId;
+  evaluationStageId?: AuthoredLessonStageId;
+  questionId?: string;
+  questionLessonId?: LessonId;
+  questionExpectation?: {
+    columns: string[];
+    rows: unknown[][];
+    rowsOrdered: boolean;
+    planInclude: string[];
+    planExclude: string[];
+    flatSelect: boolean;
+  };
   objective: string;
   queryTemplate: string;
   answerSql: string;
@@ -506,7 +520,7 @@ export type AnswerResult =
 
 export type BattleOutcome = "hit" | "countered" | "victory" | "defeat";
 
-export const MAX_ANSWER_HISTORY = 200;
+export const MAX_ANSWER_HISTORY = STORAGE_RUNTIME_CONFIG.maxAnswerHistory;
 
 export interface AnswerAttemptRecord {
   id: number;
@@ -524,9 +538,12 @@ export interface AnswerAttemptRecord {
   outcome: BattleOutcome;
   feedback: string;
   hintLevel: number;
+  questionId?: string;
 }
 
 export interface GameSnapshot {
+  runInstanceId: string;
+  questionBankVersion: string;
   mode: PlayMode;
   adminMode: boolean;
   adminPanelOpen: boolean;
@@ -582,6 +599,15 @@ export interface GameSnapshot {
   totalMoves: number;
   stepsSinceEncounter: number;
   safeStepsRemaining: number;
+  navigationGuidance: {
+    objectiveRoomId: string | null;
+    objectiveTitle: string | null;
+    steps: number;
+    level: 0 | 1 | 2 | 3;
+    direction: "north" | "east" | "south" | "west" | null;
+    distance: number | null;
+    route: Position[];
+  };
   hintLevel: number;
   battleReview: AnswerAttemptRecord[];
   floorReview: AnswerAttemptRecord[];
@@ -598,8 +624,24 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 11;
-  generatorVersion: 4 | 5;
+  version: 12;
+  generatorVersion: 4 | 5 | 6 | 7;
+  runInstanceId: string;
+  questionBankVersion: string;
+  practiceDrawCursor: number;
+  practiceDrawCycle: number;
+  /** v12 增量字段：三个难度牌组分别保存游标；缺失时按旧 L1 状态恢复。 */
+  practiceDrawStates?: {
+    L1: { cursor: number; cycle: number };
+    L2: { cursor: number; cycle: number };
+    L3: { cursor: number; cycle: number };
+  };
+  activePracticeMonsterId: number | null;
+  activePracticeQuestionIds: string[];
+  rewardedPracticeMonsterIds: number[];
+  guidanceObjectiveId: string | null;
+  guidanceSteps: number;
+  guidanceLevel: 0 | 1 | 2 | 3;
   campaign: CampaignProgress;
   floor: FloorNumber;
   graph: RoomGraph;
@@ -649,7 +691,7 @@ export interface MoveResolution {
   to: Position;
   encounterId: number | null;
   pickedItemIds: string[];
-  blockedBy: "none" | "wall" | "gate" | "campfire" | "threshold" | "mode";
+  blockedBy: "none" | "wall" | "gate" | "campfire" | "mode";
   hazard: {
     id: string;
     name: string;

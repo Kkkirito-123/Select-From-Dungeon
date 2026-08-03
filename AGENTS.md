@@ -30,11 +30,12 @@ working here, then read the closest nested `AGENTS.md` if one is added later.
 ## Product and Users
 
 `SQL 魔王城 / SELECT * FROM DUNGEON` is a Chinese browser roguelite for SQL
-beginners and interview learners. The MVP 2.0 Run has eight deterministic
-`48x36` generator-v5 maps. Each floor uses an authored macro silhouette, stable
-room slots, 2–4 tile-wide roads, three regions, physical transit landmarks, and
-seeded non-critical variation. Generator-v4 `64x48` maps are a legacy save
-compatibility path, not the new-Run layout. Players reveal the
+beginners and interview learners. New Runs use one canonical set of eight
+deterministic `56x42` generator-v7 maps; players cannot enter or reroll a map
+seed. Each floor distributes its authored rooms across the compact map, with a
+DFS labyrinth, about 15% loops, three regions, and physical transit landmarks.
+Generator-v6 `96x72`, generator-v5
+`48x36`, and generator-v4 `64x48` maps remain legacy save compatibility paths. Players reveal the
 non-interactive minimap by physically walking the maze. Curriculum monsters
 show only a stable `ID #NNN` until defeated; the finishing blow recovers the
 plain display name into the permanent Monster Codex. Moving into a living
@@ -53,12 +54,15 @@ encounter after 30 eligible quiet steps; reloads do not reroll the result.
 Each floor contains two seeded physical campfires in the middle and rear
 learning phases; the entrance remains the front safe/respawn anchor. The same
 seed also derives main-course route
-beacons, one-use supplies in every remaining dead end, and one guaranteed-key
-two-way shortcut. Route points stay at most 18 walking steps apart; the key sits
-in the middle or rear phase, does not consume inventory capacity, and never
-depends on random loot. The player must physically reach the key, then press
-`E` beside the shortcut to open it permanently and travel through it, so the
-shortcut reduces repeat walking without bypassing required SQL.
+beacons, one-use supplies in every remaining dead end, and three guaranteed-key
+two-way shortcuts serving the front, middle, and rear phases. Route points stay
+at most 18 walking steps apart; keys do not consume inventory capacity and never
+depend on random loot. The player must physically reach each key, then press `E`
+beside its shortcut to open and use it; shortcuts reduce repeat walking without
+bypassing required SQL or a living region Boss. If the next fixed objective is
+not reached after 40 successful steps, guidance shows direction and distance;
+at 60 it highlights up to 24 route cells, and at 100 it starts a cancellable
+step-by-step escort that does not teleport or trigger ambushes.
 Campfire visible safe zones, plus the entrance
 zone, suppress ambushes and patrol entry. Pressing `E` beside a campfire offers
 `在此休息` and `答案复盘`; resting restores maximum HP and makes that fire the
@@ -76,12 +80,24 @@ minimum count; course rewards, explicit chests, and keys stay deterministic.
 Full bags require explicit replacement, ordinary discards remain
 recoverable on the current floor, and protected base/course/key items cannot be
 discarded.
-Every campfire also renders the Scribe. Her recap is built only from local
-floor-answer evidence. Five short narrative beats and two fixed Lost Name
-evidence entries per floor unlock from existing Run progress; the local
-`失名录` distinguishes unknown, confirmed `NULL`, and actual values. The eighth
-floor resolves the sole MVP 2.0 ending, `MIGRATE`; no Agent, account, backend,
-or network log is used.
+Campfires and the Scribe are separate consumers. A physical campfire always
+handles rest/checkpoint actions, but its learning recap stays unavailable until
+the current-floor elite is defeated. After that Hook, the campfire renders an
+immediate deterministic recap from bounded current-floor evidence; its review
+button is disabled before the Hook. Each floor also has one physical Scribe.
+Her short output-only response is prepared by four semantic hooks: floor start,
+route-guidance escalation, elite defeat, and floor end. The opening, route, and
+ending hooks supply direction or closure; ordinary movement, patrols, hints, and
+render frames do not call a model. The browser always has a local fallback.
+After explicit consent, a player may enter a DeepSeek API Key into the password
+field; a dedicated Worker keeps it only in tab memory and sends bounded evidence
+directly to `https://api.deepseek.com`. A strictly validated DeepSeek response
+may replace only the Scribe wording. There is no player prompt box and Agent
+output cannot mutate gameplay. Five short narrative
+beats and two fixed Lost Name evidence entries per floor still unlock from
+existing Run progress; the local `失名录` distinguishes unknown, confirmed
+`NULL`, and actual values. The eighth floor resolves the sole MVP 2.0 ending,
+`MIGRATE`; no account, server game database, or remote game log is used.
 Floors one through eight each contain exactly one optional physical hidden room:
 the first-floor sealed archive opens after `WHERE / IS NULL`, and the
 second-floor wreck ledger opens after `ORDER BY / LIMIT / DISTINCT`. Floor
@@ -103,8 +119,12 @@ one armor-first damage and never grants mastery, XP, or loot.
 The top-console `答题复盘` view reads a browser-local answer log for the latest
 battle and current floor. Each record contains the submitted SQL, explicit
 reference SQL, result category, hint level, and battle outcome. The log is
-capped at 200 SQL turns, never records movement or key presses, and is never
-uploaded.
+capped at 200 SQL turns and never records movement or key presses. The complete
+log remains browser-local. When browser BYOK is explicitly enabled, a projection
+of at most eight current-floor attempts is sent directly from the browser to
+DeepSeek; the Agent projection contains SQL feature tags and result categories,
+not raw submitted or reference SQL, and is never proxied through the project
+server.
 Authored monster display names stay direct and easy to type: two or three
 Chinese characters such as `史莱姆`, `水胶怪`, or `幼龙`, without middle-dot
 epithets or SQL-concept suffixes. New content must follow the same rule; SQL
@@ -131,33 +151,36 @@ These actors never enter entrance or campfire safe zones and do not gate
 curriculum completion.
 Each floor also has one validated labyrinth contract that binds its unique maze
 name and topology signature to stable entry, exit, Boss-gate, return-shortcut,
-hidden-room, safe-room, sight-radius, and physical-hazard intent. The first move
-from an authored safe room into the hostile maze opens that floor's threshold
-confirmation; confirming it does not lock the return route. Authored entry/rest
-rooms and seeded campfire rings reveal their complete safe area and reject
+hidden-room, safe-room, sight-radius, and physical-hazard intent. Players walk
+directly from authored safe rooms into the hostile maze; no invisible threshold
+or confirmation wall may block an otherwise walkable tile. Authored entry/rest
+rooms and deterministic campfire rings reveal their complete safe area and reject
 ambushes, patrols, curriculum actors, area Bosses, and hazards. Outside them,
 current actor visibility uses the floor-specific local radius. Each floor's
 seed deterministically places its own visible, one-use physical hazards away
 from rooms, anchors, gates, transport, guided-map interests, and safe cells;
 triggering one applies its authored armor-first damage without starting SQL
 combat, then records the stable hazard ID in `openedGateIds` as inert. Floors
-two through eight additionally enforce the living middle area Boss as a hard
-movement boundary into the rear region; the portal requirement is not merely
-presentation metadata.
+two through eight keep adjacent maze walking free of abstract region collision:
+the living middle area Boss instead locks the visible middle-to-rear transit
+and any cross-region shortcut. Room prerequisite gates still prevent curriculum
+bypass.
 Floors one through eight have authored runtime experience definitions:
 stable landmarks, physical hidden-room entrances, derived world-state changes,
 one physical SQL cipher, story triggers, Scribe placement, and admin presets.
 Floor three makes JOIN
 relationships visible through a bone bridge, paired steles, a relic chain, and
 preserved witnesses. Floor four uses fire, frost, and storm regions; its middle
-Boss `ID #044` blocks the rear region and reveals the optional first-floor ember
+Boss `ID #044` guards the visible rear transit and reveals the optional first-floor ember
 echo after defeat. The echo is an in-floor memory space, not a floor transition
 or a second copy of first-floor progress.
 
-The current product deliberately does not include AI generation, accounts,
-leaderboards, multiplayer, a server database, or a faithful MySQL
-optimizer/InnoDB runtime. The seed randomizes the physical maze,
-non-critical room rewards, and optional loot, but not required SQL data,
+The current product deliberately does not include free-form AI chat,
+AI-authored curriculum or gameplay state, accounts, leaderboards, multiplayer,
+a server game database, or a faithful MySQL optimizer/InnoDB runtime. The
+optional output-only Scribe adapter is read-only and never gates play. A fixed
+internal world key rebuilds the canonical physical maze; stable hashes may still
+vary non-critical rewards and optional loot, but not required SQL data,
 prerequisite lessons, or key weapons. The first floor teaches `SELECT` through
 `HAVING`; the harder second floor teaches `ORDER BY / LIMIT`, `DISTINCT`,
 `INNER JOIN`, `LEFT JOIN`, and a composite `JOIN` query. Floor three adds inner,
@@ -175,6 +198,10 @@ complete SQL or MySQL interview curriculum.
 index.html -> src/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
+  -> agent/runtime (bounded evidence, deterministic campfire, cache, coordination)
+  -> agent/browser (DeepSeek memory-only Worker, strict Scribe output, settings UI)
+  -> agent/src Python output service (default loopback, optional OpenZLAgent provider)
+  -> QuestionBankLoader/LearningLedger (verified SQLite content + IndexedDB evidence)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
   -> FloorContracts (eight-floor curriculum, encounter, theme, and loot schema)
@@ -184,11 +211,11 @@ index.html -> src/main.ts
   -> FloorMapBlueprints (eight authored macro layouts and transit identities)
   -> FloorLabyrinthContent (stable F1-F8 navigation, safe-room, sight, and hazard contracts)
   -> FloorExperience (authored F1-F8 landmarks, hidden rooms, SQL ciphers, story, world states)
-  -> MazeGenerator/MazeValidation (deterministic 48x36 generator-v5 world)
+  -> MazeGenerator/MazeValidation (canonical deterministic 56x42 generator-v7 world)
   -> CampfireDomain (two seeded checkpoints, entrance anchor, safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
   -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
-  -> FloorLabyrinthDomain (thresholds, local sight, safe-area resolution, seeded hazards)
+  -> FloorLabyrinthDomain (local sight, safe-area resolution, deterministic hazards)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates and same-battle deduplication)
@@ -207,7 +234,9 @@ player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
-  -> coalesced v11 Run save + permanent v3 profile save
+  -> coalesced v12 Run save + permanent v3 profile save + IndexedDB learning ledger
+meaningful snapshot -> bounded current-floor evidence -> local prepared output
+  -> independent output cache -> optional direct DeepSeek Worker -> current-hash validation
 ```
 
 `GameSession` owns physical movement, campfires/checkpoints, guided-map
@@ -224,6 +253,20 @@ AppShell minimap is discovery evidence only and must never teleport the player.
 optional notice, `EncounterDirector` makes repeatable successful-step ambush
 decisions without rerolling on reload, and `OnboardingController` owns the
 separately persisted step-by-step tutorial.
+
+`agent/` owns all Agent code. `agent/runtime/` owns the semantic hooks, read-only evidence
+projection, stable evidence hash, deterministic campfire/Scribe fallback,
+independent output cache, and background coalescing. `agent/browser/` owns the
+DeepSeek-only BYOK Worker and settings UI. `agent/src/` remains a Python 3.11+
+controlled output service; it defaults to loopback and can use the optional
+OpenZLAgent provider without receiving a browser BYOK Key. The deployed BYOK
+path never sends keys through it. Tools, memory, MCP, gameplay writes, request
+logging, free prompts, and persisted provider credentials are forbidden.
+
+`src/config/` owns Chinese-commented runtime tuning values such as map size,
+encounter rates, navigation thresholds, storage limits, and DeepSeek defaults.
+It must never contain provider credentials. Content IDs, prose, SQL contracts,
+and save versions remain with their existing authorities.
 
 `src/content/sqlSchema.ts` owns the canonical field/type/nullability metadata,
 generated DDL, and teaching relationships for `monsters`, `monster_signals`,
@@ -268,7 +311,7 @@ is not serialized.
 `src/content/floorLabyrinth.ts` owns the stable eight-floor navigation contract;
 `src/domain/floorLabyrinth.ts` resolves that intent against the current saved
 `MazeFloor`, campfires, guided plan, and biome plan. It must not persist derived
-safe-cell, sight, hazard-position, or threshold-confirmation duplicates.
+safe-cell, sight, or hazard-position duplicates.
 `src/content/floorContracts.ts` owns campaign curriculum metadata and its
 serializable schema. Registered drift `AUTH-003` is closed by cross-authority
 tests, but this file is still not
@@ -289,7 +332,7 @@ boundaries:
 - Player-facing subregions map explicitly to the only physical navigation
   regions, `front`, `middle`, and `rear`; F2 may expose four display regions.
 - Monster IDs `1–89`, lesson/result, equipment, story/evidence, and `MIGRATE`
-  IDs plus Run v11/Profile v3 are compatibility keys and must not be renamed.
+  IDs plus Run v12/Profile v3 are compatibility keys and must not be renamed.
 - Before the finishing blow, every player-visible monster reference goes
   through `monsterIdentityPresentation` or `monsterIntentName`; admin reveal is
   memory-only and never updates the profile.
@@ -311,6 +354,8 @@ evaluation.
 ## Repository Map
 
 ```text
+agent/              Browser output-only Agent runtime/BYOK UI plus local Python evaluator
+src/config/          Chinese-commented runtime tuning parameters; no credentials
 src/audio/          Public-domain classical-theme electronic Web Audio score and SFX
 src/content/        Curriculum, SQL schema, map/actor/narrative truth, entities,
                     fixed weapons, rewards, and onboarding copy
@@ -320,7 +365,7 @@ src/feedback/       Semantic gameplay-event routing to notices and audio cues
 src/game/           Continuous-maze exploration, battle scene, and bootstrap
 src/runtime/        Page lifecycle coordination for rendering, audio, and saves
 src/sql/            SQLite WASM initialization, schema, execution, HP sync
-src/storage/        Versioned Run/profile validation, recovery, and write coalescing
+src/storage/        Run/profile validation plus question-bank and learning IndexedDB stores
 src/ui/             DOM shell, Lost Name codex, onboarding, and game orchestration
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
                     onboarding, and query policy
@@ -333,18 +378,22 @@ scripts/            Portable repository-rule validator and its regression tests
 dist/               Generated static build; ignored and never hand-edited
 ```
 
-There is no nested module guide because the repository is still small and uses
-one setup and quality gate.
+There is no nested module guide. Root rules govern every module, while
+`agent/README.md` owns the optional Python service setup and verification
+commands.
 
 ## Canonical Commands
 
-Requirements: Node.js `>=20.19` and pnpm `11.9.0`.
+Requirements: Node.js `>=20.19` and pnpm `11.9.0`; the optional Agent service
+requires Python `>=3.11`.
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm question-bank:build
 pnpm dev
 pnpm test
 pnpm build
+PYTHONPATH=agent/src python3 -m unittest discover -s agent/tests
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 ```
@@ -355,8 +404,15 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 
 ## Runtime and Safety Boundaries
 
-- SQL runs entirely in the browser through `sql.js`/SQLite WASM. No query or
-  gameplay data is sent to a backend.
+- SQL execution remains entirely in the browser through `sql.js`/SQLite WASM,
+  and Agent is disabled by default. With explicit consent, the browser may send
+  at most eight current-floor attempts with result categories, hint levels,
+  objectives, and derived SQL feature tags, plus bounded lesson, world-change,
+  relic, navigation, trigger, and unlocked-story evidence directly to DeepSeek.
+  Raw submitted/reference SQL is not in the Agent request. The Key exists only in a dedicated Worker's memory and
+  is never written to browser storage, logs, exports, URLs, telemetry, or the
+  project server. Refreshing or closing the tab removes it. The deployed CSP
+  allows only same-origin requests and `https://api.deepseek.com`.
 - The battle terminal accepts one read-only `SELECT` or `WITH` statement. DML, DDL, `PRAGMA`,
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.
@@ -377,23 +433,43 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - SQLite `EXPLAIN QUERY PLAN` drives the floor-seven/eight query-load teaching
   signal. It is SQLite evidence, not a MySQL execution plan. MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
+- `public/data/question-bank-v2.sqlite` is generated from authored TypeScript
+  stages and is never hand-edited. Its manifest pins the version, byte length,
+  SHA-256, and 960-question count. Every floor has 64 L1, 40 L2, and 16 L3
+  questions. On floors two through eight, L1 contains 40 current-floor plus 24
+  read-only review questions; L2 and L3 remain current-floor questions. Each
+  floor has 15 deterministic families with eight executable,
+  materially parameterized variants; generated rows, ordering, and floor-seven
+  plan evidence form the per-question grading contract. Empty-result exercises
+  must say so explicitly. Fixed curriculum monsters and floor Bosses keep their
+  authored stages; normal, mini-elite, and area-Boss practice encounters draw
+  one L1, two L2, and three L3 questions respectively.
+  New Runs pin the active bank version and draw deterministic no-repeat decks.
+  IndexedDB stores at most 5,000 full attempts plus permanent question/lesson
+  aggregates; export and explicit clearing never include an API Key.
 - Save data is browser-local and split between
-  `select-from-dungeon:run:v11` (eight-floor campaign slots plus current floor,
+  `select-from-dungeon:run:v12` (eight-floor campaign slots plus current floor,
   maze, actors, ground items, loot
   bundles, inventory, armor, consumables, unique-item history, key items, fog,
   two campfires, the entrance anchor, active checkpoint, encounter meter,
   level/XP, opened
   SQL cipher gates/shortcuts/dead-end caches/eight-floor hidden rooms,
   active gate challenge, at most 200
-  local answer records, and disposable current Run state),
+  local answer records, question-bank/deck state, first-reward practice state,
+  navigation guidance state, and disposable current Run state),
   `select-from-dungeon:profile:v3` (47 mastered lessons, recovered monster IDs,
   attempts, victories, and best query count), and
-  `select-from-dungeon:onboarding:v1` (finished/skipped guide state). A valid
-  `select-from-dungeon:run:v10` is migrated in memory into v11;
+  `select-from-dungeon:onboarding:v1` (finished/skipped guide state). Prepared
+  Agent output is stored separately under
+  `select-from-dungeon:agent-output:v2`; it contains only validated output and
+  bounded identity/hash metadata, never raw submitted or reference SQL, and is
+  not part of Run migration. A valid
+  `select-from-dungeon:run:v11` is migrated in memory into v12;
+  valid `run:v10` and `run:v9` are then migrated through the existing chain;
   valid `run:v8` is upgraded with deterministic eight-floor campaign slots, and `run:v7` is then
   migrated with empty inventory/loot state and acquired equipped gear
   registered; valid `run:v6`, `run:v5`, and `run:v4` data continue through the
-  existing migrations before v11. Legacy keys remain undeleted; older Run keys remain
+  existing migrations before v12. Legacy keys remain undeleted; older Run keys remain
   unread.
   Valid `select-from-dungeon:profile:v1` and `profile:v2` records migrate into
   v3; missing identity records start empty while existing learning counters are
@@ -401,8 +477,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   coalesces non-critical movement/patrol snapshots while flushing query, loot,
   inventory, mode, and topology changes immediately; changing a shape requires
   a version or recovery decision.
-- The labyrinth contract adds no save field and does not change
-  `select-from-dungeon:run:v11`. Generated hazard coordinates, safe-cell masks,
+- The labyrinth contract adds no separate save field. Generated hazard coordinates, safe-cell masks,
   and visibility are rebuilt from existing floor data; triggered hazard IDs
   reuse `openedGateIds`, while entry confirmation is reconstructed from the
   player's position, discovered cells, and visited rooms.
@@ -410,6 +485,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   are immediate recovery items only, with no rank-based minimum or loot bundle.
   Randomness must never block curriculum progress. Combat damage is
   deterministic so SQL targeting remains inspectable.
+- Ordinary and mini-elite random monsters draw one and two bank questions
+  respectively. They can be challenged again, but only their first victory in
+  the current Run awards XP or optional loot.
 - A new Run starts at two hearts. Normal, elite, and Boss victories award 1, 3,
   and 5 XP; area Bosses also award 3 XP. Cumulative level thresholds are
   `0, 2, 4, 6, 8, 14, 22, 32, 44, 58, 74, 92, 112`, and base maximum health is
@@ -428,10 +506,12 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   permanently changes the seal's visible state, and
   grants no mastery, attempts, XP, or loot. Wrong results and syntax errors deal
   one armor-first damage; empty input and `Escape` consume nothing.
-- New Runs use generator-v5 `48x36` `MazeFloor` records built from eight
-  authored macro blueprints; generator-v4 `64x48` records remain loadable for
-  legacy Run compatibility. Broad routes, stable room slots, and deterministic
-  local variation replace the old technical-partition maze. Players must walk through the
+- New Runs use one canonical generator-v7 `56x42` `MazeFloor` set that distributes the
+  authored rooms across the compact map with DFS carving and about 15% loops;
+  remote DFS branches outside the authored-room connection envelope are sealed
+  back into walls instead of forming an unused outer maze.
+  generator-v6 `96x72`, generator-v5 `48x36`, and generator-v4 `64x48` records remain loadable for legacy Run
+  compatibility. There is no player-facing seed input or map reroll. Players must walk through the
   continuous world; the discovery minimap is not a navigation control. Moving
   into the same tile as a living curriculum monster or triggering the
   successful-step encounter meter starts the separate battle scene. After its
@@ -441,8 +521,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   and reject patrol entry. Ordinary world monsters patrol slowly; the Boss
   remains anchored.
 - All eight floors resolve their independent labyrinth contract at runtime.
-  Crossing from an authored safe room into the maze requires one explicit
-  threshold confirmation for the current floor. Safe rooms and campfire rings
+  Players can cross every visibly open safe-room boundary directly; invisible
+  threshold confirmation walls are forbidden. Safe rooms and campfire rings
   expose their whole safe area; the hostile maze exposes only the current
   floor's local sight radius. Seeded physical hazards are visible only when both
   discovered and currently in sight, apply their configured one-time
@@ -452,9 +532,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - `GuidedMap` is derived deterministically from the curriculum graph, saved
   `MazeFloor`, and two campfires rather than duplicated in save data. Route
   beacons appear about every 14 steps with no gap above 18, and every remaining
-  corridor dead end contains a one-use supply. Each floor currently has exactly
-  one two-way shortcut and one guaranteed middle/rear key that consumes no
-  inventory slot. Opening requires both the key and the shortcut's course
+  corridor dead end contains a one-use supply. Generator-v6 floors have three
+  two-way shortcuts and three guaranteed keys that consume no inventory slot;
+  legacy floors retain one. Opening requires both the key and the shortcut's course
   prerequisites; opening, rest, and death never reroll or relock it.
 - Collecting a key on floors one through seven enters `transition` mode.
   AppShell displays the gold `FLOOR NN CLEARED / CONGRATULATIONS!!` feedback and calls
@@ -521,9 +601,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   material, not bundled commercial recordings. Do not add any third-party art,
   fonts, audio, or copied level text without a license review and attribution
   update.
-- Runtime dependencies are pinned in `package.json` and `pnpm-lock.yaml`.
-  Dependency changes remain approval-gated and require license, bundle, build,
-  and browser checks proportional to risk.
+- Browser runtime dependencies are pinned in `package.json` and
+  `pnpm-lock.yaml`; the optional OpenZLAgent source revision is pinned in
+  `agent/pyproject.toml`. Dependency changes remain approval-gated and require
+  license, bundle, build, and browser checks proportional to risk.
 - Never expose credentials, personal data, private endpoints, or sensitive local
   content in code, fixtures, logs, screenshots, manifests, or reports.
 

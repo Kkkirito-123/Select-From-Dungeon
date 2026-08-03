@@ -1,4 +1,10 @@
 import { ArcadeAudio } from "../audio/ArcadeAudio";
+import type { AgentContentSource } from "../../agent/runtime/AgentCoordinator";
+import { buildAgentPrepareRequest } from "../../agent/runtime/context";
+import {
+  buildLocalPreparedOutput,
+  scribeInspectionMessage,
+} from "../../agent/runtime/localFallback";
 import {
   NARRATIVE_ENDINGS,
   NARRATIVE_FLOORS,
@@ -15,7 +21,6 @@ import {
   floorExperience,
   hasFloorExperience,
 } from "../content/floorExperience";
-import { floorLabyrinth } from "../content/floorLabyrinth";
 import { floorCurrentSightCellKeys } from "../domain/floorLabyrinth";
 import type { OnboardingMilestone } from "../content/onboarding";
 import {
@@ -32,10 +37,7 @@ import {
   type SqlTableName,
 } from "../content/sqlSchema";
 import { GameSession, LEVEL_XP_THRESHOLDS } from "../domain/GameSession";
-import {
-  buildScribeRecap,
-  narrativeFloorFor,
-} from "../domain/narrative";
+import { narrativeFloorFor } from "../domain/narrative";
 import {
   FloorStoryMomentQueue,
   floorStoryInspectMomentForLandmark,
@@ -70,7 +72,6 @@ import type {
 import type { FeedbackDirector, FeedbackNotice } from "../feedback/FeedbackDirector";
 import type { BattleScene } from "../game/BattleScene";
 import { pickedItemsBetween } from "../game/snapshotFeedback";
-import { createRunSeed } from "../storage/localProgress";
 import type { SqlEngine } from "../sql/SqlEngine";
 import type { OnboardingController, OnboardingSnapshot } from "./OnboardingController";
 import { bindAppShellDom } from "./appShellDom";
@@ -580,10 +581,10 @@ export class AppShell {
   private unsubscribeSession: (() => void) | null = null;
   private unsubscribeFeedback: (() => void) | null = null;
   private unsubscribeOnboarding: (() => void) | null = null;
+  private unsubscribeAgent: (() => void) | null = null;
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
   private focusBeforeInspection: HTMLElement | null = null;
-  private pendingLabyrinthMove: { x: number; y: number } | null = null;
   private toastTimer: number | null = null;
   private terminalFocusTimer: number | null = null;
   private pickupShownAtMove: number | null = null;
@@ -617,6 +618,9 @@ export class AppShell {
     }>).detail;
     const message = detail?.message;
     if (typeof message === "string" && message.trim() !== "") {
+      const inspectionMessage = detail?.landmarkId?.startsWith("npc-scribe-f")
+        ? this.scribeMessage(message)
+        : message;
       if (typeof detail.landmarkId === "string") {
         const inspectMoment = floorStoryInspectMomentForLandmark({
           floor: this.lastSnapshot.floor,
@@ -629,41 +633,19 @@ export class AppShell {
         }, detail.landmarkId);
         if (inspectMoment) {
           this.activeNarrativeMoment = inspectMoment;
-          this.openStoryMoment(inspectMoment, this.lastSnapshot, message);
+          this.openStoryMoment(inspectMoment, this.lastSnapshot, inspectionMessage);
           return;
         }
       }
-      this.openInspection(message);
+      this.openInspection(inspectionMessage);
     }
-  };
-  private readonly labyrinthEntryHandler = (event: Event): void => {
-    const detail = (event as CustomEvent<{
-      dx?: number;
-      dy?: number;
-      message?: string;
-    }>).detail;
-    if (
-      typeof detail?.dx !== "number" ||
-      typeof detail.dy !== "number"
-    ) return;
-    this.pendingLabyrinthMove = { x: detail.dx, y: detail.dy };
-    const contract = floorLabyrinth(this.lastSnapshot.floor);
-    this.openRecordOverlay({
-      kicker: "THRESHOLD / 安全区边界",
-      title: `是否进入${contract.mazeName}？`,
-      body: detail.message ?? "迷宫内视野降低，怪物和伤害机关会开始活动。",
-      closeLabel: "ESC · 暂不进入",
-      kind: "labyrinth",
-    });
   };
   private readonly keydownHandler = (event: KeyboardEvent): void => {
     if (this.isInspectionOpen()) {
       if (isInspectionPrimaryKey(event)) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (this.inspectionOverlay.dataset.recordKind === "labyrinth") {
-          this.confirmLabyrinthEntry();
-        } else if (this.inspectionOverlay.dataset.recordKind === "migration") {
+        if (this.inspectionOverlay.dataset.recordKind === "migration") {
           this.advanceFinalMigration();
         } else {
           this.closeInspection();
@@ -730,6 +712,10 @@ export class AppShell {
     if (event.key === "Escape" && this.isTerminalOpen()) {
       event.preventDefault();
       this.closeTerminal();
+      return;
+    }
+    if (event.key === "Escape" && this.session.cancelGuidanceEscort()) {
+      event.preventDefault();
       return;
     }
     if (
@@ -862,6 +848,7 @@ export class AppShell {
     private readonly onboarding: OnboardingController,
     private readonly getBattleScene: () => BattleScene | null,
     initialRunSource: "new" | "restored" = "new",
+    private readonly agent: AgentContentSource | null = null,
   ) {
     this.narrativeBootstrapMode = initialRunSource;
     this.floorTransitionCoordinator = new FloorTransitionCoordinator({
@@ -944,11 +931,6 @@ export class AppShell {
       () => this.inspectionOverlay.dataset.recordKind === "migration"
         ? this.advanceFinalMigration()
         : this.closeInspection(),
-      listenerOptions,
-    );
-    requiredElement(this.root, "#confirm-labyrinth-entry").addEventListener(
-      "click",
-      () => this.confirmLabyrinthEntry(),
       listenerOptions,
     );
     requiredElement(this.root, "#cancel-gate-query").addEventListener(
@@ -1149,11 +1131,6 @@ export class AppShell {
     this.releaseAudioGesture = this.audio.armFirstGesture(window);
     window.addEventListener("dungeon:open-terminal", this.openTerminalHandler, listenerOptions);
     window.addEventListener("dungeon:inspection", this.inspectionHandler, listenerOptions);
-    window.addEventListener(
-      "dungeon:labyrinth-entry",
-      this.labyrinthEntryHandler,
-      listenerOptions,
-    );
     window.addEventListener("dungeon:milestone", this.milestoneHandler, listenerOptions);
     window.addEventListener("dungeon:patrol", this.patrolHandler, listenerOptions);
     window.addEventListener("keydown", this.keydownHandler, {
@@ -1168,6 +1145,11 @@ export class AppShell {
     this.unsubscribeOnboarding = this.onboarding.subscribe((snapshot) => {
       this.renderOnboarding(snapshot);
     });
+    this.unsubscribeAgent = this.agent?.subscribe(() => {
+      if (this.lastSnapshot && this.isCampfireMenuOpen()) {
+        this.renderCampfireMenu(this.lastSnapshot, false);
+      }
+    }) ?? null;
     this.unsubscribeSession = this.session.subscribe((snapshot) => this.render(snapshot));
   }
 
@@ -1178,6 +1160,8 @@ export class AppShell {
     this.unsubscribeFeedback = null;
     this.unsubscribeOnboarding?.();
     this.unsubscribeOnboarding = null;
+    this.unsubscribeAgent?.();
+    this.unsubscribeAgent = null;
     this.releaseAudioGesture?.();
     this.releaseAudioGesture = null;
     this.listenerController.abort();
@@ -1252,6 +1236,7 @@ export class AppShell {
         result = this.sql.execute(
           this.textarea.value,
           this.lastSnapshot?.floor ?? 1,
+          this.lastSnapshot?.lessonId,
         );
       } catch (error) {
         queryError = error;
@@ -1572,6 +1557,7 @@ export class AppShell {
     this.sql.reset(snapshot.monsters);
     this.getBattleScene()?.abortEncounter();
     this.clearQueryArtifacts();
+    if (this.isInspectionOpen()) this.closeInspection(false, false);
     this.resetAdminNarrativePresentation();
     this.renderAdminMenu(snapshot);
   }
@@ -2027,14 +2013,27 @@ export class AppShell {
         ? "中段篝火"
         : "后段篝火";
     requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
+    const reviewButton = requiredElement<HTMLButtonElement>(this.campfireMenu, "#review-at-campfire");
+    const recap = this.preparedAgentOutput(snapshot).campfire;
     requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
-      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；篝火只负责恢复、复活与打开复盘页。`;
-    const recap = buildScribeRecap(snapshot.floorReview);
-    const campfireBeat = narrativeFloorFor(snapshot.floor).beats.find(
-      (beat) => beat.kind === "campfire",
-    );
-    requiredElement(this.campfireMenu, "#scribe-recap").textContent =
-      `${campfireBeat?.lines[0] ?? "抄写员此前留下了本层事实。"} ${recap.summary}`;
+      `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；${recap.available ? "本层精英记录已解锁复盘。" : "击败本层精英后才会解锁复盘。"}`;
+    reviewButton.disabled = !recap.available;
+    requiredElement(this.campfireMenu, "#campfire-recap-headline").textContent =
+      recap.headline;
+    const facts = requiredElement(this.campfireMenu, "#campfire-recap-facts");
+    facts.replaceChildren(...recap.facts.map((fact) => {
+      const item = document.createElement("li");
+      item.textContent = fact;
+      item.classList.toggle("is-hint-fact", fact.includes("提示"));
+      return item;
+    }));
+    const focus = requiredElement(this.campfireMenu, "#campfire-recap-focus");
+    focus.hidden = recap.focusConcept === null;
+    focus.textContent = recap.focusConcept === null
+      ? ""
+      : `当前关注 · ${recap.focusConcept}`;
+    requiredElement(this.campfireMenu, "#campfire-recap-next").textContent =
+      `下一步 · ${recap.nextAction}`;
     if (entered && !this.isReviewOpen()) {
       requiredElement<HTMLButtonElement>(
         this.campfireMenu,
@@ -2045,6 +2044,20 @@ export class AppShell {
 
   private isCampfireMenuOpen(): boolean {
     return this.campfireMenu?.classList.contains("is-open") ?? false;
+  }
+
+  private preparedAgentOutput(snapshot: GameSnapshot) {
+    return this.agent?.preparedFor(snapshot)
+      ?? buildLocalPreparedOutput(buildAgentPrepareRequest(snapshot));
+  }
+
+  private scribeMessage(authoredMessage: string): string {
+    const prepared = this.preparedAgentOutput(this.lastSnapshot);
+    const route = authoredMessage.replace(/^抄写员：\s*/u, "");
+    return redactSnapshotMonsterIdentity(
+      `${scribeInspectionMessage(prepared.scribe)}\n\n当前路线\n${route}`,
+      this.lastSnapshot,
+    );
   }
 
   private renderNarrativeProgress(snapshot: GameSnapshot): void {
@@ -2297,7 +2310,7 @@ export class AppShell {
     title: string;
     body: string;
     closeLabel: string;
-    kind: "inspection" | "story" | "labyrinth" | "migration";
+    kind: "inspection" | "story" | "migration";
   }): void {
     if (!this.isInspectionOpen()) {
       this.focusBeforeInspection = document.activeElement instanceof HTMLElement
@@ -2311,47 +2324,13 @@ export class AppShell {
       this.inspectionOverlay,
       "#close-inspection",
     ).textContent = copy.closeLabel;
-    const confirmButton = requiredElement<HTMLButtonElement>(
-      this.inspectionOverlay,
-      "#confirm-labyrinth-entry",
-    );
-    confirmButton.hidden = copy.kind !== "labyrinth";
     this.inspectionOverlay.dataset.recordKind = copy.kind;
     this.hideNarrativeBeatCard();
     this.inspectionOverlay.hidden = false;
     this.inspectionOverlay.inert = false;
     this.inspectionOverlay.setAttribute("aria-hidden", "false");
     this.root.classList.add("inspection-active");
-    (copy.kind === "labyrinth"
-      ? confirmButton
-      : requiredElement<HTMLButtonElement>(this.inspectionOverlay, "#close-inspection")
-    ).focus({
-      preventScroll: true,
-    });
-  }
-
-  private confirmLabyrinthEntry(): void {
-    const direction = this.pendingLabyrinthMove;
-    if (!direction) return;
-    if (!this.session.confirmLabyrinthEntry()) {
-      this.closeInspection();
-      return;
-    }
-    this.pendingLabyrinthMove = null;
-    this.closeInspection(false);
-    const resolution = this.session.attemptPlayerMove(direction.x, direction.y);
-    if (resolution.ok && resolution.moved) {
-      this.feedback.dispatch({ type: "player-step" });
-      window.dispatchEvent(new CustomEvent("dungeon:milestone", {
-        detail: { type: "player-step" },
-      }));
-    } else if (!resolution.ok) {
-      this.showFeedbackNotice({
-        message: resolution.message,
-        tone: "info",
-      });
-    }
-    requiredElement<HTMLElement>(this.root, "#game-root").focus({
+    requiredElement<HTMLButtonElement>(this.inspectionOverlay, "#close-inspection").focus({
       preventScroll: true,
     });
   }
@@ -2376,7 +2355,6 @@ export class AppShell {
     this.inspectionOverlay.inert = true;
     this.inspectionOverlay.setAttribute("aria-hidden", "true");
     delete this.inspectionOverlay.dataset.recordKind;
-    this.pendingLabyrinthMove = null;
     this.activeNarrativeMoment = null;
     this.root.classList.remove("inspection-active");
     if (!returnFocus) {
@@ -2802,7 +2780,7 @@ export class AppShell {
 
   private reset(): void {
     if (this.lastSnapshot.adminMode) {
-      const message = "管理员预览不会覆盖正式 Run。刷新页面后再生成新迷宫。";
+      const message = "管理员预览不会覆盖正式 Run。刷新页面后回到正式固定地图。";
       requiredElement(this.root, "#banner").textContent = message;
       this.showFeedbackNotice({ message, tone: "info" });
       return;
@@ -2826,11 +2804,11 @@ export class AppShell {
       this.defeatRespawnTimer = null;
     }
     const battleScene = this.getBattleScene();
-    this.session.reset(createRunSeed());
+    this.session.reset();
     this.sql.reset(this.session.snapshot().monsters);
     battleScene?.abortEncounter();
     this.clearQueryArtifacts();
-    const message = "新迷宫已生成；永久 SQL 图鉴没有被删除。";
+    const message = "固定地图已重置；永久 SQL 图鉴没有被删除。";
     this.queryStatus.textContent = message;
     this.queryStatus.dataset.kind = "success";
     this.showFeedbackNotice({ message, tone: "success" });
@@ -2918,7 +2896,6 @@ export class AppShell {
       this.dismissTransientCards(snapshot);
     }
 
-    requiredElement(this.root, "#seed-value").textContent = snapshot.runSeed;
     requiredElement(this.root, "#floor-value").textContent =
       `${String(snapshot.floor).padStart(2, "0")} / 08`;
     const adminButton = requiredElement<HTMLButtonElement>(this.root, "#open-admin");
@@ -3672,11 +3649,23 @@ export class AppShell {
       paths.setAttribute("d", floorCommands.join(""));
       svg.append(paths);
     }
+    if (snapshot.navigationGuidance.route.length > 0) {
+      const guidancePath = document.createElementNS(SVG_NS, "path");
+      guidancePath.classList.add("minimap-guidance-route");
+      guidancePath.setAttribute("d", snapshot.navigationGuidance.route
+        .map((position) => `M${position.x} ${position.y}h1v1h-1z`)
+        .join(""));
+      svg.append(guidancePath);
+    }
     const revealedMarkers = snapshot.guidedMap.routeMarkers.filter(
       (marker) => discovered.has(`${marker.x}:${marker.y}`),
     ).length;
     requiredElement(this.root, "#map-explored").textContent =
-      `${floorCommands.length} 格 · ${revealedMarkers} 信标`;
+      `${floorCommands.length} 格 · ${revealedMarkers} 信标${
+        snapshot.navigationGuidance.level > 0
+          ? ` · 指路 L${snapshot.navigationGuidance.level}`
+          : ""
+      }`;
 
     floor.gates.forEach((gate) => {
       if (!discovered.has(`${gate.x}:${gate.y}`)) return;

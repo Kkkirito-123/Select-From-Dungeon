@@ -91,25 +91,20 @@ describe("第一层双岸失名迷宫", () => {
     }
   }, 20_000);
 
-  it("首次越过安全区边界先确认；确认后移动只触发一次陷阱伤害", () => {
+  it("安全区边界没有空气墙；进入后移动只触发一次陷阱伤害", () => {
     const session = new GameSession(null, null, "f1-entry-and-hazard");
     const exit = firstSafeExit(session.snapshot().mazeFloor);
     expect(session.setPlayerPosition(exit.from.x, exit.from.y)).toBe(true);
-    const blocked = session.attemptPlayerMove(
+    const entered = session.attemptPlayerMove(
       exit.to.x - exit.from.x,
       exit.to.y - exit.from.y,
     );
-    expect(blocked).toMatchObject({
-      ok: false,
-      moved: false,
-      blockedBy: "threshold",
+    expect(entered).toMatchObject({
+      ok: true,
+      moved: true,
+      blockedBy: "none",
       hazard: null,
     });
-    expect(session.confirmFloorOneLabyrinthEntry()).toBe(true);
-    expect(session.attemptPlayerMove(
-      exit.to.x - exit.from.x,
-      exit.to.y - exit.from.y,
-    )).toMatchObject({ ok: true, moved: true, blockedBy: "none" });
     expect(session.snapshot().player).toMatchObject(exit.to);
     expect(floorOneAreaAt(session.snapshot().mazeFloor, session.snapshot().player))
       .toBe("labyrinth");
