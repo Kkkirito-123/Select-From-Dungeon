@@ -8,6 +8,7 @@
   },
   "packageManager": "pnpm@11.9.0",
   "scripts": {
+    "question-bank:build": "node scripts/build-question-bank.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",

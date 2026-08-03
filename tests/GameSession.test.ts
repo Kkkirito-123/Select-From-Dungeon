@@ -163,7 +163,12 @@ function placeNearFloorLandmark(session: GameSession, landmarkId: string): void 
     x: Math.round(zone.x + landmark.anchor.position.x * zone.width),
     y: Math.round(zone.y + landmark.anchor.position.y * zone.height),
   };
-  for (let radius = 0; radius <= 3; radius += 1) {
+  const maximumRadius = Math.max(
+    3,
+    Math.ceil(landmark.anchor.clearance.width / 2),
+    Math.ceil(landmark.anchor.clearance.height / 2),
+  );
+  for (let radius = 0; radius <= maximumRadius; radius += 1) {
     for (let y = focus.y - radius; y <= focus.y + radius; y += 1) {
       for (let x = focus.x - radius; x <= focus.x + radius; x += 1) {
         if (Math.abs(x - focus.x) + Math.abs(y - focus.y) !== radius) continue;
@@ -281,6 +286,21 @@ function clearBothBranches(
 }
 
 describe("GameSession SQL 魔王城 Run", () => {
+  it("同层地面不会同时生成重复武器或重复遗物奖励", () => {
+    const session = new GameSession(null, null, "unique-course-rewards");
+    expect(session.enableAdminMode().ok).toBe(true);
+    for (let floor = 1; floor <= 8; floor += 1) {
+      expect(session.adminLoadFloor(floor as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8).ok).toBe(true);
+      const uniqueRewards = session.snapshot().groundItems
+        .filter((item) => item.kind === "weapon" || item.kind === "relic")
+        .map((item) => item.rewardId)
+        .filter((rewardId) => rewardId !== null);
+      expect(new Set(uniqueRewards).size, `第 ${floor} 层存在重复唯一奖励`).toBe(
+        uniqueRewards.length,
+      );
+    }
+  });
+
   it("玩家以两颗心开始，并按总经验 2/4/6/8 升级", () => {
     expect(["normal", "elite", "boss"].map((rank) => (
       experienceForRank(rank as "normal" | "elite" | "boss")
@@ -462,7 +482,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().openedGateIds).toContain(
       "story:evidence:lost-name:f1:current-record",
     );
-    expect(session.toSavedRun().version).toBe(11);
+    expect(session.toSavedRun().version).toBe(12);
   });
 
   it("MIGRATE 只在第八层 victory 按七步顺序写入兼容 marker", () => {
@@ -498,7 +518,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(victory.snapshot().openedGateIds.filter((id) =>
       id.startsWith("story:migrate:")
     )).toEqual(migrationStepMarkerIds());
-    expect(victory.toSavedRun().version).toBe(11);
+    expect(victory.toSavedRun().version).toBe(12);
   });
 
   it("第一、二层隐藏区域需要完成前置课程并开启实体暗门，发现状态可随 Run 恢复", () => {
@@ -1245,8 +1265,8 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
     expect(restored.toProfile().masteredLessons).toContain("select");
     expect(restored.toSavedRun()).toMatchObject({
-      version: 11,
-      generatorVersion: 5,
+      version: 12,
+      generatorVersion: 7,
       floor: 1,
       campaign: { currentFloor: 1, status: "active" },
     });
@@ -1458,7 +1478,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.toProfile()).toEqual(formalProfile);
   });
 
-  it("第四层炉主同时封锁区域交通和普通步行边界，击败后才能穿过", () => {
+  it("第四层抽象区域边界不再形成空气墙", () => {
     const session = new GameSession(null, null, "f4-guardian-boundary");
     expect(session.enableAdminMode()).toMatchObject({ ok: true });
     expect(session.adminLoadFloor(4)).toMatchObject({ ok: true });
@@ -1503,10 +1523,9 @@ describe("GameSession SQL 魔王城 Run", () => {
       boundary.to.x - boundary.from.x,
       boundary.to.y - boundary.from.y,
     )).toMatchObject({
-      ok: false,
-      moved: false,
-      blockedBy: "gate",
-      message: expect.stringContaining("ID #044"),
+      ok: true,
+      moved: true,
+      blockedBy: "none",
     });
 
     expect(session.adminApplyPreset("f4-admin-echo")).toMatchObject({ ok: true });

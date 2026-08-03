@@ -5,6 +5,8 @@ import { generateMazeFloor, mazeTileAt, mazeZoneAt } from "../src/domain/mazeGen
 import { floorOneAreaAt } from "../src/domain/floorOneLabyrinth";
 import { generateRoomGraph } from "../src/domain/runGraph";
 import { GameSession } from "../src/domain/GameSession";
+import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
+import type { SqlQueryResult } from "../src/domain/types";
 import {
   FLOOR_ONE_CHEST_IDS,
   FLOOR_ONE_MIMIC_MONSTER_ID,
@@ -12,6 +14,23 @@ import {
   floorOneWalkableNeighborCount,
   generateFloorOneChestItems,
 } from "../src/domain/floorOneTreasure";
+
+function result(
+  sql: string,
+  columns: string[],
+  rows: Array<Record<string, unknown>>,
+  targetIds: number[] = [],
+): SqlQueryResult {
+  return {
+    sql,
+    columns,
+    rows,
+    targetIds,
+    plan: ["SEARCH teaching fixture"],
+    baseHeat: 3,
+    features: detectQueryFeatures(sql),
+  };
+}
 
 describe("第一层迷宫宝箱", () => {
   it("相同 Seed 生成两个普通箱、一个宝箱怪和一个偏移箱，且不落在安全区", () => {
@@ -65,6 +84,21 @@ describe("第一层迷宫宝箱", () => {
     expect(session.snapshot().banner).toContain("2 道第一层基础题");
     expect(session.snapshot().banner).not.toContain("宝箱怪");
     expect(floorOneChestKind(mimic!.id)).toBe("mimic");
+
+    expect(session.resolveQuery(result(
+      "SELECT id, status FROM monsters WHERE id = 6",
+      ["id", "status"],
+      [{ id: 6, status: "dripping" }],
+      [6],
+    )).accepted).toBe(true);
+    expect(session.resolveQuery(result(
+      "SELECT id FROM monsters WHERE master_id IS NULL AND status = 'toxic'",
+      ["id"],
+      [{ id: 8 }],
+      [8],
+    )).accepted).toBe(true);
+    expect(session.snapshot().relics.map((relic) => relic.id)).toContain("schema-eye");
+    expect(session.snapshot().banner).toContain("Schema 之眼");
   });
 
   it("偏移宝箱传送到迷宫可回返支路，不落在安全区或死路", () => {

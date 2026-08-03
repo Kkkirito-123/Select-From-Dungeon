@@ -17,13 +17,21 @@ import {
 } from "./runGraph";
 
 export const LEGACY_MAZE_GENERATOR_VERSION = 4 as const;
-export const MAZE_GENERATOR_VERSION = 5 as const;
+export const PREVIOUS_MAZE_GENERATOR_VERSION = 5 as const;
+export const LARGE_MAZE_GENERATOR_VERSION = 6 as const;
+export const MAZE_GENERATOR_VERSION = 7 as const;
 export const LEGACY_MAZE_WIDTH = 64;
 export const LEGACY_MAZE_HEIGHT = 48;
 export const LEGACY_MAZE_CHUNK_SIZE = 16;
-export const MAZE_WIDTH = MVP2_MAZE_WIDTH;
-export const MAZE_HEIGHT = MVP2_MAZE_HEIGHT;
-export const MAZE_CHUNK_SIZE = MVP2_MAZE_CHUNK_SIZE;
+export const PREVIOUS_MAZE_WIDTH = MVP2_MAZE_WIDTH;
+export const PREVIOUS_MAZE_HEIGHT = MVP2_MAZE_HEIGHT;
+export const PREVIOUS_MAZE_CHUNK_SIZE = MVP2_MAZE_CHUNK_SIZE;
+export const LARGE_MAZE_WIDTH = 96;
+export const LARGE_MAZE_HEIGHT = 72;
+export const LARGE_MAZE_CHUNK_SIZE = 24;
+export const MAZE_WIDTH = 56;
+export const MAZE_HEIGHT = 42;
+export const MAZE_CHUNK_SIZE = 14;
 
 export type MazeTile = "#" | ".";
 export type MazeDecorationKind = "torch" | "rubble" | "rune";
@@ -54,12 +62,12 @@ export interface MazeDecoration extends Position {
 
 /**
  * `version` remains 4 because the serialized shape is unchanged. The nested
- * generator version distinguishes legacy 64×48 mazes from authored 48×36
- * macro layouts.
+ * generator version distinguishes legacy 64×48, authored 48×36, large 96×72,
+ * and current compact 56×42 labyrinths without changing the serialized shape.
  */
 export interface MazeFloor {
   version: 4;
-  generatorVersion: 4 | 5;
+  generatorVersion: 4 | 5 | 6 | 7;
   seed: string;
   width: number;
   height: number;
@@ -169,6 +177,15 @@ function slotsOverlap(first: FloorMapSlot, second: FloorMapSlot): boolean {
   );
 }
 
+function slotsTooClose(first: FloorMapSlot, second: FloorMapSlot, margin = 2): boolean {
+  return !(
+    first.x + first.width + margin <= second.x ||
+    second.x + second.width + margin <= first.x ||
+    first.y + first.height + margin <= second.y ||
+    second.y + second.height + margin <= first.y
+  );
+}
+
 function assertBlueprint(
   blueprint: FloorMapBlueprint,
   graph: RoomGraph,
@@ -198,6 +215,59 @@ function assertBlueprint(
       }
     }
   });
+}
+
+export function mazeLayoutNameForVersion(
+  floor: RoomGraph["floor"],
+  generatorVersion: MazeFloor["generatorVersion"],
+): string {
+  const baseName = floorMapBlueprint(floor).layoutName;
+  if (generatorVersion === LARGE_MAZE_GENERATOR_VERSION) {
+    return `${baseName}·96×72大迷宫`;
+  }
+  if (generatorVersion === MAZE_GENERATOR_VERSION) {
+    return `${baseName}·56×42紧凑迷宫`;
+  }
+  return baseName;
+}
+
+function compactBlueprint(graph: RoomGraph): FloorMapBlueprint {
+  const base = floorMapBlueprint(graph.floor);
+  const random = createSeededRandom(
+    `select-from-dungeon:maze:v7:floor-${graph.floor}:${graph.seed}:phase:rooms`,
+  );
+  const scaleX = (MAZE_WIDTH - 2) / (MVP2_MAZE_WIDTH - 2);
+  const scaleY = (MAZE_HEIGHT - 2) / (MVP2_MAZE_HEIGHT - 2);
+  const placed: FloorMapSlot[] = [];
+  base.slots.forEach((slot) => {
+    const width = slot.width;
+    const height = slot.height;
+    const baseX = clamp(
+      Math.round(1 + (slot.x - 1) * scaleX),
+      1,
+      MAZE_WIDTH - width - 1,
+    );
+    const baseY = clamp(
+      Math.round(1 + (slot.y - 1) * scaleY),
+      1,
+      MAZE_HEIGHT - height - 1,
+    );
+    const candidate: FloorMapSlot = {
+      roomNodeId: slot.roomNodeId,
+      x: clamp(baseX + Math.floor(random() * 3) - 1, 1, MAZE_WIDTH - width - 1),
+      y: clamp(baseY + Math.floor(random() * 3) - 1, 1, MAZE_HEIGHT - height - 1),
+      width,
+      height,
+    };
+    placed.push(placed.some((other) => slotsTooClose(candidate, other))
+      ? { ...candidate, x: baseX, y: baseY }
+      : candidate);
+  });
+  return {
+    ...base,
+    layoutName: mazeLayoutNameForVersion(graph.floor, MAZE_GENERATOR_VERSION),
+    slots: placed,
+  };
 }
 
 function placeZones(
@@ -341,6 +411,106 @@ function zoneMaskContains(mask: Uint8Array, width: number, x: number, y: number)
   return mask[y * width + x] === 1;
 }
 
+function carveDepthFirstLabyrinth(
+  grid: MazeTile[][],
+  zoneMask: Uint8Array,
+  random: () => number,
+  braidRatio: number,
+): void {
+  const width = grid[0].length;
+  const height = grid.length;
+  const visited = new Set<string>();
+  const cells: Position[] = [];
+  for (let y = 1; y < height - 1; y += 2) {
+    for (let x = 1; x < width - 1; x += 2) {
+      if (!zoneMaskContains(zoneMask, width, x, y)) cells.push({ x, y });
+    }
+  }
+
+  shuffle(cells, random).forEach((start) => {
+    if (visited.has(key(start))) return;
+    const stack = [{ ...start }];
+    visited.add(key(start));
+    grid[start.y][start.x] = ".";
+    while (stack.length > 0) {
+      const current = stack[stack.length - 1];
+      const candidates = shuffle(DIRECTIONS, random)
+        .map((direction) => ({
+          target: {
+            x: current.x + direction.x * 2,
+            y: current.y + direction.y * 2,
+          },
+          between: {
+            x: current.x + direction.x,
+            y: current.y + direction.y,
+          },
+        }))
+        .filter(({ target, between }) => (
+          inBounds(target.x, target.y, width, height) &&
+          !visited.has(key(target)) &&
+          !zoneMaskContains(zoneMask, width, target.x, target.y) &&
+          !zoneMaskContains(zoneMask, width, between.x, between.y)
+        ));
+      const next = candidates[0];
+      if (!next) {
+        stack.pop();
+        continue;
+      }
+      visited.add(key(next.target));
+      grid[next.between.y][next.between.x] = ".";
+      grid[next.target.y][next.target.x] = ".";
+      stack.push(next.target);
+    }
+  });
+
+  const braidCandidates: Position[] = [];
+  for (let y = 2; y < height - 2; y += 1) {
+    for (let x = 2; x < width - 2; x += 1) {
+      if (grid[y][x] !== "#" || zoneMaskContains(zoneMask, width, x, y)) continue;
+      const horizontal = grid[y][x - 1] === "." && grid[y][x + 1] === ".";
+      const vertical = grid[y - 1][x] === "." && grid[y + 1][x] === ".";
+      if (!horizontal && !vertical) continue;
+      const neighborTouchesZone = DIRECTIONS.some((direction) => (
+        zoneMaskContains(zoneMask, width, x + direction.x, y + direction.y)
+      ));
+      if (!neighborTouchesZone) braidCandidates.push({ x, y });
+    }
+  }
+  shuffle(braidCandidates, random)
+    .slice(0, Math.floor(braidCandidates.length * braidRatio))
+    .forEach((position) => {
+      grid[position.y][position.x] = ".";
+    });
+}
+
+function sealDisconnectedFloors(grid: MazeTile[][], spawn: Position): void {
+  const width = grid[0].length;
+  const height = grid.length;
+  const reachable = new Set<string>([key(spawn)]);
+  const pending: Position[] = [{ ...spawn }];
+  while (pending.length > 0) {
+    const current = pending.shift();
+    if (!current) break;
+    DIRECTIONS.forEach((direction) => {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const nextKey = key(next);
+      if (
+        !reachable.has(nextKey) &&
+        inBounds(next.x, next.y, width, height) &&
+        grid[next.y][next.x] === "."
+      ) {
+        reachable.add(nextKey);
+        pending.push(next);
+      }
+    });
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      if (grid[y][x] === "." && !reachable.has(`${x}:${y}`)) grid[y][x] = "#";
+    }
+  }
+}
+
 function routeBetween(
   start: Position,
   target: Position,
@@ -388,6 +558,7 @@ function carveWideRoute(
   route: readonly Position[],
   roadWidth: 2 | 3 | 4,
   zoneMask: Uint8Array,
+  interestMask?: Uint8Array,
 ): void {
   const width = grid[0].length;
   const height = grid.length;
@@ -403,6 +574,7 @@ function carveWideRoute(
           zoneMaskContains(zoneMask, width, x, y)
         ) continue;
         grid[y][x] = ".";
+        if (interestMask) interestMask[y * width + x] = 1;
       }
     }
   });
@@ -421,6 +593,7 @@ function ensureCurriculumAccessRedundancy(
   zones: readonly MazeZone[],
   gates: readonly MazeGate[],
   random: () => number,
+  interestMask: Uint8Array,
 ): void {
   const width = grid[0].length;
   const height = grid.length;
@@ -498,7 +671,7 @@ function ensureCurriculumAccessRedundancy(
     grid[selected.fromDoor.outside.y][selected.fromDoor.outside.x] = ".";
     grid[selected.toDoor.gate.y][selected.toDoor.gate.x] = ".";
     grid[selected.toDoor.outside.y][selected.toDoor.outside.x] = ".";
-    carveWideRoute(grid, selected.route, 2, zoneMask);
+    carveWideRoute(grid, selected.route, 2, zoneMask, interestMask);
   });
 }
 
@@ -509,8 +682,9 @@ function connectRoomGraph(
   zones: readonly MazeZone[],
   blueprint: FloorMapBlueprint,
   random: () => number,
-): void {
+): Uint8Array {
   const zoneMask = createZoneMask(zones, grid[0].length, grid.length);
+  const interestMask = new Uint8Array(grid[0].length * grid.length);
   const gateByNodeId = new Map(gates.map((gate) => [gate.roomNodeId, gate]));
   const zoneByNodeId = new Map(zones.map((zone) => [zone.roomNodeId, zone]));
   graph.nodes.forEach((node) => {
@@ -549,10 +723,57 @@ function connectRoomGraph(
           `无法连接宏观路线 ${key(fromDoor.outside)} → ${key(toDoor.outside)}。`,
         );
       }
-      carveWideRoute(grid, route, blueprint.mainRoadWidth, zoneMask);
+      carveWideRoute(grid, route, blueprint.mainRoadWidth, zoneMask, interestMask);
     });
   });
-  ensureCurriculumAccessRedundancy(grid, graph, zones, gates, random);
+  ensureCurriculumAccessRedundancy(
+    grid,
+    graph,
+    zones,
+    gates,
+    random,
+    interestMask,
+  );
+  return interestMask;
+}
+
+function pruneRemoteLabyrinth(
+  grid: MazeTile[][],
+  zones: readonly MazeZone[],
+  interestMask: Uint8Array,
+  radius = 3,
+): void {
+  const width = grid[0].length;
+  const height = grid.length;
+  const keep = new Uint8Array(interestMask);
+  zones.forEach((zone) => {
+    for (let y = zone.y; y < zone.y + zone.height; y += 1) {
+      for (let x = zone.x; x < zone.x + zone.width; x += 1) {
+        keep[y * width + x] = 1;
+      }
+    }
+  });
+  const sources: Position[] = [];
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      if (keep[y * width + x] === 1) sources.push({ x, y });
+    }
+  }
+  sources.forEach((source) => {
+    for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+      const remaining = radius - Math.abs(offsetY);
+      for (let offsetX = -remaining; offsetX <= remaining; offsetX += 1) {
+        const x = source.x + offsetX;
+        const y = source.y + offsetY;
+        if (inBounds(x, y, width, height)) keep[y * width + x] = 1;
+      }
+    }
+  });
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      if (grid[y][x] === "." && keep[y * width + x] === 0) grid[y][x] = "#";
+    }
+  }
 }
 
 function createDecorations(
@@ -596,24 +817,39 @@ export function generateMazeFloor(
   graph: RoomGraph,
   options: MazeGenerationOptions = {},
 ): MazeFloor {
-  const blueprint = floorMapBlueprint(graph.floor);
+  const blueprint = compactBlueprint(graph);
   const topologyRandom = createSeededRandom(
-    `select-from-dungeon:maze:v5:floor-${graph.floor}:${graph.seed}:phase:topology`,
+    `select-from-dungeon:maze:v7:floor-${graph.floor}:${graph.seed}:phase:topology`,
   );
   const decorRandom = createSeededRandom(
-    `select-from-dungeon:maze:v5:floor-${graph.floor}:${graph.seed}:phase:decor`,
+    `select-from-dungeon:maze:v7:floor-${graph.floor}:${graph.seed}:phase:decor`,
   );
   const grid = createWallGrid(MAZE_WIDTH, MAZE_HEIGHT);
   const zones = placeZones(grid, graph, blueprint);
+  const zoneMask = createZoneMask(zones, MAZE_WIDTH, MAZE_HEIGHT);
+  carveDepthFirstLabyrinth(
+    grid,
+    zoneMask,
+    topologyRandom,
+    clamp(options.braidRatio ?? 0.15, 0, 0.35),
+  );
   const gates = placeGates(grid, graph, zones, topologyRandom);
-  connectRoomGraph(grid, graph, gates, zones, blueprint, topologyRandom);
+  const interestMask = connectRoomGraph(
+    grid,
+    graph,
+    gates,
+    zones,
+    blueprint,
+    topologyRandom,
+  );
+  pruneRemoteLabyrinth(grid, zones, interestMask);
   const entryZone = zones.find((zone) => zone.roomNodeId === graph.entryId) ?? zones[0];
   const spawn = { ...entryZone.center };
+  sealDisconnectedFloors(grid, spawn);
   const tiles = grid.map((row) => row.join(""));
   const anchors = Object.fromEntries(
     zones.map((zone) => [zone.roomNodeId, { ...zone.center }]),
   );
-  const zoneMask = createZoneMask(zones, MAZE_WIDTH, MAZE_HEIGHT);
   const density = clamp(options.decorDensity ?? 0.045, 0, 0.2);
   return {
     version: 4,

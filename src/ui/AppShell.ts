@@ -1,4 +1,10 @@
 import { ArcadeAudio } from "../audio/ArcadeAudio";
+import type { AgentContentSource } from "../../agent/runtime/AgentCoordinator";
+import { buildAgentPrepareRequest } from "../../agent/runtime/context";
+import {
+  buildLocalPreparedOutput,
+  scribeInspectionMessage,
+} from "../../agent/runtime/localFallback";
 import {
   NARRATIVE_ENDINGS,
   NARRATIVE_FLOORS,
@@ -33,7 +39,6 @@ import {
 } from "../content/sqlSchema";
 import { GameSession, LEVEL_XP_THRESHOLDS } from "../domain/GameSession";
 import {
-  buildScribeRecap,
   narrativeFloorFor,
 } from "../domain/narrative";
 import {
@@ -569,6 +574,7 @@ export class AppShell {
   private unsubscribeSession: (() => void) | null = null;
   private unsubscribeFeedback: (() => void) | null = null;
   private unsubscribeOnboarding: (() => void) | null = null;
+  private unsubscribeAgent: (() => void) | null = null;
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
   private focusBeforeInspection: HTMLElement | null = null;
@@ -606,6 +612,9 @@ export class AppShell {
     }>).detail;
     const message = detail?.message;
     if (typeof message === "string" && message.trim() !== "") {
+      const inspectionMessage = detail?.landmarkId?.startsWith("npc-scribe-f")
+        ? this.scribeMessage(message)
+        : message;
       if (typeof detail.landmarkId === "string") {
         const inspectMoment = floorStoryInspectMomentForLandmark({
           floor: this.lastSnapshot.floor,
@@ -618,11 +627,11 @@ export class AppShell {
         }, detail.landmarkId);
         if (inspectMoment) {
           this.activeNarrativeMoment = inspectMoment;
-          this.openStoryMoment(inspectMoment, this.lastSnapshot, message);
+          this.openStoryMoment(inspectMoment, this.lastSnapshot, inspectionMessage);
           return;
         }
       }
-      this.openInspection(message);
+      this.openInspection(inspectionMessage);
     }
   };
   private readonly labyrinthEntryHandler = (event: Event): void => {
@@ -719,6 +728,10 @@ export class AppShell {
     if (event.key === "Escape" && this.isTerminalOpen()) {
       event.preventDefault();
       this.closeTerminal();
+      return;
+    }
+    if (event.key === "Escape" && this.session.cancelGuidanceEscort()) {
+      event.preventDefault();
       return;
     }
     if (
@@ -851,6 +864,7 @@ export class AppShell {
     private readonly onboarding: OnboardingController,
     private readonly getBattleScene: () => BattleScene | null,
     initialRunSource: "new" | "restored" = "new",
+    private readonly agent: AgentContentSource | null = null,
   ) {
     this.narrativeBootstrapMode = initialRunSource;
     this.floorTransitionCoordinator = new FloorTransitionCoordinator({
@@ -969,9 +983,11 @@ export class AppShell {
                 <span>CAMPFIRE / SAFE ZONE</span>
                 <h2 id="campfire-menu-title">篝火</h2>
                 <p id="campfire-menu-status">选择接下来的行动。</p>
-                <blockquote class="scribe-recap">
-                  <strong>复盘页 · 抄写员留存</strong>
-                  <p id="scribe-recap">这里保存抄写员此前整理的本层事实，不代表她就在篝火旁。</p>
+                <blockquote class="campfire-recap">
+                  <strong id="campfire-recap-headline">篝火记录 · 学习复盘</strong>
+                  <ul id="campfire-recap-facts"></ul>
+                  <p id="campfire-recap-focus" hidden></p>
+                  <small id="campfire-recap-next">完成一次作答后，这里会整理下一步。</small>
                 </blockquote>
                 <div class="campfire-menu__actions">
                   <button id="rest-at-campfire" type="button" class="primary-action">在此休息</button>
@@ -1233,7 +1249,7 @@ export class AppShell {
               <div>
                 <span>LOCAL REVIEW / 本地记录</span>
                 <h2 id="answer-review-title">答题复盘</h2>
-                <p id="answer-review-description">只保存在本地：记录提交的 SQL 回合，不记录移动或按键，也不会上传。</p>
+                <p id="answer-review-description">完整复盘只保存在浏览器，不记录移动或按键；启用可选输出 Agent 时，最多 8 条当前层 SQL 与参考答案证据会发送到你配置的 Agent / 模型服务用于预生成。</p>
               </div>
               <button id="close-review" type="button" class="icon-action" aria-label="关闭答题复盘">ESC ×</button>
             </header>
@@ -1283,7 +1299,7 @@ export class AppShell {
 
         <footer class="page-footer">
           <span>真实执行：SQLite WASM</span>
-          <span>地图：48×36 八层手工轮廓 + Seeded 支路</span>
+          <span>地图：56×42 八层紧凑迷宫 + 三区域捷径</span>
           <span>音乐：公共领域古典主题电子改编 · 无外部录音</span>
           <span>奖励：课程宝箱固定 · 随机恢复品低概率</span>
         </footer>
@@ -1579,6 +1595,11 @@ export class AppShell {
     this.unsubscribeOnboarding = this.onboarding.subscribe((snapshot) => {
       this.renderOnboarding(snapshot);
     });
+    this.unsubscribeAgent = this.agent?.subscribe(() => {
+      if (this.lastSnapshot && this.isCampfireMenuOpen()) {
+        this.renderCampfireMenu(this.lastSnapshot, false);
+      }
+    }) ?? null;
     this.unsubscribeSession = this.session.subscribe((snapshot) => this.render(snapshot));
   }
 
@@ -1589,6 +1610,8 @@ export class AppShell {
     this.unsubscribeFeedback = null;
     this.unsubscribeOnboarding?.();
     this.unsubscribeOnboarding = null;
+    this.unsubscribeAgent?.();
+    this.unsubscribeAgent = null;
     this.releaseAudioGesture?.();
     this.releaseAudioGesture = null;
     this.listenerController.abort();
@@ -1663,6 +1686,7 @@ export class AppShell {
         result = this.sql.execute(
           this.textarea.value,
           this.lastSnapshot?.floor ?? 1,
+          this.lastSnapshot?.lessonId,
         );
       } catch (error) {
         queryError = error;
@@ -1983,6 +2007,7 @@ export class AppShell {
     this.sql.reset(snapshot.monsters);
     this.getBattleScene()?.abortEncounter();
     this.clearQueryArtifacts();
+    if (this.isInspectionOpen()) this.closeInspection(false, false);
     this.resetAdminNarrativePresentation();
     this.renderAdminMenu(snapshot);
   }
@@ -2440,12 +2465,23 @@ export class AppShell {
     requiredElement(this.campfireMenu, "#campfire-menu-title").textContent = phaseName;
     requiredElement(this.campfireMenu, "#campfire-menu-status").textContent =
       `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；篝火只负责恢复、复活与打开复盘页。`;
-    const recap = buildScribeRecap(snapshot.floorReview);
-    const campfireBeat = narrativeFloorFor(snapshot.floor).beats.find(
-      (beat) => beat.kind === "campfire",
-    );
-    requiredElement(this.campfireMenu, "#scribe-recap").textContent =
-      `${campfireBeat?.lines[0] ?? "抄写员此前留下了本层事实。"} ${recap.summary}`;
+    const recap = this.preparedAgentOutput(snapshot).campfire;
+    requiredElement(this.campfireMenu, "#campfire-recap-headline").textContent =
+      recap.headline;
+    const facts = requiredElement(this.campfireMenu, "#campfire-recap-facts");
+    facts.replaceChildren(...recap.facts.map((fact) => {
+      const item = document.createElement("li");
+      item.textContent = fact;
+      item.classList.toggle("is-hint-fact", fact.includes("提示"));
+      return item;
+    }));
+    const focus = requiredElement(this.campfireMenu, "#campfire-recap-focus");
+    focus.hidden = recap.focusConcept === null;
+    focus.textContent = recap.focusConcept === null
+      ? ""
+      : `当前关注 · ${recap.focusConcept}`;
+    requiredElement(this.campfireMenu, "#campfire-recap-next").textContent =
+      `下一步 · ${recap.nextAction}`;
     if (entered && !this.isReviewOpen()) {
       requiredElement<HTMLButtonElement>(
         this.campfireMenu,
@@ -2456,6 +2492,20 @@ export class AppShell {
 
   private isCampfireMenuOpen(): boolean {
     return this.campfireMenu?.classList.contains("is-open") ?? false;
+  }
+
+  private preparedAgentOutput(snapshot: GameSnapshot) {
+    return this.agent?.preparedFor(snapshot)
+      ?? buildLocalPreparedOutput(buildAgentPrepareRequest(snapshot));
+  }
+
+  private scribeMessage(authoredMessage: string): string {
+    const prepared = this.preparedAgentOutput(this.lastSnapshot);
+    const route = authoredMessage.replace(/^抄写员：\s*/u, "");
+    return redactSnapshotMonsterIdentity(
+      `${scribeInspectionMessage(prepared.scribe)}\n\n当前路线\n${route}`,
+      this.lastSnapshot,
+    );
   }
 
   private renderNarrativeProgress(snapshot: GameSnapshot): void {
@@ -4033,11 +4083,23 @@ export class AppShell {
       paths.setAttribute("d", floorCommands.join(""));
       svg.append(paths);
     }
+    if (snapshot.navigationGuidance.route.length > 0) {
+      const guidancePath = document.createElementNS(SVG_NS, "path");
+      guidancePath.classList.add("minimap-guidance-route");
+      guidancePath.setAttribute("d", snapshot.navigationGuidance.route
+        .map((position) => `M${position.x} ${position.y}h1v1h-1z`)
+        .join(""));
+      svg.append(guidancePath);
+    }
     const revealedMarkers = snapshot.guidedMap.routeMarkers.filter(
       (marker) => discovered.has(`${marker.x}:${marker.y}`),
     ).length;
     requiredElement(this.root, "#map-explored").textContent =
-      `${floorCommands.length} 格 · ${revealedMarkers} 信标`;
+      `${floorCommands.length} 格 · ${revealedMarkers} 信标${
+        snapshot.navigationGuidance.level > 0
+          ? ` · 指路 L${snapshot.navigationGuidance.level}`
+          : ""
+      }`;
 
     floor.gates.forEach((gate) => {
       if (!discovered.has(`${gate.x}:${gate.y}`)) return;

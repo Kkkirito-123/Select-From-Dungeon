@@ -208,8 +208,11 @@ export class SqlEngine {
     };
   }
 
-  execute(input: string, floor: FloorNumber): SqlQueryResult {
-    return floor === 6
+  execute(input: string, floor: FloorNumber, lessonId?: string): SqlQueryResult {
+    const usesFloorSixSandbox = floor === 6 && (
+      lessonId === undefined || lessonId.startsWith("f6-")
+    );
+    return usesFloorSixSandbox
       ? this.executeSandbox(input)
       : this.executeSelect(input);
   }

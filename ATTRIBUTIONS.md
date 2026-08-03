@@ -116,6 +116,17 @@ edit only the root sources and rebuild instead of maintaining duplicate notices.
   [dedicated to the public domain](https://www.sqlite.org/copyright.html).
 - Status: installed through pnpm and bundled into generated JavaScript/WASM.
 
+### OpenZLAgent (optional)
+
+- Source: [Kkkirito-123/OpenZLAgent at `e1d441afc1af`](https://github.com/Kkkirito-123/OpenZLAgent/tree/e1d441afc1af808e9f436aa80598542c449e9359).
+- Use: optional Python-side OpenAI-compatible model client for one bounded,
+  output-only Scribe response; no OpenZLAgent tool, memory, or MCP runtime is
+  enabled.
+- License: [MIT](https://github.com/Kkkirito-123/OpenZLAgent/blob/e1d441afc1af808e9f436aa80598542c449e9359/LICENSE),
+  copyright 2026 OpenZLAgent.
+- Status: installed only when the `agent` package's `openzl` extra is selected;
+  no upstream source is vendored or included in the browser bundle.
+
 ## Vendored CC0 runtime art / 随包分发的 CC0 运行时美术
 
 Of the vendored art, only the selected PNG files named below enter

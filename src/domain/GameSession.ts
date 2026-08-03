@@ -29,6 +29,12 @@ import {
   weightedBiomeEncounterCandidates,
 } from "../content/biomeContent";
 import {
+  QUESTION_BANK_VERSION,
+  practiceStageForQuestion,
+  type PracticeDrawState,
+  type QuestionBankCatalog,
+} from "../content/questionBank";
+import {
   floorMapBlueprint,
   floorTransitPresentation,
   regionPortalsEnabledForFloor,
@@ -124,6 +130,7 @@ import {
   type GuidedMapPlan,
 } from "./guidedMap";
 import { rollLootItems } from "./lootDirector";
+import { findGridPath } from "./pathfinding";
 import {
   biomeGuardianIdForStep,
   biomeRegionAt,
@@ -188,6 +195,13 @@ const LEGACY_INSPECTION_BANNER_PREFIXES = [
   "档案水轮",
   "无名宿舍",
 ] as const;
+
+function createRunInstanceId(seed: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `run-${stableStringHash(seed).toString(36)}-${Date.now().toString(36)}`;
+}
 
 function restoredWorldBanner(banner: string): string {
   return LEGACY_INSPECTION_BANNER_PREFIXES.some((prefix) => banner.startsWith(prefix))
@@ -530,20 +544,34 @@ function initialGroundItems(
   guidedMap?: GuidedMapPlan,
 ): GroundItem[] {
   const items: GroundItem[] = [];
+  const uniqueRewardIds = new Set<RoomReward>();
   graph.nodes.forEach((node) => {
     if (node.type === "rest" || !node.reward) return;
-    const reward = rewardDetails(node.reward);
+    let rewardId = node.reward;
+    let reward = rewardDetails(rewardId);
     const position = floor.anchors[node.id];
     if (!reward || !position) return;
+    let kind = rewardItemKind(reward);
+    if (
+      (kind === "weapon" || kind === "relic") &&
+      uniqueRewardIds.has(rewardId)
+    ) {
+      rewardId = kind === "weapon" ? "cool-8-heat" : "cool-12-heat";
+      reward = rewardDetails(rewardId);
+      if (!reward) return;
+      kind = rewardItemKind(reward);
+    } else if (kind === "weapon" || kind === "relic") {
+      uniqueRewardIds.add(rewardId);
+    }
     items.push({
       id: `room-reward:${node.id}`,
       sourceRoomId: node.id,
       ...position,
       name: reward.name,
       description: reward.description,
-      kind: rewardItemKind(reward),
+      kind,
       collection: "interact",
-      rewardId: node.reward,
+      rewardId,
     });
   });
   if (graph.floor === 1 && guidedMap && campfires.length > 0) {
@@ -553,6 +581,8 @@ function initialGroundItems(
 }
 
 export class GameSession {
+  private runInstanceId: string;
+  private questionBankVersion: string;
   private campaign: CampaignProgress;
   private floorNumber: FloorNumber = 1;
   private graph: RoomGraph;
@@ -591,6 +621,13 @@ export class GameSession {
   };
   private hintLevel = 0;
   private answerHistory: AnswerAttemptRecord[] = [];
+  private practiceDrawState: PracticeDrawState = { cursor: 0, cycle: 0 };
+  private activePracticeMonsterId: number | null = null;
+  private activePracticeQuestionIds: string[] = [];
+  private rewardedPracticeMonsterIds = new Set<number>();
+  private guidanceObjectiveId: string | null = null;
+  private guidanceSteps = 0;
+  private guidanceLevel: 0 | 1 | 2 | 3 = 0;
   private battleSequence = 0;
   private reviewBattleId: number | null = null;
   private banner = INITIAL_EXPLORATION_BANNER;
@@ -607,7 +644,10 @@ export class GameSession {
     savedRun?: SavedRun | null,
     profile?: ProfileProgress | null,
     seed = "sql-castle-demo",
+    private readonly questionBank: QuestionBankCatalog | null = null,
   ) {
+    this.runInstanceId = createRunInstanceId(seed);
+    this.questionBankVersion = questionBank?.version ?? QUESTION_BANK_VERSION;
     this.profile = cloneProfile(profile ?? emptyProfile());
     this.campaign = createCampaignProgress(seed);
     this.graph = generateRoomGraph(seed, 1);
@@ -653,9 +693,16 @@ export class GameSession {
     this.revealAt(this.player);
 
     if (
-      savedRun?.version === 11 &&
-      (savedRun.generatorVersion === 4 || savedRun.generatorVersion === 5)
+      savedRun?.version === 12 &&
+      (
+        savedRun.generatorVersion === 4 ||
+        savedRun.generatorVersion === 5 ||
+        savedRun.generatorVersion === 6 ||
+        savedRun.generatorVersion === 7
+      )
     ) {
+      this.runInstanceId = savedRun.runInstanceId;
+      this.questionBankVersion = savedRun.questionBankVersion;
       this.campaign = cloneCampaignProgress(savedRun.campaign);
       this.floorNumber = savedRun.floor;
       this.graph = cloneGraph(savedRun.graph);
@@ -745,6 +792,16 @@ export class GameSession {
       };
       this.hintLevel = savedRun.hintLevel;
       this.answerHistory = cloneAnswerHistory(savedRun.answerHistory);
+      this.practiceDrawState = {
+        cursor: savedRun.practiceDrawCursor,
+        cycle: savedRun.practiceDrawCycle,
+      };
+      this.activePracticeMonsterId = savedRun.activePracticeMonsterId;
+      this.activePracticeQuestionIds = [...savedRun.activePracticeQuestionIds];
+      this.rewardedPracticeMonsterIds = new Set(savedRun.rewardedPracticeMonsterIds);
+      this.guidanceObjectiveId = savedRun.guidanceObjectiveId;
+      this.guidanceSteps = savedRun.guidanceSteps;
+      this.guidanceLevel = savedRun.guidanceLevel;
       this.battleSequence = savedRun.battleSequence;
       this.reviewBattleId = savedRun.reviewBattleId;
       this.banner = restoredWorldBanner(savedRun.banner);
@@ -898,7 +955,10 @@ export class GameSession {
       })
     );
 
+    const navigationGuidance = this.navigationGuidance();
     return {
+      runInstanceId: this.runInstanceId,
+      questionBankVersion: this.questionBankVersion,
       mode: this.mode,
       adminMode: this.adminMode,
       adminPanelOpen: this.adminPanelOpen,
@@ -968,6 +1028,7 @@ export class GameSession {
       totalMoves: this.encounterMeter.totalMoves,
       stepsSinceEncounter: this.encounterMeter.stepsSinceEncounter,
       safeStepsRemaining: this.encounterMeter.safeStepsRemaining,
+      navigationGuidance,
       hintLevel: this.hintLevel,
       battleReview: visibleAnswerHistory(this.answerHistory.filter(
         (record) => record.battleId === this.reviewBattleId,
@@ -995,8 +1056,18 @@ export class GameSession {
 
   toSavedRun(): SavedRun {
     return {
-      version: 11,
+      version: 12,
       generatorVersion: this.mazeFloor.generatorVersion,
+      runInstanceId: this.runInstanceId,
+      questionBankVersion: this.questionBankVersion,
+      practiceDrawCursor: this.practiceDrawState.cursor,
+      practiceDrawCycle: this.practiceDrawState.cycle,
+      activePracticeMonsterId: this.activePracticeMonsterId,
+      activePracticeQuestionIds: [...this.activePracticeQuestionIds],
+      rewardedPracticeMonsterIds: [...this.rewardedPracticeMonsterIds],
+      guidanceObjectiveId: this.guidanceObjectiveId,
+      guidanceSteps: this.guidanceSteps,
+      guidanceLevel: this.guidanceLevel,
       campaign: cloneCampaignProgress(this.campaign),
       floor: this.floorNumber,
       graph: cloneGraph(this.graph),
@@ -1180,6 +1251,7 @@ export class GameSession {
     this.player.y = to.y;
     this.revealAt(to);
     this.updateCurrentRoom(to);
+    const guidanceRaised = this.advanceGuidanceProgress();
     const pickedItemIds: string[] = [];
     const touchItems = this.groundItems.filter(
       (item) => item.collection === "touch" && item.x === to.x && item.y === to.y,
@@ -1217,6 +1289,7 @@ export class GameSession {
       hazardResolution === null &&
       pickedItemIds.length === 0 &&
       encounterId === null &&
+      !guidanceRaised &&
       this.mode === "explore"
     ) {
       const biome = biomeRegionAt(this.biomePlan, this.player);
@@ -1239,6 +1312,73 @@ export class GameSession {
   confirmLabyrinthEntry(): boolean {
     if (this.mode !== "explore") return false;
     this.labyrinthEntryConfirmed = true;
+    return true;
+  }
+
+  cancelGuidanceEscort(): boolean {
+    if (this.guidanceLevel !== 3) return false;
+    this.guidanceLevel = 2;
+    this.banner = "自动寻路护送已取消；高亮路线仍会保留。";
+    this.emit();
+    return true;
+  }
+
+  advanceGuidanceEscort(): boolean {
+    if (this.mode !== "explore" || this.guidanceLevel !== 3) return false;
+    const objective = this.guidanceObjective();
+    if (!objective) return false;
+    if (objective.roomNodeId === null && distance(this.player, objective.target) <= 1) {
+      this.guidanceSteps = 0;
+      this.guidanceLevel = 0;
+      this.banner = `护送抵达「${objective.title}」，准备迎战。`;
+      this.emit();
+      return false;
+    }
+    const lockedRegionId = this.lockedGuidanceRegionId();
+    const blockedHazards = new Set(this.floorHazards()
+      .filter((hazard) => !this.openedGateIds.has(hazard.id))
+      .map(positionKey));
+    const path = findGridPath(
+      this.player,
+      objective.target,
+      (x, y) => {
+        const position = { x, y };
+        return isMazeWalkable(
+          this.mazeFloor,
+          x,
+          y,
+          this.completedLessons,
+          this.openedGateIds,
+        ) &&
+          !blockedHazards.has(positionKey(position)) &&
+          !this.campfires.some((campfire) => campfire.x === x && campfire.y === y) &&
+          (
+            lockedRegionId === null ||
+            biomeRegionAt(this.biomePlan, position).id !== lockedRegionId
+          );
+      },
+    );
+    const next = path[1];
+    if (!next || this.livingActorAt(next) || this.regionGuardianAccessMessage(this.player, next)) {
+      return false;
+    }
+    this.player.x = next.x;
+    this.player.y = next.y;
+    this.revealAt(next);
+    this.updateCurrentRoom(next);
+    if (
+      (objective.roomNodeId !== null && this.currentRoomId === objective.roomNodeId) ||
+      (objective.roomNodeId === null && distance(this.player, objective.target) <= 1)
+    ) {
+      this.guidanceSteps = 0;
+      this.guidanceLevel = 0;
+      this.banner = objective.roomNodeId === null
+        ? `护送抵达「${objective.title}」，准备迎战。`
+        : `护送抵达「${objective.title}」，迷路计数已重置。`;
+    } else {
+      this.banner = `路线护送中：前往「${objective.title}」。按 Escape 可取消。`;
+    }
+    this.emit();
     return true;
   }
 
@@ -2111,10 +2251,24 @@ export class GameSession {
               itemName: target.name,
             });
           }
-          experience = this.awardExperience(target);
-          const experienceMessage = this.describeExperience(experience);
+          const practiceRewardEligible = !this.isRepeatablePracticeMonster(target) ||
+            !this.rewardedPracticeMonsterIds.has(target.id);
+          experience = practiceRewardEligible ? this.awardExperience(target) : null;
+          const experienceMessage = experience
+            ? this.describeExperience(experience)
+            : "重复练习完成，本次不重复结算 XP 或掉落。";
           if (this.combat.kind === "ambush") {
-            this.completeAmbush(target, events, experienceMessage);
+            this.completeAmbush(
+              target,
+              events,
+              experienceMessage,
+              practiceRewardEligible,
+            );
+            if (this.isRepeatablePracticeMonster(target)) {
+              this.rewardedPracticeMonsterIds.add(target.id);
+              target.hp = target.maxHp;
+              hpUpdates.push({ id: target.id, hp: target.hp });
+            }
           } else {
             lessonCompleted = lesson.id;
             this.completeLesson(lesson, events, experienceMessage);
@@ -2165,10 +2319,11 @@ export class GameSession {
         answerSql: stage.answerSql,
         result: evaluation.kind === "exact" ? "correct" : evaluation.kind,
         outcome: evaluation.accepted
-          ? experience ? "victory" : "hit"
+          ? killedIds.includes(reviewTarget.id) ? "victory" : "hit"
           : playerDefeated ? "defeat" : "countered",
         feedback: evaluation.message,
         hintLevel: reviewHintLevel,
+        questionId: stage.questionId,
       });
     }
     this.emit();
@@ -2246,6 +2401,7 @@ export class GameSession {
         outcome: playerDefeated ? "defeat" : "countered",
         feedback: message,
         hintLevel: reviewHintLevel,
+        questionId: stage.questionId,
       });
     }
     this.emit();
@@ -2328,6 +2484,12 @@ export class GameSession {
     this.activeLootBundleId = null;
     this.discoveredCells = new Set();
     this.combat = null;
+    this.practiceDrawState = { cursor: 0, cycle: 0 };
+    this.activePracticeMonsterId = null;
+    this.activePracticeQuestionIds = [];
+    this.guidanceObjectiveId = null;
+    this.guidanceSteps = 0;
+    this.guidanceLevel = 0;
     this.visitedRoomIds = new Set([this.currentRoomId]);
     this.completedRoomIds = new Set([this.currentRoomId]);
     this.completedLessons = new Set();
@@ -2366,6 +2528,8 @@ export class GameSession {
       return;
     }
     this.campaign = createCampaignProgress(seed);
+    this.runInstanceId = createRunInstanceId(seed);
+    this.questionBankVersion = this.questionBank?.version ?? QUESTION_BANK_VERSION;
     this.floorNumber = 1;
     this.graph = generateRoomGraph(seed, 1);
     this.mazeFloor = generateMazeFloor(this.graph);
@@ -2432,6 +2596,13 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.answerHistory = [];
+    this.practiceDrawState = { cursor: 0, cycle: 0 };
+    this.activePracticeMonsterId = null;
+    this.activePracticeQuestionIds = [];
+    this.rewardedPracticeMonsterIds.clear();
+    this.guidanceObjectiveId = null;
+    this.guidanceSteps = 0;
+    this.guidanceLevel = 0;
     this.battleSequence = 0;
     this.reviewBattleId = null;
     this.regionTransfer = null;
@@ -2445,7 +2616,161 @@ export class GameSession {
     return this.graph.nodes.find((node) => node.id === this.currentRoomId) ?? this.graph.nodes[0];
   }
 
+  private guidanceObjective(): {
+    id: string;
+    title: string;
+    roomNodeId: string | null;
+    target: Position;
+  } | null {
+    const nextLessonId = lessonsForFloor(this.floorNumber)
+      .find((lessonId) => !this.completedLessons.has(lessonId));
+    if (!nextLessonId) return null;
+    const room = this.graph.nodes.find((node) => node.lessonId === nextLessonId);
+    const target = room ? this.mazeFloor.anchors[room.id] : null;
+    if (!room || !target) return null;
+
+    const rearPortal = this.biomePlan.portals.find((portal) => (
+      portal.id === `biome-portal:${this.floorNumber}:middle-rear`
+    ));
+    const guardian = rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined
+      ? null
+      : this.monsters.find((monster) => (
+          monster.id === rearPortal.requiredBossId && monster.hp > 0
+        )) ?? null;
+    const middleRegion = rearPortal
+      ? this.biomePlan.regions.find((region) => region.id === rearPortal.fromRegionId)
+      : null;
+    if (
+      guardian &&
+      rearPortal &&
+      middleRegion?.areaBossPosition &&
+      biomeRegionAt(this.biomePlan, target).id === rearPortal.toRegionId
+    ) {
+      return {
+        id: `area-boss:${guardian.id}`,
+        title: `区域首领 ${monsterIdLabel(guardian.id)}`,
+        roomNodeId: null,
+        target: { ...middleRegion.areaBossPosition },
+      };
+    }
+    return {
+      id: room.id,
+      title: room.title,
+      roomNodeId: room.id,
+      target: { ...target },
+    };
+  }
+
+  private lockedGuidanceRegionId(): string | null {
+    const rearPortal = this.biomePlan.portals.find((portal) => (
+      portal.id === `biome-portal:${this.floorNumber}:middle-rear`
+    ));
+    if (rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined) {
+      return null;
+    }
+    return this.monsters.some((monster) => (
+      monster.id === rearPortal.requiredBossId && monster.hp > 0
+    )) ? rearPortal.toRegionId : null;
+  }
+
+  private guidanceRoute(target: Position): Position[] {
+    const lockedRegionId = this.lockedGuidanceRegionId();
+    return findGridPath(
+      this.player,
+      target,
+      (x, y) => {
+        const position = { x, y };
+        return isMazeWalkable(
+          this.mazeFloor,
+          x,
+          y,
+          this.completedLessons,
+          this.openedGateIds,
+        ) && (
+          lockedRegionId === null ||
+          biomeRegionAt(this.biomePlan, position).id !== lockedRegionId
+        );
+      },
+    );
+  }
+
+  private navigationGuidance(): GameSnapshot["navigationGuidance"] {
+    const objective = this.guidanceObjective();
+    const path = objective ? this.guidanceRoute(objective.target) : [];
+    const next = path[1];
+    const direction = !next
+      ? null
+      : next.x > this.player.x ? "east"
+      : next.x < this.player.x ? "west"
+      : next.y > this.player.y ? "south"
+      : "north";
+    return {
+      objectiveRoomId: objective?.roomNodeId ?? objective?.id ?? null,
+      objectiveTitle: objective?.title ?? null,
+      steps: this.guidanceSteps,
+      level: this.guidanceLevel,
+      direction,
+      distance: path.length > 0 ? path.length - 1 : null,
+      route: this.guidanceLevel >= 2
+        ? path.slice(1, 25).map((position) => ({ ...position }))
+        : [],
+    };
+  }
+
+  private advanceGuidanceProgress(): boolean {
+    const objective = this.guidanceObjective();
+    if (!objective) {
+      this.guidanceObjectiveId = null;
+      this.guidanceSteps = 0;
+      this.guidanceLevel = 0;
+      return false;
+    }
+    if (this.guidanceObjectiveId !== objective.id) {
+      this.guidanceObjectiveId = objective.id;
+      this.guidanceSteps = 0;
+      this.guidanceLevel = 0;
+    }
+    if (
+      (objective.roomNodeId !== null && this.currentRoomId === objective.roomNodeId) ||
+      (objective.roomNodeId === null && distance(this.player, objective.target) <= 1)
+    ) {
+      this.guidanceSteps = 0;
+      this.guidanceLevel = 0;
+      return false;
+    }
+    this.guidanceSteps += 1;
+    const nextLevel: 0 | 1 | 2 | 3 = this.guidanceSteps >= 100
+      ? 3
+      : this.guidanceSteps >= 60
+        ? 2
+        : this.guidanceSteps >= 40
+          ? 1
+          : 0;
+    if (nextLevel <= this.guidanceLevel) return false;
+    this.guidanceLevel = nextLevel;
+    const guidance = this.navigationGuidance();
+    const directionNames = {
+      north: "北",
+      east: "东",
+      south: "南",
+      west: "西",
+    } as const;
+    const direction = guidance.direction ? directionNames[guidance.direction] : "前";
+    this.banner = nextLevel === 1
+      ? `余烬指路：下一个固定目标「${objective.title}」在${direction}侧，约 ${guidance.distance ?? "?"} 步。`
+      : nextLevel === 2
+        ? `余烬已高亮前方最多 24 格安全路线，目标「${objective.title}」。`
+        : `抄写员已启动逐格路线护送，目标「${objective.title}」；按 Escape 可取消。`;
+    return true;
+  }
+
   private currentLesson(): LessonDefinition {
+    const practiceLessonId = this.activePracticeQuestionIds
+      .map((questionId) => this.questionBank?.question(questionId)?.lessonId)
+      .find((lessonId): lessonId is LessonId => lessonId !== undefined);
+    if (this.combat?.kind === "ambush" && practiceLessonId) {
+      return lessonById(practiceLessonId);
+    }
     const combatMonster = this.combat
       ? this.monsters.find((monster) => monster.id === this.combat?.targetId)
       : null;
@@ -2473,6 +2798,17 @@ export class GameSession {
   }
 
   private combatStagesForMonster(monster: Monster): readonly LessonStageDefinition[] {
+    if (
+      this.questionBank &&
+      this.activePracticeMonsterId === monster.id &&
+      this.activePracticeQuestionIds.length > 0
+    ) {
+      const stages = this.activePracticeQuestionIds
+        .map((questionId) => this.questionBank?.question(questionId))
+        .filter((question) => question !== null && question !== undefined)
+        .map((question) => practiceStageForQuestion(question, monster.id));
+      if (stages.length > 0) return stages;
+    }
     const authored = monster.encounterType === "ambush"
       ? practiceStagesFor(monster.id)
       : lessonById(monster.lessonId).stages;
@@ -2482,6 +2818,42 @@ export class GameSession {
       .slice(0, Math.max(0, lessonIndex))
       .flatMap((lessonId) => lessonById(lessonId).stages);
     return stagesForEncounter(monster, authored, reviewStages);
+  }
+
+  private isRepeatablePracticeMonster(monster: Monster): boolean {
+    const role = biomeEncounterFor(monster.id)?.role;
+    return monster.encounterType === "ambush" && (
+      role === "normal" || role === "mini-elite"
+    );
+  }
+
+  private preparePracticeBattle(monster: Monster): void {
+    this.activePracticeMonsterId = null;
+    this.activePracticeQuestionIds = [];
+    if (!this.questionBank || !this.isRepeatablePracticeMonster(monster)) return;
+    const unlockedLessons = new Set<LessonId>([
+      ...this.profile.masteredLessons,
+      ...this.completedLessons,
+      ...this.graph.nodes
+        .filter((room) => room.lessonId && this.roomAccessMessage(room) === null)
+        .map((room) => room.lessonId as LessonId),
+    ]);
+    const count = biomeEncounterFor(monster.id)?.role === "mini-elite" ? 2 : 1;
+    const tier = biomeEncounterFor(monster.id)?.role === "mini-elite"
+      ? "elite"
+      : "normal";
+    const draw = this.questionBank.draw(
+      this.floorNumber,
+      this.graph.seed,
+      this.practiceDrawState,
+      unlockedLessons,
+      count,
+      tier,
+    );
+    if (draw.questions.length === 0) return;
+    this.practiceDrawState = draw.state;
+    this.activePracticeMonsterId = monster.id;
+    this.activePracticeQuestionIds = draw.questions.map((question) => question.questionId);
   }
 
   private restoreCanonicalCombatState(): void {
@@ -2588,6 +2960,7 @@ export class GameSession {
       return this.interactionFailure(accessMessage);
     }
     const combatKind = monster.encounterType;
+    this.preparePracticeBattle(monster);
     const stages = this.combatStagesForMonster(monster);
     const stage = stages[0];
     if (!stage) return this.interactionFailure("这只怪物尚未配置可执行的 SQL 题。");
@@ -2648,6 +3021,7 @@ export class GameSession {
     this.encounterMeter = advance.meter;
     if (advance.targetId === null) return null;
     const monster = this.monsters.find((entry) => entry.id === advance.targetId);
+    if (monster) this.preparePracticeBattle(monster);
     const stages = monster ? this.combatStagesForMonster(monster) : [];
     const stage = stages[0];
     if (!monster || !stage) return null;
@@ -2973,18 +3347,24 @@ export class GameSession {
     monster: Monster,
     events: CombatEvent[],
     experienceMessage: string,
+    rewardEligible = true,
   ): void {
     const openedMimicChest = monster.id === FLOOR_ONE_MIMIC_MONSTER_ID;
     if (openedMimicChest) {
       this.groundItems = this.groundItems.filter((item) => item.id !== "chest:f1:mimic");
       this.openedGateIds.add("chest:f1:mimic");
     }
-    const loot = this.spawnLootBundle(
-      monster,
-      this.currentRoomId,
-      { x: this.player.x, y: this.player.y },
-      [],
-    );
+    const eliteRelic = rewardEligible && monster.id === FLOOR_ONE_MIMIC_MONSTER_ID
+      ? this.addRelic(RELICS["schema-eye"])
+      : false;
+    const loot = rewardEligible
+      ? this.spawnLootBundle(
+          monster,
+          this.currentRoomId,
+          { x: this.player.x, y: this.player.y },
+          [],
+        )
+      : { bundleCount: 0, recoveryNames: [] };
     if (loot.bundleCount > 0) {
       events.push({ type: "loot-drop", targetId: monster.id });
     }
@@ -2992,15 +3372,21 @@ export class GameSession {
       events.push({ type: "auto-heal", targetId: monster.id, itemName });
     });
     this.combat = null;
+    this.activePracticeMonsterId = null;
+    this.activePracticeQuestionIds = [];
     this.selectedMonsterId = null;
     this.mode = "explore";
     this.hintLevel = 0;
     this.encounterMeter = resetEncounterMeterAfterBattle(this.encounterMeter);
+    const eliteRelicMessage = eliteRelic
+      ? " 获得攻略遗物「Schema 之眼」：新题自动展示第一条提示。"
+      : "";
     this.banner = loot.bundleCount > 0
       ? `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} 掉落 1 个含 ${loot.bundleCount} 件物品的战利品包。`
       : loot.recoveryNames.length > 0
         ? `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} ${loot.recoveryNames.join("、")}已直接使用，不占背包。`
-        : `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} 本次没有物品掉落；接下来 5 步不会再次遭遇。`;
+        : `${openedMimicChest ? "宝箱怪已击败。" : `${monster.name} 已清除。`}${experienceMessage} 本次没有随机物品掉落；接下来 5 步不会再次遭遇。`;
+    this.banner += eliteRelicMessage;
     const transferMessage = this.autoTransferAfterAreaBoss(monster);
     if (transferMessage) this.banner = `${this.banner} ${transferMessage}`;
   }
@@ -3440,6 +3826,7 @@ export class GameSession {
       );
     }
     const monster = this.monsters.find((entry) => entry.id === FLOOR_ONE_MIMIC_MONSTER_ID);
+    if (monster) this.preparePracticeBattle(monster);
     const stages = monster ? this.combatStagesForMonster(monster) : [];
     if (!monster || monster.hp <= 0 || stages.length === 0) {
       return this.interactionFailure("箱盖已经安静下来。 ");
@@ -3592,10 +3979,12 @@ export class GameSession {
     }
   }
 
-  private addRelic(relic: Relic): void {
+  private addRelic(relic: Relic): boolean {
     if (!this.relics.some((entry) => entry.id === relic.id)) {
       this.relics.push({ ...relic });
+      return true;
     }
+    return false;
   }
 
   private availableWeaponLoot(): LootDrop | null {
@@ -3748,14 +4137,27 @@ export class GameSession {
         && landmark.kind !== "transit"
         && landmark.kind !== "sql-seal"
       ))
-      .map((landmark) => landmark.id);
+      .map((landmark) => ({
+        id: landmark.id,
+        radius: Math.max(
+          3,
+          Math.ceil(landmark.anchor.clearance.width / 2),
+          Math.ceil(landmark.anchor.clearance.height / 2),
+        ),
+      }));
     const npcId = `npc-scribe-f${this.floorNumber}`;
     return [
-      { id: npcId, position: this.floorNpcPosition(npcId) },
-      ...ids.map((id) => ({ id, position: this.floorLandmarkPosition(id) })),
+      { id: npcId, position: this.floorNpcPosition(npcId), radius: 3 },
+      ...ids.map(({ id, radius }) => ({
+        id,
+        radius,
+        position: this.floorLandmarkPosition(id),
+      })),
     ]
-      .filter((entry): entry is { id: string; position: Position } => entry.position !== null)
-      .filter((entry) => distance(entry.position, this.player) <= 3)
+      .filter((entry): entry is { id: string; position: Position; radius: number } => (
+        entry.position !== null
+      ))
+      .filter((entry) => distance(entry.position, this.player) <= entry.radius)
       .sort((left, right) => (
         distance(left.position, this.player) - distance(right.position, this.player)
       ))[0] ?? null;

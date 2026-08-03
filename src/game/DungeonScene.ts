@@ -429,6 +429,7 @@ export class DungeonScene extends Phaser.Scene {
   private battleTransitioning = false;
   private pagePaused = false;
   private patrolTimer: Phaser.Time.TimerEvent | null = null;
+  private nextGuidanceEscortAt = 0;
   private pendingArtFloor: GameSnapshot["floor"] | null = null;
   private readonly reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
@@ -582,6 +583,15 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   update(time: number): void {
+    if (
+      this.snapshot.navigationGuidance.level === 3 &&
+      time >= this.nextGuidanceEscortAt &&
+      this.canAcceptGameplayInput()
+    ) {
+      this.session.advanceGuidanceEscort();
+      this.nextGuidanceEscortAt = time + 260;
+      return;
+    }
     if (
       time < this.nextHeldMoveAt ||
       this.moveLocked ||
@@ -2262,6 +2272,7 @@ export class DungeonScene extends Phaser.Scene {
     if (
       this.moveLocked ||
       this.snapshot.mode !== "explore" ||
+      this.snapshot.navigationGuidance.level === 3 ||
       this.pagePaused ||
       this.hasBlockingExplorationOverlay() ||
       !this.scene.isActive()

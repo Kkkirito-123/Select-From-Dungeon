@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import legacyV11Fixture from "./fixtures/legacy-v11-before-mvp2-1.json";
 import {
   LEGACY_MAZE_CHUNK_SIZE,
   LEGACY_MAZE_HEIGHT,
   LEGACY_MAZE_WIDTH,
+  LARGE_MAZE_CHUNK_SIZE,
+  LARGE_MAZE_HEIGHT,
+  LARGE_MAZE_WIDTH,
   MAZE_CHUNK_SIZE,
   MAZE_HEIGHT,
   MAZE_WIDTH,
@@ -22,7 +26,7 @@ import {
   type FloorNumber,
   type RoomGraph,
 } from "../src/domain/runGraph";
-import type { Position } from "../src/domain/types";
+import type { Position, SavedRun } from "../src/domain/types";
 
 const FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const satisfies readonly FloorNumber[];
 const DIRECTIONS = [
@@ -108,6 +112,21 @@ function asLegacyV4Floor(floor: MazeFloor): MazeFloor {
   };
 }
 
+function asLargeV6Floor(floor: MazeFloor): MazeFloor {
+  const tiles = floor.tiles.map((row) => row.padEnd(LARGE_MAZE_WIDTH, "#"));
+  while (tiles.length < LARGE_MAZE_HEIGHT) {
+    tiles.push("#".repeat(LARGE_MAZE_WIDTH));
+  }
+  return {
+    ...floor,
+    generatorVersion: 6,
+    width: LARGE_MAZE_WIDTH,
+    height: LARGE_MAZE_HEIGHT,
+    chunkSize: LARGE_MAZE_CHUNK_SIZE,
+    tiles,
+  };
+}
+
 describe("generateMazeFloor", () => {
   it("同 Seed 完全一致，不同 Seed 改变非关键路线拓扑", () => {
     const graph = generateRoomGraph("maze-repeatable");
@@ -128,14 +147,16 @@ describe("generateMazeFloor", () => {
     expect(sparse.decorations.length).toBeLessThan(dense.decorations.length);
   });
 
-  it("八层固定 Seed 都生成 48×36 v5 图并保持节点一一映射", () => {
+  it("八层固定 Seed 都生成 56×42 v7 图并把课程房分散到全图", () => {
+    expect((MAZE_WIDTH * MAZE_HEIGHT) / (LARGE_MAZE_WIDTH * LARGE_MAZE_HEIGHT))
+      .toBeCloseTo(1 / 3, 1);
     const topologyHashes = new Set<number>();
     FLOORS.forEach((floorNumber) => {
       const graph = generateRoomGraph("mvp2-eight-floors", floorNumber);
       const floor = generateMazeFloor(graph);
       expect(floor).toMatchObject({
         version: 4,
-        generatorVersion: 5,
+        generatorVersion: 7,
         width: MAZE_WIDTH,
         height: MAZE_HEIGHT,
         chunkSize: MAZE_CHUNK_SIZE,
@@ -145,6 +166,12 @@ describe("generateMazeFloor", () => {
       );
       expect(Object.keys(floor.anchors)).toEqual(graph.nodes.map((node) => node.id));
       expect(floor.zones).toHaveLength(floorNumber === 8 ? 11 : 10);
+      const minX = Math.min(...floor.zones.map((zone) => zone.x));
+      const maxX = Math.max(...floor.zones.map((zone) => zone.x + zone.width - 1));
+      const minY = Math.min(...floor.zones.map((zone) => zone.y));
+      const maxY = Math.max(...floor.zones.map((zone) => zone.y + zone.height - 1));
+      expect((maxX - minX + 1) / floor.width).toBeGreaterThanOrEqual(0.7);
+      expect((maxY - minY + 1) / floor.height).toBeGreaterThanOrEqual(0.7);
       topologyHashes.add(floor.topologyHash);
     });
     expect(topologyHashes.size).toBe(8);
@@ -153,20 +180,44 @@ describe("generateMazeFloor", () => {
   it("八层 160 个 Seed 均满足课程可达、门锁不可绕过和环路不变量", () => {
     FLOORS.forEach((floorNumber) => {
       for (let index = 0; index < 20; index += 1) {
-        const graph = generateRoomGraph(`maze-v5-${floorNumber}-${index}`, floorNumber);
+        const graph = generateRoomGraph(`maze-v7-${floorNumber}-${index}`, floorNumber);
         const floor = generateMazeFloor(graph);
         const validation = validateMazeFloor(floor, graph);
         expect(
           validation,
-          `失败 Seed: maze-v5-${floorNumber}-${index}`,
+          `失败 Seed: maze-v7-${floorNumber}-${index}`,
         ).toMatchObject({ valid: true, errors: [] });
         expect(validation.reachableTiles).toBeGreaterThan(150);
         expect(validation.cycleRank).toBeGreaterThanOrEqual(6);
+        let maximumDistanceFromContent = 0;
+        for (let y = 1; y < floor.height - 1; y += 1) {
+          for (let x = 1; x < floor.width - 1; x += 1) {
+            if (mazeTileAt(floor, x, y) !== ".") continue;
+            const distance = Math.min(...floor.zones.map((zone) => {
+              const dx = x < zone.x
+                ? zone.x - x
+                : x >= zone.x + zone.width
+                  ? x - (zone.x + zone.width - 1)
+                  : 0;
+              const dy = y < zone.y
+                ? zone.y - y
+                : y >= zone.y + zone.height
+                  ? y - (zone.y + zone.height - 1)
+                  : 0;
+              return dx + dy;
+            }));
+            maximumDistanceFromContent = Math.max(maximumDistanceFromContent, distance);
+          }
+        }
+        expect(
+          maximumDistanceFromContent,
+          `Seed ${graph.seed} 仍存在远离内容的外围迷宫`,
+        ).toBeLessThanOrEqual(12);
       }
     });
   }, 30_000);
 
-  it("八层必修图边都可步行，关键相邻目标不超过 18 步", () => {
+  it("八层必修图边都可步行，关键相邻目标推荐距离不超过 35 步", () => {
     const violations: string[] = [];
     FLOORS.forEach((floorNumber) => {
       const graph = generateRoomGraph("mvp2-critical-distance", floorNumber);
@@ -182,7 +233,7 @@ describe("generateMazeFloor", () => {
             floor.anchors[nextId],
             graph,
           );
-          if (distance > 18) {
+          if (distance > 35) {
             violations.push(
               `第 ${floorNumber} 层 ${node.id} → ${nextId}: ${distance}`,
             );
@@ -232,11 +283,16 @@ describe("generateMazeFloor", () => {
     });
   }, 30_000);
 
-  it("校验器同时接受旧 v4 形状和新 v5 形状", () => {
-    const graph = generateRoomGraph("legacy-v4-compatible");
+  it("校验器同时接受旧 v4/v5/v6 形状和新 v7 形状", () => {
+    const fixture = legacyV11Fixture as unknown as { floor1: SavedRun };
+    const graph = fixture.floor1.graph;
     const current = generateMazeFloor(graph);
-    const legacy = asLegacyV4Floor(current);
+    const previous = fixture.floor1.mazeFloor;
+    const legacy = asLegacyV4Floor(previous);
+    const large = asLargeV6Floor(current);
     expect(validateMazeFloor(current, graph)).toMatchObject({ valid: true, errors: [] });
+    expect(validateMazeFloor(large, graph)).toMatchObject({ valid: true, errors: [] });
+    expect(validateMazeFloor(previous, graph)).toMatchObject({ valid: true, errors: [] });
     expect(validateMazeFloor(legacy, graph)).toMatchObject({ valid: true, errors: [] });
     expect(reachableMazeCells(legacy, new Set(lessonsForFloor(1))).size).toBeGreaterThan(150);
   });

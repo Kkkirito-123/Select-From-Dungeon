@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-dungeon-agent"
+version = "0.1.0"
+description = "Output-only recap and Scribe adapter for SELECT * FROM DUNGEON."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+openzl = [
+  "re-zlagent @ git+https://github.com/Kkkirito-123/OpenZLAgent.git@e1d441afc1af808e9f436aa80598542c449e9359",
+]
+
+[project.scripts]
+sql-dungeon-agent = "sql_dungeon_agent.api:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

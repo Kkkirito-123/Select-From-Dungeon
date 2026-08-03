@@ -1,10 +1,15 @@
 import "./style.css";
 import type Phaser from "phaser";
 import { ArcadeAudio } from "./audio/ArcadeAudio";
+import { AgentCache } from "../agent/runtime/AgentCache";
+import { AgentCoordinator } from "../agent/runtime/AgentCoordinator";
+import { DeepSeekWorkerClient } from "../agent/browser/deepseek/DeepSeekWorkerClient";
+import { AgentSettingsPanel } from "../agent/browser/ui/AgentSettingsPanel";
 import { GameSession } from "./domain/GameSession";
 import { FeedbackDirector } from "./feedback/FeedbackDirector";
 import type { BattleScene } from "./game/BattleScene";
 import { applyPageVisibilityRuntime } from "./runtime/pageLifecycle";
+import { loadBundledQuestionBank } from "./runtime/questionBankLoader";
 import { SqlEngine } from "./sql/SqlEngine";
 import {
   createRunSeed,
@@ -13,6 +18,7 @@ import {
   type StorageLike,
 } from "./storage/localProgress";
 import { startProgressPersistence } from "./storage/progressPersistence";
+import { LearningLedger, LearningProgressRecorder } from "./storage/learningLedger";
 import { AppShell } from "./ui/AppShell";
 import { OnboardingController } from "./ui/OnboardingController";
 
@@ -29,6 +35,14 @@ function runtimeStorage(): StorageLike {
   }
 }
 
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 async function bootstrap(): Promise<void> {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("缺少应用根节点。 ");
@@ -37,7 +51,17 @@ async function bootstrap(): Promise<void> {
   const storage = runtimeStorage();
   const savedRun = loadRun(storage);
   const profile = loadProfile(storage);
-  const session = new GameSession(savedRun, profile, savedRun?.graph.seed ?? createRunSeed());
+  const questionBank = await loadBundledQuestionBank(
+    import.meta.env.BASE_URL,
+    fetch,
+    savedRun?.questionBankVersion ?? null,
+  );
+  const session = new GameSession(
+    savedRun,
+    profile,
+    savedRun?.graph.seed ?? createRunSeed(),
+    questionBank,
+  );
   const [sql, { createGame }] = await Promise.all([
     SqlEngine.create(session.snapshot().monsters),
     import("./game/createGame"),
@@ -45,6 +69,20 @@ async function bootstrap(): Promise<void> {
   const audio = new ArcadeAudio({ mode: "explore", volume: 0.55 });
   const feedback = new FeedbackDirector(audio);
   const onboarding = new OnboardingController(storage);
+  const deepSeek = new DeepSeekWorkerClient();
+  const agent = new AgentCoordinator(
+    session,
+    new AgentCache(storage),
+    deepSeek,
+  );
+  const learningLedger = new LearningLedger();
+  const learningRecorder = new LearningProgressRecorder(session, learningLedger);
+  const agentSettings = new AgentSettingsPanel(
+    deepSeek,
+    learningLedger,
+    () => agent.refresh(session.snapshot()),
+    browserStorage(),
+  );
   let game: Phaser.Game | null = null;
   const app = new AppShell(
     root,
@@ -58,12 +96,19 @@ async function bootstrap(): Promise<void> {
       return game.scene.getScene("BattleScene") as BattleScene;
     },
     savedRun ? "restored" : "new",
+    agent,
   );
   try {
+    agent.start();
+    learningRecorder.start();
+    agentSettings.mount();
     app.mount();
     game = createGame(session, audio, feedback);
     root.dataset.runtimeState = "active";
   } catch (error) {
+    agent.destroy();
+    learningRecorder.destroy();
+    agentSettings.destroy();
     app.destroy();
     game?.destroy(true);
     throw error;
@@ -94,6 +139,9 @@ async function bootstrap(): Promise<void> {
     persistence.destroy();
     window.removeEventListener("pagehide", pageHideHandler);
     document.removeEventListener("visibilitychange", visibilityChangeHandler);
+    agent.destroy();
+    learningRecorder.destroy();
+    agentSettings.destroy();
     app.destroy();
     game?.destroy(true);
   };

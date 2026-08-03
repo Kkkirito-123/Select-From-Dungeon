@@ -83,8 +83,10 @@ describe("guided map plan", () => {
           emptyDeadEnds: 0,
         });
         expect(validation.maxMarkerGap).toBeLessThanOrEqual(18);
-        expect(plan.shortcuts).toHaveLength(1);
-        expect(plan.shortcuts[0].detourDistance).toBeGreaterThanOrEqual(17);
+        expect(plan.shortcuts).toHaveLength(3);
+        expect(plan.shortcuts.every(
+          (shortcut) => shortcut.detourDistance >= 11,
+        )).toBe(true);
       }
     });
   }, 60_000);

@@ -147,6 +147,25 @@ const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTem
   8: FLOOR_EIGHT_TEMPLATES,
 };
 
+/**
+ * Generator-v6+ regions follow the authored guardian split instead of a numeric
+ * third of the lesson list. The middle anchor is the last lesson before the
+ * area guardian; the rear anchor is the first lesson that guardian protects.
+ */
+const V6_REGION_LESSONS: Readonly<Record<
+  RoomGraph["floor"],
+  readonly [RunLessonId, RunLessonId, RunLessonId]
+>> = {
+  1: ["select", "group-by", "having"],
+  2: ["order-by", "left-join", "join-boss"],
+  3: ["f3-inner", "f3-chain", "f3-union"],
+  4: ["f4-scalar", "f4-in", "f4-exists"],
+  5: ["f5-over", "f5-lag-lead", "f5-frame"],
+  6: ["f6-insert", "f6-constraint", "f6-transaction"],
+  7: ["f7-btree", "f7-invalid", "f7-plan"],
+  8: ["f8-mvcc", "f8-modeling", "f8-replication"],
+};
+
 function positionKey(position: Position): string {
   return `${position.x}:${position.y}`;
 }
@@ -418,10 +437,14 @@ export function generateBiomePlan(
   guidedMap: GuidedMapPlan,
 ): BiomePlan {
   const templates = TEMPLATES_BY_FLOOR[graph.floor];
+  const regionLessonIds = V6_REGION_LESSONS[graph.floor];
   const regionNames = floorMapBlueprint(graph.floor).regionNames;
   const seed = `select-from-dungeon:biome:v1:floor-${graph.floor}:${graph.seed}`;
   const regions: BiomeRegion[] = templates.map((template, index) => {
-    const node = graph.nodes.find((entry) => entry.lessonId === template.lessonId);
+    const sourceLessonId = floor.generatorVersion >= 6
+      ? regionLessonIds[index]
+      : template.lessonId;
+    const node = graph.nodes.find((entry) => entry.lessonId === sourceLessonId);
     const anchor = node ? floor.anchors[node.id] : floor.zones[index]?.center;
     if (!node || !anchor) {
       throw new Error(`生态 ${template.kind} 缺少课程锚点。`);
@@ -485,11 +508,10 @@ export function biomeRegionAt(
 }
 
 /**
- * Returns the living area guardian that blocks this exact cross-region step.
- *
- * The generated maze remains a single walkable graph. This pure rule is the
- * authoritative boundary shared by runtime movement and reachability tests, so
- * a middle-area boss cannot be bypassed by walking around its portal artwork.
+ * Returns the living area guardian that blocks a non-walking cross-region
+ * transit such as a shortcut. Adjacent maze steps must never be stopped by the
+ * abstract nearest-region partition because that boundary has no visible wall.
+ * Visible portals enforce their own requiredBossId during interaction.
  */
 export function biomeGuardianIdForStep(
   plan: BiomePlan,
@@ -497,6 +519,7 @@ export function biomeGuardianIdForStep(
   to: Position,
 ): number | null {
   if (!regionPortalsEnabledForFloor(plan.floor)) return null;
+  if (Math.abs(from.x - to.x) + Math.abs(from.y - to.y) <= 1) return null;
   const rearPortal = plan.portals.find(
     (portal) => portal.id === `biome-portal:${plan.floor}:middle-rear`,
   );

@@ -2,9 +2,16 @@ import {
   LEGACY_MAZE_CHUNK_SIZE,
   LEGACY_MAZE_HEIGHT,
   LEGACY_MAZE_WIDTH,
+  LARGE_MAZE_CHUNK_SIZE,
+  LARGE_MAZE_HEIGHT,
+  LARGE_MAZE_WIDTH,
   MAZE_CHUNK_SIZE,
   MAZE_HEIGHT,
   MAZE_WIDTH,
+  PREVIOUS_MAZE_CHUNK_SIZE,
+  PREVIOUS_MAZE_HEIGHT,
+  PREVIOUS_MAZE_WIDTH,
+  mazeLayoutNameForVersion,
   mazeTileAt,
   type MazeFloor,
 } from "../domain/mazeGenerator";
@@ -50,6 +57,8 @@ import {
   detectMonsterIdScheme,
 } from "../content/monsterIds";
 import { LESSONS } from "../content/mvpLevel";
+import { biomeEncounterFor } from "../content/biomeContent";
+import { QUESTION_BANK_VERSION } from "../content/questionBank";
 import { rewardDetails } from "../content/runContent";
 import {
   lessonsForFloor,
@@ -84,8 +93,9 @@ import type {
   Weapon,
 } from "../domain/types";
 
-export const RUN_SAVE_KEY = "select-from-dungeon:run:v11";
+export const RUN_SAVE_KEY = "select-from-dungeon:run:v12";
 export const PROFILE_SAVE_KEY = "select-from-dungeon:profile:v3";
+const LEGACY_RUN_V11_SAVE_KEY = "select-from-dungeon:run:v11";
 const LEGACY_RUN_SAVE_KEY = "select-from-dungeon:run:v10";
 const OLDER_RUN_SAVE_KEY = "select-from-dungeon:run:v9";
 const OLDEST_RUN_SAVE_KEY = "select-from-dungeon:run:v8";
@@ -888,15 +898,32 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
         height: LEGACY_MAZE_HEIGHT,
         chunkSize: LEGACY_MAZE_CHUNK_SIZE,
       }
-    : {
-        width: MAZE_WIDTH,
-        height: MAZE_HEIGHT,
-        chunkSize: MAZE_CHUNK_SIZE,
-      };
+    : generatorVersion === 5
+      ? {
+          width: PREVIOUS_MAZE_WIDTH,
+          height: PREVIOUS_MAZE_HEIGHT,
+          chunkSize: PREVIOUS_MAZE_CHUNK_SIZE,
+        }
+      : generatorVersion === 6
+        ? {
+            width: LARGE_MAZE_WIDTH,
+            height: LARGE_MAZE_HEIGHT,
+            chunkSize: LARGE_MAZE_CHUNK_SIZE,
+          }
+        : {
+            width: MAZE_WIDTH,
+            height: MAZE_HEIGHT,
+            chunkSize: MAZE_CHUNK_SIZE,
+          };
   if (
     !isRecord(value) ||
     value.version !== 4 ||
-    (value.generatorVersion !== 4 && value.generatorVersion !== 5) ||
+    (
+      value.generatorVersion !== 4 &&
+      value.generatorVersion !== 5 &&
+      value.generatorVersion !== 6 &&
+      value.generatorVersion !== 7
+    ) ||
     value.seed !== graph.seed ||
     value.width !== expectedDimensions.width ||
     value.height !== expectedDimensions.height ||
@@ -1027,7 +1054,9 @@ function isMazeFloor(value: unknown, graph: RoomGraph): value is MazeFloor {
     .join("|")}`;
   const compatibleLayoutNames = floor.generatorVersion === 5
     ? compatibleFloorLayoutNames(graph.floor)
-    : [""];
+    : floor.generatorVersion >= 6
+      ? [mazeLayoutNameForVersion(graph.floor, floor.generatorVersion)]
+      : [""];
   const hasCompatibleTopologyHash = compatibleLayoutNames.some((layoutName) => (
     floor.topologyHash === stableStringHash(
       `${layoutName ? `${layoutName}|` : ""}${topologyBody}`,
@@ -1170,7 +1199,11 @@ function isAnswerAttemptRecord(value: unknown): value is AnswerAttemptRecord {
     typeof value.outcome === "string" &&
     BATTLE_OUTCOMES.includes(value.outcome as AnswerAttemptRecord["outcome"]) &&
     typeof value.feedback === "string" &&
-    isNonNegativeInteger(value.hintLevel)
+    isNonNegativeInteger(value.hintLevel) &&
+    (value.questionId === undefined || (
+      typeof value.questionId === "string" &&
+      /^question-bank-v\d+:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(value.questionId)
+    ))
   );
 }
 
@@ -1237,7 +1270,7 @@ function validatedCampfires(
 
 function isSavedRunVersion(
   value: unknown,
-  version: 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11,
+  version: 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12,
 ): boolean {
   if (!isRecord(value)) return false;
   const run = value as Partial<SavedRun>;
@@ -1246,7 +1279,8 @@ function isSavedRunVersion(
     candidateVersion !== version ||
     (
       run.generatorVersion !== 4 &&
-      run.generatorVersion !== 5
+      run.generatorVersion !== 5 &&
+      (version < 12 || (run.generatorVersion !== 6 && run.generatorVersion !== 7))
     ) ||
     (
       run.floor !== 1 &&
@@ -1309,6 +1343,15 @@ function isSavedRunVersion(
   const activeCampfireId = version >= 7 ? run.activeCampfireId : null;
   const respawnCampfireId = version >= 7 ? run.respawnCampfireId : null;
   const activeLootBundleId = version >= 8 ? run.activeLootBundleId : null;
+  const activePracticeQuestionIds = version >= 12 && Array.isArray(run.activePracticeQuestionIds)
+    ? run.activePracticeQuestionIds
+    : [];
+  const activePracticeMonsterId = version >= 12
+    ? run.activePracticeMonsterId
+    : null;
+  const allCurrentMonsterIds = new Set(
+    Object.values(CURRENT_MONSTER_IDS_BY_FLOOR).flat(),
+  );
   if (
     !PLAY_MODES.includes(run.mode as (typeof PLAY_MODES)[number]) ||
     (version === 4 && run.mode === "challenge") ||
@@ -1318,6 +1361,34 @@ function isSavedRunVersion(
     !(activeCampfireId === null || typeof activeCampfireId === "string") ||
     !(respawnCampfireId === null || typeof respawnCampfireId === "string") ||
     !(activeLootBundleId === null || typeof activeLootBundleId === "string") ||
+    (version >= 12 && (
+      typeof run.runInstanceId !== "string" ||
+      run.runInstanceId.length < 8 ||
+      typeof run.questionBankVersion !== "string" ||
+      !/^question-bank-v\d+$/u.test(run.questionBankVersion) ||
+      !isNonNegativeInteger(run.practiceDrawCursor) ||
+      !isNonNegativeInteger(run.practiceDrawCycle) ||
+      !(activePracticeMonsterId === null || (
+        isPositiveInteger(activePracticeMonsterId) &&
+        CURRENT_MONSTER_IDS_BY_FLOOR[run.floor as FloorNumber].includes(activePracticeMonsterId)
+      )) ||
+      !Array.isArray(run.activePracticeQuestionIds) ||
+      activePracticeQuestionIds.length > 2 ||
+      !activePracticeQuestionIds.every((id) => (
+        typeof id === "string" &&
+        /^question-bank-v\d+:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(id)
+      )) ||
+      !hasUniqueValues(activePracticeQuestionIds) ||
+      !Array.isArray(run.rewardedPracticeMonsterIds) ||
+      !run.rewardedPracticeMonsterIds.every((id) => (
+        isPositiveInteger(id) && allCurrentMonsterIds.has(id)
+      )) ||
+      !hasUniqueValues(run.rewardedPracticeMonsterIds) ||
+      !(run.guidanceObjectiveId === null || typeof run.guidanceObjectiveId === "string") ||
+      !isNonNegativeInteger(run.guidanceSteps) ||
+      (run.guidanceLevel !== 0 && run.guidanceLevel !== 1 &&
+        run.guidanceLevel !== 2 && run.guidanceLevel !== 3)
+    )) ||
     (run.mode === "campfire" && activeCampfireId === null) ||
     (activeCampfireId !== null && run.mode !== "campfire" && run.mode !== "inventory") ||
     ((run.mode === "loot") !== (activeLootBundleId !== null)) ||
@@ -1360,6 +1431,14 @@ function isSavedRunVersion(
     !run.monsters.every((monster) => isPositionInFloor(monster, mazeFloor)) ||
     !isCombat(run.combat) ||
     ((run.mode === "combat") !== (run.combat !== null)) ||
+    (version >= 12 && (
+      (activePracticeMonsterId === null) !== (activePracticeQuestionIds.length === 0) ||
+      (activePracticeMonsterId !== null && (
+        run.mode !== "combat" ||
+        run.combat?.kind !== "ambush" ||
+        run.combat.targetId !== activePracticeMonsterId
+      ))
+    )) ||
     !Array.isArray(run.visitedRoomIds) ||
     !run.visitedRoomIds.every((id) => typeof id === "string" && graph.nodes.some((node) => node.id === id)) ||
     !hasUniqueValues(run.visitedRoomIds) ||
@@ -1595,12 +1674,30 @@ function isSavedRunVersion(
 }
 
 export function isSavedRun(value: unknown): value is SavedRun {
-  return isSavedRunVersion(value, 11);
+  return isSavedRunVersion(value, 12);
 }
 
 type LegacyPlayerState = Omit<PlayerState, "armor" | "armorHp">;
 
-type SavedRunV10 = Omit<SavedRun, "version"> & {
+type SavedRunV11 = Omit<
+  SavedRun,
+  | "version"
+  | "runInstanceId"
+  | "questionBankVersion"
+  | "practiceDrawCursor"
+  | "practiceDrawCycle"
+  | "activePracticeMonsterId"
+  | "activePracticeQuestionIds"
+  | "rewardedPracticeMonsterIds"
+  | "guidanceObjectiveId"
+  | "guidanceSteps"
+  | "guidanceLevel"
+> & {
+  version: 11;
+  generatorVersion: 4 | 5;
+};
+
+type SavedRunV10 = Omit<SavedRunV11, "version"> & {
   version: 10;
 };
 
@@ -1637,6 +1734,41 @@ type SavedRunV5 = Omit<
   "version" | "answerHistory" | "battleSequence" | "reviewBattleId"
 > & { version: 5 };
 
+function migrateV11Run(value: unknown): SavedRun | null {
+  if (!isSavedRunVersion(value, 11)) return null;
+  const legacy = value as SavedRunV11;
+  const rewardedPracticeMonsterIds = legacy.monsters
+    .filter((monster) => {
+      const role = biomeEncounterFor(monster.id)?.role;
+      return monster.hp === 0 && (role === "normal" || role === "mini-elite");
+    })
+    .map((monster) => monster.id);
+  const monsters = legacy.monsters.map((monster) => (
+    rewardedPracticeMonsterIds.includes(monster.id)
+      ? { ...monster, hp: monster.maxHp }
+      : monster
+  ));
+  const migrated: SavedRun = {
+    ...legacy,
+    version: 12,
+    runInstanceId: `run-${stableStringHash(
+      `${legacy.graph.seed}:${legacy.queryCount}:${legacy.battleSequence}`,
+    ).toString(36)}`,
+    questionBankVersion: QUESTION_BANK_VERSION,
+    practiceDrawCursor: 0,
+    practiceDrawCycle: 0,
+    activePracticeMonsterId: null,
+    activePracticeQuestionIds: [],
+    rewardedPracticeMonsterIds,
+    guidanceObjectiveId: null,
+    guidanceSteps: 0,
+    guidanceLevel: 0,
+    monsters,
+    banner: `${legacy.banner} 练习题库与本地复盘账本已升级。`,
+  };
+  return isSavedRun(migrated) ? migrated : null;
+}
+
 function migrateV10Run(value: unknown): SavedRun | null {
   if (!isSavedRunVersion(value, 10)) return null;
   const legacy = value as SavedRunV10;
@@ -1661,7 +1793,7 @@ function migrateV10Run(value: unknown): SavedRun | null {
     ? { ...legacy.player, ...movedCampfire.restPosition }
     : legacy.player;
   const currentRoomId = movedCampfire?.roomNodeId ?? legacy.currentRoomId;
-  const migrated: SavedRun = {
+  const migrated: SavedRunV11 = {
     ...legacy,
     version: 11,
     campfires,
@@ -1679,7 +1811,7 @@ function migrateV10Run(value: unknown): SavedRun | null {
     ])],
     banner: `${legacy.banner} 篝火路线已收束为中、后两个检查点。`,
   };
-  return isSavedRun(migrated) ? migrated : null;
+  return isSavedRunVersion(migrated, 11) ? migrateV11Run(migrated) : null;
 }
 
 function migrateV9Run(value: unknown): SavedRun | null {
@@ -1948,7 +2080,9 @@ export function loadRun(storage: StorageLike): SavedRun | null {
   );
   const value = readRun(RUN_SAVE_KEY);
   if (isSavedRun(value)) return value;
-  return migrateV10Run(readRun(LEGACY_RUN_SAVE_KEY))
+  return migrateV11Run(value)
+    ?? migrateV11Run(readRun(LEGACY_RUN_V11_SAVE_KEY))
+    ?? migrateV10Run(readRun(LEGACY_RUN_SAVE_KEY))
     ?? migrateV9Run(readRun(OLDER_RUN_SAVE_KEY))
     ?? migrateV8Run(readRun(OLDEST_RUN_SAVE_KEY))
     ?? migrateV7Run(readRun(ANCIENT_RUN_SAVE_KEY))

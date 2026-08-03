@@ -17,7 +17,7 @@ import type { FloorHazard } from "./floorLabyrinth";
 
 export type LessonId = RunLessonId;
 
-export type LessonStageId =
+export type AuthoredLessonStageId =
   | "select-name"
   | "select-weakness"
   | "where-target"
@@ -136,6 +136,8 @@ export type LessonStageId =
   | "practice-golem"
   | "throne-boss-scan"
   | "throne-boss-core";
+
+export type LessonStageId = AuthoredLessonStageId | `question:${string}`;
 
 export type PlayMode =
   | "explore"
@@ -393,6 +395,17 @@ export interface PlayerState extends Position {
 
 export interface LessonStageDefinition {
   id: LessonStageId;
+  evaluationStageId?: AuthoredLessonStageId;
+  questionId?: string;
+  questionLessonId?: LessonId;
+  questionExpectation?: {
+    columns: string[];
+    rows: unknown[][];
+    rowsOrdered: boolean;
+    planInclude: string[];
+    planExclude: string[];
+    flatSelect: boolean;
+  };
   objective: string;
   queryTemplate: string;
   answerSql: string;
@@ -490,9 +503,12 @@ export interface AnswerAttemptRecord {
   outcome: BattleOutcome;
   feedback: string;
   hintLevel: number;
+  questionId?: string;
 }
 
 export interface GameSnapshot {
+  runInstanceId: string;
+  questionBankVersion: string;
   mode: PlayMode;
   adminMode: boolean;
   adminPanelOpen: boolean;
@@ -548,6 +564,15 @@ export interface GameSnapshot {
   totalMoves: number;
   stepsSinceEncounter: number;
   safeStepsRemaining: number;
+  navigationGuidance: {
+    objectiveRoomId: string | null;
+    objectiveTitle: string | null;
+    steps: number;
+    level: 0 | 1 | 2 | 3;
+    direction: "north" | "east" | "south" | "west" | null;
+    distance: number | null;
+    route: Position[];
+  };
   hintLevel: number;
   battleReview: AnswerAttemptRecord[];
   floorReview: AnswerAttemptRecord[];
@@ -563,8 +588,18 @@ export interface GameSnapshot {
 }
 
 export interface SavedRun {
-  version: 11;
-  generatorVersion: 4 | 5;
+  version: 12;
+  generatorVersion: 4 | 5 | 6 | 7;
+  runInstanceId: string;
+  questionBankVersion: string;
+  practiceDrawCursor: number;
+  practiceDrawCycle: number;
+  activePracticeMonsterId: number | null;
+  activePracticeQuestionIds: string[];
+  rewardedPracticeMonsterIds: number[];
+  guidanceObjectiveId: string | null;
+  guidanceSteps: number;
+  guidanceLevel: 0 | 1 | 2 | 3;
   campaign: CampaignProgress;
   floor: FloorNumber;
   graph: RoomGraph;
