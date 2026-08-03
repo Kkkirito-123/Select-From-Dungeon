@@ -2583,7 +2583,8 @@ h1 span {
   display: grid;
   /* 展开的证据只能延长终端滚动区域，不能向下压缩并覆盖操作按钮。 */
   flex: 1 0 auto;
-  grid-template-columns: minmax(180px, 0.72fr) minmax(330px, 1.48fr);
+  grid-template-columns: minmax(300px, 0.9fr) minmax(420px, 1.1fr);
+  align-items: start;
   gap: 10px;
   min-height: 0;
 }
@@ -2604,6 +2605,24 @@ h1 span {
 .terminal-editor {
   display: flex;
   flex-direction: column;
+}
+
+@media (min-width: 781px) {
+  /* 桌面端限制右侧输入区高度，避免空编辑器吞掉整块战斗画面。 */
+  .terminal-editor {
+    align-self: start;
+  }
+
+  .terminal-editor .sql-editor-shell {
+    flex: 0 0 auto;
+    height: clamp(280px, 38vh, 420px);
+    min-height: 0;
+  }
+
+  .terminal-editor #sql-editor,
+  .terminal-editor #gate-sql-editor {
+    min-height: 0;
+  }
 }
 
 .card-heading {
