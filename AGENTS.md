@@ -174,6 +174,7 @@ complete SQL or MySQL interview curriculum.
 ```text
 index.html -> src/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
+  -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
   -> FloorContracts (eight-floor curriculum, encounter, theme, and loot schema)
@@ -250,6 +251,10 @@ stage one contains one current chapter plus baseline projection/filtering;
 mini-elites may add at most one mastered chapter from stage two onward, and
 floor Bosses progress from a single chapter to a final two- or three-chapter
 audit. A complete SQL answer appears only in hint four.
+`src/ui/appShellTemplate.ts` exclusively owns the static AppShell markup;
+`src/ui/appShellDom.ts` owns reusable stable selector bindings. Runtime renderers
+and event handlers must not duplicate that markup or silently query a second
+selector for the same persistent node.
 `src/content/inventoryCatalog.ts` owns inventory capacities, the current
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/lootDirector.ts` owns deterministic independent rolls and

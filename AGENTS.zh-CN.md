@@ -160,6 +160,9 @@ SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，
 条件、世界效果、难度标签和四级提示；`AppShell` 只负责渲染，不得重新猜测 SQL 语义。普通
 遭遇第一击只包含当前章节和基础投影/过滤；小型精英只能从第二击起增加至多一个已掌握章节；
 楼层 Boss 从单章确认逐步升级到最终二至三章审计。完整 SQL 只能出现在第四级提示。
+`src/ui/appShellTemplate.ts` 独占 AppShell 静态页面骨架，`src/ui/appShellDom.ts` 统一绑定会被
+运行时重复使用的稳定节点；状态渲染和事件处理不得复制整份模板，也不得为同一个持久节点维护
+第二套静默选择器。
 `src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
 MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得
 生成完整答案、提交查询或绕过课程判定。
@@ -197,7 +200,7 @@ src/game/           连续迷宫探索、战斗场景与游戏启动
 src/runtime/        页面隐藏/恢复时协调渲染、音频与存档
 src/sql/            SQLite WASM 初始化、Schema、执行和 HP 同步
 src/storage/        带版本的 Run/Profile 校验、恢复与写入合并
-src/ui/             DOM 界面、《失名录》、新手引导与游戏编排
+src/ui/             静态页面模板、稳定 DOM 契约、视图、《失名录》、新手引导与游戏编排
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
 docs/               双语蓝图、活跃路线图、docs/design/ 后续候选设计与历史报告
 .agents/skills/     需求、初始化、交付、实现、指南同步和显式发布工作流
