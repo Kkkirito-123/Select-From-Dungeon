@@ -1,3 +1,7 @@
+/**
+ * 分级练习题库运行时目录。
+ * 题目来自校验过的 SQLite 题库，运行时只负责查询、分层抽取和确定性洗牌。
+ */
 import type {
   AuthoredLessonStageId,
   LessonStageDefinition,
@@ -20,6 +24,7 @@ export type { PracticeQuestionTier } from "../config/questionBankConfig";
 export type PracticeQuestionScope = "current" | "review";
 
 export interface PracticeQuestion {
+  /** 一道可执行、可判定且绑定课程契约的练习题。 */
   questionId: string;
   bankVersion: string;
   floor: FloorNumber;
@@ -41,16 +46,19 @@ export interface PracticeQuestion {
 }
 
 export interface PracticeDrawState {
+  /** 某楼层/层级牌组的游标和循环编号。 */
   cursor: number;
   cycle: number;
 }
 
 export interface PracticeDrawResult {
+  /** 一次抽题结果及更新后的牌组状态。 */
   questions: PracticeQuestion[];
   state: PracticeDrawState;
 }
 
 function shuffled<T>(values: readonly T[], seed: string): T[] {
+  // 固定内部世界身份生成确定性顺序，避免刷新后改变题目牌组。
   const random = createSeededRandom(seed);
   const result = [...values];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -64,6 +72,7 @@ function interleaveScopeDeck(
   current: readonly PracticeQuestion[],
   review: readonly PracticeQuestion[],
 ): PracticeQuestion[] {
+  // 交错当前题与复习题，避免跨层复习挤占本层题目。
   if (review.length === 0) return [...current];
   const deck: PracticeQuestion[] = [];
   let currentIndex = 0;
@@ -83,6 +92,7 @@ function interleaveScopeDeck(
 }
 
 export class QuestionBankCatalog {
+  /** 提供题目查询、楼层过滤和无重复牌组抽取。 */
   private readonly byId: ReadonlyMap<string, PracticeQuestion>;
 
   constructor(
@@ -93,10 +103,12 @@ export class QuestionBankCatalog {
   }
 
   question(questionId: string): PracticeQuestion | null {
+    // 按稳定题目 ID 查找，不修改题库内容。
     return this.byId.get(questionId) ?? null;
   }
 
   questionsForFloor(floor: FloorNumber): PracticeQuestion[] {
+    // 返回该楼层全部题目，具体抽取由 deck/draw 控制。
     return this.questions.filter((question) => question.floor === floor);
   }
 
@@ -106,6 +118,7 @@ export class QuestionBankCatalog {
     cycle: number,
     tier: PracticeQuestionTier,
   ): PracticeQuestion[] {
+    // 构造一个确定性、按层级隔离的抽取牌组。
     const floorQuestions = this.questionsForFloor(floor)
       .filter((question) => question.tier === tier);
     const current = shuffled(
@@ -127,6 +140,7 @@ export class QuestionBankCatalog {
     count: number,
     tier: PracticeQuestionTier,
   ): PracticeDrawResult {
+    // 消费当前游标；耗尽后递增循环编号并重新洗牌。
     const questions: PracticeQuestion[] = [];
     let cursor = Math.max(0, state.cursor);
     let cycle = Math.max(0, state.cycle);
@@ -161,6 +175,7 @@ export function practiceStageForQuestion(
   question: PracticeQuestion,
   targetMonsterId: number,
 ): LessonStageDefinition {
+  // 把题库题目映射回现有判题阶段，防止题库绕过课程契约。
   return {
     id: `question:${question.questionId}`,
     evaluationStageId: question.baseStageId,

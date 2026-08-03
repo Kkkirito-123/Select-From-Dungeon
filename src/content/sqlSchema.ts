@@ -1,3 +1,7 @@
+/**
+ * SQL 教学 Schema 目录。
+ * 表、字段和逻辑关系由这里统一定义，SQLite DDL、补全和题目说明都从此处派生。
+ */
 export type SqlTableName =
   | "monsters"
   | "monster_signals"
@@ -7,6 +11,7 @@ export type SqlTableName =
 export type SqlColumnType = "INTEGER" | "TEXT";
 
 export interface SqlColumnDefinition {
+  /** 单个教学字段的类型、可空性和主键属性。 */
   name: string;
   type: SqlColumnType;
   nullable: boolean;
@@ -15,6 +20,7 @@ export interface SqlColumnDefinition {
 }
 
 export interface SqlTableDefinition {
+  /** 一张教学表及其字段目录。 */
   name: SqlTableName;
   title: string;
   description: string;
@@ -22,6 +28,7 @@ export interface SqlTableDefinition {
 }
 
 export interface SqlRelationDefinition {
+  /** JOIN 教学关系，不等同于 SQLite 外键约束。 */
   fromTable: SqlTableName;
   fromColumn: string;
   toTable: SqlTableName;
@@ -119,6 +126,7 @@ function column(
   description: string,
   options: { nullable?: boolean; primaryKey?: boolean } = {},
 ): SqlColumnDefinition {
+  // 用小型构造器保持字段元数据与 DDL 生成的一致性。
   return {
     name,
     type,
@@ -129,6 +137,7 @@ function column(
 }
 
 function columnDdl(columnDefinition: SqlColumnDefinition): string {
+  // 从权威字段元数据生成列定义，避免手写 DDL 漂移。
   const constraints = columnDefinition.primaryKey
     ? " PRIMARY KEY"
     : columnDefinition.nullable ? "" : " NOT NULL";
@@ -142,12 +151,14 @@ export const SQL_SCHEMA_DDL = SQL_TABLES.map((table) => (
 )).join("\n\n");
 
 export function sqlTable(name: SqlTableName): SqlTableDefinition {
+  // 返回指定表目录；未知表名属于开发期错误。
   const table = SQL_TABLES.find((entry) => entry.name === name);
   if (!table) throw new Error(`未知 SQL 表：${name}`);
   return table;
 }
 
 export function sqlSchemaLine(name: SqlTableName): string {
+  // 生成终端 Schema Codex 使用的一行字段说明。
   const table = sqlTable(name);
   return `${table.name}(${table.columns.map((entry) => entry.name).join(", ")})`;
 }

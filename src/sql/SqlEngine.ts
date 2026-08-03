@@ -1,3 +1,7 @@
+/**
+ * 浏览器内 SQLite 执行器。
+ * 负责建表、种子数据、只读查询、一次性脚本沙箱和怪物 HP 回写，不负责 UI 或战斗判定。
+ */
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { SQL_RUNTIME_CONFIG } from "../config/runtimeConfig";
@@ -126,6 +130,7 @@ const MONSTER_GEAR_FIXTURES: readonly MonsterGearFixture[] = [
 ] as const;
 
 function estimateHeat(plan: string[]): number {
+  // 查询计划热度是教学信号，不代表真实 MySQL 或设备性能。
   if (plan.length === 0) return 4;
   return Math.max(
     2,
@@ -143,12 +148,14 @@ function rowsFromResult(
   columns: string[],
   values: Array<Array<number | string | Uint8Array | null>>,
 ): Array<Record<string, unknown>> {
+  // 统一限制展示行数，避免异常查询拖垮终端和复盘证据。
   return values.slice(0, MAX_RESULT_ROWS).map((valueRow) =>
     Object.fromEntries(columns.map((column, index) => [column, valueRow[index]])),
   );
 }
 
 export class SqlEngine {
+  /** 封装单个内存 SQLite 实例及其当前教学数据。 */
   private constructor(
     private readonly SQL: SqlJsStatic,
     private database: Database,
@@ -165,6 +172,7 @@ export class SqlEngine {
   }
 
   executeSelect(input: string): SqlQueryResult {
+    // 只执行已通过 SELECT 语法边界检查的单条查询。
     const validation = validateReadOnlyQuery(input);
     if (!validation.ok) {
       throw new Error(validation.message);
@@ -210,6 +218,7 @@ export class SqlEngine {
   }
 
   execute(input: string, floor: FloorNumber, lessonId?: string): SqlQueryResult {
+    // 按楼层规则选择只读查询或第六层一次性沙箱执行路径。
     const usesFloorSixSandbox = floor === 6 && (
       lessonId === undefined || lessonId.startsWith("f6-")
     );
@@ -219,6 +228,7 @@ export class SqlEngine {
   }
 
   executeSandbox(input: string): SqlQueryResult {
+    // 在独立数据库副本执行受控写脚本，结束后丢弃所有写入。
     const validation = validateSandboxScript(input);
     if (!validation.ok) {
       throw new Error(validation.message);
@@ -250,6 +260,7 @@ export class SqlEngine {
   }
 
   updateMonsterHp(updates: Array<{ id: number; hp: number }>): void {
+    // 仅同步战斗结算后的 HP，不允许查询输入直接修改世界状态。
     const statement = this.database.prepare(
       "UPDATE monsters SET hp = $hp WHERE id = $id",
     );
@@ -261,12 +272,14 @@ export class SqlEngine {
   }
 
   reset(monsters: Monster[]): void {
+    // 重建教学数据库，供新战斗或测试恢复确定性初始数据。
     this.database.close();
     this.database = new this.SQL.Database();
     this.seed(monsters);
   }
 
   private seed(monsters: Monster[]): void {
+    // 建表和基础种子必须集中在 SQL 执行器内，避免 UI 重复定义表结构。
     this.database.run(`
       ${SQL_SCHEMA_DDL}
 
@@ -545,6 +558,7 @@ export class SqlEngine {
   }
 
   private seedMonsterRelations(monsterIds: ReadonlySet<number>): void {
+    // 关系表只使用当前怪物集合，保证 JOIN 题与战斗目标保持一致。
     const insertSignal = this.database.prepare(`
       INSERT INTO monster_signals(id, monster_id, channel, charge)
       VALUES ($id, $monsterId, $channel, $charge)

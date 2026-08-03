@@ -1,3 +1,4 @@
+/** 验证只读 SQL 与第六层受控沙箱脚本的语句边界。 */
 import { describe, expect, it } from "vitest";
 import {
   validateReadOnlyQuery,

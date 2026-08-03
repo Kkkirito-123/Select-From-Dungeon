@@ -1,3 +1,4 @@
+/** 验证怪物身份在 SQLite 判题和结果展示之间的封存边界。 */
 import { describe, expect, it } from "vitest";
 import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";

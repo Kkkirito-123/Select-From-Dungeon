@@ -1,3 +1,4 @@
+/** 验证课程阶段的结构锁、结果语义、题库期待和身份封存判定。 */
 import { describe, expect, it } from "vitest";
 import {
   detectQueryFeatures,

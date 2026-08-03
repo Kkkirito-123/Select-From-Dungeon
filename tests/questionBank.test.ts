@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+/** 验证题库完整性、分级牌组、参数化变体和现有判题契约。 */
 import { describe, expect, it } from "vitest";
 import initSqlJs from "sql.js";
 import {

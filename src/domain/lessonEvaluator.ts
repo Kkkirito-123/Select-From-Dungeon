@@ -1,3 +1,7 @@
+/**
+ * SQL 课程语义判定器。
+ * 同时检查 SQL 结构、结果集合、课程锁和身份披露规则，不能被模型或 UI 绕过。
+ */
 import { lessonById } from "../content/mvpLevel";
 import type {
   LessonId,
@@ -9,6 +13,7 @@ import type {
 } from "./types";
 
 function stripLiteralsAndComments(sql: string): string {
+  // 去掉字符串和注释后再识别结构，避免注释内容伪装成 SQL 关键字。
   return sql
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/--.*$/gm, " ")
@@ -23,6 +28,7 @@ function stripComments(sql: string): string {
 }
 
 function normalizeStructure(sql: string): string {
+  // 将大小写、空白和别名差异归一化，支持等价写法比较。
   return stripComments(sql).replace(/\s+/g, " ").trim();
 }
 
@@ -350,6 +356,7 @@ export function evaluateUnrevealedIdentityQuery(
   sql: string,
   identityRevealed: boolean,
 ): QueryEvaluation | null {
+  // 在完整判题前执行身份封存检查，防止查询旁路披露名称或种族。
   const message = unrevealedIdentityQueryMessage(
     floor,
     stage.answerSql,
@@ -374,6 +381,7 @@ export function unrevealedIdentityQueryMessage(
   sql: string,
   identityRevealed: boolean,
 ): string | null {
+  // 将身份封存结果转换为玩家可理解但不泄露实际值的反馈。
   if (floor < 1 || floor > 8 || identityRevealed) return null;
   return (
     hasSealedIdentityUse(sql, new Set()) ||
@@ -466,6 +474,7 @@ function hasAggregateProjection(sql: string): boolean {
 }
 
 export function detectQueryFeatures(sql: string): QueryFeature[] {
+  // 只报告课程所需的结构特征，供判题和 Agent 证据投影使用。
   const normalized = stripLiteralsAndComments(sql).replace(/\s+/g, " ").trim();
   const features: QueryFeature[] = [];
   const selectCount = normalized.match(/\bselect\b/gi)?.length ?? 0;
@@ -1529,6 +1538,7 @@ export function evaluateLesson(
   stageIndex: number,
   result: SqlQueryResult,
 ): QueryEvaluation {
+  // 课程级判定组合语义结果、身份披露和阶段锁，不执行任何游戏写入。
   const stage = stageFor(lessonId, stageIndex);
   return evaluateStage(stage, result);
 }
@@ -1577,6 +1587,7 @@ export function evaluateStage(
   stage: LessonStageDefinition,
   result: SqlQueryResult,
 ): QueryEvaluation {
+  // 将题库阶段契约与真实 SQLite 结果进行最终匹配。
   const featureSet = new Set(result.features);
   const locksBroken = stage.requiredFeatures
     .map((feature, index) => ({ feature, label: stage.locks[index] }))

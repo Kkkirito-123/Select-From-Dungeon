@@ -1,3 +1,11 @@
+/**
+ * 浏览器本地学习账本。
+ * 完整作答和永久聚合只进入独立 IndexedDB，不上传服务器，也不记录移动或按键。
+ */
+/**
+ * 浏览器本地学习账本。
+ * 完整作答和永久聚合只进入独立 IndexedDB，不上传服务器，也不记录移动或按键。
+ */
 import type {
   AnswerAttemptRecord,
   GameSnapshot,
@@ -10,12 +18,16 @@ export const LEARNING_DATABASE_VERSION = 1;
 export const MAX_FULL_LEARNING_ATTEMPTS = STORAGE_RUNTIME_CONFIG.maxLearningAttempts;
 
 export interface HintSourceCounts {
+  /** 按提示来源聚合的次数。 */
+  /** 按提示来源聚合的次数。 */
   manual: number;
   schemaEye: number;
   agent: number;
 }
 
 export interface LearningAttempt {
+  /** 可导出的单条学习记录，保留判题证据但不保留控制输入。 */
+  /** 可导出的单条学习记录，保留判题证据但不保留控制输入。 */
   attemptId: string;
   schemaVersion: 1;
   runInstanceId: string;
@@ -41,6 +53,8 @@ export interface LearningAttempt {
 }
 
 export interface LearningAggregate {
+  /** 永久保留的题目/知识点聚合统计。 */
+  /** 永久保留的题目/知识点聚合统计。 */
   key: string;
   attempts: number;
   correct: number;
@@ -60,6 +74,8 @@ interface LearningExport {
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
+  // 将 IndexedDB 事件接口统一包装成 Promise。
+  // 将 IndexedDB 事件接口统一包装成 Promise。
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
@@ -67,6 +83,8 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 function transactionComplete(transaction: IDBTransaction): Promise<void> {
+  // 只有 complete 事件发生后才认为写入真正成功。
+  // 只有 complete 事件发生后才认为写入真正成功。
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
@@ -75,6 +93,8 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
 }
 
 async function openLearningDatabase(factory: IDBFactory): Promise<IDBDatabase> {
+  // 学习账本单独建库，避免与 Run 存档和题库缓存互相污染。
+  // 学习账本单独建库，避免与 Run 存档和题库缓存互相污染。
   const request = factory.open(LEARNING_DATABASE_NAME, LEARNING_DATABASE_VERSION);
   request.onupgradeneeded = () => {
     const database = request.result;
@@ -101,6 +121,8 @@ export function buildLearningAttempt(
   recordedAt = Date.now(),
   firstAttempt = record.round === 1,
 ): LearningAttempt {
+  // 从战斗记录构建稳定学习事件；不把移动或按键混入统计。
+  // 从战斗记录构建稳定学习事件；不把移动或按键混入统计。
   const monster = snapshot.monsters.find((entry) => entry.id === record.monsterId);
   const schemaEye = snapshot.relics.some((relic) => relic.id === "schema-eye") &&
     record.hintLevel > 0 ? 1 : 0;
@@ -139,6 +161,8 @@ export function nextLearningAggregate(
   attempt: LearningAttempt,
   current?: LearningAggregate,
 ): LearningAggregate {
+  // 以不可变方式更新永久聚合，保证重复写入可以被上层去重。
+  // 以不可变方式更新永久聚合，保证重复写入可以被上层去重。
   const correct = attempt.result === "correct";
   return {
     key,
@@ -157,6 +181,8 @@ export function nextLearningAggregate(
 }
 
 export class LearningLedger {
+  /** 管理完整作答上限、永久聚合、导出和显式清除。 */
+  /** 管理完整作答上限、永久聚合、导出和显式清除。 */
   private databasePromise: Promise<IDBDatabase> | null = null;
 
   constructor(private readonly factory: IDBFactory | null = globalThis.indexedDB ?? null) {}
@@ -166,6 +192,8 @@ export class LearningLedger {
   }
 
   async record(attempt: LearningAttempt): Promise<boolean> {
+    // 单条记录和聚合必须在同一 IndexedDB 事务内完成。
+    // 单条记录和聚合必须在同一 IndexedDB 事务内完成。
     if (!this.factory) return false;
     try {
       const database = await this.database();
@@ -201,6 +229,8 @@ export class LearningLedger {
   }
 
   async exportJson(): Promise<string | null> {
+    // 导出只包含学习数据；API Key 从未进入账本。
+    // 导出只包含学习数据；API Key 从未进入账本。
     if (!this.factory) return null;
     try {
       const database = await this.database();
@@ -223,6 +253,8 @@ export class LearningLedger {
   }
 
   async clear(): Promise<boolean> {
+    // 清除学习库不会触碰 Run、Profile 或 Agent 配置。
+    // 清除学习库不会触碰 Run、Profile 或 Agent 配置。
     if (!this.factory) return false;
     try {
       const database = await this.database();
@@ -241,17 +273,23 @@ export class LearningLedger {
   }
 
   close(): void {
+    // 页面销毁时主动关闭连接，避免持久化事务悬挂。
+    // 页面销毁时主动关闭连接，避免持久化事务悬挂。
     void this.databasePromise?.then((database) => database.close()).catch(() => undefined);
     this.databasePromise = null;
   }
 
   private database(): Promise<IDBDatabase> {
+    // 延迟初始化 IndexedDB，使无存储环境仍可正常游玩。
+    // 延迟初始化 IndexedDB，使无存储环境仍可正常游玩。
     if (!this.factory) return Promise.reject(new Error("IndexedDB unavailable"));
     this.databasePromise ??= openLearningDatabase(this.factory);
     return this.databasePromise;
   }
 
   private async prune(database: IDBDatabase): Promise<void> {
+    // 只裁剪完整作答，永久聚合不受最近记录上限影响。
+    // 只裁剪完整作答，永久聚合不受最近记录上限影响。
     const countTransaction = database.transaction("attempts", "readonly");
     const count = await requestResult(countTransaction.objectStore("attempts").count());
     await transactionComplete(countTransaction);
@@ -271,10 +309,14 @@ export class LearningLedger {
 }
 
 export interface LearningSnapshotSource {
+  /** 提供只读快照，供记录器识别新的作答记录。 */
+  /** 提供只读快照，供记录器识别新的作答记录。 */
   subscribe(listener: (snapshot: GameSnapshot) => void): () => void;
 }
 
 export class LearningProgressRecorder {
+  /** 把 GameSnapshot 中新增的作答记录同步到本地学习账本。 */
+  /** 把 GameSnapshot 中新增的作答记录同步到本地学习账本。 */
   private readonly seen = new Set<string>();
   private readonly pending = new Set<string>();
   private unsubscribe: (() => void) | null = null;
@@ -285,6 +327,8 @@ export class LearningProgressRecorder {
   ) {}
 
   start(): void {
+    // 记录器订阅一次即可；重复启动不能重复写入同一条记录。
+    // 记录器订阅一次即可；重复启动不能重复写入同一条记录。
     if (this.unsubscribe) return;
     this.unsubscribe = this.source.subscribe((snapshot) => {
       const records = [...snapshot.floorReview, ...snapshot.battleReview];

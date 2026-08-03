@@ -1,3 +1,7 @@
+/**
+ * 故事专用查询目录。
+ * 每条查询绑定固定输入表、输出列和叙事证据，避免剧情层自行拼接 SQL。
+ */
 export type StoryQueryId =
   | "f1-current-resident"
   | "f1-restore-contradiction"
@@ -17,6 +21,7 @@ export type StoryQueryId =
   | "f8-deadlock-cycle";
 
 export interface StoryQueryDefinition {
+  /** 一条只读故事查询及其可展示的确定性结果。 */
   id: StoryQueryId;
   floor: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   title: string;
@@ -174,6 +179,7 @@ export const STORY_QUERY_CATALOG: readonly StoryQueryDefinition[] = [
 ] as const;
 
 export function storyQuery(id: StoryQueryId): StoryQueryDefinition {
+  // 未知 ID 属于内容开发错误，应在查询调用处立即暴露。
   const definition = STORY_QUERY_CATALOG.find((entry) => entry.id === id);
   if (!definition) throw new Error(`未知剧情查询：${id}`);
   return definition;

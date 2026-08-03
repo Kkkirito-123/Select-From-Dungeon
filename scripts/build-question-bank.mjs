@@ -1,3 +1,7 @@
+/**
+ * 题库生成脚本。
+ * 从作者课程阶段生成可执行、可校验、可版本化的 SQLite 题库；生成物不可手工修改。
+ */
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -5,10 +9,12 @@ import initSqlJs from "sql.js";
 import { createServer } from "vite";
 
 function uniqueStages(entries) {
+  // 去除同一课程阶段的重复候选，保证题族统计稳定。
   return [...new Map(entries.map((entry) => [entry.stage.id, entry])).values()];
 }
 
 function questionFamilies(candidates, count, tier, scope, offset = 0, excludedStageIds = new Set()) {
+  // 按题阶和作用域选择题族，并保留足够的变体空间。
   const parameterized = candidates.filter((entry) => (
     /'(?:''|[^'])*'|-?\d+(?:\.\d+)?/u.test(entry.stage.answerSql)
   ));
@@ -29,15 +35,18 @@ function questionFamilies(candidates, count, tier, scope, offset = 0, excludedSt
 }
 
 function replaceAt(value, start, length, replacement) {
+  // 只替换已定位的字面量区间，避免参数化时改变 SQL 结构。
   return `${value.slice(0, start)}${replacement}${value.slice(start + length)}`;
 }
 
 function replaceLiteralInCopy(value, raw, replacement) {
+  // 在 SQL 模板副本中替换一个确定性字面量。
   const plain = raw.startsWith("'") ? raw.slice(1, -1).replace(/''/g, "'") : raw;
   return value.includes(plain) ? value.replace(plain, replacement) : value;
 }
 
 function nearbyColumn(sql, index, domainColumns) {
+  // 从字面量附近推断可替换字段，避免跨列生成无效题目。
   const prefix = sql.slice(Math.max(0, index - 120), index).toLowerCase();
   return domainColumns
     .map((column) => {
@@ -55,6 +64,7 @@ function nearbyColumn(sql, index, domainColumns) {
 }
 
 function tableSpecificValues(sql, column, domains) {
+  // 根据字段语义筛选候选值，保持生成题目的可执行性。
   const suffix = `.${column}`;
   const matches = [...domains.keys()].filter((key) => {
     if (!key.endsWith(suffix)) return false;
@@ -65,6 +75,7 @@ function tableSpecificValues(sql, column, domains) {
 }
 
 function literalOptions(stage, floor, domains, monstersByFloor, config) {
+  // 为一条课程阶段构造有限参数域，后续再验证结果契约。
   const sql = stage.answerSql.trim().replace(/;$/u, "");
   const literals = [...sql.matchAll(/'(?:''|[^'])*'|-?\d+(?:\.\d+)?/gu)]
     .filter((match) => match.index !== undefined);
@@ -211,6 +222,7 @@ function materialVariant(
   monstersByFloor,
   config,
 ) {
+  // 生成一条参数化变体，并保留原题的判题和展示契约。
   const options = literalOptions(stage, floor, domains, monstersByFloor, config);
   if (options.length === 0) throw new Error(`${stage.id} 没有真实值参数候选。`);
   return options[
@@ -219,6 +231,7 @@ function materialVariant(
 }
 
 function planEvidence(plan) {
+  // 将 SQLite 查询计划压缩为稳定的教学证据，不使用设备耗时。
   const normalized = plan.join(" ").toUpperCase();
   const include = [];
   if (normalized.includes("COVERING")) include.push("COVERING");
@@ -229,6 +242,7 @@ function planEvidence(plan) {
 }
 
 function buildDomains(engine, monsters, floor) {
+  // 从当前楼层真实教学数据建立字段值域，避免生成悬空条件。
   const domains = new Map();
   const register = (column, values) => {
     domains.set(column, [...new Set([
@@ -283,6 +297,7 @@ function buildDomains(engine, monsters, floor) {
 }
 
 function insertQuestion(database, question) {
+  // 使用参数绑定写入题库，避免生成内容破坏 SQLite 语句。
   database.run(
     `INSERT INTO questions(
       question_id, bank_version, floor, scope, tier, template_id, variant_index,
@@ -320,6 +335,7 @@ function insertQuestion(database, question) {
 }
 
 async function main() {
+  // 主流程按楼层/题阶生成、校验并写出 Manifest 和 SQLite 文件。
   const root = resolve(import.meta.dirname, "..");
   const vite = await createServer({
     root,

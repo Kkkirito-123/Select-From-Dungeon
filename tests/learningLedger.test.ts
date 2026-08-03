@@ -1,3 +1,4 @@
+/** 验证本地学习账本的稳定 ID、聚合统计和提示来源计数。 */
 import { describe, expect, it } from "vitest";
 import {
   buildLearningAttempt,

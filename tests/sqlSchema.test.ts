@@ -1,3 +1,4 @@
+/** 验证教学 Schema 目录、关系元数据与真实 SQLite 表结构保持一致。 */
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";

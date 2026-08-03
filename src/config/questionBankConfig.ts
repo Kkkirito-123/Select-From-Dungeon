@@ -1,4 +1,8 @@
-/** 题库支持的三个练习难度；运行时和 SQLite 共用同一组稳定值。 */
+/**
+ * 题库运行参数的唯一配置入口。
+ * 版本、层级和每层数量由这里统一约束，生成器与运行时不应重复硬编码。
+ * 题库支持 L1、L2、L3 三个练习难度，运行时和 SQLite 共用同一组稳定值。
+ */
 export const QUESTION_BANK_TIERS = ["L1", "L2", "L3"] as const;
 
 export type PracticeQuestionTier = typeof QUESTION_BANK_TIERS[number];

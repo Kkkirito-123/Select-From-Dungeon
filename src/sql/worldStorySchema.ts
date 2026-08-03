@@ -1,4 +1,9 @@
+/**
+ * 故事证据数据库的独立 Schema 和种子数据。
+ * 这些表只服务于剧情查询，不应混入普通战斗 Schema 或永久存档。
+ */
 export interface IdentitySourceFixture {
+  /** 一条可供剧情查询使用的身份来源记录。 */
   id: number;
   residentId: number;
   contentKey: string;
@@ -111,10 +116,12 @@ export const IDENTITY_SOURCE_FIXTURES: readonly IdentitySourceFixture[] = [
 ] as const;
 
 function quote(value: string): string {
+  // 仅处理内置种子文本；统一转义单引号，避免生成非法 SQL。
   return `'${value.replaceAll("'", "''")}'`;
 }
 
 export function worldStorySeedDml(): string {
+  // 生成确定性的故事证据插入语句。
   const residents = IDENTITY_SOURCE_FIXTURES.map((entry) => (
     `(${entry.residentId}, ${quote(entry.aliasName)}, ${quote(entry.restoreTrace)}, ` +
     `${quote("archived")}, NULL)`

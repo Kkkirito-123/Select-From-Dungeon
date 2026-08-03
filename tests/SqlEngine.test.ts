@@ -1,3 +1,4 @@
+/** 验证真实 SQLite 执行、六层沙箱、查询计划和怪物 HP 同步边界。 */
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";

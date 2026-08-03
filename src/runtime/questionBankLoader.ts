@@ -1,3 +1,7 @@
+/**
+ * 题库加载器。
+ * 负责内置资源、Manifest/SHA-256 校验和 IndexedDB 缓存，不决定题目抽取策略。
+ */
 import initSqlJs from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import {
@@ -24,6 +28,7 @@ interface QuestionBankManifest {
 }
 
 function parseStringArray(value: unknown): string[] {
+  // 题库字段必须是有限字符串数组，避免不可信 SQLite 行进入运行时。
   if (typeof value !== "string") return [];
   const parsed: unknown = JSON.parse(value);
   return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")
@@ -32,6 +37,7 @@ function parseStringArray(value: unknown): string[] {
 }
 
 function parseRows(value: unknown): unknown[][] {
+  // 将 SQLite 查询结果限制为普通数组，供后续题目契约逐列校验。
   if (typeof value !== "string") return [];
   const parsed: unknown = JSON.parse(value);
   return Array.isArray(parsed) && parsed.every((entry) => Array.isArray(entry))
@@ -40,12 +46,14 @@ function parseRows(value: unknown): unknown[][] {
 }
 
 function parseTier(value: unknown): PracticeQuestionTier | null {
+  // 只允许配置文件声明的 L1/L2/L3 三个层级。
   return typeof value === "string" && QUESTION_BANK_TIERS.some((tier) => tier === value)
     ? value as PracticeQuestionTier
     : null;
 }
 
 async function sha256(bytes: ArrayBuffer): Promise<string> {
+  // Manifest 摘要用于完整性校验，不承担用户身份或密钥保护。
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)]
     .map((value) => value.toString(16).padStart(2, "0"))
@@ -59,6 +67,7 @@ export async function loadBundledQuestionBank(
   cache = new QuestionBankCache(),
   wasmLocation = wasmUrl,
 ): Promise<QuestionBankCatalog | null> {
+  // 新 Run 固定一个题库版本；加载失败时不静默使用未校验内容。
   try {
     const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
     const manifestResponse = await fetcher(
@@ -101,6 +110,7 @@ async function downloadAndCache(
   fetcher: typeof fetch,
   cache: QuestionBankCache,
 ): Promise<CachedQuestionBank | null> {
+  // 先读取内置资源，成功校验后再写入缓存；缓存失败不阻塞当前加载。
   try {
     const databaseResponse = await fetcher(`${normalizedBase}${manifest.url}`, {
       cache: "no-store",
@@ -129,6 +139,7 @@ async function catalogFromBytes(
   cached: CachedQuestionBank,
   wasmLocation: string,
 ): Promise<QuestionBankCatalog | null> {
+  // 使用独立 SQLite WASM 读取只读题库，并映射为运行时目录对象。
   try {
     if (cached.schemaVersion !== QUESTION_BANK_CONFIG.schemaVersion) return null;
     const SQL = await initSqlJs({ locateFile: () => wasmLocation });

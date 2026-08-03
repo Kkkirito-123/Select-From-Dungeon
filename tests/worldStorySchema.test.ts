@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+/** 验证故事专用 Schema 的查询结果、证据来源和战斗表隔离。 */
 import { describe, expect, it } from "vitest";
 import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
 import {

@@ -1,3 +1,7 @@
+/**
+ * SQL 输入策略。
+ * 先在文本层拒绝危险语句，再交给 SQLite；第六层写操作只允许进入一次性沙箱。
+ */
 export type QueryValidation =
   | { ok: true; sql: string }
   | { ok: false; message: string };
@@ -13,6 +17,7 @@ const PERMANENT_TABLES =
   /\b(?:monsters|monster_signals|rooms|monster_gear|sqlite_master)\b/i;
 
 function splitSandboxStatements(input: string): string[] | null {
+  // 按引号和括号边界拆分脚本，不能把字符串中的分号误判为新语句。
   const statements: string[] = [];
   let current = "";
   let quote: "'" | '"' | null = null;
@@ -79,6 +84,7 @@ function splitSandboxStatements(input: string): string[] | null {
 }
 
 function maskQuotedContent(input: string): string {
+  // 用占位符屏蔽字符串内容，只分析关键字结构而不改变原始 SQL。
   let masked = "";
   let quote: "'" | '"' | null = null;
   for (let index = 0; index < input.length; index += 1) {
@@ -106,6 +112,7 @@ function maskQuotedContent(input: string): string {
 }
 
 export function validateReadOnlyQuery(input: string): QueryValidation {
+  // 只接受单条 SELECT/WITH，并拒绝 DDL、DML、PRAGMA 和多语句输入。
   const trimmed = input.trim();
   if (!trimmed) {
     return { ok: false, message: "先写一条 SELECT 查询。" };
@@ -128,6 +135,7 @@ export function validateReadOnlyQuery(input: string): QueryValidation {
 }
 
 export function validateSandboxScript(input: string): SandboxValidation {
+  // 第六层只允许 repair_queue 上带 WHERE 的有限写操作。
   const trimmed = input.trim();
   if (!trimmed) {
     return { ok: false, message: "先写出本回合的沙箱 SQL。" };

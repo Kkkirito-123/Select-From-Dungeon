@@ -1,7 +1,12 @@
+/**
+ * SQL 结果身份披露边界。
+ * 怪物未击败前只允许结构性反馈，不能通过查询或文本间接猜出隐藏身份。
+ */
 import type { Monster, SqlQueryResult } from "./types";
 import { monsterIdLabel } from "./monsterIdentity";
 
 function replaceAllLiteral(value: string, search: string, replacement: string): string {
+  // 使用字面量替换而不是正则，避免名称中的特殊字符改变匹配含义。
   return search === "" ? value : value.split(search).join(replacement);
 }
 
@@ -14,6 +19,7 @@ export function redactUndiscoveredQueryIdentities(
   monsters: readonly Monster[],
   discoveredMonsterIds: readonly number[],
 ): SqlQueryResult {
+  // 只遮蔽未发现身份；已发现名称可在本地复盘和故事中正常显示。
   const discovered = new Set(discoveredMonsterIds);
   const hidden = monsters
     .filter((monster) => !discovered.has(monster.id))
