@@ -74,8 +74,11 @@ export function stagesForEncounter(
 ): LessonStageDefinition[] {
   if (authoredStages.length === 0) return [];
   const requiredCount = stageCountForEncounter(monster, authoredStages.length);
-  const result = authoredStages
-    .slice(0, requiredCount)
+  const selectedAuthored = authoredStages.slice(0, requiredCount);
+  const finalAuthored = selectedAuthored.length >= 2
+    ? selectedAuthored.at(-1) ?? null
+    : null;
+  const result = (finalAuthored ? selectedAuthored.slice(0, -1) : selectedAuthored)
     .map((stage) => retargetStage(stage, monster.id));
   const authoredIds = new Set(authoredStages.map((stage) => stage.id));
   const supplements = [...reviewStages]
@@ -83,11 +86,13 @@ export function stagesForEncounter(
     .filter((stage) => !authoredIds.has(stage.id));
 
   let supplementIndex = 0;
-  while (result.length < requiredCount) {
+  const supplementTarget = requiredCount - (finalAuthored ? 1 : 0);
+  while (result.length < supplementTarget) {
     const source = supplements[supplementIndex]
       ?? authoredStages[result.length % authoredStages.length];
     result.push(retargetStage(source, monster.id));
     supplementIndex += 1;
   }
+  if (finalAuthored) result.push(retargetStage(finalAuthored, monster.id));
   return result;
 }

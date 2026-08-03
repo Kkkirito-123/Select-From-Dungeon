@@ -201,17 +201,17 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     primaryMonsterId: 11,
     stages: [{
       id: "distinct-status",
-      objective: "从 monster_signals 查询 monster_id = 11 的不同 channel，并按 channel 升序排列。",
+      objective: "潮渠里同一方向被复制了多次。只返回 ID #011 在 monster_signals 中真正不同的 channel，让重复水纹折叠。",
       queryTemplate: "",
-      answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11 ORDER BY channel;",
+      answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11;",
       hints: [
         "数据表是 monster_signals。",
         "SELECT 后加入 DISTINCT channel。",
         "WHERE 锁定 monster_id = 11。",
-        "完整写法：SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11 ORDER BY channel;",
+        "完整写法：SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11;",
       ],
-      locks: ["DISTINCT", "ORDER BY"],
-      requiredFeatures: ["distinct", "order-by"],
+      locks: ["DISTINCT"],
+      requiredFeatures: ["distinct"],
       attackTargetIds: [11],
     }],
   },
@@ -225,7 +225,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     stages: [
       {
         id: "inner-join-sector",
-        objective: "第一击：给 monsters 使用别名 m、rooms 使用别名 r，查询 m.id = 12 的 m.id 与 r.sector。",
+        objective: "根桥缺少 ID #012 所在区域的连接记录。令 monsters 为 m、rooms 为 r，返回怪物主键 m.id 与房间区域 r.sector；用 m.id = 12 锁定怪物。",
         queryTemplate: "",
         answerSql: "SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;",
         hints: [
@@ -240,7 +240,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
       },
       {
         id: "inner-join-room",
-        objective: "第二击：继续使用别名 m 与 r，查询 m.id = 12 的 m.id，并把 r.name 命名为 room_name。",
+        objective: "根桥已经接通，但桥牌还缺少房间名。继续连接 m.room_id 与 r.id，返回 m.id 和 r.name AS room_name。",
         queryTemplate: "",
         answerSql: "SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;",
         hints: [
@@ -264,7 +264,7 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     primaryMonsterId: 13,
     stages: [{
       id: "left-join-unarmed",
-      objective: "给 monsters 使用别名 m、monster_gear 使用别名 g；LEFT JOIN 后返回 m.room_id = 24 且 g.monster_id 为空的 m.id。",
+      objective: "沉水村落要保留所有怪物记录，再找出芦苇沼泽中没有装备明细的住户。返回怪物主键 m.id；房间条件是 m.room_id = 24，空匹配条件是 g.monster_id IS NULL。",
       queryTemplate: "",
       answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 24 AND g.monster_id IS NULL;",
       hints: [
@@ -282,29 +282,29 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     id: "join-boss",
     concept: "JOIN 综合查询",
     title: "灯塔核心 · 多表综合查询",
-    intro: "ID #014 同时控制房间、怪物和装备。把 JOIN、分组过滤与排序组合成一条可核对的查询。",
+    intro: "ID #014 把灯塔位置和核心装备拆在不同表中。先证明它位于哪一片区域，再追踪功率最高的核心装备。",
     schema: FLOOR_TWO_SCHEMA,
     primaryMonsterId: 14,
     stages: [
       {
         id: "join-boss-groups",
-        objective: "护盾阶段：连接 monsters AS m 与 rooms AS r，按 r.sector 统计第二层怪物数为 total；保留至少 3 只的组，并按 total 降序、r.sector 升序。",
+        objective: "第一层护盾只检查连接键。连接 monsters AS m 与 rooms AS r，返回 ID #014 的怪物主键 m.id 与房间区域 r.sector。",
         queryTemplate: "",
-        answerSql: "SELECT r.sector, COUNT(*) AS total FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 3 ORDER BY total DESC, r.sector ASC;",
+        answerSql: "SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 14;",
         hints: [
           "连接 monsters m 与 rooms r。",
           "连接条件是 ON m.room_id = r.id。",
-          "WHERE r.floor = 2，GROUP BY r.sector。",
-          "HAVING COUNT(*) >= 3，最后 ORDER BY total DESC, r.sector ASC。",
-          "完整写法：SELECT r.sector, COUNT(*) AS total FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 3 ORDER BY total DESC, r.sector ASC;",
+          "用 WHERE m.id = 14 锁定灯塔记录。",
+          "只返回 m.id 与 r.sector。",
+          "完整写法：SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 14;",
         ],
-        locks: ["INNER JOIN", "GROUP BY", "HAVING", "ORDER BY"],
-        requiredFeatures: ["join", "group-by", "having", "order-by"],
+        locks: ["INNER JOIN", "ON"],
+        requiredFeatures: ["join", "on"],
         attackTargetIds: [14],
       },
       {
         id: "join-boss-core",
-        objective: "核心阶段：连接 monsters AS m 与 monster_gear AS g，返回 m.id = 14 的 m.id 与最高 g.power。",
+        objective: "核心阶段在已掌握 JOIN 的基础上复习排序。连接 monsters AS m 与 monster_gear AS g，返回 ID #014 的 m.id 与最高 g.power。",
         queryTemplate: "",
         answerSql: "SELECT m.id, g.power FROM monsters m INNER JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1;",
         hints: [

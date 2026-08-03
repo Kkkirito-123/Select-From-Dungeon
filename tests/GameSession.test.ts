@@ -1310,6 +1310,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot()).toMatchObject({
       mode: "challenge",
       activeGateChallenge: { id: "aggregate-breach", gateId: bossGate.id },
+      taskBrief: null,
       openedGateIds: [],
     });
     const restoredInChallenge = new GameSession(session.toSavedRun());

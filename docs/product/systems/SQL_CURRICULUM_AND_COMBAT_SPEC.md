@@ -1,14 +1,14 @@
 # 《SELECT FROM 地牢》SQL 课程与战斗系统规格
 
-> 文档版本：`v0.1`
+> 文档版本：`v0.2`
 >
-> 状态：`F1–F2 IMPLEMENTED / IMPLEMENTATION CONTRACT`
+> 状态：`F1–F8 IMPLEMENTED / IMPLEMENTATION CONTRACT`
 >
-> 适用版本：`MVP 2.1 — The First Two Records`
+> 适用版本：`MVP 2.1 — Eight-Floor Curriculum Clarity`
 >
-> 详细范围：第一层、第二层完整课程与战斗；第三至八层宏观接口
+> 详细范围：第一至八层结构化任务卡、难度阶梯与真实 SQLite 判定
 >
-> 最近更新：`2026-07-26`
+> 最近更新：`2026-08-01`
 
 ## 0. 文档职责与优先级
 
@@ -73,7 +73,9 @@
 
 必须完成：
 
-- 第一、第二层共 22 个怪物的阶段契约；
+- 第一至八层全部课程怪、生态怪、精英、区域 Boss 与楼层 Boss 的阶段契约；
+- 运行时结构化任务卡：局面、目标、输出、字段语义、连接键、条件和世界效果；
+- 普通怪、精英与 Boss 的单章 → 熟练 → 复合难度阶梯；
 - 主线、随机复习、小型精英、区域 Boss 和楼层 Boss；
 - 四级渐进提示；
 - 名字延迟揭示；
@@ -83,7 +85,7 @@
 
 本轮不做：
 
-- 不改变第三至八层课程顺序；
+- 不改变第一至八层既定课程顺序、怪物 ID、SQLite DDL 或存档版本；
 - 不引入 AI 自动出题或联网判题；
 - 不允许模型自动改写玩家 SQL；
 - 不把答案缩短成不可执行的“核心算法”；
@@ -129,20 +131,24 @@ identity_policy
 hints[4]
 ```
 
-`answer_sql` 是验收参考，不是唯一允许写法。
+`answer_sql` 是验收参考，不是唯一允许写法。`LessonStageDefinition` 仍是题目与判定真源；
+`lessonTaskBriefFor` 只在运行时结合规范 Schema 生成展示契约，不写入 Run/Profile，也不由 UI
+临时猜测字段含义或表关系。
 
 ### 2.2 任务卡固定顺序
 
 SQL 面板左侧必须按以下顺序展示：
 
-1. **本回合目标**：一句完整自然语言；
-2. **返回结果**：列名、来源表、需要的输出别名；
-3. **使用数据**：主表、关联表及各自角色；
-4. **连接关系**：仅在 JOIN 题展示；
-5. **过滤 / 分组 / 排序**：值和方向完整写明；
-6. **世界结果**：成功后会改变什么；
-7. **完整字段速查**：只高亮本题相关表，不隐藏其他合法表；
-8. **提示进度**：`0/4` 至 `4/4`。
+1. **难度标签**：基础、熟练、精英复合或首领审计；
+2. **当前局面**：为什么现在需要这次查询；
+3. **这次要做**：一句完整自然语言；
+4. **必须返回**：列名、来源表、需要的输出别名；
+5. **字段说明**：`m.id`、`m.room_id`、`r.id` 等逐项解释；
+6. **连接关系**：仅在 JOIN 题展示，并说明关系语义；
+7. **过滤 / 分组 / 排序**：值和方向完整写明；
+8. **成功后**：查询会改变哪条道路、机关、证据或迁移状态；
+9. **完整字段速查**：只高亮本题相关表，不隐藏其他合法表；
+10. **提示进度**：`0/4` 至 `4/4`。
 
 禁止任务文本：
 
@@ -291,6 +297,18 @@ SQLite 执行
 6. 状态可变性；
 7. 计划与系统证据。
 
+角色难度契约：
+
+| 角色 | 第一击 | 后续阶段 |
+|---|---|---|
+| 普通怪 | 当前章节一个知识点 + 基础 SELECT/WHERE | 只做同章熟练，不引入第二个高级章节 |
+| 小型精英 | 当前章节一个知识点 | 第二击起才允许叠加一个已掌握章节 |
+| 区域 Boss | 当前层已学章节的单点确认 | 第二击做不超过两个章节的复合应用 |
+| 楼层 Boss | 从本层基础关系或诊断开始 | 逐阶段增加，最终题最多组合二至三个已掌握章节 |
+
+`INNER JOIN + ON + 表别名`、`ORDER BY + LIMIT`、`LEFT JOIN + IS NULL` 分别按一个教学章节计算；
+窗口函数内部排序、事务脚本内的 DML + ROLLBACK、冲突处理中的 INSERT + 约束也各按一个章节计算。
+
 ## 6. 第一层逐怪逐阶段矩阵
 
 ### 6.1 主线怪物 ID 001–005
@@ -325,12 +343,12 @@ SQLite 执行
 |---|---|---|---|---|---|---|
 | `010-A` 最强信号 | 白沙浅滩触碰 ID #010 | `SELECT channel FROM monster_signals WHERE monster_id = 10 ORDER BY charge DESC LIMIT 1;` | `channel=surge` | 第一盏浮标亮起；阶段 0→1 | ASC、漏 LIMIT 或多行时反击 1 | 最高 charge 对应 surge |
 | `010-B` 前两航线 | 阶段 1；最终阶段 | `SELECT channel, charge FROM monster_signals WHERE monster_id = 10 ORDER BY charge DESC LIMIT 2;` | `surge,13`；`arc,11` | 两段航线出现；击杀后揭名“猎犬” | 顺序错误明确显示期望方向，不直接给答案 | 行顺序和 LIMIT 均正确 |
-| `011-A` 不同水纹 | 月影湖触碰 ID #011；最终阶段 | `SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11 ORDER BY channel;` | `echo`；`mirror` | 岛屿方向显形；击杀后揭名“水蛇” | 没 DISTINCT 或顺序错误时反击 1 | 两个不同值且有序 |
+| `011-A` 不同水纹 | 月影湖触碰 ID #011；最终阶段 | `SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 11;` | `echo`；`mirror` | 岛屿方向显形；击杀后揭名“水蛇” | 没 DISTINCT 时反击 1 | 只练 DISTINCT，不额外要求排序 |
 | `012-A` ID 与区域 | 古树桥触碰 ID #012 | `SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;` | `id=12, sector=forest` | 未知 ID 与区域之间出现唯一正确根系；不揭名 | 错键、缺表别名或字段来源不清时反击 1 | 两表有别名、连接键正确；输出列精确为 `id,sector`，不改名为 `monster_id` |
-| `012-B` 身份与房间 | 阶段 1；最终阶段 | `SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;` | `name=树妖, room_name=古树桥`，结算前暂存 | 桥完成、击杀、揭名“树妖” | 未限定两个 `name` 来源时给歧义错误 | 最终阶段才显示 `m.name`；房间 `name` 明确别名为 `room_name` |
+| `012-B` 房间牌 | 阶段 1；最终阶段 | `SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 12;` | `id=12, room_name=古树桥` | 桥完成；击杀结算后独立恢复姓名 | 错键或输出别名错误时反击 1 | SQL 不负责提前读取身份；房间名明确为 `room_name` |
 | `013-A` 缺失右表 | 芦苇沼泽触碰 ID #013；最终阶段 | `SELECT m.id FROM monsters AS m LEFT JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.room_id = 24 AND g.monster_id IS NULL;` | `id=13` | 无守卫门打开；击杀后揭名“毒蛙” | INNER JOIN、检查左表 NULL 或漏房间均反击 2 | LEFT JOIN 保留目标，右表 NULL |
-| `014-A` 多区域证据 | 灯塔守卫 Boss；前置与湖兽完成 | `SELECT r.sector, COUNT(*) AS total FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 GROUP BY r.sector HAVING COUNT(*) >= 3 ORDER BY total DESC, r.sector ASC;` | `lake,4`；`swamp,4`；`forest,3` | 灯塔从单束改为三束；多数护盾失效 | 旧 `ambush/storm` 结果不再通过 | 内容数据与三地区结果一致，平局顺序稳定 |
-| `014-B` 主透镜 | Boss 最终阶段 | `SELECT m.name, g.power FROM monsters AS m INNER JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1;` | `name=灯塔守卫, power=21`，结算前暂存 | 关闭覆盖规则、七束光、揭名、钥匙与七页记录 | 死亡回后篝火，本场阶段重置 | 真名只在最终结算出现；最强 power 为 21 |
+| `014-A` 灯塔定位 | 灯塔守卫 Boss；前置与蛙王硬门完成 | `SELECT m.id, r.sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 14;` | `id=14, sector=lighthouse` | 第一层护盾失效 | 错键时明确提示 `m.room_id = r.id` | 第一击只检查当前 JOIN 章节 |
+| `014-B` 主透镜 | Boss 最终阶段 | `SELECT m.id, g.power FROM monsters AS m INNER JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.id = 14 ORDER BY g.power DESC LIMIT 1;` | `id=14, power=21` | 关闭覆盖规则、七束光、揭名、钥匙与七页记录 | 死亡回后篝火，本场阶段重置 | 第二击才组合 JOIN 与已掌握排序 |
 
 ### 7.2 生态、精英与区域 Boss ID 015–022
 
@@ -347,17 +365,17 @@ SQLite 执行
 | ID / 阶段 | 触发与输入 | 目标 SQL | 示例结果 | 状态与输出 | 失败兜底 | 验收 |
 |---|---|---|---|---|---|---|
 | `015-A` | 湖区随机遭遇；单阶段即最终阶段 | `SELECT channel FROM monster_signals WHERE monster_id = 15 ORDER BY charge DESC LIMIT 1;` | `surge` | 击杀后揭名“水怪” | 错误反击 1 | 只复习 ORDER/LIMIT |
-| `016-A` | 湖区随机遭遇；单阶段即最终阶段 | `SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16 ORDER BY channel;` | `echo`；`mirror` | 击杀后揭名“水蛇” | 错误反击 1 | 只复习 DISTINCT |
-| `017-A` | 泥沼随机遭遇；最终阶段 | `SELECT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 17;` | `name=青蛙, room_name=泥沼石径`，结算前暂存 | 击杀、揭名 | 错键或缺输出别名反击 1 | 一阶段最终查询原子揭名 |
+| `016-A` | 湖区随机遭遇；单阶段即最终阶段 | `SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16;` | `echo`；`mirror` | 击杀后揭名“镜蛇” | 错误反击 1 | 普通怪只复习 DISTINCT |
+| `017-A` | 泥沼随机遭遇；最终阶段 | `SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 17;` | `id=17, room_name=泥沼石径` | 击杀结算后独立揭名 | 错键或缺输出别名反击 1 | 任务卡逐项解释 `m.id / m.room_id / r.id` |
 | `018-A` | 泥沼小型精英 | `SELECT m.id FROM monsters AS m LEFT JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL;` | `id=18` | 阶段 0→1 | 错误反击 2 | 找到右表缺失记录 |
-| `018-B` | 精英最终阶段 | `SELECT name FROM monsters WHERE id = 18 AND status = 'toxic';` | `name=毒蛙`，结算前暂存 | 击杀、3 XP、揭名 | 死亡重置本场 | 最终才显示名字 |
+| `018-B` | 精英最终阶段 | `SELECT m.id FROM monsters AS m LEFT JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.id = 18 AND m.status = 'toxic' AND g.monster_id IS NULL;` | `id=18` | 击杀、3 XP、揭名 | 死亡保留敌方 HP，未提交阶段不结算 | 第二击才在 LEFT JOIN 上叠加基础状态过滤 |
 | `019-A` | 林区随机遭遇；最终阶段 | `SELECT name, hp FROM monsters WHERE id = 19 ORDER BY hp DESC LIMIT 1;` | `name=猎犬, hp=13`，结算前暂存 | 击杀、揭名 | 错误反击 1 | WHERE、DESC、LIMIT 均正确 |
 | `020-A` | 林区小型精英 | `SELECT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20;` | `id=20, room_name=盘根林地` | 根系定位；阶段 0→1 | 错误反击 2 | `name` 只来自房间表；不在非最终阶段泄露怪物名，也不把主键改名为 `monster_id` |
-| `020-B` | 精英最终阶段 | `SELECT m.name, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;` | `name=树妖, room_sector=forest`，结算前暂存 | 击杀、3 XP、揭名 | 错误保留答题记录 | 最终原子揭名 |
+| `020-B` | 精英最终阶段 | `SELECT m.id, r.sector AS room_sector FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE m.id = 20 ORDER BY r.sector LIMIT 1;` | `id=20, room_sector=forest` | 击杀、3 XP、揭名 | 错误保留答题记录 | 第二击组合 JOIN 与排序，不提前查询身份 |
 | `021-A` 湖兽浮出 | 玩家选择挑战湖兽 | `SELECT channel, charge FROM monster_signals WHERE monster_id = 21 ORDER BY charge DESC LIMIT 2;` | `surge,14`；`surge,13` | 定位两次浮出时机；阶段 0→1 | 错误反击 2；可撤退 | 顺序与前两行精确 |
-| `021-B` 真实波纹 | 区域 Boss 最终阶段 | `SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 21 ORDER BY channel;` | `deep`；`surge`；`wake` | 击败、5 XP、揭名“湖兽”、潮位降低 | 死亡恢复战前潮位和 Boss 阶段 | 退潮只在最终成功后提交 |
-| `022-A` 无装备王 | 可选蛙王支线 | `SELECT m.id FROM monsters AS m LEFT JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.id = 22 AND g.monster_id IS NULL;` | `id=22` | 阶段 0→1 | 错误反击 2；不阻塞主线 | LEFT JOIN 和右表 NULL 正确 |
-| `022-B` 房间来源 | 可选 Boss 最终阶段 | `SELECT DISTINCT m.name, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;` | `name=蛙王, room_name=泥冠宫`，结算前暂存 | 击杀、5 XP、揭名、藤甲确定奖励 | 死亡回最近篝火；支线仍可重试 | 最终才显示名字；排序使用已知 ID，避免用封存身份构造旁路 |
+| `021-B` 真实波纹 | 区域 Boss 最终阶段 | `SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 21 ORDER BY channel;` | `deep`；`surge`；`wake` | 击败、3 XP、揭名“湖兽”、潮位降低 | 死亡保留已造成伤害，退回最近篝火 | 退潮只在最终成功后提交；不控制主线 |
+| `022-A` 无装备王 | 中区硬门蛙王 | `SELECT m.id FROM monsters AS m LEFT JOIN monster_gear AS g ON m.id = g.monster_id WHERE m.id = 22 AND g.monster_id IS NULL;` | `id=22` | 阶段 0→1 | 错误反击 1；可撤退 | LEFT JOIN 和右表 NULL 正确；击败前不能进入灯塔后区 |
+| `022-B` 房间来源 | 区域 Boss 最终阶段 | `SELECT DISTINCT m.id, r.name AS room_name FROM monsters AS m INNER JOIN rooms AS r ON m.room_id = r.id WHERE r.floor = 2 AND m.id = 22 ORDER BY m.id;` | `id=22, room_name=泥冠宫` | 击杀、3 XP、揭名、开放灯塔道路 | 死亡回最近篝火；本场仍可重试 | SQL 不提前查询姓名；关系、去重与排序均使用公开 ID |
 
 ## 8. 四级渐进提示
 
@@ -656,21 +674,21 @@ boss-rule-changed
 
 | 字段 | 契约 |
 |---|---|
-| 触发 | 沉水村落支线 |
+| 触发 | 抵达沉水村落的中区主线路口 |
 | 输入 | 怪物、装备、房间三类证据 |
-| 状态 | 可选，不阻塞主线 |
-| 输出 | 找到无装备记录并连接来源；藤甲确定奖励 |
+| 状态 | 中区唯一硬门；击败前封锁灯塔后区 |
+| 输出 | 找到无装备记录并连接来源；开放灯塔道路 |
 | 失败兜底 | 返回篝火后可重试 |
-| 验收 | 不授予主线课程替代，不随机掉装备 |
+| 验收 | 湖兽保持可选；蛙王不能被捷径绕过，也不随机掉装备 |
 
 ### 13.4 灯塔守卫
 
 | 字段 | 契约 |
 |---|---|
-| 触发 | 必修完成、湖兽击败、船闸开启 |
-| 输入 | 第二层地区统计与 ID #014 装备核心 |
+| 触发 | 必修完成、蛙王击败、灯塔道路开启 |
+| 输入 | ID #014 的房间关系与装备核心 |
 | 状态 | `lighthouse=majority-only` |
-| 输出 | 证明多个地区均有可靠记录，关闭覆盖规则，恢复名字 |
+| 输出 | 证明位置与装备记录可以交叉核对，关闭覆盖规则，恢复名字 |
 | 失败兜底 | 死亡回后篝火，七页记录不提前授予 |
 | 验收 | 旧“丛林王”名字、结果和攻击文本不再出现 |
 

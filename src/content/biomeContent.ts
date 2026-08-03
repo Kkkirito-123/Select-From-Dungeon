@@ -831,24 +831,24 @@ const PRACTICE_ORDER: LessonStageDefinition = {
 
 const PRACTICE_DISTINCT: LessonStageDefinition = {
   id: "practice-distinct",
-  objective: "从 monster_signals 去重查询 monster_id = 16 的 channel，并按 channel 排序。",
+  objective: "镜潮湾把同一方向复制成多条水纹。只返回 ID #016 在 monster_signals 中真正不同的 channel。",
   queryTemplate: "",
-  answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16 ORDER BY channel;",
+  answerSql: "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16;",
   hints: [
     "数据表是 monster_signals。",
     "SELECT 后加入 DISTINCT。",
     "读取 channel。",
-    "按 channel 排序。",
-    "完整写法：SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16 ORDER BY channel;",
+    "WHERE monster_id = 16 锁定这组水纹。",
+    "完整写法：SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 16;",
   ],
-  locks: ["DISTINCT", "ORDER BY"],
-  requiredFeatures: ["distinct", "order-by"],
+  locks: ["DISTINCT"],
+  requiredFeatures: ["distinct"],
   attackTargetIds: [16],
 };
 
 const PRACTICE_INNER_JOIN: LessonStageDefinition = {
   id: "practice-inner-join",
-  objective: "给 monsters 使用别名 m、rooms 使用别名 r；连接后返回 m.id = 17 的 m.id，并把 r.name 命名为 room_name。",
+  objective: "泥沼石径缺少 ID #017 的房间记录。令 monsters 为 m、rooms 为 r；用 m.room_id = r.id 连接，返回怪物主键 m.id 与房间名 r.name AS room_name，再用 m.id = 17 锁定目标。",
   queryTemplate: "",
   answerSql: "SELECT m.id, r.name AS room_name FROM monsters m INNER JOIN rooms r ON m.room_id = r.id WHERE m.id = 17;",
   hints: [
@@ -864,7 +864,7 @@ const PRACTICE_INNER_JOIN: LessonStageDefinition = {
 
 const PRACTICE_LEFT_JOIN: LessonStageDefinition = {
   id: "practice-left-join",
-  objective: "给 monsters 使用别名 m、monster_gear 使用别名 g；LEFT JOIN 后返回 m.room_id = 34 且 g.monster_id 为空的 m.id。",
+  objective: "毒雾洼地要保留所有怪物，再找出没有装备记录的一只。返回 m.id；房间条件是 m.room_id = 34，空匹配条件是 g.monster_id IS NULL。",
   queryTemplate: "",
   answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.room_id = 34 AND g.monster_id IS NULL;",
   hints: [
@@ -880,17 +880,17 @@ const PRACTICE_LEFT_JOIN: LessonStageDefinition = {
 
 const PRACTICE_LEFT_CORE: LessonStageDefinition = {
   id: "practice-left-core",
-  objective: "第二击：从 monsters 返回 id = 18 且 status = 'toxic' 的 id。",
+  objective: "第二击继续使用 LEFT JOIN，并加入已学过的状态过滤。返回 ID #018 中 status = 'toxic' 且没有装备记录的 m.id。",
   queryTemplate: "",
-  answerSql: "SELECT id FROM monsters WHERE id = 18 AND status = 'toxic';",
+  answerSql: "SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 18 AND m.status = 'toxic' AND g.monster_id IS NULL;",
   hints: [
-    "读取 id。",
-    "使用 WHERE。",
-    "用 AND 同时检查 id 与 status。",
-    "完整写法：SELECT id FROM monsters WHERE id = 18 AND status = 'toxic';",
+    "仍从 monsters m LEFT JOIN monster_gear g。",
+    "连接条件是 m.id = g.monster_id。",
+    "同时检查 m.status 与 g.monster_id IS NULL。",
+    "完整写法：SELECT m.id FROM monsters m LEFT JOIN monster_gear g ON m.id = g.monster_id WHERE m.id = 18 AND m.status = 'toxic' AND g.monster_id IS NULL;",
   ],
-  locks: ["WHERE", "AND"],
-  requiredFeatures: ["where", "and"],
+  locks: ["LEFT JOIN", "ON", "IS NULL", "AND"],
+  requiredFeatures: ["left-join", "on", "is-null", "and"],
   attackTargetIds: [18],
 };
 
@@ -1056,17 +1056,17 @@ const PRACTICE_SPIRIT: LessonStageDefinition = {
 
 const PRACTICE_SPIRIT_CORE: LessonStageDefinition = {
   id: "practice-spirit-core",
-  objective: "第二击：查询 id = 31 且 status = 'haunting' 的 id。",
+  objective: "第二击保留自连接，再加入已学过的状态过滤。返回 ID #031 的 child_id 与 master_id，并确认 child.status = 'haunting'。",
   queryTemplate: "",
-  answerSql: "SELECT id FROM monsters WHERE id = 31 AND status = 'haunting';",
+  answerSql: "SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31 AND child.status = 'haunting';",
   hints: [
-    "读取 id。",
-    "使用 WHERE。",
-    "用 AND 同时限定 id 与 status。",
-    "完整写法：SELECT id FROM monsters WHERE id = 31 AND status = 'haunting';",
+    "继续给 monsters 使用 child 与 master 两个别名。",
+    "连接 child.master_id = master.id。",
+    "用 AND 检查 child.status = 'haunting'。",
+    "完整写法：SELECT child.id AS child_id, master.id AS master_id FROM monsters child INNER JOIN monsters master ON child.master_id = master.id WHERE child.id = 31 AND child.status = 'haunting';",
   ],
-  locks: ["WHERE", "AND"],
-  requiredFeatures: ["where", "and"],
+  locks: ["SELF JOIN", "ON", "AND"],
+  requiredFeatures: ["self-join", "on", "and"],
   attackTargetIds: [31],
 };
 
