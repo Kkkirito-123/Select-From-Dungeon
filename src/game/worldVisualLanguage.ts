@@ -1,8 +1,8 @@
 import type { FloorLandmarkKind } from "../content/floorExperience";
 
 /**
- * World-space color is semantic: gold means the player can act, teal means
- * data/SQL state, red means danger. Passive scenery must stay below actors.
+ * 世界空间颜色具有固定语义：金色表示玩家可操作，青色表示数据或 SQL 状态，
+ * 红色表示危险。被动布景的视觉层级必须低于角色。
  */
 export const WORLD_VISUAL_LANGUAGE = {
   passiveDecorationAlpha: 0.24,

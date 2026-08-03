@@ -185,12 +185,11 @@ export function floorStoryEvidenceQueryForLandmark(
 }
 
 /**
- * UI-facing FIFO for story moments unlocked by synchronous Run updates.
+ * 面向 UI 的剧情片段先进先出队列，由同步 Run 更新负责解锁。
  *
- * A moment is recorded when it enters the queue, but is removed only when the
- * caller can actually present it. This keeps combat settlement overlays from
- * consuming a story card and preserves authored order when one update unlocks
- * multiple moments (for example, a floor Boss and the ascent conclusion).
+ * 片段进入队列时即被记录，但只有调用方真正开始展示时才会移除。这样可以
+ * 防止战斗结算层误消费剧情卡，也能在一次更新解锁多个片段时保持设计顺序，
+ * 例如同一时刻解锁楼层 Boss 结算和登层结论。
  */
 export class FloorStoryMomentQueue {
   private readonly recordedIds = new Set<string>();
@@ -201,8 +200,8 @@ export class FloorStoryMomentQueue {
   }
 
   /**
-   * @deprecated Use primeExisting when hydrating an existing Run. Kept as a
-   * temporary compatibility alias while presentation callers migrate.
+   * @deprecated 恢复已有 Run 时请使用 primeExisting。展示调用方迁移期间，
+   * 暂时保留该兼容别名。
    */
   prime(moments: readonly FloorStoryMoment[]): void {
     this.primeExisting(moments);
@@ -228,8 +227,8 @@ export class FloorStoryMomentQueue {
   }
 
   /**
-   * @deprecated Use peekNext followed by ackPresented after presentation has
-   * actually started, so a temporarily blocked UI cannot lose the moment.
+   * @deprecated 请先调用 peekNext，并在展示真正开始后调用 ackPresented，
+   * 避免 UI 暂时被阻挡时丢失剧情片段。
    */
   takeNext(): FloorStoryMoment | null {
     const next = this.peekNext();

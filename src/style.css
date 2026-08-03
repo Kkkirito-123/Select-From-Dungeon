@@ -2581,7 +2581,7 @@ h1 span {
 
 .terminal-grid {
   display: grid;
-  /* Expanded evidence must extend terminal scrolling, never shrink over action buttons. */
+  /* 展开的证据只能延长终端滚动区域，不能向下压缩并覆盖操作按钮。 */
   flex: 1 0 auto;
   grid-template-columns: minmax(180px, 0.72fr) minmax(330px, 1.48fr);
   gap: 10px;

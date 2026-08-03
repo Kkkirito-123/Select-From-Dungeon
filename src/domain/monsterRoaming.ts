@@ -43,10 +43,9 @@ function manhattan(a: Position, b: Position): number {
 }
 
 /**
- * Patrol actors stay inside the walkable interior of their authored room.
- * The one-tile boundary contains the room gate, while anything outside it is
- * shared maze corridor, so excluding both keeps monsters away from gates and
- * chokepoints without coupling patrol behavior to a particular gate direction.
+ * 巡逻角色只能停留在设计房间的可行走内部。外侧一格边界包含房门，
+ * 再向外则是共享迷宫走廊；同时排除两者可以让怪物远离门口和咽喉点，
+ * 又不会让巡逻规则依赖某个具体的门方向。
  */
 export function isActorPatrolPosition(
   actor: Pick<WorldActor, "roomNodeId">,
@@ -86,7 +85,7 @@ export function advanceMonsterPatrol(
       legacyMonsterIdForCurrent(actor.monsterId)
     }:${nextTick}`,
   );
-  // An explicit idle choice keeps patrols readable and avoids relentless pursuit.
+  // 显式加入原地等待，使巡逻节奏清晰，也避免怪物持续追赶玩家。
   const directions = shuffled(DIRECTIONS, random);
   for (const direction of directions) {
     const target = { x: actor.x + direction.x, y: actor.y + direction.y };

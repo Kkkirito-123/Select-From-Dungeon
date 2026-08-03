@@ -64,8 +64,8 @@ describe("seeded biome plan", () => {
         });
       }
     }
-  // This verifies 360 complete map/biome generations. Keep the sample size,
-  // but allow slower CI runners and parallel local suites enough wall time.
+  // 这里会验证 360 次完整地图与生态生成。保留样本规模，同时为较慢的
+  // CI 执行器和本地并行测试预留足够的实际运行时间。
   }, 60_000);
 
   it("第二层稳定生成湖兽与蛙王，首领不会落在安全区", () => {

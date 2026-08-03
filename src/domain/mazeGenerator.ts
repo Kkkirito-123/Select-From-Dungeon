@@ -53,9 +53,8 @@ export interface MazeDecoration extends Position {
 }
 
 /**
- * `version` remains 4 because the serialized shape is unchanged. The nested
- * generator version distinguishes legacy 64×48 mazes from authored 48×36
- * macro layouts.
+ * 序列化结构没有改变，因此 `version` 继续保持为 4。内部生成器版本用于
+ * 区分旧版 64×48 迷宫和经过设计的 48×36 宏观布局。
  */
 export interface MazeFloor {
   version: 4;
@@ -409,11 +408,9 @@ function carveWideRoute(
 }
 
 /**
- * Curriculum actors occupy room centers. A single anchored area Boss or
- * patrol actor must not be able to seal the only doorway. Every curriculum
- * transition therefore receives a second physical route between the same two
- * RoomGraph nodes. Both apertures still resolve through each room's one
- * serialized MazeGate and prerequisite list.
+ * 课程角色位于房间中心，单个固定区域首领或巡逻角色不能封死唯一门口。
+ * 因此每条课程过渡都会在相同的两个 RoomGraph 节点之间获得第二条物理
+ * 路线；两个开口仍共同受房间唯一的序列化 MazeGate 和前置条件约束。
  */
 function ensureCurriculumAccessRedundancy(
   grid: MazeTile[][],
@@ -521,9 +518,8 @@ function connectRoomGraph(
       const to = gateByNodeId.get(nextId);
       const toZone = zoneByNodeId.get(nextId);
       if (!to || !toZone) throw new Error(`缺少房间 ${nextId} 的物理门。`);
-      // One canonical gate remains serialized per room. Additional graph-edge
-      // apertures are derived from the saved zones and tiles, so the shape does
-      // not grow while branching rooms can face each connected objective.
+      // 每个房间仍只序列化一个权威门。额外图边开口由已保存区域和地块
+      // 推导，既不扩充存档结构，也允许分支房间朝向每个相邻目标。
       const fromDoor = gateCandidate(
         fromZone,
         directionTowardPosition(fromZone, toZone.center),

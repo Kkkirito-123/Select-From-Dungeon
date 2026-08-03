@@ -11,7 +11,7 @@ import { createEmptyProfile } from "../src/storage/localProgress";
 import { buildMonsterCodexModel } from "../src/ui/MonsterCodexView";
 
 describe("monster identity archive", () => {
-  it("未确认时只公开补零 ID，确认后才公开名字与物种", () => {
+  it("探索与战斗界面始终只公开补零 ID", () => {
     const monster = INITIAL_MONSTERS.find((entry) => entry.id === 1);
     if (!monster) throw new Error("缺少 ID #001 测试怪物");
 
@@ -26,11 +26,11 @@ describe("monster identity archive", () => {
     expect(monsterIntentName(monster, [])).toBe("攻击正在蓄力");
     expect(monsterIdentityPresentation(monster, [1])).toMatchObject({
       discovered: true,
-      nameLabel: "史莱姆",
-      worldLabel: "史莱姆 · ID #001",
-      speciesLabel: "类型 = 软体记录",
+      nameLabel: "ID #001",
+      worldLabel: "ID #001",
+      speciesLabel: "类型 = 未识别",
     });
-    expect(monsterIntentName(monster, [1])).toBe(monster.attackName);
+    expect(monsterIntentName(monster, [1])).toBe("攻击正在蓄力");
   });
 
   it("身份写入去重并保持稳定排序", () => {
@@ -41,14 +41,14 @@ describe("monster identity archive", () => {
     expect(profile.discoveredMonsterIds).toEqual([1, 3]);
   });
 
-  it("自由文本在身份恢复前把 canonical 名称与 species 收敛为稳定 ID", () => {
+  it("自由文本无论身份是否恢复都收敛为稳定 ID", () => {
     const monster = INITIAL_MONSTERS.find((entry) => entry.id === 84);
     if (!monster) throw new Error("缺少 ID #084 测试怪物");
     const text = `目标是${monster.name}，内部类型 ${monster.species}。`;
     expect(redactUndiscoveredMonsterIdentityText(text, [monster], []))
       .toBe("目标是ID #084，内部类型 未识别类型。");
     expect(redactUndiscoveredMonsterIdentityText(text, [monster], [84]))
-      .toBe(text);
+      .toBe("目标是ID #084，内部类型 未识别类型。");
   });
 
   it("图鉴不会从未击败条目泄露名字、物种或课程概念", () => {

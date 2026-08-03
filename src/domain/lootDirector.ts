@@ -48,10 +48,9 @@ function isKey(item: LootItem): boolean {
 }
 
 /**
- * Every candidate has its own deterministic roll. Guaranteed curriculum items
- * are inserted first, and keys never consume the three visible non-key loot
- * slots. The optional minimum is retained for explicit authored callers and
- * tests; production combat omits it, so rank never creates a random drop.
+ * 每个候选物品都独立进行确定性判定。必得课程物品优先加入，钥匙不占用
+ * 三个可见的非钥匙战利品槽。可选最小数量只供明确设计的调用方和测试使用；
+ * 正式战斗不传该值，因此怪物阶级不会凭空保证随机掉落。
  */
 export function rollLootItems(input: LootRollInput): LootItem[] {
   const stableMonsterId = legacyMonsterIdForCurrent(input.monster.id);

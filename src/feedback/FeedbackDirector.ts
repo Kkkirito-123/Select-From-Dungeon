@@ -83,9 +83,8 @@ function noticeFor(event: FeedbackEvent): FeedbackNotice | null {
 }
 
 /**
- * Keeps one semantic event mapped to one audio cue and one optional notice.
- * Scenes choose the exact frame at which `dispatch` is called; the director
- * never guesses feedback from a later snapshot.
+ * 每个语义事件只映射一个音频提示和一个可选通知。场景负责选择调用
+ * `dispatch` 的准确帧；导演器不会根据之后的快照猜测反馈。
  */
 export class FeedbackDirector {
   private readonly listeners = new Set<FeedbackListener>();

@@ -95,9 +95,8 @@ function radiusCellKeys(
 }
 
 /**
- * Safe rooms are authored and campfire circles are seeded, but neither is
- * persisted as a second geometry model. The current floor contract resolves
- * both against the saved MazeFloor whenever the Run is loaded.
+ * 安全房由内容设计，篝火范围由种子生成，但两者都不会作为第二套几何模型
+ * 持久化。每次加载 Run 时，当前楼层合同都会基于已保存的 MazeFloor 重新解析。
  */
 export function floorLabyrinthAreaAt(
   floorNumber: FloorNumber,
@@ -125,9 +124,8 @@ export function crossesIntoFloorLabyrinth(
 }
 
 /**
- * The player sees the whole authored safe room, only the current campfire ring,
- * or a floor-specific Manhattan radius inside the hostile labyrinth. Already
- * explored cells remain available to the minimap, but do not reveal actors.
+ * 玩家可以看见完整的设计安全房、当前篝火圈，或敌对迷宫中按楼层设定的
+ * 曼哈顿半径。已探索地块会保留在小地图上，但不会继续暴露其中角色。
  */
 export function floorCurrentSightCellKeys(
   floorNumber: FloorNumber,
@@ -243,8 +241,8 @@ export function generateFloorHazards(
   guidedMap: GuidedMapPlan,
   biomePlan: BiomePlan,
 ): FloorHazard[] {
-  // F1 shipped before the shared eight-floor contract. Keep its exact seeded
-  // positions so an existing v11 Run never moves an already-triggered cutter.
+  // 第一层早于八层共享合同发布，因此保留其精确种子位置，避免已有 v11 Run
+  // 在载入后移动已经触发过的切割机关。
   if (floorNumber === 1) {
     return generateFloorOneHazards(floor, campfires, guidedMap);
   }

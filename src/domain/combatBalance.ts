@@ -63,9 +63,8 @@ function retargetStage(
 }
 
 /**
- * Keeps authored stages authoritative and only fills missing elite/boss stages
- * with already introduced review questions. Stable stage IDs are preserved so
- * old answer history remains readable without a save-version migration.
+ * 设计好的阶段始终具有权威性，只使用已经教授过的复习题补齐缺失的精英或
+ * Boss 阶段。稳定阶段 ID 会被保留，使旧答题记录无需迁移存档版本也能读取。
  */
 export function stagesForEncounter(
   monster: Monster,

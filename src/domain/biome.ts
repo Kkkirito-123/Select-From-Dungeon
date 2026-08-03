@@ -485,11 +485,10 @@ export function biomeRegionAt(
 }
 
 /**
- * Returns the living area guardian that blocks this exact cross-region step.
+ * 返回阻挡本次跨区域移动的存活区域首领。
  *
- * The generated maze remains a single walkable graph. This pure rule is the
- * authoritative boundary shared by runtime movement and reachability tests, so
- * a middle-area boss cannot be bypassed by walking around its portal artwork.
+ * 生成后的迷宫仍是一张连通的可行走图。该纯规则同时作为运行时移动和
+ * 可达性测试的权威边界，确保玩家不能绕过传送门画面来避开中区首领。
  */
 export function biomeGuardianIdForStep(
   plan: BiomePlan,

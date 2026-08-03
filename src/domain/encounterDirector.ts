@@ -26,7 +26,7 @@ function hashUnit(value: string): number {
   return stableStringHash(value) / 0x1_0000_0000;
 }
 
-/** One deterministic roll per successful movement step; reloads cannot reroll it. */
+/** 每次有效移动只进行一次确定性判定，重新加载页面不能重抽结果。 */
 export function advanceEncounterMeter(
   current: EncounterMeter,
   seed: string,
