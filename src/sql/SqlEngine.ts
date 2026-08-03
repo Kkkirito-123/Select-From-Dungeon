@@ -1,5 +1,6 @@
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
+import { SQL_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import { SQL_SCHEMA_DDL } from "../content/sqlSchema";
 import { detectQueryFeatures } from "../domain/lessonEvaluator";
 import type { Monster, SqlQueryResult } from "../domain/types";
@@ -13,7 +14,7 @@ import {
   worldStorySeedDml,
 } from "./worldStorySchema";
 
-const MAX_RESULT_ROWS = 50;
+const MAX_RESULT_ROWS = SQL_RUNTIME_CONFIG.maxResultRows;
 
 interface MonsterSignalFixture {
   id: number;

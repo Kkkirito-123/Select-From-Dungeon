@@ -1,3 +1,4 @@
+import { NAVIGATION_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import { mazeTileAt, mazeZoneAt, type MazeFloor } from "./mazeGenerator";
 import { findGridPath } from "./pathfinding";
 import {
@@ -14,7 +15,7 @@ import type {
 } from "./types";
 
 export const GUIDED_MAP_VERSION = 1 as const;
-export const ROUTE_MARKER_SPACING = 14;
+export const ROUTE_MARKER_SPACING = NAVIGATION_RUNTIME_CONFIG.routeMarkerSpacing;
 
 export interface GuidedRouteMarker extends Position {
   id: string;

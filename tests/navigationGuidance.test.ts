@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NAVIGATION_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
 import { GameSession } from "../src/domain/GameSession";
 import { isMazeWalkable } from "../src/domain/mazeGenerator";
 import type { SavedRun } from "../src/domain/types";
@@ -17,7 +18,11 @@ function runAtGuidanceStep(step: number): SavedRun {
   if (!objective) throw new Error("测试图缺少 SELECT 固定目标");
   run.guidanceObjectiveId = objective.id;
   run.guidanceSteps = step;
-  run.guidanceLevel = step >= 100 ? 3 : step >= 60 ? 2 : step >= 40 ? 1 : 0;
+  run.guidanceLevel = step >= NAVIGATION_RUNTIME_CONFIG.escortAt
+    ? 3
+    : step >= NAVIGATION_RUNTIME_CONFIG.routeHighlightAt
+      ? 2
+      : step >= NAVIGATION_RUNTIME_CONFIG.directionHintAt ? 1 : 0;
   return run;
 }
 
@@ -36,9 +41,9 @@ function takeOneStep(session: GameSession): void {
 
 describe("navigation guidance", () => {
   it.each([
-    [39, 1],
-    [59, 2],
-    [99, 3],
+    [NAVIGATION_RUNTIME_CONFIG.directionHintAt - 1, 1],
+    [NAVIGATION_RUNTIME_CONFIG.routeHighlightAt - 1, 2],
+    [NAVIGATION_RUNTIME_CONFIG.escortAt - 1, 3],
   ] as const)("在第 %i 步后提升到 L%i", (before, expectedLevel) => {
     const session = new GameSession(runAtGuidanceStep(before));
     takeOneStep(session);
@@ -48,12 +53,14 @@ describe("navigation guidance", () => {
     expect(guidance.objectiveRoomId).toContain("tutorial");
     if (expectedLevel >= 2) {
       expect(guidance.route.length).toBeGreaterThan(0);
-      expect(guidance.route.length).toBeLessThanOrEqual(24);
+      expect(guidance.route.length).toBeLessThanOrEqual(
+        NAVIGATION_RUNTIME_CONFIG.maxHighlightedCells,
+      );
     }
   });
 
   it("L3 护送逐格移动、不推进伏击计数，并允许 Escape 对应的取消动作", () => {
-    const session = new GameSession(runAtGuidanceStep(100));
+    const session = new GameSession(runAtGuidanceStep(NAVIGATION_RUNTIME_CONFIG.escortAt));
     const before = session.snapshot();
     expect(session.advanceGuidanceEscort()).toBe(true);
     const after = session.snapshot();

@@ -556,6 +556,19 @@ function isPositiveInteger(value: unknown): value is number {
   return isNonNegativeInteger(value) && value > 0;
 }
 
+function isPracticeDrawState(value: unknown): boolean {
+  return isRecord(value) &&
+    isNonNegativeInteger(value.cursor) &&
+    isNonNegativeInteger(value.cycle);
+}
+
+function isPracticeDrawStates(value: unknown): boolean {
+  return isRecord(value) &&
+    isPracticeDrawState(value.L1) &&
+    isPracticeDrawState(value.L2) &&
+    isPracticeDrawState(value.L3);
+}
+
 function isPosition(
   value: unknown,
 ): value is Record<string, unknown> & { x: number; y: number } {
@@ -1368,12 +1381,16 @@ function isSavedRunVersion(
       !/^question-bank-v\d+$/u.test(run.questionBankVersion) ||
       !isNonNegativeInteger(run.practiceDrawCursor) ||
       !isNonNegativeInteger(run.practiceDrawCycle) ||
+      !(
+        run.practiceDrawStates === undefined ||
+        isPracticeDrawStates(run.practiceDrawStates)
+      ) ||
       !(activePracticeMonsterId === null || (
         isPositiveInteger(activePracticeMonsterId) &&
         CURRENT_MONSTER_IDS_BY_FLOOR[run.floor as FloorNumber].includes(activePracticeMonsterId)
       )) ||
       !Array.isArray(run.activePracticeQuestionIds) ||
-      activePracticeQuestionIds.length > 2 ||
+      activePracticeQuestionIds.length > 3 ||
       !activePracticeQuestionIds.every((id) => (
         typeof id === "string" &&
         /^question-bank-v\d+:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(id)
@@ -2142,13 +2159,4 @@ export function clearRun(storage: StorageLike): void {
   } catch {
     // A blocked storage area already behaves like an empty persisted Run.
   }
-}
-
-export function createRunSeed(): string {
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
-    const values = new Uint32Array(2);
-    crypto.getRandomValues(values);
-    return `${values[0].toString(36)}-${values[1].toString(36)}`;
-  }
-  return `castle-${Date.now().toString(36)}`;
 }

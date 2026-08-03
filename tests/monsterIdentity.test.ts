@@ -11,7 +11,7 @@ import { createEmptyProfile } from "../src/storage/localProgress";
 import { buildMonsterCodexModel } from "../src/ui/MonsterCodexView";
 
 describe("monster identity archive", () => {
-  it("未确认时只公开补零 ID，确认后才公开名字与物种", () => {
+  it("活体始终只公开补零 ID，已恢复名字只进入图鉴", () => {
     const monster = INITIAL_MONSTERS.find((entry) => entry.id === 1);
     if (!monster) throw new Error("缺少 ID #001 测试怪物");
 
@@ -26,11 +26,11 @@ describe("monster identity archive", () => {
     expect(monsterIntentName(monster, [])).toBe("攻击正在蓄力");
     expect(monsterIdentityPresentation(monster, [1])).toMatchObject({
       discovered: true,
-      nameLabel: "史莱姆",
-      worldLabel: "史莱姆 · ID #001",
-      speciesLabel: "类型 = 软体记录",
+      nameLabel: "ID #001",
+      worldLabel: "ID #001",
+      speciesLabel: "类型 = 未识别",
     });
-    expect(monsterIntentName(monster, [1])).toBe(monster.attackName);
+    expect(monsterIntentName(monster, [1])).toBe("攻击正在蓄力");
   });
 
   it("身份写入去重并保持稳定排序", () => {

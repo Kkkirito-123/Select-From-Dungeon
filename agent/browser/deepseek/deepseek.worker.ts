@@ -5,14 +5,15 @@ import {
   type ScribeOutput,
 } from "../../runtime/contracts";
 import { buildScribeUserPrompt, SCRIBE_SYSTEM_PROMPT } from "../scribe/prompt";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../../../src/config/runtimeConfig";
 import type {
   DeepSeekErrorCode,
   DeepSeekWorkerRequest,
   DeepSeekWorkerResponse,
 } from "./protocol";
 
-const DEEPSEEK_ORIGIN = "https://api.deepseek.com";
-const FETCH_TIMEOUT_MS = 12_000;
+const DEEPSEEK_ORIGIN = DEEPSEEK_RUNTIME_CONFIG.origin;
+const FETCH_TIMEOUT_MS = DEEPSEEK_RUNTIME_CONFIG.requestTimeoutMs;
 const worker = self as DedicatedWorkerGlobalScope;
 let credential: string | null = null;
 let configuredOnce = false;
@@ -57,7 +58,10 @@ async function configure(message: Extract<DeepSeekWorkerRequest, { type: "config
   }
   configuredOnce = true;
   const nextCredential = message.key.trim();
-  if (nextCredential.length < 8 || nextCredential.length > 512) {
+  if (
+    nextCredential.length < DEEPSEEK_RUNTIME_CONFIG.credentialMinLength ||
+    nextCredential.length > DEEPSEEK_RUNTIME_CONFIG.credentialMaxLength
+  ) {
     credential = null;
     response({ type: "error", requestId: message.requestId, code: "invalid-key" });
     return;
@@ -122,8 +126,8 @@ async function prepare(message: Extract<DeepSeekWorkerRequest, { type: "prepare"
           { role: "user", content: buildScribeUserPrompt(message.request, message.campfire) },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 360,
+        temperature: DEEPSEEK_RUNTIME_CONFIG.temperature,
+        max_tokens: DEEPSEEK_RUNTIME_CONFIG.maxTokens,
         stream: false,
       }),
     });
@@ -137,7 +141,11 @@ async function prepare(message: Extract<DeepSeekWorkerRequest, { type: "prepare"
       ? (value.choices[0] as { message?: { content?: unknown } } | undefined)
           ?.message?.content
       : null;
-    if (typeof content !== "string" || content.length === 0 || content.length > 8_000) {
+    if (
+      typeof content !== "string" ||
+      content.length === 0 ||
+      content.length > DEEPSEEK_RUNTIME_CONFIG.maxResponseCharacters
+    ) {
       response({ type: "error", requestId: message.requestId, code: "invalid-response" });
       return;
     }

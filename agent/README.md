@@ -19,6 +19,7 @@ always available. A player can explicitly enable DeepSeek in `AI 复盘设置`:
 - the Key is sent once to a dedicated Worker and the password field is cleared;
 - the Worker keeps it only in current-tab memory and only calls
   `https://api.deepseek.com`;
+- the model list prefers `deepseek-v4-flash` when the provider returns it;
 - refresh, tab close, `清除 Key`, or worker termination removes it;
 - no Key is written to localStorage, sessionStorage, IndexedDB, logs, exports,
   URLs, telemetry, Run/Profile data, or the project server;

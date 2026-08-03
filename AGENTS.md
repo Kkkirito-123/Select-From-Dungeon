@@ -30,10 +30,11 @@ working here, then read the closest nested `AGENTS.md` if one is added later.
 ## Product and Users
 
 `SQL 魔王城 / SELECT * FROM DUNGEON` is a Chinese browser roguelite for SQL
-beginners and interview learners. New Runs have eight deterministic `56x42`
-generator-v7 maps. Each floor distributes its authored rooms across the compact
-map, with a DFS labyrinth, about 15% loops, three regions, physical transit
-landmarks, and non-critical variation. Generator-v6 `96x72`, generator-v5
+beginners and interview learners. New Runs use one canonical set of eight
+deterministic `56x42` generator-v7 maps; players cannot enter or reroll a map
+seed. Each floor distributes its authored rooms across the compact map, with a
+DFS labyrinth, about 15% loops, three regions, and physical transit landmarks.
+Generator-v6 `96x72`, generator-v5
 `48x36`, and generator-v4 `64x48` maps remain legacy save compatibility paths. Players reveal the
 non-interactive minimap by physically walking the maze. Curriculum monsters
 show only a stable `ID #NNN` until defeated; the finishing blow recovers the
@@ -143,10 +144,10 @@ These actors never enter entrance or campfire safe zones and do not gate
 curriculum completion.
 Each floor also has one validated labyrinth contract that binds its unique maze
 name and topology signature to stable entry, exit, Boss-gate, return-shortcut,
-hidden-room, safe-room, sight-radius, and physical-hazard intent. The first move
-from an authored safe room into the hostile maze opens that floor's threshold
-confirmation; confirming it does not lock the return route. Authored entry/rest
-rooms and seeded campfire rings reveal their complete safe area and reject
+hidden-room, safe-room, sight-radius, and physical-hazard intent. Players walk
+directly from authored safe rooms into the hostile maze; no invisible threshold
+or confirmation wall may block an otherwise walkable tile. Authored entry/rest
+rooms and deterministic campfire rings reveal their complete safe area and reject
 ambushes, patrols, curriculum actors, area Bosses, and hazards. Outside them,
 current actor visibility uses the floor-specific local radius. Each floor's
 seed deterministically places its own visible, one-use physical hazards away
@@ -170,9 +171,9 @@ or a second copy of first-floor progress.
 The current product deliberately does not include free-form AI chat,
 AI-authored curriculum or gameplay state, accounts, leaderboards, multiplayer,
 a server game database, or a faithful MySQL optimizer/InnoDB runtime. The
-optional output-only Scribe adapter is read-only and never gates play. The seed
-randomizes the physical maze,
-non-critical room rewards, and optional loot, but not required SQL data,
+optional output-only Scribe adapter is read-only and never gates play. A fixed
+internal world key rebuilds the canonical physical maze; stable hashes may still
+vary non-critical rewards and optional loot, but not required SQL data,
 prerequisite lessons, or key weapons. The first floor teaches `SELECT` through
 `HAVING`; the harder second floor teaches `ORDER BY / LIMIT`, `DISTINCT`,
 `INNER JOIN`, `LEFT JOIN`, and a composite `JOIN` query. Floor three adds inner,
@@ -202,11 +203,11 @@ index.html -> src/main.ts
   -> FloorMapBlueprints (eight authored macro layouts and transit identities)
   -> FloorLabyrinthContent (stable F1-F8 navigation, safe-room, sight, and hazard contracts)
   -> FloorExperience (authored F1-F8 landmarks, hidden rooms, SQL ciphers, story, world states)
-  -> MazeGenerator/MazeValidation (deterministic 56x42 generator-v7 world)
+  -> MazeGenerator/MazeValidation (canonical deterministic 56x42 generator-v7 world)
   -> CampfireDomain (two seeded checkpoints, entrance anchor, safe-cell masks)
   -> GuidedMap (route beacons, dead-end caches, guaranteed key, shortcut)
   -> BiomeDomain (derived regions, static features, safe area-Boss anchors)
-  -> FloorLabyrinthDomain (thresholds, local sight, safe-area resolution, seeded hazards)
+  -> FloorLabyrinthDomain (local sight, safe-area resolution, deterministic hazards)
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates and same-battle deduplication)
@@ -253,6 +254,11 @@ loopback adapter for local OpenZLAgent prompt evaluation and regression only;
 the deployed web path never sends keys through it. Tools, memory, MCP, gameplay
 writes, request logging, free prompts, and persisted provider credentials are
 forbidden.
+
+`src/config/` owns Chinese-commented runtime tuning values such as map size,
+encounter rates, navigation thresholds, storage limits, and DeepSeek defaults.
+It must never contain provider credentials. Content IDs, prose, SQL contracts,
+and save versions remain with their existing authorities.
 
 `src/content/sqlSchema.ts` owns the canonical field/type/nullability metadata,
 generated DDL, and teaching relationships for `monsters`, `monster_signals`,
@@ -328,6 +334,7 @@ evaluation.
 
 ```text
 agent/              Browser output-only Agent runtime/BYOK UI plus local Python evaluator
+src/config/          Chinese-commented runtime tuning parameters; no credentials
 src/audio/          Public-domain classical-theme electronic Web Audio score and SFX
 src/content/        Curriculum, SQL schema, map/actor/narrative truth, entities,
                     fixed weapons, rewards, and onboarding copy
@@ -404,16 +411,17 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - SQLite `EXPLAIN QUERY PLAN` drives the floor-seven/eight query-load teaching
   signal. It is SQLite evidence, not a MySQL execution plan. MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
-- `public/data/question-bank-v1.sqlite` is generated from authored TypeScript
+- `public/data/question-bank-v2.sqlite` is generated from authored TypeScript
   stages and is never hand-edited. Its manifest pins the version, byte length,
-  SHA-256, and 960-question count. Every floor has 96 normal and 24 elite
-  questions. On floors two through eight, the normal pool uses 72 current-floor
-  plus 24 read-only review questions while the elite pool uses 24 current-floor
-  questions. Each floor has 15 deterministic families with eight executable,
+  SHA-256, and 960-question count. Every floor has 64 L1, 40 L2, and 16 L3
+  questions. On floors two through eight, L1 contains 40 current-floor plus 24
+  read-only review questions; L2 and L3 remain current-floor questions. Each
+  floor has 15 deterministic families with eight executable,
   materially parameterized variants; generated rows, ordering, and floor-seven
   plan evidence form the per-question grading contract. Empty-result exercises
-  must say so explicitly. Fixed curriculum monsters keep their authored stages; normal and
-  mini-elite practice encounters draw only from their matching tier.
+  must say so explicitly. Fixed curriculum monsters and floor Bosses keep their
+  authored stages; normal, mini-elite, and area-Boss practice encounters draw
+  one L1, two L2, and three L3 questions respectively.
   New Runs pin the active bank version and draw deterministic no-repeat decks.
   IndexedDB stores at most 5,000 full attempts plus permanent question/lesson
   aggregates; export and explicit clearing never include an API Key.
@@ -476,12 +484,12 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   permanently changes the seal's visible state, and
   grants no mastery, attempts, XP, or loot. Wrong results and syntax errors deal
   one armor-first damage; empty input and `Escape` consume nothing.
-- New Runs use generator-v7 `56x42` `MazeFloor` records that distribute the
+- New Runs use one canonical generator-v7 `56x42` `MazeFloor` set that distributes the
   authored rooms across the compact map with DFS carving and about 15% loops;
   remote DFS branches outside the authored-room connection envelope are sealed
   back into walls instead of forming an unused outer maze.
   generator-v6 `96x72`, generator-v5 `48x36`, and generator-v4 `64x48` records remain loadable for legacy Run
-  compatibility. Players must walk through the
+  compatibility. There is no player-facing seed input or map reroll. Players must walk through the
   continuous world; the discovery minimap is not a navigation control. Moving
   into the same tile as a living curriculum monster or triggering the
   successful-step encounter meter starts the separate battle scene. After its
@@ -491,8 +499,8 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   and reject patrol entry. Ordinary world monsters patrol slowly; the Boss
   remains anchored.
 - All eight floors resolve their independent labyrinth contract at runtime.
-  Crossing from an authored safe room into the maze requires one explicit
-  threshold confirmation for the current floor. Safe rooms and campfire rings
+  Players can cross every visibly open safe-room boundary directly; invisible
+  threshold confirmation walls are forbidden. Safe rooms and campfire rings
   expose their whole safe area; the hostile maze exposes only the current
   floor's local sight radius. Seeded physical hazards are visible only when both
   discovered and currently in sight, apply their configured one-time

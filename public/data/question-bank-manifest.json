@@ -1,8 +1,8 @@
 {
-  "bankVersion": "question-bank-v1",
-  "schemaVersion": 1,
-  "url": "data/question-bank-v1.sqlite",
-  "byteLength": 1077248,
-  "sha256": "b2a8ab70be3514041cfe68bc0f2a0f5b7919abda37404f82f32657442291c44b",
+  "bankVersion": "question-bank-v2",
+  "schemaVersion": 2,
+  "url": "data/question-bank-v2.sqlite",
+  "byteLength": 1048576,
+  "sha256": "11a8735c34841f7b5322adb293775ad14b6b6339edeaf3ce0b044d684fb88904",
   "questionCount": 960
 }

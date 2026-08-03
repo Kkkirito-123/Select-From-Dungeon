@@ -2,10 +2,14 @@ import initSqlJs from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import {
   QuestionBankCatalog,
-  practiceQuestionTier,
   type PracticeQuestion,
   type PracticeQuestionScope,
+  type PracticeQuestionTier,
 } from "../content/questionBank";
+import {
+  QUESTION_BANK_CONFIG,
+  QUESTION_BANK_TIERS,
+} from "../config/questionBankConfig";
 import type { AuthoredLessonStageId, QueryFeature } from "../domain/types";
 import type { FloorNumber, RunLessonId } from "../domain/runGraph";
 import { QuestionBankCache, type CachedQuestionBank } from "../storage/questionBankCache";
@@ -35,6 +39,12 @@ function parseRows(value: unknown): unknown[][] {
     : [];
 }
 
+function parseTier(value: unknown): PracticeQuestionTier | null {
+  return typeof value === "string" && QUESTION_BANK_TIERS.some((tier) => tier === value)
+    ? value as PracticeQuestionTier
+    : null;
+}
+
 async function sha256(bytes: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)]
@@ -52,7 +62,7 @@ export async function loadBundledQuestionBank(
   try {
     const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
     const manifestResponse = await fetcher(
-      `${normalizedBase}data/question-bank-manifest.json`,
+      `${normalizedBase}${QUESTION_BANK_CONFIG.manifestUrl}`,
       { cache: "no-store" },
     );
     if (!manifestResponse.ok) {
@@ -61,10 +71,10 @@ export async function loadBundledQuestionBank(
     }
     const manifest = await manifestResponse.json() as QuestionBankManifest;
     if (
-      manifest.schemaVersion !== 1 ||
-      manifest.questionCount !== 960 ||
-      !/^question-bank-v\d+$/u.test(manifest.bankVersion) ||
-      !/^data\/question-bank-v\d+\.sqlite$/u.test(manifest.url)
+      manifest.schemaVersion !== QUESTION_BANK_CONFIG.schemaVersion ||
+      manifest.questionCount !== QUESTION_BANK_CONFIG.totalQuestions ||
+      manifest.bankVersion !== QUESTION_BANK_CONFIG.version ||
+      manifest.url !== QUESTION_BANK_CONFIG.databaseUrl
     ) return null;
     if (pinnedVersion && pinnedVersion !== manifest.bankVersion) {
       const pinned = await cache.get(pinnedVersion);
@@ -120,11 +130,12 @@ async function catalogFromBytes(
   wasmLocation: string,
 ): Promise<QuestionBankCatalog | null> {
   try {
+    if (cached.schemaVersion !== QUESTION_BANK_CONFIG.schemaVersion) return null;
     const SQL = await initSqlJs({ locateFile: () => wasmLocation });
     const database = new SQL.Database(new Uint8Array(cached.bytes));
     try {
       const result = database.exec(`
-        SELECT question_id, bank_version, floor, scope, template_id,
+        SELECT question_id, bank_version, floor, scope, tier, template_id,
                variant_index, primary_lesson_id, base_stage_id, objective,
                answer_sql, hints_json, required_features_json,
                expected_columns_json, expected_rows_json, rows_ordered,
@@ -133,27 +144,31 @@ async function catalogFromBytes(
          WHERE enabled = 1
          ORDER BY floor, scope, template_id, variant_index
       `)[0];
-      if (!result || result.values.length !== 960) return null;
-      const questions = result.values.map((row): PracticeQuestion => ({
-        questionId: String(row[0]),
-        bankVersion: String(row[1]),
-        floor: Number(row[2]) as FloorNumber,
-        scope: String(row[3]) as PracticeQuestionScope,
-        templateId: String(row[4]),
-        tier: practiceQuestionTier(String(row[4])),
-        variantIndex: Number(row[5]),
-        lessonId: String(row[6]) as RunLessonId,
-        baseStageId: String(row[7]) as AuthoredLessonStageId,
-        objective: String(row[8]),
-        answerSql: String(row[9]),
-        hints: parseStringArray(row[10]),
-        requiredFeatures: parseStringArray(row[11]) as QueryFeature[],
-        expectedColumns: parseStringArray(row[12]),
-        expectedRows: parseRows(row[13]),
-        rowsOrdered: Number(row[14]) === 1,
-        planInclude: parseStringArray(row[15]),
-        planExclude: parseStringArray(row[16]),
-      }));
+      if (!result || result.values.length !== QUESTION_BANK_CONFIG.totalQuestions) return null;
+      const questions = result.values.map((row): PracticeQuestion => {
+        const tier = parseTier(row[4]);
+        if (!tier) throw new Error("题库包含无效 tier");
+        return {
+          questionId: String(row[0]),
+          bankVersion: String(row[1]),
+          floor: Number(row[2]) as FloorNumber,
+          scope: String(row[3]) as PracticeQuestionScope,
+          tier,
+          templateId: String(row[5]),
+          variantIndex: Number(row[6]),
+          lessonId: String(row[7]) as RunLessonId,
+          baseStageId: String(row[8]) as AuthoredLessonStageId,
+          objective: String(row[9]),
+          answerSql: String(row[10]),
+          hints: parseStringArray(row[11]),
+          requiredFeatures: parseStringArray(row[12]) as QueryFeature[],
+          expectedColumns: parseStringArray(row[13]),
+          expectedRows: parseRows(row[14]),
+          rowsOrdered: Number(row[15]) === 1,
+          planInclude: parseStringArray(row[16]),
+          planExclude: parseStringArray(row[17]),
+        };
+      });
       return new QuestionBankCatalog(cached.bankVersion, questions);
     } finally {
       database.close();

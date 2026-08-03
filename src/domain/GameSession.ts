@@ -32,6 +32,7 @@ import {
   QUESTION_BANK_VERSION,
   practiceStageForQuestion,
   type PracticeDrawState,
+  type PracticeQuestionTier,
   type QuestionBankCatalog,
 } from "../content/questionBank";
 import {
@@ -44,6 +45,10 @@ import {
   hasFloorExperience,
 } from "../content/floorExperience";
 import { floorLabyrinth } from "../content/floorLabyrinth";
+import {
+  NAVIGATION_RUNTIME_CONFIG,
+  WORLD_RUNTIME_CONFIG,
+} from "../config/runtimeConfig";
 import {
   cloneMazeFloor,
   generateMazeFloor,
@@ -84,11 +89,9 @@ import {
   safeZoneCellKeys,
 } from "./campfire";
 import {
-  crossesIntoFloorLabyrinth,
   floorLabyrinthAreaAt,
   floorSafeAreaCellKeysAt,
   generateFloorHazards,
-  hasDiscoveredLabyrinthCell,
   type FloorHazard,
 } from "./floorLabyrinth";
 import {
@@ -187,6 +190,16 @@ import type {
 } from "./types";
 
 type SessionListener = (snapshot: GameSnapshot) => void;
+
+type PracticeDrawStates = Record<PracticeQuestionTier, PracticeDrawState>;
+
+function emptyPracticeDrawStates(): PracticeDrawStates {
+  return {
+    L1: { cursor: 0, cycle: 0 },
+    L2: { cursor: 0, cycle: 0 },
+    L3: { cursor: 0, cycle: 0 },
+  };
+}
 
 const INITIAL_EXPLORATION_BANNER =
   "迷宫已经生成。沿青色箭头找到 ID #001，触碰它进入 SELECT 战斗。";
@@ -621,7 +634,7 @@ export class GameSession {
   };
   private hintLevel = 0;
   private answerHistory: AnswerAttemptRecord[] = [];
-  private practiceDrawState: PracticeDrawState = { cursor: 0, cycle: 0 };
+  private practiceDrawStates: PracticeDrawStates = emptyPracticeDrawStates();
   private activePracticeMonsterId: number | null = null;
   private activePracticeQuestionIds: string[] = [];
   private rewardedPracticeMonsterIds = new Set<number>();
@@ -636,14 +649,13 @@ export class GameSession {
   private adminIdentityMonsterIds = new Set<number>();
   private regionTransferSequence = 0;
   private regionTransfer: GameSnapshot["regionTransfer"] = null;
-  private labyrinthEntryConfirmed = false;
   private profile: ProfileProgress;
   private readonly listeners = new Set<SessionListener>();
 
   constructor(
     savedRun?: SavedRun | null,
     profile?: ProfileProgress | null,
-    seed = "sql-castle-demo",
+    seed: string = WORLD_RUNTIME_CONFIG.fixedWorldSeed,
     private readonly questionBank: QuestionBankCatalog | null = null,
   ) {
     this.runInstanceId = createRunInstanceId(seed);
@@ -792,10 +804,19 @@ export class GameSession {
       };
       this.hintLevel = savedRun.hintLevel;
       this.answerHistory = cloneAnswerHistory(savedRun.answerHistory);
-      this.practiceDrawState = {
-        cursor: savedRun.practiceDrawCursor,
-        cycle: savedRun.practiceDrawCycle,
-      };
+      this.practiceDrawStates = savedRun.practiceDrawStates
+        ? {
+            L1: { ...savedRun.practiceDrawStates.L1 },
+            L2: { ...savedRun.practiceDrawStates.L2 },
+            L3: { ...savedRun.practiceDrawStates.L3 },
+          }
+        : {
+            ...emptyPracticeDrawStates(),
+            L1: {
+              cursor: savedRun.practiceDrawCursor,
+              cycle: savedRun.practiceDrawCycle,
+            },
+          };
       this.activePracticeMonsterId = savedRun.activePracticeMonsterId;
       this.activePracticeQuestionIds = [...savedRun.activePracticeQuestionIds];
       this.rewardedPracticeMonsterIds = new Set(savedRun.rewardedPracticeMonsterIds);
@@ -807,20 +828,6 @@ export class GameSession {
       this.banner = restoredWorldBanner(savedRun.banner);
       this.restoreCanonicalCombatState();
       this.selectedMonsterId = this.combat?.targetId ?? this.monsterForCurrentRoom()?.id ?? null;
-      this.labyrinthEntryConfirmed =
-        floorLabyrinthAreaAt(
-          this.floorNumber,
-          this.mazeFloor,
-          this.campfires,
-          this.player,
-        ) === "labyrinth" ||
-        hasDiscoveredLabyrinthCell(
-          this.floorNumber,
-          this.mazeFloor,
-          this.campfires,
-          this.discoveredCells,
-        ) ||
-        this.visitedRoomIds.size > 1;
       this.revealAt(this.player);
     }
     this.ensureOpenedHiddenAreaRewards();
@@ -947,7 +954,9 @@ export class GameSession {
           ...record,
           answerSql: redactRecordIdentity(record.answerSql),
           monsterName: monster
-            ? monsterNameForProfile(monster, visibleProfile)
+            ? record.outcome === "victory"
+              ? monsterNameForProfile(monster, visibleProfile)
+              : monsterIdLabel(monster.id)
             : redactRecordIdentity(record.monsterName),
           stageObjective: redactRecordIdentity(record.stageObjective),
           feedback: redactRecordIdentity(record.feedback),
@@ -1060,8 +1069,13 @@ export class GameSession {
       generatorVersion: this.mazeFloor.generatorVersion,
       runInstanceId: this.runInstanceId,
       questionBankVersion: this.questionBankVersion,
-      practiceDrawCursor: this.practiceDrawState.cursor,
-      practiceDrawCycle: this.practiceDrawState.cycle,
+      practiceDrawCursor: this.practiceDrawStates.L1.cursor,
+      practiceDrawCycle: this.practiceDrawStates.L1.cycle,
+      practiceDrawStates: {
+        L1: { ...this.practiceDrawStates.L1 },
+        L2: { ...this.practiceDrawStates.L2 },
+        L3: { ...this.practiceDrawStates.L3 },
+      },
       activePracticeMonsterId: this.activePracticeMonsterId,
       activePracticeQuestionIds: [...this.activePracticeQuestionIds],
       rewardedPracticeMonsterIds: [...this.rewardedPracticeMonsterIds],
@@ -1203,24 +1217,6 @@ export class GameSession {
       return this.moveFailure(from, to, "gate", regionGuardianMessage);
     }
 
-    if (
-      !this.adminMode &&
-      !this.labyrinthEntryConfirmed &&
-      crossesIntoFloorLabyrinth(
-        this.floorNumber,
-        this.mazeFloor,
-        this.campfires,
-        from,
-        to,
-      )
-    ) {
-      const contract = floorLabyrinth(this.floorNumber);
-      const message = `${contract.entryPrompt} 迷宫中会出现「${contract.hazardName}」，进入后仍可原路返回安全区。`;
-      this.banner = message;
-      this.emit();
-      return this.moveFailure(from, to, "threshold", message);
-    }
-
     const blockingCampfire = this.campfires.find(
       (campfire) => campfire.x === to.x && campfire.y === to.y,
     );
@@ -1309,12 +1305,6 @@ export class GameSession {
     };
   }
 
-  confirmLabyrinthEntry(): boolean {
-    if (this.mode !== "explore") return false;
-    this.labyrinthEntryConfirmed = true;
-    return true;
-  }
-
   cancelGuidanceEscort(): boolean {
     if (this.guidanceLevel !== 3) return false;
     this.guidanceLevel = 2;
@@ -1380,11 +1370,6 @@ export class GameSession {
     }
     this.emit();
     return true;
-  }
-
-  /** @deprecated Kept for the shipped F1 UI/test contract. */
-  confirmFloorOneLabyrinthEntry(): boolean {
-    return this.confirmLabyrinthEntry();
   }
 
   setPlayerPosition(x: number, y: number): boolean {
@@ -1497,7 +1482,7 @@ export class GameSession {
       return this.interactionFailure("这只怪物不在当前迷宫区域。");
     }
     this.selectedMonsterId = id;
-    this.banner = `已扫描 ${monsterNameForProfile(monster, this.profile)}：错误查询最高受到 ${monster.damage} 点伤害。`;
+    this.banner = `已扫描 ${monsterIdLabel(monster.id)}：错误查询最高受到 ${monster.damage} 点伤害。`;
     this.emit();
     return { ok: true, kind: "none", message: this.banner };
   }
@@ -2277,7 +2262,7 @@ export class GameSession {
           const nextStage = combatStages[Math.min(nextSuccessStep, combatStages.length - 1)];
           this.combat.intent.locks = [...nextStage.locks];
           this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
-          this.banner = `${evaluation.message} ${this.player.weapon.name} 命中，${monsterNameForProfile(target, this.profile)} 剩余 ${target.hp} HP。下一问：${nextStage.objective}`;
+          this.banner = `${evaluation.message} ${this.player.weapon.name} 命中，${monsterIdLabel(target.id)} 剩余 ${target.hp} HP。下一问：${nextStage.objective}`;
         }
       }
     } else {
@@ -2291,7 +2276,7 @@ export class GameSession {
         ? `护甲吸收 ${armorDamage} 点${playerDamage > 0 ? `，生命损失 ${playerDamage} 点` : ""}`
         : `生命损失 ${playerDamage} 点`;
       this.banner = `${evaluation.message} ${
-        target ? monsterNameForProfile(target, this.profile) : "未知记录"
+        target ? monsterIdLabel(target.id) : "未知记录"
       }：${
         target
           ? monsterIntentName(target, this.profile.discoveredMonsterIds)
@@ -2310,7 +2295,9 @@ export class GameSession {
         battleId: this.reviewBattleId ?? this.battleSequence,
         floor: this.floorNumber,
         monsterId: reviewTarget.id,
-        monsterName: monsterNameForProfile(reviewTarget, this.profile),
+        monsterName: killedIds.includes(reviewTarget.id)
+          ? monsterNameForProfile(reviewTarget, this.profile)
+          : monsterIdLabel(reviewTarget.id),
         lessonId: lesson.id,
         stageId: stage.id,
         stageObjective: stage.objective,
@@ -2374,7 +2361,7 @@ export class GameSession {
       ? `护甲吸收 ${armorDamage} 点${playerDamage > 0 ? `，生命损失 ${playerDamage} 点` : ""}`
       : `生命损失 ${playerDamage} 点`;
     this.banner = `${message} ${
-      target ? monsterNameForProfile(target, this.profile) : "未知记录"
+      target ? monsterIdLabel(target.id) : "未知记录"
     } 趁终端失稳反击，${damageMessage}。`;
     if (playerDefeated) {
       this.enterDefeat("combat");
@@ -2390,7 +2377,7 @@ export class GameSession {
         battleId: this.reviewBattleId ?? this.battleSequence,
         floor: this.floorNumber,
         monsterId: reviewTarget.id,
-        monsterName: monsterNameForProfile(reviewTarget, this.profile),
+        monsterName: monsterIdLabel(reviewTarget.id),
         lessonId: lesson.id,
         stageId: stage.id,
         stageObjective: stage.objective,
@@ -2484,7 +2471,7 @@ export class GameSession {
     this.activeLootBundleId = null;
     this.discoveredCells = new Set();
     this.combat = null;
-    this.practiceDrawState = { cursor: 0, cycle: 0 };
+    this.practiceDrawStates = emptyPracticeDrawStates();
     this.activePracticeMonsterId = null;
     this.activePracticeQuestionIds = [];
     this.guidanceObjectiveId = null;
@@ -2504,7 +2491,6 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.regionTransfer = null;
-    this.labyrinthEntryConfirmed = false;
     const floorNames: Record<FloorNumber, string> = {
       1: "余烬地窖",
       2: "潮汐群岛",
@@ -2521,12 +2507,13 @@ export class GameSession {
     return true;
   }
 
-  reset(seed = `${this.graph.seed}-next`): void {
+  reset(): void {
     if (this.adminMode) {
-      this.banner = "管理员预览不会覆盖正式 Run。刷新页面后再生成新迷宫。";
+      this.banner = "管理员预览不会覆盖正式 Run。刷新页面后回到正式固定地图。";
       this.emit();
       return;
     }
+    const seed = WORLD_RUNTIME_CONFIG.fixedWorldSeed;
     this.campaign = createCampaignProgress(seed);
     this.runInstanceId = createRunInstanceId(seed);
     this.questionBankVersion = this.questionBank?.version ?? QUESTION_BANK_VERSION;
@@ -2596,7 +2583,7 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.answerHistory = [];
-    this.practiceDrawState = { cursor: 0, cycle: 0 };
+    this.practiceDrawStates = emptyPracticeDrawStates();
     this.activePracticeMonsterId = null;
     this.activePracticeQuestionIds = [];
     this.rewardedPracticeMonsterIds.clear();
@@ -2606,8 +2593,7 @@ export class GameSession {
     this.battleSequence = 0;
     this.reviewBattleId = null;
     this.regionTransfer = null;
-    this.labyrinthEntryConfirmed = false;
-    this.banner = "新迷宫已生成。沿青色箭头触碰 ID #001 开始 SELECT；永久怪物图鉴保持不变。";
+    this.banner = "固定地图已重置。沿青色箭头触碰 ID #001 开始 SELECT；永久怪物图鉴保持不变。";
     this.revealAt(this.player);
     this.emit();
   }
@@ -2712,7 +2698,9 @@ export class GameSession {
       direction,
       distance: path.length > 0 ? path.length - 1 : null,
       route: this.guidanceLevel >= 2
-        ? path.slice(1, 25).map((position) => ({ ...position }))
+        ? path
+            .slice(1, NAVIGATION_RUNTIME_CONFIG.maxHighlightedCells + 1)
+            .map((position) => ({ ...position }))
         : [],
     };
   }
@@ -2739,11 +2727,11 @@ export class GameSession {
       return false;
     }
     this.guidanceSteps += 1;
-    const nextLevel: 0 | 1 | 2 | 3 = this.guidanceSteps >= 100
+    const nextLevel: 0 | 1 | 2 | 3 = this.guidanceSteps >= NAVIGATION_RUNTIME_CONFIG.escortAt
       ? 3
-      : this.guidanceSteps >= 60
+      : this.guidanceSteps >= NAVIGATION_RUNTIME_CONFIG.routeHighlightAt
         ? 2
-        : this.guidanceSteps >= 40
+        : this.guidanceSteps >= NAVIGATION_RUNTIME_CONFIG.directionHintAt
           ? 1
           : 0;
     if (nextLevel <= this.guidanceLevel) return false;
@@ -2759,7 +2747,7 @@ export class GameSession {
     this.banner = nextLevel === 1
       ? `余烬指路：下一个固定目标「${objective.title}」在${direction}侧，约 ${guidance.distance ?? "?"} 步。`
       : nextLevel === 2
-        ? `余烬已高亮前方最多 24 格安全路线，目标「${objective.title}」。`
+        ? `余烬已高亮前方最多 ${NAVIGATION_RUNTIME_CONFIG.maxHighlightedCells} 格安全路线，目标「${objective.title}」。`
         : `抄写员已启动逐格路线护送，目标「${objective.title}」；按 Escape 可取消。`;
     return true;
   }
@@ -2827,10 +2815,17 @@ export class GameSession {
     );
   }
 
+  private usesQuestionBank(monster: Monster): boolean {
+    const role = biomeEncounterFor(monster.id)?.role;
+    return monster.encounterType === "ambush" && (
+      role === "normal" || role === "mini-elite" || role === "area-boss"
+    );
+  }
+
   private preparePracticeBattle(monster: Monster): void {
     this.activePracticeMonsterId = null;
     this.activePracticeQuestionIds = [];
-    if (!this.questionBank || !this.isRepeatablePracticeMonster(monster)) return;
+    if (!this.questionBank || !this.usesQuestionBank(monster)) return;
     const unlockedLessons = new Set<LessonId>([
       ...this.profile.masteredLessons,
       ...this.completedLessons,
@@ -2838,20 +2833,21 @@ export class GameSession {
         .filter((room) => room.lessonId && this.roomAccessMessage(room) === null)
         .map((room) => room.lessonId as LessonId),
     ]);
-    const count = biomeEncounterFor(monster.id)?.role === "mini-elite" ? 2 : 1;
-    const tier = biomeEncounterFor(monster.id)?.role === "mini-elite"
-      ? "elite"
-      : "normal";
+    const role = biomeEncounterFor(monster.id)?.role;
+    const count = role === "area-boss" ? 3 : role === "mini-elite" ? 2 : 1;
+    const tier: PracticeQuestionTier = role === "area-boss"
+      ? "L3"
+      : role === "mini-elite" ? "L2" : "L1";
     const draw = this.questionBank.draw(
       this.floorNumber,
-      this.graph.seed,
-      this.practiceDrawState,
+      this.runInstanceId,
+      this.practiceDrawStates[tier],
       unlockedLessons,
       count,
       tier,
     );
     if (draw.questions.length === 0) return;
-    this.practiceDrawState = draw.state;
+    this.practiceDrawStates[tier] = draw.state;
     this.activePracticeMonsterId = monster.id;
     this.activePracticeQuestionIds = draw.questions.map((question) => question.questionId);
   }
@@ -2984,7 +2980,7 @@ export class GameSession {
     const roleLabel = encounter?.role === "area-boss"
       ? "区域首领"
       : encounter?.role === "mini-elite" ? "小型精英" : "触碰遭遇";
-    this.banner = `${roleLabel} ${monsterNameForProfile(monster, this.profile)}（${stages.length} 阶段）。按住 Q + S 写出完整 SQL。`;
+    this.banner = `${roleLabel} ${monsterIdLabel(monster.id)}（${stages.length} 阶段）。按住 Q + S 写出完整 SQL。`;
     this.emit();
     return { ok: true, kind: "combat", message: this.banner };
   }
@@ -3043,7 +3039,7 @@ export class GameSession {
     this.hintLevel = this.relics.some((relic) => relic.id === "schema-eye") ? 1 : 0;
     const encounter = biomeEncounterFor(monster.id);
     const roleLabel = encounter?.role === "mini-elite" ? "小型精英" : "突发遭遇";
-    this.banner = `${roleLabel} ${monsterNameForProfile(monster, this.profile)}！完成 ${
+    this.banner = `${roleLabel} ${monsterIdLabel(monster.id)}！完成 ${
       stages.length
     } 道 ${lessonById(monster.lessonId).concept} 练习即可脱身。`;
     return monster.id;
@@ -3489,7 +3485,7 @@ export class GameSession {
     }
     const campaign = createCampaignProgress(this.campaign.baseSeed, floor);
     const floorSeed = campaign.floors.find((slot) => slot.floor === floor)?.seed;
-    if (!floorSeed) return this.interactionFailure("管理员预览层缺少 Seed。");
+    if (!floorSeed) return this.interactionFailure("管理员预览层缺少固定地图标识。");
 
     this.campaign = campaign;
     this.floorNumber = floor;
@@ -3546,7 +3542,6 @@ export class GameSession {
     };
     this.hintLevel = 0;
     this.regionTransfer = null;
-    this.labyrinthEntryConfirmed = true;
     this.revealAt(this.player);
     this.banner = `管理员预览：第 ${floor} 层全图已载入。刷新页面可回到最后一次正式存档。`;
     this.emit();
@@ -4014,7 +4009,7 @@ export class GameSession {
     const item = this.groundItems.find((entry) => entry.sourceRoomId === zone.roomNodeId);
     const lootBundle = this.lootBundles.find((entry) => entry.sourceRoomId === zone.roomNodeId);
     if (monster && monster.hp > 0) {
-    this.banner = `${monsterNameForProfile(monster, this.profile)} 正在区域内巡逻。触碰才会开战。`;
+      this.banner = `${monsterIdLabel(monster.id)} 正在区域内巡逻。触碰才会开战。`;
     } else if (lootBundle) {
       this.banner = `这里留有一个含 ${lootBundle.items.length} 件物品的战利品包。靠近后按 E 打开。`;
     } else if (item) {
@@ -4487,7 +4482,7 @@ export class GameSession {
       const blocker = this.monsters.find((monster) => monster.id === portal.requiredBossId);
       if (blocker && blocker.hp > 0) {
         return this.interactionFailure(
-          `${transit.label}尚未开放：先击败 ${monsterNameForProfile(blocker, this.profile)}。`,
+          `${transit.label}尚未开放：先击败 ${monsterIdLabel(blocker.id)}。`,
         );
       }
     }
@@ -4704,7 +4699,7 @@ export class GameSession {
             (monster) => monster.id === regionPortal.portal.requiredBossId && monster.hp > 0,
           );
       return boss && regionPortal.side === "entry"
-        ? `E  ${transit.label}未开放 · 先击败 ${monsterNameForProfile(boss, this.profile)}`
+        ? `E  ${transit.label}未开放 · 先击败 ${monsterIdLabel(boss.id)}`
         : `E  ${transit.action}${transit.label} · 前往${targetRegion?.name ?? "相邻区域"}`;
     }
     if (lootBundle) return `E  打开战利品包 · ${lootBundle.items.length} 件物品`;
@@ -4737,7 +4732,7 @@ export class GameSession {
       ? this.monsters.find((entry) => entry.id === actor.monsterId && entry.hp > 0)
       : undefined;
     if (actor && monster) {
-      return `触碰 ${monsterNameForProfile(monster, this.profile)} 进入战斗`;
+      return `触碰 ${monsterIdLabel(monster.id)} 进入战斗`;
     }
     return "探索迷宫 · 已走过的区域会显示在小地图";
   }

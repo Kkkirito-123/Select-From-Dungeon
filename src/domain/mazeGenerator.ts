@@ -6,6 +6,7 @@ import {
   type FloorMapBlueprint,
   type FloorMapSlot,
 } from "../content/floorMapBlueprints";
+import { WORLD_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import type { LessonId, Position } from "./types";
 import {
   createSeededRandom,
@@ -29,9 +30,9 @@ export const PREVIOUS_MAZE_CHUNK_SIZE = MVP2_MAZE_CHUNK_SIZE;
 export const LARGE_MAZE_WIDTH = 96;
 export const LARGE_MAZE_HEIGHT = 72;
 export const LARGE_MAZE_CHUNK_SIZE = 24;
-export const MAZE_WIDTH = 56;
-export const MAZE_HEIGHT = 42;
-export const MAZE_CHUNK_SIZE = 14;
+export const MAZE_WIDTH = WORLD_RUNTIME_CONFIG.width;
+export const MAZE_HEIGHT = WORLD_RUNTIME_CONFIG.height;
+export const MAZE_CHUNK_SIZE = WORLD_RUNTIME_CONFIG.chunkSize;
 
 export type MazeTile = "#" | ".";
 export type MazeDecorationKind = "torch" | "rubble" | "rune";
@@ -831,7 +832,11 @@ export function generateMazeFloor(
     grid,
     zoneMask,
     topologyRandom,
-    clamp(options.braidRatio ?? 0.15, 0, 0.35),
+    clamp(
+      options.braidRatio ?? WORLD_RUNTIME_CONFIG.braidRatio,
+      0,
+      WORLD_RUNTIME_CONFIG.maxBraidRatio,
+    ),
   );
   const gates = placeGates(grid, graph, zones, topologyRandom);
   const interestMask = connectRoomGraph(

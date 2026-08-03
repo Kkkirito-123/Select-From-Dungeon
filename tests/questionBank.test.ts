@@ -1,10 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import initSqlJs from "sql.js";
 import {
   QuestionBankCatalog,
   practiceStageForQuestion,
+  type PracticeQuestionTier,
 } from "../src/content/questionBank";
+import { QUESTION_BANK_CONFIG } from "../src/config/questionBankConfig";
 import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
 import { evaluateStage } from "../src/domain/lessonEvaluator";
@@ -17,15 +20,15 @@ async function fixtureFetcher(input: RequestInfo | URL): Promise<Response> {
   if (url.endsWith("question-bank-manifest.json")) {
     return new Response(await readFile(resolve("public/data/question-bank-manifest.json")));
   }
-  if (url.endsWith("question-bank-v1.sqlite")) {
-    return new Response(await readFile(resolve("public/data/question-bank-v1.sqlite")));
+  if (url.endsWith("question-bank-v2.sqlite")) {
+    return new Response(await readFile(resolve("public/data/question-bank-v2.sqlite")));
   }
   return new Response(null, { status: 404 });
 }
 
 const wasmLocation = resolve("node_modules/sql.js/dist/sql-wasm.wasm");
 
-describe("question bank v1", () => {
+describe("question bank v2", () => {
   it("loads one verified read-only catalog with 120 questions per floor", async () => {
     const catalog = await loadBundledQuestionBank(
       "/",
@@ -35,25 +38,75 @@ describe("question bank v1", () => {
       wasmLocation,
     );
     expect(catalog).toBeInstanceOf(QuestionBankCatalog);
-    expect(catalog?.questions).toHaveLength(960);
-    for (let floor = 1; floor <= 8; floor += 1) {
+    expect(catalog?.questions).toHaveLength(QUESTION_BANK_CONFIG.totalQuestions);
+    const lastFloor = QUESTION_BANK_CONFIG.firstFloor + QUESTION_BANK_CONFIG.floorCount - 1;
+    for (let floor = QUESTION_BANK_CONFIG.firstFloor; floor <= lastFloor; floor += 1) {
       const questions = catalog?.questionsForFloor(floor as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8) ?? [];
-      expect(questions).toHaveLength(120);
-      expect(new Set(questions.map((question) => question.questionId)).size).toBe(120);
+      expect(questions).toHaveLength(QUESTION_BANK_CONFIG.questionsPerFloor);
+      expect(new Set(questions.map((question) => question.questionId)).size)
+        .toBe(QUESTION_BANK_CONFIG.questionsPerFloor);
       expect(questions.every((question) => (
-        /^question-bank-v1:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(question.questionId)
+        /^question-bank-v2:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(question.questionId)
       ))).toBe(true);
-      if (floor === 1) {
+      if (floor === QUESTION_BANK_CONFIG.firstFloor) {
         expect(questions.every((question) => question.scope === "current")).toBe(true);
       } else {
         expect(questions.filter((question) => question.scope === "current")).toHaveLength(96);
         expect(questions.filter((question) => question.scope === "review")).toHaveLength(24);
       }
-      expect(questions.filter((question) => question.tier === "normal")).toHaveLength(96);
-      expect(questions.filter((question) => question.tier === "elite")).toHaveLength(24);
+      expect(questions.filter((question) => question.tier === "L1")).toHaveLength(
+        QUESTION_BANK_CONFIG.familiesPerTier.L1 * QUESTION_BANK_CONFIG.variantsPerFamily,
+      );
+      expect(questions.filter((question) => question.tier === "L2")).toHaveLength(
+        QUESTION_BANK_CONFIG.familiesPerTier.L2 * QUESTION_BANK_CONFIG.variantsPerFamily,
+      );
+      expect(questions.filter((question) => question.tier === "L3")).toHaveLength(
+        QUESTION_BANK_CONFIG.familiesPerTier.L3 * QUESTION_BANK_CONFIG.variantsPerFamily,
+      );
+      expect(questions.filter((question) => question.tier !== "L1" && question.scope === "review"))
+        .toHaveLength(0);
+      if (floor >= QUESTION_BANK_CONFIG.reviewStartsAtFloor) {
+        expect(questions.filter((question) => question.tier === "L1" && question.scope === "current"))
+          .toHaveLength(
+            (QUESTION_BANK_CONFIG.familiesPerTier.L1 - QUESTION_BANK_CONFIG.reviewFamiliesPerFloor) *
+              QUESTION_BANK_CONFIG.variantsPerFamily,
+          );
+        expect(questions.filter((question) => question.tier === "L1" && question.scope === "review"))
+          .toHaveLength(
+            QUESTION_BANK_CONFIG.reviewFamiliesPerFloor *
+              QUESTION_BANK_CONFIG.variantsPerFamily,
+          );
+      }
       expect(new Set(questions.map((question) => (
         `${question.objective}\u0000${question.answerSql}`
       ))).size).toBe(120);
+    }
+  });
+
+  it("stores tier as an explicit constrained SQLite column", async () => {
+    const SQL = await initSqlJs({ locateFile: () => wasmLocation });
+    const bytes = await readFile(resolve("public/data/question-bank-v2.sqlite"));
+    const database = new SQL.Database(bytes);
+    try {
+      const columns = database.exec("PRAGMA table_info(questions)")[0]?.values ?? [];
+      expect(columns.some((column) => column[1] === "tier")).toBe(true);
+      const counts = database.exec(`
+        SELECT floor, tier, COUNT(*)
+          FROM questions
+         GROUP BY floor, tier
+         ORDER BY floor, tier
+      `)[0]?.values ?? [];
+      expect(counts).toHaveLength(24);
+      const lastFloor = QUESTION_BANK_CONFIG.firstFloor + QUESTION_BANK_CONFIG.floorCount - 1;
+      for (let floor = QUESTION_BANK_CONFIG.firstFloor; floor <= lastFloor; floor += 1) {
+        expect(counts.filter((row) => row[0] === floor)).toEqual([
+          [floor, "L1", 64],
+          [floor, "L2", 40],
+          [floor, "L3", 16],
+        ]);
+      }
+    } finally {
+      database.close();
     }
   });
 
@@ -87,7 +140,7 @@ describe("question bank v1", () => {
     });
   });
 
-  it("draws a deterministic 4 current + 1 review deck without repeats", async () => {
+  it("filters and shuffles each tier independently without repeats before exhaustion", async () => {
     const catalog = await loadBundledQuestionBank(
       "/",
       fixtureFetcher as typeof fetch,
@@ -100,34 +153,37 @@ describe("question bank v1", () => {
       ...lessonsForFloor(1),
       ...lessonsForFloor(2),
     ]);
-    const deck = catalog?.deck(2, "bank-deck-test", 0) ?? [];
-    expect(deck).toHaveLength(120);
-    for (let index = 0; index < deck.length; index += 5) {
-      expect(deck.slice(index, index + 4).every((question) => question.scope === "current")).toBe(true);
-      expect(deck[index + 4]?.scope).toBe("review");
+    const tierCounts: Record<PracticeQuestionTier, number> = Object.fromEntries(
+      Object.entries(QUESTION_BANK_CONFIG.familiesPerTier).map(([tier, families]) => (
+        [tier, families * QUESTION_BANK_CONFIG.variantsPerFamily]
+      )),
+    ) as Record<PracticeQuestionTier, number>;
+    const drawn = new Map<PracticeQuestionTier, string[]>([
+      ["L1", []],
+      ["L2", []],
+      ["L3", []],
+    ]);
+    const states: Record<PracticeQuestionTier, { cursor: number; cycle: number }> = {
+      L1: { cursor: 0, cycle: 0 },
+      L2: { cursor: 0, cycle: 0 },
+      L3: { cursor: 0, cycle: 0 },
+    };
+    for (let round = 0; round < 64; round += 1) {
+      for (const tier of ["L1", "L2", "L3"] as const) {
+        if ((drawn.get(tier)?.length ?? 0) >= tierCounts[tier]) continue;
+        const draw = catalog?.draw(2, "bank-deck-test", states[tier], unlocked, 1, tier);
+        expect(draw?.questions).toHaveLength(1);
+        expect(draw?.questions[0]?.tier).toBe(tier);
+        drawn.get(tier)?.push(draw?.questions[0]?.questionId ?? "");
+        states[tier] = draw?.state ?? states[tier];
+      }
     }
-    const draw = catalog?.draw(
-      2,
-      "bank-deck-test",
-      { cursor: 0, cycle: 0 },
-      unlocked,
-      96,
-      "normal",
-    );
-    expect(draw?.questions).toHaveLength(96);
-    expect(new Set(draw?.questions.map((question) => question.questionId)).size).toBe(96);
-    expect(draw?.questions.every((question) => question.tier === "normal")).toBe(true);
-
-    const eliteDraw = catalog?.draw(
-      2,
-      "bank-elite-test",
-      { cursor: 0, cycle: 0 },
-      unlocked,
-      2,
-      "elite",
-    );
-    expect(eliteDraw?.questions).toHaveLength(2);
-    expect(eliteDraw?.questions.every((question) => question.tier === "elite")).toBe(true);
+    for (const tier of ["L1", "L2", "L3"] as const) {
+      const deck = catalog?.deck(2, "bank-deck-test", 0, tier) ?? [];
+      expect(deck).toHaveLength(tierCounts[tier]);
+      expect(deck.every((question) => question.tier === tier)).toBe(true);
+      expect(new Set(drawn.get(tier)).size).toBe(tierCounts[tier]);
+    }
   });
 
   it("rejects a bank whose bytes do not match the manifest hash", async () => {

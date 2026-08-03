@@ -7,6 +7,7 @@ import type {
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { buildLocalPreparedOutput } from "../agent/runtime/localFallback";
 import { GameSession } from "../src/domain/GameSession";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
 
 class FakeWorker implements WorkerLike {
   readonly messages: DeepSeekWorkerRequest[] = [];
@@ -19,7 +20,7 @@ class FakeWorker implements WorkerLike {
         this.listener?.({ data: {
           type: "configured",
           requestId: message.requestId,
-          models: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          models: [DEEPSEEK_RUNTIME_CONFIG.preferredModel, "deepseek-v4-pro"],
         } } as MessageEvent<DeepSeekWorkerResponse>);
       } else if (message.type === "prepare") {
         const local = buildLocalPreparedOutput(message.request);
@@ -44,10 +45,10 @@ describe("DeepSeek browser BYOK client", () => {
   it("sends the key only in the one-way configure message and validates outputs", async () => {
     const worker = new FakeWorker();
     const client = new DeepSeekWorkerClient(() => worker, 1_000);
-    const secret = "sk-private-browser-only";
+    const secret = "test-browser-credential";
     const connected = await client.connect(secret);
     expect(connected.ok).toBe(true);
-    expect(client.model).toBe("deepseek-v4-flash");
+    expect(client.model).toBe(DEEPSEEK_RUNTIME_CONFIG.preferredModel);
     const request = buildAgentPrepareRequest(new GameSession(null, null, "deepseek-test").snapshot());
     const prepared = await client.prepare(request);
     expect(prepared?.source).toBe("deepseek");

@@ -4,6 +4,7 @@ import type {
   LootItem,
   Weapon,
 } from "../domain/types";
+import { INVENTORY_RUNTIME_CONFIG } from "../config/runtimeConfig";
 import type { FloorNumber } from "../domain/runGraph";
 import {
   type BiomeEncounterRole,
@@ -32,9 +33,9 @@ export {
   ROYAL_SWORD,
 };
 
-export const EQUIPMENT_CAPACITY = 12;
-export const CONSUMABLE_SLOT_CAPACITY = 3;
-export const CONSUMABLE_STACK_CAPACITY = 5;
+export const EQUIPMENT_CAPACITY = INVENTORY_RUNTIME_CONFIG.equipmentCapacity;
+export const CONSUMABLE_SLOT_CAPACITY = INVENTORY_RUNTIME_CONFIG.consumableSlotCapacity;
+export const CONSUMABLE_STACK_CAPACITY = INVENTORY_RUNTIME_CONFIG.consumableStackCapacity;
 
 export const SLIME_SWORD: Weapon = {
   id: "slime-sword",

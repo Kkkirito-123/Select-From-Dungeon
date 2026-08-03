@@ -5,6 +5,7 @@ import {
 } from "../../runtime/contracts";
 import type { AgentPreparationClient } from "../../runtime/AgentClient";
 import { buildLocalCampfireOutput } from "../../runtime/localFallback";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../../../src/config/runtimeConfig";
 import type {
   DeepSeekErrorCode,
   DeepSeekWorkerRequest,
@@ -65,7 +66,7 @@ export class DeepSeekWorkerClient implements AgentPreparationClient {
 
   constructor(
     private readonly workerFactory: () => WorkerLike = defaultWorker,
-    private readonly timeoutMs = 12_000,
+    private readonly timeoutMs: number = DEEPSEEK_RUNTIME_CONFIG.requestTimeoutMs,
   ) {}
 
   get enabled(): boolean {
@@ -98,7 +99,9 @@ export class DeepSeekWorkerClient implements AgentPreparationClient {
     this.models = [...message.models];
     this.selectedModel = preferredModel && this.models.includes(preferredModel)
       ? preferredModel
-      : this.models.find((model) => model.includes("flash")) ?? this.models[0] ?? null;
+      : this.models.includes(DEEPSEEK_RUNTIME_CONFIG.preferredModel)
+        ? DEEPSEEK_RUNTIME_CONFIG.preferredModel
+        : this.models.find((model) => model.includes("flash")) ?? this.models[0] ?? null;
     this.configured = this.selectedModel !== null;
     return { ok: this.configured, models: this.models, error: null };
   }

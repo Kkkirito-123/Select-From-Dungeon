@@ -14,6 +14,7 @@ import type {
 } from "../content/biomeContent";
 import type { BiomePlan } from "./biome";
 import type { FloorHazard } from "./floorLabyrinth";
+import { STORAGE_RUNTIME_CONFIG } from "../config/runtimeConfig";
 
 export type LessonId = RunLessonId;
 
@@ -485,7 +486,7 @@ export type AnswerResult =
 
 export type BattleOutcome = "hit" | "countered" | "victory" | "defeat";
 
-export const MAX_ANSWER_HISTORY = 200;
+export const MAX_ANSWER_HISTORY = STORAGE_RUNTIME_CONFIG.maxAnswerHistory;
 
 export interface AnswerAttemptRecord {
   id: number;
@@ -594,6 +595,12 @@ export interface SavedRun {
   questionBankVersion: string;
   practiceDrawCursor: number;
   practiceDrawCycle: number;
+  /** v12 增量字段：三个难度牌组分别保存游标；缺失时按旧 L1 状态恢复。 */
+  practiceDrawStates?: {
+    L1: { cursor: number; cycle: number };
+    L2: { cursor: number; cycle: number };
+    L3: { cursor: number; cycle: number };
+  };
   activePracticeMonsterId: number | null;
   activePracticeQuestionIds: string[];
   rewardedPracticeMonsterIds: number[];
@@ -649,7 +656,7 @@ export interface MoveResolution {
   to: Position;
   encounterId: number | null;
   pickedItemIds: string[];
-  blockedBy: "none" | "wall" | "gate" | "campfire" | "threshold" | "mode";
+  blockedBy: "none" | "wall" | "gate" | "campfire" | "mode";
   hazard: {
     id: string;
     name: string;

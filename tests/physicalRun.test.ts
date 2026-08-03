@@ -553,11 +553,7 @@ function walkPath(
   engine: SqlEngine,
 ): void {
   path.forEach((step) => {
-    let move = session.attemptPlayerMove(step.x, step.y);
-    if (move.blockedBy === "threshold") {
-      expect(session.confirmFloorOneLabyrinthEntry()).toBe(true);
-      move = session.attemptPlayerMove(step.x, step.y);
-    }
+    const move = session.attemptPlayerMove(step.x, step.y);
     expect(move, move.message).toMatchObject({ ok: true, moved: true });
     if (move.encounterId !== null) {
       let repeatCount = 0;

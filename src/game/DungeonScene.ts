@@ -2182,13 +2182,6 @@ export class DungeonScene extends Phaser.Scene {
     }
     if (!resolution.ok) {
       this.moveLocked = false;
-      if (resolution.blockedBy === "threshold") {
-        this.resetPlayerMovement();
-        window.dispatchEvent(new CustomEvent("dungeon:labyrinth-entry", {
-          detail: { dx, dy, message: resolution.message },
-        }));
-        return;
-      }
       if (resolution.blockedBy === "wall" || resolution.blockedBy === "gate") {
         this.feedback.dispatch({ type: "wall-bump", message: resolution.message });
         this.bumpPlayer(dx, dy);

@@ -17,22 +17,22 @@
 [Release checklist](docs/RELEASE_CHECKLIST.md)
 
 A Chinese browser roguelite for SQL beginners and interview review. SQL is the
-combat action: physically explore a continuous seeded pixel maze, move into an
+combat action: physically explore a continuous canonical pixel maze, move into an
 unidentified monster's ID-labelled tile to enter a separate duel, write a
 complete SQLite query, and turn the correct result into an animated attack.
 
 ## MVP Features
 
-- Complete an eight-floor Run made from deterministic `56x42` generator-v7
-  labyrinths. Seeded room placement distributes each authored layout across the
-  compact map;
+- Complete an eight-floor Run made from one canonical set of deterministic
+  `56x42` generator-v7 labyrinths. Players cannot enter or reroll a map seed;
+  each authored layout is distributed across the compact map;
   DFS carving, about 15% loops, three keyed two-way shortcuts, route guidance,
   physical transit landmarks, and non-critical variation keep exploration
   dense without an unused outer maze. The ascent runs from the Ember Archive through tidal
   islands, frost graves, the elemental furnace, black-iron walls, dragon ridge,
   the sunset index garden, and the black-gold high hall.
 - The header now shows the current slot out of eight. A validated campaign
-  scaffold defines all eight ordered floor seeds, curriculum prerequisites,
+  scaffold defines all eight ordered floor identities, curriculum prerequisites,
   exercise tiers, encounter roles, themes, and content pools. All eight floors
   are executable in v0.10 and hardened for low-cost play in v0.11.
 - Collecting a Boss key on floors one through seven shows a gold
@@ -47,9 +47,9 @@ complete SQLite query, and turn the correct result into an animated attack.
   into the rear main path. Floor one stays continuous and uses water-state
   changes plus its guaranteed physical shortcut instead of generic portals.
 - Every floor now resolves its own labyrinth contract instead of inheriting a
-  first-floor maze rule. The first step from an authored safe room opens a
-  floor-named `E` confirmation; the player can decline or return by the same
-  route. Entry/rest safe rooms and the two campfire rings reveal their full safe
+  first-floor maze rule. Visibly open safe-room boundaries are directly
+  walkable; there is no invisible threshold confirmation wall. Entry/rest safe
+  rooms and the two campfire rings reveal their full safe
   area and reject ambushes, patrols, curriculum monsters, area Bosses, and
   traps. Beyond them, actors and traps are visible only inside that floor's
   local sight radius. Each Seed places a small, floor-specific set of physical
@@ -59,7 +59,7 @@ complete SQLite query, and turn the correct result into an animated attack.
   the invisible region partition. The living middle area Boss locks the visible
   rear transit and cross-region shortcuts, while curriculum room gates still
   prevent lesson bypass.
-- The same seed deterministically rebuilds course-route beacons, two
+- The fixed internal world identity deterministically rebuilds course-route beacons, two
   middle/rear campfires, the entrance safe anchor, dead-end caches, and three
   keyed two-way shortcuts for generator-v6+ maps.
   Visible route interests stay within 18 steps on the main course route. Every
@@ -373,8 +373,8 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ CampaignDomain ── ordered eight-floor slots and transition invariants
   ├─ RunGraph ── curriculum dependencies and point-of-interest gates
   ├─ FloorMapBlueprints ── eight authored macro layouts and transit identities
-  ├─ FloorLabyrinthContent/Domain ── F1-F8 thresholds, safe areas, sight, hazards
-  ├─ MazeGenerator/MazeFloor ── seeded 56x42 generator-v7 physical map
+  ├─ FloorLabyrinthContent/Domain ── F1-F8 safe areas, sight, hazards
+  ├─ MazeGenerator/MazeFloor ── canonical 56x42 generator-v7 physical map
   ├─ MazeValidation ── topology, reachability, and save invariants
   ├─ CampfireDomain ── two seeded fires, entrance checkpoint, visible safe masks
   ├─ GuidedMap ── route beacons, dead-end caches, guaranteed key, shortcut
@@ -404,15 +404,16 @@ run/floor/evidence-hash and closed-output checks can replace the Scribe wording.
 There is no gameplay tool, save write, user prompt, MCP, or long-term memory.
 
 `FloorContracts` defines the eight-floor curriculum and content boundary, while
-`CampaignDomain` serializes deterministic ordered slots and rejects skips,
-duplicate activation, or rerolled floor seeds. `RunGraph` is the executable
+`CampaignDomain` serializes deterministic ordered slots and rejects skips or
+duplicate activation. `RunGraph` is the executable
 eight-floor dependency graph; it does not move the player.
 `MazeFloor` is the physical world. The discovery minimap is a read-only view of
 exploration, while movement, same-tile encounters, pickups, and gates are
 resolved by `GameSession` against the maze.
 
-New Runs use maze generator v7 and eight `56x42` compact labyrinths that spread
-authored rooms across the full map. Generator-v6 `96x72`, generator-v5 `48x36`,
+New Runs use one canonical maze-generator-v7 set of eight `56x42` compact
+labyrinths that spread authored rooms across the full map. Players cannot input
+or reroll a map seed. Generator-v6 `96x72`, generator-v5 `48x36`,
 and generator-v4 `64x48` maps remain loadable only for legacy Run compatibility.
 The generator isolates `topology` and `decor` random streams. `GuidedMap`
 then derives route beacons, dead-end caches, and the keyed shortcut from the
@@ -421,19 +422,19 @@ courses, keys, or shortcuts. Actors and fixed curriculum room chests derive from
 course anchors, while biome loot uses independent stable hashes. The biome plan
 is rebuilt from maze, campfires, guided map, and seed instead of being stored.
 The eight-floor labyrinth content similarly stores only stable intent; its safe
-cells, current sight, and hazard coordinates are resolved from the existing
-maze and Seed. Triggered traps reuse `openedGateIds`, and threshold confirmation
-is restored from position, discovered cells, and visited rooms, so this feature
-adds no separate save field. Run v12 pins the question-bank version, deterministic
+cells, current sight, and hazard coordinates are resolved from the canonical
+maze. Triggered traps reuse `openedGateIds`; directly crossing open room
+boundaries adds no save field. Run v12 pins the question-bank version, deterministic
 deck state, repeat-practice reward state, and navigation guidance counters.
 
-The generated, read-only `public/data/question-bank-v1.sqlite` contains 960
-questions: each floor has 96 normal and 24 elite questions. On floors two
-through eight, the normal pool contains 72 current-floor and 24 review questions;
-the elite pool contains 24 current-floor questions. Each floor uses 15 families
+The generated, read-only `public/data/question-bank-v2.sqlite` contains 960
+questions: each floor has 64 L1, 40 L2, and 16 L3 questions. On floors two
+through eight, L1 contains 40 current-floor and 24 review questions; L2/L3 are
+current-floor questions. Each floor uses 15 families
 of eight executable variants built from real fixture values, with exact result
-and ordering evidence stored for grading. Fixed curriculum monsters
-keep their authored stages. Its manifest verifies version, size, count, and
+and ordering evidence stored for grading. Fixed curriculum monsters and floor
+Bosses keep authored stages; normal, mini-elite, and area-Boss practice battles
+draw one L1, two L2, and three L3 questions. Its manifest verifies version, size, count, and
 SHA-256 before use. A new bank version only applies to a new Run.
 
 On floors one through five and seven through eight, the terminal accepts one

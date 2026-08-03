@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/floorExperience";
 import { ARMORS } from "../src/content/inventoryCatalog";
+import { WORLD_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
 import { biomeRegionAt } from "../src/domain/biome";
 import { GameSession, experienceForRank } from "../src/domain/GameSession";
 import { safeZoneCellKeys } from "../src/domain/campfire";
@@ -1254,7 +1255,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     });
   });
 
-  it("Run 存档恢复同一张图，重开只清局内状态而保留永久图鉴", () => {
+  it("Run 存档恢复同一张图，重开回到唯一固定地图并保留永久图鉴", () => {
     const session = new GameSession(null, null, "save-run");
     clearSelect(session);
     const staleProfile = session.toProfile();
@@ -1271,8 +1272,11 @@ describe("GameSession SQL 魔王城 Run", () => {
       campaign: { currentFloor: 1, status: "active" },
     });
 
-    restored.reset("new-run");
-    expect(restored.snapshot().runSeed).toBe("new-run");
+    restored.reset();
+    expect(restored.snapshot().runSeed).toBe(WORLD_RUNTIME_CONFIG.fixedWorldSeed);
+    expect(restored.snapshot().mazeFloor.topologyHash).toBe(
+      new GameSession().snapshot().mazeFloor.topologyHash,
+    );
     expect(restored.snapshot().player.weapon.id).toBe("data-blade");
     expect(restored.snapshot().completedLessons).toEqual([]);
     expect(restored.snapshot().profile.masteredLessons).toContain("select");

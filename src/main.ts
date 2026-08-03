@@ -5,6 +5,7 @@ import { AgentCache } from "../agent/runtime/AgentCache";
 import { AgentCoordinator } from "../agent/runtime/AgentCoordinator";
 import { DeepSeekWorkerClient } from "../agent/browser/deepseek/DeepSeekWorkerClient";
 import { AgentSettingsPanel } from "../agent/browser/ui/AgentSettingsPanel";
+import { WORLD_RUNTIME_CONFIG } from "./config/runtimeConfig";
 import { GameSession } from "./domain/GameSession";
 import { FeedbackDirector } from "./feedback/FeedbackDirector";
 import type { BattleScene } from "./game/BattleScene";
@@ -12,7 +13,6 @@ import { applyPageVisibilityRuntime } from "./runtime/pageLifecycle";
 import { loadBundledQuestionBank } from "./runtime/questionBankLoader";
 import { SqlEngine } from "./sql/SqlEngine";
 import {
-  createRunSeed,
   loadProfile,
   loadRun,
   type StorageLike,
@@ -59,7 +59,7 @@ async function bootstrap(): Promise<void> {
   const session = new GameSession(
     savedRun,
     profile,
-    savedRun?.graph.seed ?? createRunSeed(),
+    savedRun?.graph.seed ?? WORLD_RUNTIME_CONFIG.fixedWorldSeed,
     questionBank,
   );
   const [sql, { createGame }] = await Promise.all([

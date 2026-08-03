@@ -1,10 +1,11 @@
 import type { AnswerResult, BattleOutcome } from "../../src/domain/types";
 import type { FloorNumber, RunLessonId } from "../../src/domain/runGraph";
+import { AGENT_RUNTIME_CONFIG } from "../../src/config/runtimeConfig";
 
 export const AGENT_OUTPUT_CACHE_KEY = "select-from-dungeon:agent-output:v1";
 export const AGENT_REQUEST_VERSION = 1 as const;
 export const AGENT_OUTPUT_VERSION = 1 as const;
-export const MAX_AGENT_ATTEMPTS = 8;
+export const MAX_AGENT_ATTEMPTS = AGENT_RUNTIME_CONFIG.maxEvidenceAttempts;
 
 export interface AgentAttemptEvidence {
   attemptId: number;

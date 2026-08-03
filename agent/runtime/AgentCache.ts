@@ -1,4 +1,5 @@
 import type { StorageLike } from "../../src/storage/localProgress";
+import { AGENT_RUNTIME_CONFIG } from "../../src/config/runtimeConfig";
 import {
   AGENT_OUTPUT_CACHE_KEY,
   AGENT_OUTPUT_VERSION,
@@ -7,7 +8,7 @@ import {
   type PreparedAgentOutput,
 } from "./contracts";
 
-const MAX_CACHE_ENTRIES = 16;
+const MAX_CACHE_ENTRIES = AGENT_RUNTIME_CONFIG.maxOutputCacheEntries;
 
 interface AgentCachePayload {
   version: typeof AGENT_OUTPUT_VERSION;

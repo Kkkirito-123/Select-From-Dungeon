@@ -8,12 +8,16 @@ import {
   type FloorNumber,
   type RunLessonId,
 } from "../domain/runGraph";
+import {
+  QUESTION_BANK_CONFIG,
+  type PracticeQuestionTier,
+} from "../config/questionBankConfig";
 
-export const QUESTION_BANK_VERSION = "question-bank-v1" as const;
-export const QUESTIONS_PER_FLOOR = 120;
+export const QUESTION_BANK_VERSION = QUESTION_BANK_CONFIG.version;
+export const QUESTIONS_PER_FLOOR = QUESTION_BANK_CONFIG.questionsPerFloor;
+export type { PracticeQuestionTier } from "../config/questionBankConfig";
 
 export type PracticeQuestionScope = "current" | "review";
-export type PracticeQuestionTier = "normal" | "elite";
 
 export interface PracticeQuestion {
   questionId: string;
@@ -56,25 +60,26 @@ function shuffled<T>(values: readonly T[], seed: string): T[] {
   return result;
 }
 
-function interleaveFloorDeck(
-  floor: FloorNumber,
+function interleaveScopeDeck(
   current: readonly PracticeQuestion[],
   review: readonly PracticeQuestion[],
 ): PracticeQuestion[] {
-  if (floor === 1) return [...current];
+  if (review.length === 0) return [...current];
   const deck: PracticeQuestion[] = [];
   let currentIndex = 0;
   let reviewIndex = 0;
-  while (currentIndex < current.length || reviewIndex < review.length) {
-    deck.push(...current.slice(currentIndex, currentIndex + 4));
-    currentIndex += 4;
-    if (reviewIndex < review.length) deck.push(review[reviewIndex++]);
+  const total = current.length + review.length;
+  for (let position = 0; position < total; position += 1) {
+    const expectedReviewCount = Math.floor(((position + 1) * review.length) / total);
+    if (reviewIndex < expectedReviewCount) {
+      deck.push(review[reviewIndex++]);
+    } else if (currentIndex < current.length) {
+      deck.push(current[currentIndex++]);
+    } else {
+      deck.push(review[reviewIndex++]);
+    }
   }
   return deck;
-}
-
-export function practiceQuestionTier(templateId: string): PracticeQuestionTier {
-  return templateId.includes("-elite-") ? "elite" : "normal";
 }
 
 export class QuestionBankCatalog {
@@ -95,17 +100,23 @@ export class QuestionBankCatalog {
     return this.questions.filter((question) => question.floor === floor);
   }
 
-  deck(floor: FloorNumber, runSeed: string, cycle: number): PracticeQuestion[] {
-    const floorQuestions = this.questionsForFloor(floor);
+  deck(
+    floor: FloorNumber,
+    runSeed: string,
+    cycle: number,
+    tier: PracticeQuestionTier,
+  ): PracticeQuestion[] {
+    const floorQuestions = this.questionsForFloor(floor)
+      .filter((question) => question.tier === tier);
     const current = shuffled(
       floorQuestions.filter((question) => question.scope === "current"),
-      `${this.version}:${runSeed}:f${floor}:current:${cycle}`,
+      `${this.version}:${runSeed}:f${floor}:${tier}:current:${cycle}`,
     );
     const review = shuffled(
       floorQuestions.filter((question) => question.scope === "review"),
-      `${this.version}:${runSeed}:f${floor}:review:${cycle}`,
+      `${this.version}:${runSeed}:f${floor}:${tier}:review:${cycle}`,
     );
-    return interleaveFloorDeck(floor, current, review);
+    return interleaveScopeDeck(current, review);
   }
 
   draw(
@@ -114,15 +125,20 @@ export class QuestionBankCatalog {
     state: PracticeDrawState,
     unlockedLessons: ReadonlySet<RunLessonId>,
     count: number,
-    tier: PracticeQuestionTier = "normal",
+    tier: PracticeQuestionTier,
   ): PracticeDrawResult {
     const questions: PracticeQuestion[] = [];
     let cursor = Math.max(0, state.cursor);
     let cycle = Math.max(0, state.cycle);
     let inspected = 0;
-    const maximumInspections = Math.max(QUESTIONS_PER_FLOOR * 4, count * 8);
+    const tierQuestionCount = this.questionsForFloor(floor)
+      .filter((question) => question.tier === tier).length;
+    const maximumInspections = Math.max(
+      tierQuestionCount * QUESTION_BANK_CONFIG.drawInspectionMultiplier,
+      count * QUESTION_BANK_CONFIG.drawCountInspectionMultiplier,
+    );
     while (questions.length < count && inspected < maximumInspections) {
-      const deck = this.deck(floor, runSeed, cycle);
+      const deck = this.deck(floor, runSeed, cycle, tier);
       if (deck.length === 0) break;
       if (cursor >= deck.length) {
         cursor = 0;
@@ -156,7 +172,7 @@ export function practiceStageForQuestion(
       rowsOrdered: question.rowsOrdered,
       planInclude: [...question.planInclude],
       planExclude: [...question.planExclude],
-      flatSelect: question.floor === 1,
+      flatSelect: question.floor === QUESTION_BANK_CONFIG.firstFloor,
     },
     objective: question.objective,
     queryTemplate: "",

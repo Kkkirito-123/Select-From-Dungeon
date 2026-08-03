@@ -3,10 +3,11 @@ import type {
   GameSnapshot,
   LessonId,
 } from "../domain/types";
+import { STORAGE_RUNTIME_CONFIG } from "../config/runtimeConfig";
 
 export const LEARNING_DATABASE_NAME = "select-from-dungeon-learning";
 export const LEARNING_DATABASE_VERSION = 1;
-export const MAX_FULL_LEARNING_ATTEMPTS = 5_000;
+export const MAX_FULL_LEARNING_ATTEMPTS = STORAGE_RUNTIME_CONFIG.maxLearningAttempts;
 
 export interface HintSourceCounts {
   manual: number;

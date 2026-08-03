@@ -251,6 +251,11 @@ describe("localProgress", () => {
     expect(loaded?.activeCampfireId).toBeNull();
     expect(loaded?.respawnCampfireId).toBeNull();
     expect(loaded?.discoveredCells).toEqual(saved.discoveredCells);
+    expect(loaded?.practiceDrawStates).toEqual({
+      L1: { cursor: 0, cycle: 0 },
+      L2: { cursor: 0, cycle: 0 },
+      L3: { cursor: 0, cycle: 0 },
+    });
     expect(loadProfile(storage).masteredLessons).toEqual(["select"]);
 
     const restored = new GameSession(loaded, loadProfile(storage));
@@ -260,6 +265,11 @@ describe("localProgress", () => {
     expect(snapshot.groundItems).toEqual(saved.groundItems);
     expect(snapshot.campfires).toEqual(saved.campfires);
     expect(snapshot.discoveredCells).toEqual(saved.discoveredCells);
+
+    const invalidTierState = structuredClone(saved);
+    if (!invalidTierState.practiceDrawStates) throw new Error("缺少分级题库游标");
+    invalidTierState.practiceDrawStates.L3.cursor = -1;
+    expect(isSavedRun(invalidTierState)).toBe(false);
   });
 
   it("v12 继续读取已经保存的 96×72 generator-v6 Run", () => {

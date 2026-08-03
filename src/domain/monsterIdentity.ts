@@ -79,11 +79,10 @@ export function monsterIdentityPresentation(
   return {
     discovered,
     idLabel,
-    nameLabel: discovered ? monster.name : idLabel,
-    worldLabel: discovered ? `${monster.name} · ${idLabel}` : idLabel,
-    speciesLabel: discovered
-      ? `类型 = ${monsterKindLabel(monster)}`
-      : "类型 = 未识别",
+    // 已写入图鉴的名字也不回流到活体标签，避免新 Run 提前泄露身份。
+    nameLabel: idLabel,
+    worldLabel: idLabel,
+    speciesLabel: "类型 = 未识别",
   };
 }
 
@@ -91,9 +90,7 @@ export function monsterIntentName(
   monster: Pick<Monster, "id" | "attackName" | "isBoss">,
   discoveredMonsterIds: readonly number[],
 ): string {
-  if (isMonsterIdentityDiscovered(monster.id, discoveredMonsterIds)) {
-    return monster.attackName;
-  }
+  void discoveredMonsterIds;
   return monster.isBoss ? "规则反击正在蓄力" : "攻击正在蓄力";
 }
 

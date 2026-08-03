@@ -1530,18 +1530,6 @@ h1 span {
   gap: 10px;
 }
 
-.inspection-overlay[data-record-kind="labyrinth"] {
-  background:
-    radial-gradient(circle at 50% 48%, rgba(175, 66, 58, 0.15), transparent 38%),
-    rgba(3, 6, 9, 0.88);
-}
-
-.inspection-overlay[data-record-kind="labyrinth"] #confirm-labyrinth-entry {
-  border-color: var(--query);
-  background: var(--query);
-  color: #07100f;
-}
-
 #app.inspection-active .interaction-prompt {
   opacity: 0;
 }

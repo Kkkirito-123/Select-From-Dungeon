@@ -4,27 +4,27 @@ import { resolve } from "node:path";
 import initSqlJs from "sql.js";
 import { createServer } from "vite";
 
-const BANK_VERSION = "question-bank-v1";
-const SCHEMA_VERSION = 1;
-const VARIANTS_PER_TEMPLATE = 8;
-const TEMPLATES_PER_FLOOR = 15;
-const NORMAL_CURRENT_TEMPLATES = 9;
-const ELITE_CURRENT_TEMPLATES = 3;
-const REVIEW_TEMPLATES = 3;
-
 function uniqueStages(entries) {
   return [...new Map(entries.map((entry) => [entry.stage.id, entry])).values()];
 }
 
-function questionFamilies(candidates, count, tier, scope, offset = 0) {
+function questionFamilies(candidates, count, tier, scope, offset = 0, excludedStageIds = new Set()) {
   const parameterized = candidates.filter((entry) => (
     /'(?:''|[^'])*'|-?\d+(?:\.\d+)?/u.test(entry.stage.answerSql)
   ));
   if (parameterized.length === 0) throw new Error(`${tier}/${scope} 题组没有可参数化阶段。`);
+  const rotated = [
+    ...parameterized.slice(offset % parameterized.length),
+    ...parameterized.slice(0, offset % parameterized.length),
+  ];
+  const ordered = [
+    ...rotated.filter((entry) => !excludedStageIds.has(entry.stage.id)),
+    ...rotated.filter((entry) => excludedStageIds.has(entry.stage.id)),
+  ];
   return Array.from({ length: count }, (_, familyIndex) => ({
     tier,
     scope,
-    entry: parameterized[(offset + familyIndex) % parameterized.length],
+    entry: ordered[familyIndex % ordered.length],
   }));
 }
 
@@ -64,7 +64,7 @@ function tableSpecificValues(sql, column, domains) {
   return matches.length === 1 ? [...(domains.get(matches[0]) ?? [])] : [];
 }
 
-function literalOptions(stage, floor, domains, monstersByFloor) {
+function literalOptions(stage, floor, domains, monstersByFloor, config) {
   const sql = stage.answerSql.trim().replace(/;$/u, "");
   const literals = [...sql.matchAll(/'(?:''|[^'])*'|-?\d+(?:\.\d+)?/gu)]
     .filter((match) => match.index !== undefined);
@@ -111,7 +111,7 @@ function literalOptions(stage, floor, domains, monstersByFloor) {
         ? [...(domains.get("string_fallback") ?? [])]
         : [...(monstersByFloor.get(floor) ?? [])];
     }
-    return [...new Set(values)].slice(0, 24).map((value) => {
+    return [...new Set(values)].slice(0, config.generationDomainValueLimit).map((value) => {
       const display = String(value);
       const replacement = isString
         ? `'${display.replace(/'/g, "''")}'`
@@ -130,8 +130,8 @@ function literalOptions(stage, floor, domains, monstersByFloor) {
   ];
   for (let left = 0; left < groups.length; left += 1) {
     for (let right = left + 1; right < groups.length; right += 1) {
-      groups[left].slice(0, 24).forEach((leftReplacement) => {
-        groups[right].slice(0, 24).forEach((rightReplacement) => {
+      groups[left].slice(0, config.generationDomainValueLimit).forEach((leftReplacement) => {
+        groups[right].slice(0, config.generationDomainValueLimit).forEach((rightReplacement) => {
           replacementSets.push([leftReplacement, rightReplacement]);
         });
       });
@@ -177,14 +177,14 @@ function literalOptions(stage, floor, domains, monstersByFloor) {
     });
   }
   if (
-    floor >= 2 &&
+    floor >= config.reviewStartsAtFloor &&
     /^\s*(?:SELECT|WITH)\b/iu.test(sql) &&
     !/\blimit\b/iu.test(sql)
   ) {
     const materialOptions = [...options];
     materialOptions.forEach((option) => {
       const baseSql = option.answerSql.trim().replace(/;$/u, "");
-      for (let limit = 1; limit <= 8; limit += 1) {
+      for (let limit = 1; limit <= config.generationLimitMaximum; limit += 1) {
         const answerSql = `${baseSql} LIMIT ${limit};`;
         options.push({
           objective: `${option.objective} 最多返回 ${limit} 行。`,
@@ -201,11 +201,20 @@ function literalOptions(stage, floor, domains, monstersByFloor) {
   return options;
 }
 
-function materialVariant(stage, floor, familyIndex, variantIndex, attempt, domains, monstersByFloor) {
-  const options = literalOptions(stage, floor, domains, monstersByFloor);
+function materialVariant(
+  stage,
+  floor,
+  familyIndex,
+  variantIndex,
+  attempt,
+  domains,
+  monstersByFloor,
+  config,
+) {
+  const options = literalOptions(stage, floor, domains, monstersByFloor, config);
   if (options.length === 0) throw new Error(`${stage.id} 没有真实值参数候选。`);
   return options[
-    (familyIndex * VARIANTS_PER_TEMPLATE + variantIndex - 1 + attempt) % options.length
+    (familyIndex * config.variantsPerFamily + variantIndex - 1 + attempt) % options.length
   ];
 }
 
@@ -219,7 +228,7 @@ function planEvidence(plan) {
   return include;
 }
 
-function buildDomains(engine, monsters) {
+function buildDomains(engine, monsters, floor) {
   const domains = new Map();
   const register = (column, values) => {
     domains.set(column, [...new Set([
@@ -246,7 +255,7 @@ function buildDomains(engine, monsters) {
     columns.forEach((column) => {
       const result = engine.execute(
         `SELECT DISTINCT ${column} FROM ${table} WHERE ${column} IS NOT NULL ORDER BY ${column};`,
-        1,
+        floor,
       );
       const values = result.rows.map((row) => row[column]);
       register(column, values);
@@ -276,17 +285,18 @@ function buildDomains(engine, monsters) {
 function insertQuestion(database, question) {
   database.run(
     `INSERT INTO questions(
-      question_id, bank_version, floor, scope, template_id, variant_index,
+      question_id, bank_version, floor, scope, tier, template_id, variant_index,
       primary_lesson_id, base_stage_id, objective, answer_sql, hints_json,
       required_features_json, expectation_kind, expected_columns_json,
       expected_rows_json, rows_ordered, plan_include_json, plan_exclude_json,
       enabled
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
     [
       question.questionId,
-      BANK_VERSION,
+      question.bankVersion,
       question.floor,
       question.scope,
+      question.tier,
       question.templateId,
       question.variantIndex,
       question.lessonId,
@@ -323,16 +333,36 @@ async function main() {
       { BIOME_ENCOUNTERS },
       { lessonsForFloor },
       { SqlEngine },
+      { QUESTION_BANK_CONFIG, QUESTION_BANK_TIERS },
     ] = await Promise.all([
       vite.ssrLoadModule("/src/content/mvpLevel.ts"),
       vite.ssrLoadModule("/src/content/biomeContent.ts"),
       vite.ssrLoadModule("/src/domain/runGraph.ts"),
       vite.ssrLoadModule("/src/sql/SqlEngine.ts"),
+      vite.ssrLoadModule("/src/config/questionBankConfig.ts"),
     ]);
+    const {
+      version: bankVersion,
+      schemaVersion,
+      firstFloor,
+      floorCount,
+      variantsPerFamily,
+      familiesPerFloor,
+      familiesPerTier,
+      reviewFamiliesPerFloor,
+      reviewStartsAtFloor,
+      reviewTier,
+      questionsPerFloor,
+      totalQuestions,
+      databaseUrl,
+      generationVariantSearchLimit,
+      planEvidenceFloor,
+    } = QUESTION_BANK_CONFIG;
+    const lastFloor = firstFloor + floorCount - 1;
     const lessonById = new Map(LESSONS.map((lesson) => [lesson.id, lesson]));
     const monsterById = new Map(INITIAL_MONSTERS.map((monster) => [monster.id, monster]));
     const authored = [];
-    for (let floor = 1; floor <= 8; floor += 1) {
+    for (let floor = firstFloor; floor <= lastFloor; floor += 1) {
       for (const lessonId of lessonsForFloor(floor)) {
         const lesson = lessonById.get(lessonId);
         if (!lesson) throw new Error(`缺少课程 ${lessonId}`);
@@ -358,9 +388,9 @@ async function main() {
       [...INITIAL_MONSTERS],
       resolve(root, "node_modules/sql.js/dist/sql-wasm.wasm"),
     );
-    const domains = buildDomains(engine, INITIAL_MONSTERS);
-    const monstersByFloor = new Map(Array.from({ length: 8 }, (_, index) => {
-      const floor = index + 1;
+    const domains = buildDomains(engine, INITIAL_MONSTERS, firstFloor);
+    const monstersByFloor = new Map(Array.from({ length: floorCount }, (_, index) => {
+      const floor = firstFloor + index;
       return [
         floor,
         INITIAL_MONSTERS.filter((monster) => monster.floor === floor)
@@ -368,7 +398,7 @@ async function main() {
       ];
     }));
     database.run(`
-      PRAGMA user_version = ${SCHEMA_VERSION};
+      PRAGMA user_version = ${schemaVersion};
       CREATE TABLE bank_metadata (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -376,10 +406,11 @@ async function main() {
       CREATE TABLE questions (
         question_id TEXT PRIMARY KEY,
         bank_version TEXT NOT NULL,
-        floor INTEGER NOT NULL CHECK(floor BETWEEN 1 AND 8),
+        floor INTEGER NOT NULL CHECK(floor BETWEEN ${firstFloor} AND ${lastFloor}),
         scope TEXT NOT NULL CHECK(scope IN ('current', 'review')),
+        tier TEXT NOT NULL CHECK(tier IN (${QUESTION_BANK_TIERS.map((tier) => `'${tier}'`).join(", ")})),
         template_id TEXT NOT NULL,
-        variant_index INTEGER NOT NULL CHECK(variant_index BETWEEN 1 AND 8),
+        variant_index INTEGER NOT NULL CHECK(variant_index BETWEEN 1 AND ${variantsPerFamily}),
         primary_lesson_id TEXT NOT NULL,
         base_stage_id TEXT NOT NULL,
         objective TEXT NOT NULL,
@@ -400,34 +431,40 @@ async function main() {
         is_primary INTEGER NOT NULL CHECK(is_primary IN (0, 1)),
         PRIMARY KEY(question_id, lesson_id)
       );
-      CREATE INDEX idx_questions_floor_scope
-        ON questions(floor, scope, enabled);
+      CREATE INDEX idx_questions_floor_tier_scope
+        ON questions(floor, tier, scope, enabled);
       CREATE INDEX idx_questions_lesson
         ON questions(primary_lesson_id, enabled);
       CREATE INDEX idx_questions_template
         ON questions(template_id, variant_index);
     `);
     const metadata = {
-      bankVersion: BANK_VERSION,
-      schemaVersion: String(SCHEMA_VERSION),
-      floorCount: "8",
-      questionsPerFloor: String(TEMPLATES_PER_FLOOR * VARIANTS_PER_TEMPLATE),
+      bankVersion,
+      schemaVersion: String(schemaVersion),
+      floorCount: String(floorCount),
+      questionsPerFloor: String(questionsPerFloor),
       generatedFrom: "src/content/*Level.ts",
     };
     Object.entries(metadata).forEach(([key, value]) => {
       database.run("INSERT INTO bank_metadata(key, value) VALUES (?, ?)", [key, value]);
     });
 
-    for (let floor = 1; floor <= 8; floor += 1) {
+    for (let floor = firstFloor; floor <= lastFloor; floor += 1) {
       const floorAuthored = authored.filter((entry) => entry.floor === floor);
       const floorEncounters = encounters.filter((entry) => entry.floor === floor);
-      const normalCurrent = uniqueStages([
+      const l1Current = uniqueStages([
         ...floorAuthored,
         ...floorEncounters.filter((entry) => entry.role === "normal"),
         ...floorEncounters.filter((entry) => entry.role === "mini-elite"),
       ]);
-      const eliteCurrent = uniqueStages([
+      const l2Current = uniqueStages([
         ...floorEncounters.filter((entry) => entry.role !== "normal"),
+        ...[...floorAuthored].reverse(),
+        ...floorEncounters.filter((entry) => entry.role === "normal"),
+      ]);
+      const l3Current = uniqueStages([
+        ...floorEncounters.filter((entry) => entry.role === "area-boss"),
+        ...floorEncounters.filter((entry) => entry.role === "mini-elite"),
         ...[...floorAuthored].reverse(),
         ...floorEncounters.filter((entry) => entry.role === "normal"),
       ]);
@@ -437,26 +474,46 @@ async function main() {
       ].filter((entry) => (
         entry.floor < floor && /^\s*(?:SELECT|WITH)\b/iu.test(entry.stage.answerSql)
       )));
-      const families = floor === 1
-        ? [
-            ...questionFamilies(normalCurrent, 12, "normal", "current"),
-            ...questionFamilies(eliteCurrent, 3, "elite", "current", floor),
-          ]
-        : [
-            ...questionFamilies(normalCurrent, NORMAL_CURRENT_TEMPLATES, "normal", "current"),
-            ...questionFamilies(eliteCurrent, ELITE_CURRENT_TEMPLATES, "elite", "current", floor),
-            ...questionFamilies(review, REVIEW_TEMPLATES, "normal", "review", floor),
-          ];
+      const reviewFamilyCount = floor >= reviewStartsAtFloor ? reviewFamiliesPerFloor : 0;
+      const usedFamilyStageIds = new Set();
+      const addFamilies = (candidates, count, tier, scope, offset = 0) => {
+        const selected = questionFamilies(
+          candidates,
+          count,
+          tier,
+          scope,
+          offset,
+          usedFamilyStageIds,
+        );
+        selected.forEach((family) => usedFamilyStageIds.add(family.entry.stage.id));
+        return selected;
+      };
+      const families = [
+        ...addFamilies(
+          l1Current,
+          familiesPerTier.L1 - reviewFamilyCount,
+          "L1",
+          "current",
+        ),
+        ...addFamilies(l2Current, familiesPerTier.L2, "L2", "current", floor),
+        ...addFamilies(l3Current, familiesPerTier.L3, "L3", "current", floor * 2),
+        ...(reviewFamilyCount > 0
+          ? addFamilies(review, reviewFamilyCount, reviewTier, "review", floor)
+          : []),
+      ];
+      if (families.length !== familiesPerFloor) {
+        throw new Error(`F${floor} 模板族数量 ${families.length}，预期 ${familiesPerFloor}`);
+      }
       const usedQuestionContent = new Set();
       families.forEach((family, familyIndex) => {
         const templateId = `f${floor}-${family.tier}-${family.scope}-${String(familyIndex + 1).padStart(2, "0")}`;
-        for (let variantIndex = 1; variantIndex <= VARIANTS_PER_TEMPLATE; variantIndex += 1) {
+        for (let variantIndex = 1; variantIndex <= variantsPerFamily; variantIndex += 1) {
           const entry = family.entry;
           let variant;
           let result;
           let lastError;
           let emptyFallback;
-          for (let attempt = 0; attempt < 2_048; attempt += 1) {
+          for (let attempt = 0; attempt < generationVariantSearchLimit; attempt += 1) {
             variant = materialVariant(
               entry.stage,
               floor,
@@ -465,6 +522,7 @@ async function main() {
               attempt,
               domains,
               monstersByFloor,
+              QUESTION_BANK_CONFIG,
             );
             try {
               const candidateResult = engine.execute(
@@ -507,9 +565,11 @@ async function main() {
             );
           }
           insertQuestion(database, {
-            questionId: `${BANK_VERSION}:f${floor}:${family.scope}:t${String(familyIndex + 1).padStart(2, "0")}:v${variantIndex}`,
+            questionId: `${bankVersion}:f${floor}:${family.scope}:t${String(familyIndex + 1).padStart(2, "0")}:v${variantIndex}`,
+            bankVersion,
             floor,
             scope: family.scope,
+            tier: family.tier,
             templateId,
             variantIndex,
             lessonId: entry.lesson.id,
@@ -523,7 +583,7 @@ async function main() {
               result.columns.map((column) => row[column] ?? null)
             )),
             rowsOrdered: /\border\s+by\b/iu.test(variant.answerSql),
-            planInclude: floor === 7 ? planEvidence(result.plan) : [],
+            planInclude: floor === planEvidenceFloor ? planEvidence(result.plan) : [],
             planExclude: [],
           });
         }
@@ -534,18 +594,19 @@ async function main() {
     database.close();
     const outputDirectory = resolve(root, "public/data");
     await mkdir(outputDirectory, { recursive: true });
-    const databaseName = `${BANK_VERSION}.sqlite`;
+    const databaseName = databaseUrl.split("/").at(-1);
+    if (!databaseName) throw new Error("题库 SQLite 输出路径无效");
     const digest = createHash("sha256").update(output).digest("hex");
     await writeFile(resolve(outputDirectory, databaseName), output);
     await writeFile(
       resolve(outputDirectory, "question-bank-manifest.json"),
       `${JSON.stringify({
-        bankVersion: BANK_VERSION,
-        schemaVersion: SCHEMA_VERSION,
-        url: `data/${databaseName}`,
+        bankVersion,
+        schemaVersion,
+        url: databaseUrl,
         byteLength: output.byteLength,
         sha256: digest,
-        questionCount: 960,
+        questionCount: totalQuestions,
       }, null, 2)}\n`,
     );
   } finally {

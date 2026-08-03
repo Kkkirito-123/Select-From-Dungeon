@@ -50,7 +50,8 @@ identity text still passes through the existing discovery/redaction boundary.
 
 The settings panel supports DeepSeek only: password input, connect, provider
 model list, model selection, clear Key, and disable-by-clearing. The user must
-accept the disclosure before connecting.
+accept the disclosure before connecting. When available in the provider model
+list, `deepseek-v4-flash` is the default selection.
 
 1. The page sends the Key once to a dedicated Worker and clears the input.
 2. The Worker stores it only in private current-tab memory.
