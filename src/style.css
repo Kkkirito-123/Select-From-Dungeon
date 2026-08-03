@@ -2629,6 +2629,77 @@ h1 span {
   line-height: 1.55;
 }
 
+.terminal-task-brief {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.task-brief__tier {
+  width: fit-content;
+  border: 1px solid var(--query-deep);
+  padding: 3px 7px;
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.task-brief__tier--composite,
+.task-brief__tier--boss {
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
+
+.task-brief__section {
+  border-left: 2px solid #4a5262;
+  padding: 5px 7px;
+  background: rgba(7, 10, 14, 0.55);
+}
+
+.task-brief__section > strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.task-brief__section > p,
+.task-brief__fallback {
+  margin: 0;
+  color: #d7d9df;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.task-brief__section > p + p {
+  margin-top: 3px;
+}
+
+.task-brief__section--situation {
+  border-left-color: var(--query);
+  background: rgba(120, 201, 184, 0.07);
+}
+
+.task-brief__section--goal {
+  border-left-color: var(--gold);
+  background: rgba(215, 173, 85, 0.08);
+}
+
+.task-brief__section--fields > p,
+.task-brief__section--relation > p {
+  color: #a9e3d8;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.task-brief__section--effect {
+  border-left-color: #b77adf;
+  background: rgba(183, 122, 223, 0.08);
+}
+
 .lock-list {
   display: flex;
   flex-wrap: wrap;
