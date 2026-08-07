@@ -3,7 +3,7 @@ import {
   ONBOARDING_SAVE_KEY,
   OnboardingController,
   type OnboardingStorage,
-} from "../src/ui/OnboardingController";
+} from "../src/presentation/dom/OnboardingController";
 
 class MemoryStorage implements OnboardingStorage {
   readonly values = new Map<string, string>();

@@ -3,7 +3,7 @@ import {
   advanceCampaignProgress,
   createCampaignProgress,
   isCampaignProgress,
-} from "../src/domain/campaign";
+} from "../src/domain/progression/campaign";
 
 describe("eight-floor campaign shell", () => {
   it("同一 Seed 生成八个稳定楼层槽位", () => {

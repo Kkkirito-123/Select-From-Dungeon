@@ -3,7 +3,7 @@ import {
   anchoredWaterBandGeometry,
   FLOOR_TWO_MARSH_ROOM_IDS,
   FLOOR_TWO_SAND_ROOM_IDS,
-} from "../src/game/floorSetpieceGeometry";
+} from "../src/presentation/phaser/floorSetpieceGeometry";
 
 describe("floor setpiece geometry", () => {
   it("changes a water band's height while keeping its world-space bottom fixed", () => {

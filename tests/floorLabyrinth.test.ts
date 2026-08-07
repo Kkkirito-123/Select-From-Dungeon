@@ -2,22 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_FLOORS,
   floorContractFor,
-} from "../src/content/floorContracts";
-import { FLOOR_EXPERIENCES } from "../src/content/floorExperience";
+} from "../src/content/curriculum/floorContracts";
+import { FLOOR_EXPERIENCES } from "../src/content/world/floorExperience";
 import {
   FLOOR_LABYRINTHS,
   floorLabyrinth,
   validateFloorLabyrinths,
   type FloorLabyrinthContract,
-} from "../src/content/floorLabyrinth";
-import { floorMapBlueprint } from "../src/content/floorMapBlueprints";
-import { generateBiomePlan } from "../src/domain/biome";
-import { generateCampfires } from "../src/domain/campfire";
-import { generateFloorHazards } from "../src/domain/floorLabyrinth";
-import { generateFloorOneHazards } from "../src/domain/floorOneLabyrinth";
-import { generateGuidedMapPlan } from "../src/domain/guidedMap";
-import { generateMazeFloor } from "../src/domain/mazeGenerator";
-import { generateRoomGraph } from "../src/domain/runGraph";
+} from "../src/content/world/floorLabyrinth";
+import { floorMapBlueprint } from "../src/content/world/floorMapBlueprints";
+import { generateBiomePlan } from "../src/domain/exploration/biome";
+import { generateCampfires } from "../src/domain/exploration/campfire";
+import { generateFloorHazards } from "../src/domain/exploration/floorLabyrinth";
+import { generateFloorOneHazards } from "../src/domain/exploration/floorOneLabyrinth";
+import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
+import { generateMazeFloor } from "../src/domain/exploration/mazeGenerator";
+import { generateRoomGraph } from "../src/domain/progression/runGraph";
 
 function mutableLabyrinths(): FloorLabyrinthContract[] {
   return structuredClone(Object.values(FLOOR_LABYRINTHS));

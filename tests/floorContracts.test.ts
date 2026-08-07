@@ -4,14 +4,14 @@ import {
   floorContractFor,
   validateFloorContracts,
   type FloorContentContract,
-} from "../src/content/floorContracts";
-import { FLOOR_EXPERIENCES } from "../src/content/floorExperience";
-import { floorLabyrinth } from "../src/content/floorLabyrinth";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+} from "../src/content/curriculum/floorContracts";
+import { FLOOR_EXPERIENCES } from "../src/content/world/floorExperience";
+import { floorLabyrinth } from "../src/content/world/floorLabyrinth";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
 import {
   lessonsForFloor,
   type RunLessonId,
-} from "../src/domain/runGraph";
+} from "../src/domain/progression/runGraph";
 
 function mutableContracts(): FloorContentContract[] {
   return structuredClone(FLOOR_CONTRACTS) as FloorContentContract[];

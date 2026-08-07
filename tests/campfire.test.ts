@@ -7,10 +7,10 @@ import {
   nearbyCampfire,
   safeZoneCellKeys,
   spawnSafeCellKeys,
-} from "../src/domain/campfire";
-import { generateMazeFloor, mazeTileAt } from "../src/domain/mazeGenerator";
-import { findGridPath } from "../src/domain/pathfinding";
-import { generateRoomGraph, type FloorNumber } from "../src/domain/runGraph";
+} from "../src/domain/exploration/campfire";
+import { generateMazeFloor, mazeTileAt } from "../src/domain/exploration/mazeGenerator";
+import { findGridPath } from "../src/domain/exploration/pathfinding";
+import { generateRoomGraph, type FloorNumber } from "../src/domain/progression/runGraph";
 
 const GENERATED_SEED_SAMPLES = 8;
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isGameplayShortcutCaptured,
   parseExternalMoveDetail,
-} from "../src/game/gameInput";
+} from "../src/presentation/phaser/gameInput";
 
 describe("game input boundary", () => {
   it("accepts only one-cell cardinal touch movement", () => {

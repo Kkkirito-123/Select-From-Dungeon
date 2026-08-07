@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
 import legacyV11Fixture from "./fixtures/legacy-v11-before-mvp2-1.json";
-import { legacyMonsterIdForCurrent } from "../src/content/monsterIds";
-import { GameSession } from "../src/domain/GameSession";
-import { generateCampfires } from "../src/domain/campfire";
+import { legacyMonsterIdForCurrent } from "../src/content/world/monsterIds";
+import { GameSession } from "../src/domain/session/GameSession";
+import { generateCampfires } from "../src/domain/exploration/campfire";
 import {
   advanceCampaignProgress,
   createCampaignProgress,
-} from "../src/domain/campaign";
-import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
-import { migrationStepMarkerIds } from "../src/domain/finalMigration";
+} from "../src/domain/progression/campaign";
+import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
+import { migrationStepMarkerIds } from "../src/domain/progression/finalMigration";
 import {
   LARGE_MAZE_CHUNK_SIZE,
   LARGE_MAZE_HEIGHT,
   LARGE_MAZE_WIDTH,
   mazeLayoutNameForVersion,
-} from "../src/domain/mazeGenerator";
-import { stableStringHash } from "../src/domain/runGraph";
-import type { SavedRun, SqlQueryResult } from "../src/domain/types";
+} from "../src/domain/exploration/mazeGenerator";
+import { stableStringHash } from "../src/domain/progression/runGraph";
+import type { SavedRun, SqlQueryResult } from "../src/domain/shared/types";
 import {
   PROFILE_SAVE_KEY,
   RUN_SAVE_KEY,
@@ -29,7 +29,7 @@ import {
   saveProfile,
   saveRun,
   type StorageLike,
-} from "../src/storage/localProgress";
+} from "../src/infrastructure/storage/localProgress";
 
 class MemoryStorage implements StorageLike {
   readonly values = new Map<string, string>();

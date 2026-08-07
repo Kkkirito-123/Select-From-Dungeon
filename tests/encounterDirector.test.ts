@@ -7,7 +7,7 @@ import {
   advanceEncounterMeter,
   recordSafeZoneMovement,
   suppressThirdConsecutiveEncounter,
-} from "../src/domain/encounterDirector";
+} from "../src/domain/exploration/encounterDirector";
 
 function candidates(...monsterIds: number[]) {
   return monsterIds.map((monsterId) => ({ monsterId, weight: 1 }));

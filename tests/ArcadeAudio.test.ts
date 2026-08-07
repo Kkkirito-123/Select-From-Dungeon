@@ -4,7 +4,7 @@ import {
   ArcadeAudio,
   chooseNextTrackIndex,
   type ArcadeSfx,
-} from "../src/audio/ArcadeAudio";
+} from "../src/infrastructure/audio/ArcadeAudio";
 
 const ALL_SFX = [
   "step",

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { NAVIGATION_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
-import { GameSession } from "../src/domain/GameSession";
-import { isMazeWalkable } from "../src/domain/mazeGenerator";
-import type { SavedRun } from "../src/domain/types";
+import { NAVIGATION_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
+import { GameSession } from "../src/domain/session/GameSession";
+import { isMazeWalkable } from "../src/domain/exploration/mazeGenerator";
+import type { SavedRun } from "../src/domain/shared/types";
 
 const DIRECTIONS = [
   { x: 1, y: 0 },

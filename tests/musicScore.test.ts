@@ -5,7 +5,7 @@ import {
   musicPatternsForScene,
   type ArcadeMusicMode,
   type DungeonFloor,
-} from "../src/audio/musicScore";
+} from "../src/infrastructure/audio/musicScore";
 
 const MODES = ["explore", "combat", "boss"] as const satisfies readonly ArcadeMusicMode[];
 

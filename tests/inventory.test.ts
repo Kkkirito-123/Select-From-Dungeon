@@ -3,16 +3,16 @@ import {
   ARMORS,
   BONE_BLADE,
   CONSUMABLES,
-} from "../src/content/inventoryCatalog";
-import { GameSession } from "../src/domain/GameSession";
-import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
-import { isSavedRun } from "../src/storage/localProgress";
+} from "../src/content/inventory/inventoryCatalog";
+import { GameSession } from "../src/domain/session/GameSession";
+import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
+import { isSavedRun } from "../src/infrastructure/storage/localProgress";
 import type {
   EquipmentItem,
   LootItem,
   SavedRun,
   SqlQueryResult,
-} from "../src/domain/types";
+} from "../src/domain/shared/types";
 
 function armorLoot(dropId = "fixture:slime-vest"): LootItem {
   const armor = ARMORS["slime-vest"];

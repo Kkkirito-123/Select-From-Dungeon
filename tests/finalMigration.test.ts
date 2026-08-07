@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { NARRATIVE_ENDINGS } from "../src/content/narrativeContent";
+import { NARRATIVE_ENDINGS } from "../src/content/narrative/narrativeContent";
 import {
   finalMigrationProgress,
   migrationMarkersFormPrefix,
   migrationStepIdFromMarker,
   migrationStepMarkerId,
   migrationStepMarkerIds,
-} from "../src/domain/finalMigration";
+} from "../src/domain/progression/finalMigration";
 
 describe("MIGRATE 七步 Run 标记", () => {
   it("复用唯一结局的七步稳定 ID，并可无损往返 marker", () => {

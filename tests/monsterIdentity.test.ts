@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
 import {
   monsterIdLabel,
   monsterIdentityPresentation,
   monsterIntentName,
   redactUndiscoveredMonsterIdentityText,
   recoverMonsterIdentity,
-} from "../src/domain/monsterIdentity";
-import { createEmptyProfile } from "../src/storage/localProgress";
-import { buildMonsterCodexModel } from "../src/ui/MonsterCodexView";
+} from "../src/domain/progression/monsterIdentity";
+import { createEmptyProfile } from "../src/infrastructure/storage/localProgress";
+import { buildMonsterCodexModel } from "../src/presentation/dom/MonsterCodexView";
 
 describe("monster identity archive", () => {
   it("活体始终只公开补零 ID，已恢复名字只进入图鉴", () => {

@@ -335,11 +335,11 @@ async function main() {
       { SqlEngine },
       { QUESTION_BANK_CONFIG, QUESTION_BANK_TIERS },
     ] = await Promise.all([
-      vite.ssrLoadModule("/src/content/mvpLevel.ts"),
-      vite.ssrLoadModule("/src/content/biomeContent.ts"),
-      vite.ssrLoadModule("/src/domain/runGraph.ts"),
-      vite.ssrLoadModule("/src/sql/SqlEngine.ts"),
-      vite.ssrLoadModule("/src/config/questionBankConfig.ts"),
+      vite.ssrLoadModule("/src/content/curriculum/mvpLevel.ts"),
+      vite.ssrLoadModule("/src/content/world/biomeContent.ts"),
+      vite.ssrLoadModule("/src/domain/progression/runGraph.ts"),
+      vite.ssrLoadModule("/src/infrastructure/sql/SqlEngine.ts"),
+      vite.ssrLoadModule("/src/application/config/questionBankConfig.ts"),
     ]);
     const {
       version: bankVersion,
@@ -443,7 +443,7 @@ async function main() {
       schemaVersion: String(schemaVersion),
       floorCount: String(floorCount),
       questionsPerFloor: String(questionsPerFloor),
-      generatedFrom: "src/content/*Level.ts",
+      generatedFrom: "src/content/curriculum/*Level.ts",
     };
     Object.entries(metadata).forEach(([key, value]) => {
       database.run("INSERT INTO bank_metadata(key, value) VALUES (?, ?)", [key, value]);

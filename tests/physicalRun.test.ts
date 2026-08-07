@@ -1,19 +1,19 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { BIOME_PRACTICE_STAGES } from "../src/content/biomeContent";
-import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
-import { GameSession } from "../src/domain/GameSession";
-import { biomeGuardianIdForStep } from "../src/domain/biome";
-import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
-import { isMazeWalkable } from "../src/domain/mazeGenerator";
-import { SqlEngine } from "../src/sql/SqlEngine";
-import { isSavedRun } from "../src/storage/localProgress";
+import { BIOME_PRACTICE_STAGES } from "../src/content/world/biomeContent";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
+import { GameSession } from "../src/domain/session/GameSession";
+import { biomeGuardianIdForStep } from "../src/domain/exploration/biome";
+import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
+import { isMazeWalkable } from "../src/domain/exploration/mazeGenerator";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
+import { isSavedRun } from "../src/infrastructure/storage/localProgress";
 import type {
   GroundItem,
   LessonId,
   Position,
   SqlQueryResult,
-} from "../src/domain/types";
+} from "../src/domain/shared/types";
 
 const DIRECTIONS = [
   { x: 1, y: 0 },

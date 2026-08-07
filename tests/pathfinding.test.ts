@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findGridPath } from "../src/domain/pathfinding";
+import { findGridPath } from "../src/domain/exploration/pathfinding";
 
 describe("findGridPath", () => {
   it("绕过障碍找到目标", () => {

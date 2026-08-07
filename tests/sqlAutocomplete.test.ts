@@ -4,7 +4,7 @@ import {
   getSqlCompletions,
   parseSchemaRelations,
   parseSchemaLines,
-} from "../src/ui/sqlAutocomplete";
+} from "../src/presentation/dom/sqlAutocomplete";
 
 const SCHEMA = [
   "monsters(id, room_id, name, status, weakness)",

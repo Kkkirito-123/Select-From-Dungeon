@@ -5,7 +5,7 @@ import {
   FLOOR_EXPERIENCES,
   floorExperience,
   validateFloorExperience,
-} from "../src/content/floorExperience";
+} from "../src/content/world/floorExperience";
 
 describe("eight-floor experience contracts", () => {
   it("keeps every content contract internally valid", () => {

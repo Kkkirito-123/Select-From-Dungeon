@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { GameSnapshot, GroundItem } from "../src/domain/types";
-import type { MazeGate } from "../src/domain/mazeGenerator";
-import { newlyOpenedGate, pickedItemsBetween } from "../src/game/snapshotFeedback";
+import type { GameSnapshot, GroundItem } from "../src/domain/shared/types";
+import type { MazeGate } from "../src/domain/exploration/mazeGenerator";
+import { newlyOpenedGate, pickedItemsBetween } from "../src/presentation/phaser/snapshotFeedback";
 
 type FeedbackSnapshot = Pick<
   GameSnapshot,

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildLearningAttempt,
   nextLearningAggregate,
-} from "../src/storage/learningLedger";
-import type { AnswerAttemptRecord } from "../src/domain/types";
+} from "../src/infrastructure/storage/learningLedger";
+import type { AnswerAttemptRecord } from "../src/domain/shared/types";
 
 const record: AnswerAttemptRecord = {
   id: 7,

@@ -1,11 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
 import {
   STORY_QUERY_CATALOG,
   storyQuery,
-} from "../src/sql/storyQueryCatalog";
-import { SqlEngine } from "../src/sql/SqlEngine";
+} from "../src/content/sql/storyQueryCatalog";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
 async function createEngine(): Promise<SqlEngine> {
   return SqlEngine.create(
@@ -52,7 +52,7 @@ describe("read-only world story schema", () => {
     ).rows.map((row) => row.name);
     expect(tables).toEqual(expect.arrayContaining(["residents", "identity_sources"]));
 
-    const ordinarySchema = (await import("../src/content/sqlSchema"))
+    const ordinarySchema = (await import("../src/content/sql/sqlSchema"))
       .COMPLETE_SCHEMA_LINES.join("\n");
     expect(ordinarySchema).not.toContain("residents");
     expect(ordinarySchema).not.toContain("identity_sources");

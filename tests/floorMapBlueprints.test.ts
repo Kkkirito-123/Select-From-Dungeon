@@ -7,11 +7,11 @@ import {
   compatibleFloorLayoutNames,
   floorTransitPresentation,
   regionPortalsEnabledForFloor,
-} from "../src/content/floorMapBlueprints";
+} from "../src/content/world/floorMapBlueprints";
 import {
   generateRoomGraph,
   type FloorNumber,
-} from "../src/domain/runGraph";
+} from "../src/domain/progression/runGraph";
 
 const FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const satisfies readonly FloorNumber[];
 

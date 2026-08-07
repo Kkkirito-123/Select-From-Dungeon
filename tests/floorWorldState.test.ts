@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { deriveFloorWorldState } from "../src/domain/floorWorldState";
-import type { RunLessonId } from "../src/domain/runGraph";
+import { deriveFloorWorldState } from "../src/domain/progression/floorWorldState";
+import type { RunLessonId } from "../src/domain/progression/runGraph";
 
 function input(
   floor: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,

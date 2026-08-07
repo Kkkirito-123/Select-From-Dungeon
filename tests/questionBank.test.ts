@@ -6,14 +6,14 @@ import {
   QuestionBankCatalog,
   practiceStageForQuestion,
   type PracticeQuestionTier,
-} from "../src/content/questionBank";
-import { QUESTION_BANK_CONFIG } from "../src/config/questionBankConfig";
-import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
-import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
-import { evaluateStage } from "../src/domain/lessonEvaluator";
-import { lessonsForFloor } from "../src/domain/runGraph";
-import { loadBundledQuestionBank } from "../src/runtime/questionBankLoader";
-import { SqlEngine } from "../src/sql/SqlEngine";
+} from "../src/content/curriculum/questionBank";
+import { QUESTION_BANK_CONFIG } from "../src/application/config/questionBankConfig";
+import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
+import { evaluateStage } from "../src/domain/learning/lessonEvaluator";
+import { lessonsForFloor } from "../src/domain/progression/runGraph";
+import { loadBundledQuestionBank } from "../src/application/runtime/questionBankLoader";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
 async function fixtureFetcher(input: RequestInfo | URL): Promise<Response> {
   const url = String(input);

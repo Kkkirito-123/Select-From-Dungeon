@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { INITIAL_MONSTERS, lessonById, practiceStagesFor } from "../src/content/mvpLevel";
-import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
+import { INITIAL_MONSTERS, lessonById, practiceStagesFor } from "../src/content/curriculum/mvpLevel";
+import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
 import {
   counterDamageForEncounter,
   counterDamageForMonster,
@@ -8,8 +8,8 @@ import {
   stageCountForEncounter,
   stagesForEncounter,
   type EncounterDamageRole,
-} from "../src/domain/combatBalance";
-import { lessonsForFloor, type FloorNumber } from "../src/domain/runGraph";
+} from "../src/domain/combat/combatBalance";
+import { lessonsForFloor, type FloorNumber } from "../src/domain/progression/runGraph";
 
 function authoredStages(monster: (typeof INITIAL_MONSTERS)[number]) {
   return monster.encounterType === "ambush"

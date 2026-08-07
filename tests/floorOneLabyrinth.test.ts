@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateCampfires, safeZoneCellKeys } from "../src/domain/campfire";
+import { generateCampfires, safeZoneCellKeys } from "../src/domain/exploration/campfire";
 import {
   FLOOR_ONE_HAZARD_COUNT,
   FLOOR_ONE_LABYRINTH_SIGHT_RADIUS,
@@ -9,16 +9,16 @@ import {
   floorOneAreaAt,
   floorOneCurrentSightCellKeys,
   generateFloorOneHazards,
-} from "../src/domain/floorOneLabyrinth";
-import { GameSession } from "../src/domain/GameSession";
-import { generateGuidedMapPlan } from "../src/domain/guidedMap";
+} from "../src/domain/exploration/floorOneLabyrinth";
+import { GameSession } from "../src/domain/session/GameSession";
+import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
 import {
   generateMazeFloor,
   mazeTileAt,
   type MazeFloor,
-} from "../src/domain/mazeGenerator";
-import { generateRoomGraph } from "../src/domain/runGraph";
-import type { Position } from "../src/domain/types";
+} from "../src/domain/exploration/mazeGenerator";
+import { generateRoomGraph } from "../src/domain/progression/runGraph";
+import type { Position } from "../src/domain/shared/types";
 
 const DIRECTIONS: readonly Position[] = [
   { x: 1, y: 0 },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/GameSession";
+import { GameSession } from "../src/domain/session/GameSession";
 import {
   INTERACTION_LABEL_DISTANCE,
   MONSTER_LABEL_DISTANCE,
@@ -8,7 +8,7 @@ import {
   isNearPlayer,
   shouldShowTutorialBeacon,
   tutorialObjective,
-} from "../src/game/worldOverlay";
+} from "../src/presentation/phaser/worldOverlay";
 
 describe("world overlay presentation", () => {
   it("首课史莱姆固定在出生位置，玩家撞上它会进入 SELECT 战斗", () => {

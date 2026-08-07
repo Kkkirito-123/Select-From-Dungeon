@@ -110,7 +110,7 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 ## 架构与执行流
 
 ```text
-index.html -> src/main.ts
+index.html -> src/application/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> agent/runtime（受限证据、确定性篝火、缓存与后台调度）
   -> agent/browser（DeepSeek 内存 Worker、严格抄写员输出与设置 UI）
@@ -168,45 +168,53 @@ index.html -> src/main.ts
 BYOK Key；正式网页 BYOK 不会让 Key 经过它。不得启用工具、记忆、MCP、游戏写入、请求日志、自由提示词
 或持久化 Provider 凭证。
 
-`src/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
+`src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
 和 DeepSeek 默认模型；其中严禁出现 Provider 凭证。内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
 
-`src/content/sqlSchema.ts` 负责 `monsters`、`monster_signals`、`rooms`、
+`src/content/sql/sqlSchema.ts` 负责 `monsters`、`monster_signals`、`rooms`、
 `monster_gear` 的权威字段、类型、可空性元数据、生成 DDL 与教学关系；`SqlEngine` 执行该 DDL
 并负责内存查询，UI 不得重复维护表定义或绕开只读边界。目录中的关系是 JOIN 教学提示，不是
 SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，但必须同时满足查询结果
 和本关概念锁。第一层课程刻意
 限定为单层 `SELECT`，不允许 `OR`、子查询或集合运算，避免把必修条件藏在无效分支里。第二层
 排序与连接题也遵循单语句边界，并把真实关系条件纳入概念锁。共享课程数据与固定房间宝箱奖励位于
-`src/content/mvpLevel.ts`，后续可玩层内容位于 `src/content/floor2Level.ts` 至
-`src/content/floor8Level.ts`；房间氛围与局内奖励位于
-`src/content/runContent.ts`；可选 Boss 门题目与语义结果约束位于
-`src/content/gateChallenges.ts`；新手引导文案位于 `src/content/onboarding.ts`。每个 SQL
-阶段都从空编辑器开始。`src/content/lessonTaskBrief.ts` 是面向玩家的 SQL 任务展示边界：
+`src/content/curriculum/mvpLevel.ts`，后续可玩层内容位于 `src/content/curriculum/floor2Level.ts` 至
+`src/content/curriculum/floor8Level.ts`；房间氛围与局内奖励位于
+`src/content/world/runContent.ts`；可选 Boss 门题目与语义结果约束位于
+`src/content/curriculum/gateChallenges.ts`；新手引导文案位于 `src/content/curriculum/onboarding.ts`。每个 SQL
+阶段都从空编辑器开始。`src/content/curriculum/lessonTaskBrief.ts` 是面向玩家的 SQL 任务展示边界：
 它根据关卡阶段与 `sqlSchema` 统一生成当前局面、精确返回列、权威字段含义、JOIN 关系、查询
 条件、世界效果、难度标签和四级提示；`AppShell` 只负责渲染，不得重新猜测 SQL 语义。普通
 遭遇第一击只包含当前章节和基础投影/过滤；小型精英只能从第二击起增加至多一个已掌握章节；
 楼层 Boss 从单章确认逐步升级到最终二至三章审计。完整 SQL 只能出现在第四级提示。
-`src/ui/appShellTemplate.ts` 独占 AppShell 静态页面骨架，`src/ui/appShellDom.ts` 统一绑定会被
+`src/presentation/dom/appShellTemplate.ts` 独占 AppShell 静态页面骨架，`src/presentation/dom/appShellDom.ts` 统一绑定会被
 运行时重复使用的稳定节点；状态渲染和事件处理不得复制整份模板，也不得为同一个持久节点维护
 第二套静默选择器。
-`src/ui/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
+`src/presentation/dom/panels/` 负责终端、背包、篝火、复盘、剧情和 Schema 交互，
+`src/presentation/dom/renderers/` 负责 HUD、小地图和战斗展示。Panel 只能接收快照与显式回调，
+不得直接访问存档、Agent Worker 或 Phaser。
+`src/presentation/phaser/world/` 负责地形、迷雾、世界对象可见性和拓扑重建判断；`DungeonScene`
+仍是 Phaser 生命周期与事件转发门面。
+`src/domain/learning/queryFeatureDetector.ts` 负责 SQL 特征标签，
+`queryIdentityRules.ts` 负责身份字段防火墙，`lessonLocks.ts` 负责课程阶段选择和基础 SQL
+外形限制，`lessonResultEvaluator.ts` 负责固定课程结果语义；`lessonEvaluator.ts` 只保留兼容导出与组合。
+`src/presentation/dom/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
 MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得
 生成完整答案、提交查询或绕过课程判定。
-`src/content/inventoryCatalog.ts` 负责背包容量、当前武器/防具/恢复品目录和生态可选候选概率；
-`src/domain/lootDirector.ts` 负责确定性独立判定、阶级最低掉落、同场去重、唯一装备转换与
+`src/content/inventory/inventoryCatalog.ts` 负责背包容量、当前武器/防具/恢复品目录和生态可选候选概率；
+`src/domain/inventory/lootDirector.ts` 负责确定性独立判定、阶级最低掉落、同场去重、唯一装备转换与
 三件上限。
-`src/content/biomeContent.ts` 负责当前可玩八层的生态怪物池与可选多阶段练习；
-`src/domain/biome.ts` 从迷宫、篝火、引导地图和 Seed 派生区域归属、静态地貌与区域首领位置。
+`src/content/world/biomeContent.ts` 负责当前可玩八层的生态怪物池与可选多阶段练习；
+`src/domain/exploration/biome.ts` 从迷宫、篝火、引导地图和 Seed 派生区域归属、静态地貌与区域首领位置。
 生态计划在加载时重建，不进入存档。
-`src/content/floorLabyrinth.ts` 负责稳定的八层导航契约；`src/domain/floorLabyrinth.ts` 再把这些
+`src/content/world/floorLabyrinth.ts` 负责稳定的八层导航契约；`src/domain/exploration/floorLabyrinth.ts` 再把这些
 意图解析到当前已保存的 `MazeFloor`、篝火、引导方案与生态方案。不得把派生安全格、视野、
 陷阱坐标重复写入存档。
-`src/content/floorContracts.ts` 负责 Campaign 课程元数据及其可序列化 Schema；在已登记的
+`src/content/curriculum/floorContracts.ts` 负责 Campaign 课程元数据及其可序列化 Schema；在已登记的
 `AUTH-003` 已由跨真源测试关闭，但它仍不是楼层显示名称、生态或精确怪物名单的玩家文案权威。可执行怪物事实
 属于各层 Level 文件与 `biomeContent.ts`，玩家地点和事件属于 Floor Experience，导航边界属于
-Floor Labyrinth 与 Floor Map Blueprints。`src/domain/campaign.ts` 负责可序列化的有序楼层槽位，
+Floor Labyrinth 与 Floor Map Blueprints。`src/domain/progression/campaign.ts` 负责可序列化的有序楼层槽位，
 必须拒绝跳层、重复激活与 Seed 重抽，且不得把一层静默套用到另一层。权威登记表位于
 `docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`。
 
@@ -220,17 +228,13 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 ## 仓库地图
 
 ```text
-agent/              浏览器纯输出 Agent/BYOK UI 与本机 Python 评测器
-src/config/          带中文注释的运行时调节参数；严禁存放凭证
-src/audio/          公版古典主题的程序化电子 Web Audio 乐谱与事件音效
-src/content/        课程、SQL Schema、地图/角色/叙事真源、实体、固定武器、奖励与引导
-src/domain/         纯状态、战斗规则、课程图、物理迷宫、校验、巡逻、语义与查询策略
-src/feedback/       把语义游戏事件路由到通知和音频提示
-src/game/           连续迷宫探索、战斗场景与游戏启动
-src/runtime/        页面隐藏/恢复时协调渲染、音频与存档
-src/sql/            SQLite WASM 初始化、Schema、执行和 HP 同步
-src/storage/        带版本的 Run/Profile 校验、恢复、写入合并，以及题库缓存与学习账本 IndexedDB
-src/ui/             静态页面模板、稳定 DOM 契约、视图、《失名录》、新手引导与游戏编排
+agent/                  浏览器纯输出 Agent/BYOK UI 与本机 Python 评测器
+src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
+src/application/        启动、运行时配置与页面生命周期
+src/content/            课程、世界、剧情、背包与 SQL 静态内容
+src/domain/             Session 门面/辅助模块、战斗、探索、学习、成长、背包与共享规则
+src/infrastructure/     音频、反馈、SQLite、存档编解码/迁移与浏览器适配器
+src/presentation/       Phaser 场景、DOM 应用视图与职责明确的渲染器
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
 docs/               双语蓝图、活跃路线图、docs/design/ 后续候选设计与历史报告
 .agents/skills/     需求、初始化、交付、实现、指南同步和显式发布工作流

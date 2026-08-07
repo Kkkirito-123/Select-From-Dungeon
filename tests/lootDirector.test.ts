@@ -6,10 +6,10 @@ import {
   lootCandidatesForFloor,
   optionalRecoveryProbability,
   type LootCandidate,
-} from "../src/content/inventoryCatalog";
-import { FILTER_BOW } from "../src/content/mvpLevel";
-import { rollLootItems } from "../src/domain/lootDirector";
-import type { LootItem, Monster } from "../src/domain/types";
+} from "../src/content/inventory/inventoryCatalog";
+import { FILTER_BOW } from "../src/content/curriculum/mvpLevel";
+import { rollLootItems } from "../src/domain/inventory/lootDirector";
+import type { LootItem, Monster } from "../src/domain/shared/types";
 
 function monster(rank: Monster["rank"]): Monster {
   return {
