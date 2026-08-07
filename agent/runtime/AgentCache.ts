@@ -1,5 +1,5 @@
-import type { StorageLike } from "../../src/storage/localProgress";
-import { AGENT_RUNTIME_CONFIG } from "../../src/config/runtimeConfig";
+import type { StorageLike } from "../../src/contracts/storage/storageLike";
+import { AGENT_RUNTIME_CONFIG } from "../../src/application/config/runtimeConfig";
 import {
   AGENT_OUTPUT_CACHE_KEY,
   AGENT_OUTPUT_VERSION,

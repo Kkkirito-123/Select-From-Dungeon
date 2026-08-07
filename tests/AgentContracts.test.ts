@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parsePreparedAgentOutput } from "../agent/runtime/contracts";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { buildLocalPreparedOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
+import { GameSession } from "../src/domain/session/GameSession";
 
 describe("Agent strict output contract", () => {
   it("拒绝 Markdown、HTML、未知证据与未知字段", () => {

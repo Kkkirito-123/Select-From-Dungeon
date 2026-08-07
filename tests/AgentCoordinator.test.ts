@@ -8,9 +8,10 @@ import {
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import type { AgentPrepareRequest, PreparedAgentOutput } from "../agent/runtime/contracts";
 import { buildLocalPreparedOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
-import type { AnswerAttemptRecord, GameSnapshot } from "../src/domain/types";
-import type { StorageLike } from "../src/storage/localProgress";
+import { GameSession } from "../src/domain/session/GameSession";
+import type { AnswerAttemptRecord } from "../src/contracts/game/results";
+import type { GameSnapshot } from "../src/contracts/game/snapshots";
+import type { StorageLike } from "../src/contracts/storage/storageLike";
 
 class SnapshotSource implements AgentSnapshotSource {
   private listener: ((snapshot: GameSnapshot) => void) | null = null;

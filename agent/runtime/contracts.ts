@@ -1,6 +1,6 @@
-import type { AnswerResult, BattleOutcome } from "../../src/domain/types";
-import type { FloorNumber, RunLessonId } from "../../src/domain/runGraph";
-import { AGENT_RUNTIME_CONFIG } from "../../src/config/runtimeConfig";
+import type { AnswerResult, BattleOutcome } from "../../src/contracts/game/results";
+import type { FloorNumber, RunLessonId } from "../../src/domain/progression/runGraph";
+import { AGENT_RUNTIME_CONFIG } from "../../src/application/config/runtimeConfig";
 
 export const AGENT_OUTPUT_CACHE_KEY = "select-from-dungeon:agent-output:v2";
 export const AGENT_REQUEST_VERSION = 2 as const;

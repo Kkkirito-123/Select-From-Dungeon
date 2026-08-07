@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { detectAgentHook } from "../agent/runtime/hooks";
 import { buildLocalCampfireOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
+import { GameSession } from "../src/domain/session/GameSession";
 
 function snapshot(overrides: Partial<ReturnType<GameSession["snapshot"]>> = {}) {
   return {

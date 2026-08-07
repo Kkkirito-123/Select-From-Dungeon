@@ -1,6 +1,6 @@
 import type { DeepSeekWorkerClient } from "../deepseek/DeepSeekWorkerClient";
 import type { DeepSeekErrorCode } from "../deepseek/protocol";
-import type { LearningLedger } from "../../../src/storage/learningLedger";
+import type { LearningLedger } from "../../../src/infrastructure/storage/learningLedger";
 
 const SETTINGS_KEY = "select-from-dungeon:agent-provider-settings:v1";
 const CONSENT_VERSION = 1;

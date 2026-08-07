@@ -5,7 +5,7 @@ import {
 } from "../../runtime/contracts";
 import type { AgentPreparationClient } from "../../runtime/AgentClient";
 import { buildLocalCampfireOutput } from "../../runtime/localFallback";
-import { DEEPSEEK_RUNTIME_CONFIG } from "../../../src/config/runtimeConfig";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../../../src/application/config/runtimeConfig";
 import type {
   DeepSeekErrorCode,
   DeepSeekWorkerRequest,

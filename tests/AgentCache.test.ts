@@ -3,8 +3,8 @@ import { AgentCache } from "../agent/runtime/AgentCache";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { AGENT_OUTPUT_CACHE_KEY } from "../agent/runtime/contracts";
 import { buildLocalPreparedOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
-import type { StorageLike } from "../src/storage/localProgress";
+import { GameSession } from "../src/domain/session/GameSession";
+import type { StorageLike } from "../src/contracts/storage/storageLike";
 
 function memoryStorage(): StorageLike & { values: Map<string, string> } {
   const values = new Map<string, string>();

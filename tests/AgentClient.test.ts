@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentClient, loopbackAgentEndpoint } from "../agent/runtime/AgentClient";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { buildLocalPreparedOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
+import { GameSession } from "../src/domain/session/GameSession";
 
 describe("AgentClient", () => {
   it("只接受显式 loopback 输出服务地址", () => {

@@ -6,8 +6,8 @@ import type {
 } from "../agent/browser/deepseek/protocol";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { buildLocalPreparedOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
-import { DEEPSEEK_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
+import { GameSession } from "../src/domain/session/GameSession";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
 
 class FakeWorker implements WorkerLike {
   readonly messages: DeepSeekWorkerRequest[] = [];

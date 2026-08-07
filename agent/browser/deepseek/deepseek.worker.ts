@@ -5,7 +5,7 @@ import {
   type ScribeOutput,
 } from "../../runtime/contracts";
 import { buildScribeUserPrompt, SCRIBE_SYSTEM_PROMPT } from "../scribe/prompt";
-import { DEEPSEEK_RUNTIME_CONFIG } from "../../../src/config/runtimeConfig";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../../../src/application/config/runtimeConfig";
 import type {
   DeepSeekErrorCode,
   DeepSeekWorkerRequest,
