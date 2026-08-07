@@ -1,8 +1,8 @@
-import { floorStoryProgress } from "../../src/domain/floorStory";
-import { floorWorldStateFromSnapshot } from "../../src/domain/floorWorldState";
-import { redactUndiscoveredMonsterIdentityText } from "../../src/domain/monsterIdentity";
-import type { RunLessonId } from "../../src/domain/runGraph";
-import type { GameSnapshot } from "../../src/domain/types";
+import { floorStoryProgress } from "../../src/domain/progression/floorStory";
+import { floorWorldStateFromSnapshot } from "../../src/domain/progression/floorWorldState";
+import { redactUndiscoveredMonsterIdentityText } from "../../src/domain/progression/monsterIdentity";
+import type { RunLessonId } from "../../src/domain/progression/runGraph";
+import type { GameSnapshot } from "../../src/contracts/game/snapshots";
 import {
   AGENT_REQUEST_VERSION,
   MAX_AGENT_ATTEMPTS,

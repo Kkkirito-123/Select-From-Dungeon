@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPrepareRequest } from "../agent/runtime/context";
 import { buildLocalCampfireOutput } from "../agent/runtime/localFallback";
-import { GameSession } from "../src/domain/GameSession";
-import type { AnswerAttemptRecord, GameSnapshot } from "../src/domain/types";
+import { GameSession } from "../src/domain/session/GameSession";
+import type { AnswerAttemptRecord } from "../src/contracts/game/results";
+import type { GameSnapshot } from "../src/contracts/game/snapshots";
 
 function attempt(
   id: number,

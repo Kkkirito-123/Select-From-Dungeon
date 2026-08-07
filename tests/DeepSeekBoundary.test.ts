@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEEPSEEK_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
+import { DEEPSEEK_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
 
 describe("DeepSeek browser security boundary", () => {
   it("Worker 固定官方域名与无凭据 fetch，且不访问浏览器持久存储", async () => {

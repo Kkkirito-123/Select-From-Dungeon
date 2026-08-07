@@ -1,4 +1,4 @@
-import type { GameSnapshot } from "../../src/domain/types";
+import type { GameSnapshot } from "../../src/contracts/game/snapshots";
 
 export type AgentHook =
   | {
