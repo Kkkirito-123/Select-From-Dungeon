@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/GameSession";
-import { generateMazeFloor } from "../src/domain/mazeGenerator";
+import { GameSession } from "../src/domain/session/GameSession";
+import { generateMazeFloor } from "../src/domain/exploration/mazeGenerator";
 import {
   advanceMonsterPatrol,
   isActorPatrolPosition,
   type PatrolContext,
   type WorldActor,
-} from "../src/domain/monsterRoaming";
-import { generateRoomGraph } from "../src/domain/runGraph";
+} from "../src/domain/exploration/monsterRoaming";
+import { generateRoomGraph } from "../src/domain/progression/runGraph";
 
 function fixture(): { actor: WorldActor; context: PatrolContext } {
   const graph = generateRoomGraph("patrol");

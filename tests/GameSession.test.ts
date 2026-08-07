@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { floorExperience } from "../src/content/floorExperience";
-import { ARMORS } from "../src/content/inventoryCatalog";
-import { WORLD_RUNTIME_CONFIG } from "../src/config/runtimeConfig";
-import { biomeRegionAt } from "../src/domain/biome";
-import { GameSession, experienceForRank } from "../src/domain/GameSession";
-import { safeZoneCellKeys } from "../src/domain/campfire";
-import { advanceCampaignProgress } from "../src/domain/campaign";
-import { migrationStepMarkerIds } from "../src/domain/finalMigration";
-import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
-import { isMazeWalkable } from "../src/domain/mazeGenerator";
-import { isSavedRun } from "../src/storage/localProgress";
+import { floorExperience } from "../src/content/world/floorExperience";
+import { ARMORS } from "../src/content/inventory/inventoryCatalog";
+import { WORLD_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
+import { biomeRegionAt } from "../src/domain/exploration/biome";
+import { GameSession, experienceForRank } from "../src/domain/session/GameSession";
+import { safeZoneCellKeys } from "../src/domain/exploration/campfire";
+import { advanceCampaignProgress } from "../src/domain/progression/campaign";
+import { migrationStepMarkerIds } from "../src/domain/progression/finalMigration";
+import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
+import { isMazeWalkable } from "../src/domain/exploration/mazeGenerator";
+import { isSavedRun } from "../src/infrastructure/storage/localProgress";
 import type {
   GroundItem,
   LessonId,
   SavedRun,
   SqlQueryResult,
   TurnResolution,
-} from "../src/domain/types";
+} from "../src/domain/shared/types";
 
 function result(
   sql: string,

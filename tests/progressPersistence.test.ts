@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/GameSession";
-import type { GameSnapshot } from "../src/domain/types";
-import { createEmptyProfile, type StorageLike } from "../src/storage/localProgress";
+import { GameSession } from "../src/domain/session/GameSession";
+import type { GameSnapshot } from "../src/domain/shared/types";
+import { createEmptyProfile, type StorageLike } from "../src/infrastructure/storage/localProgress";
 import {
   PROGRESS_SAVE_DEBOUNCE_MS,
   isCriticalPersistenceChange,
   persistenceFingerprint,
   startProgressPersistence,
-} from "../src/storage/progressPersistence";
+} from "../src/infrastructure/storage/progressPersistence";
 
 describe("progress persistence", () => {
   it("连续移动快照只保留一个尾随写入，关键查询变化立即写入", () => {

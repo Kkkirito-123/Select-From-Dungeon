@@ -1,0 +1,103 @@
+/**
+ * 战斗数值的纯计算边界。
+ *
+ * 这里只根据怪物、楼层和内容阶段计算反击伤害与阶段数量，不修改生命、
+ * 经验或存档。GameSession 负责把计算结果应用到运行状态。
+ */
+import { biomeEncounterFor } from "../../content/world/biomeContent";
+import type { LessonStageDefinition, Monster } from "../shared/types";
+import type { FloorNumber } from "../progression/runGraph";
+
+export type EncounterDamageRole =
+  | "normal"
+  | "elite"
+  | "area-boss"
+  | "floor-boss";
+
+export function encounterDamageRoleFor(monster: Monster): EncounterDamageRole {
+  const biomeEncounter = biomeEncounterFor(monster.id);
+  if (biomeEncounter?.role === "area-boss") return "area-boss";
+  if (monster.rank === "boss") return "floor-boss";
+  if (biomeEncounter?.role === "mini-elite" || monster.rank === "elite") {
+    return "elite";
+  }
+  return "normal";
+}
+
+export function counterDamageForEncounter(
+  floor: FloorNumber,
+  role: EncounterDamageRole,
+): 1 | 2 | 3 {
+  if (floor <= 2) return 1;
+  if (floor <= 4) return role === "normal" || role === "elite" ? 1 : 2;
+  if (floor <= 6) return role === "normal" ? 1 : 2;
+  return role === "floor-boss" ? 3 : 2;
+}
+
+export function counterDamageForMonster(monster: Monster): 1 | 2 | 3 {
+  return counterDamageForEncounter(monster.floor, encounterDamageRoleFor(monster));
+}
+
+export function stageCountForEncounter(
+  monster: Monster,
+  authoredStageCount: number,
+): number {
+  const biomeEncounter = biomeEncounterFor(monster.id);
+  if (biomeEncounter?.role === "area-boss") return 2;
+  if (biomeEncounter?.role === "mini-elite") return 2;
+  if (monster.rank === "boss") {
+    if (monster.floor <= 2) return 2;
+    if (monster.floor <= 4) return 3;
+    if (monster.floor <= 7) return 4;
+    return 5;
+  }
+  if (monster.rank === "elite") return Math.max(2, authoredStageCount);
+  return Math.min(2, Math.max(1, authoredStageCount));
+}
+
+function retargetStage(
+  stage: LessonStageDefinition,
+  monsterId: number,
+): LessonStageDefinition {
+  return {
+    ...stage,
+    hints: [...stage.hints],
+    locks: [...stage.locks],
+    requiredFeatures: [...stage.requiredFeatures],
+    attackTargetIds: [monsterId],
+  };
+}
+
+/**
+ * 设计好的阶段始终具有权威性，只使用已经教授过的复习题补齐缺失的精英或
+ * Boss 阶段。稳定阶段 ID 会被保留，使旧答题记录无需迁移存档版本也能读取。
+ */
+export function stagesForEncounter(
+  monster: Monster,
+  authoredStages: readonly LessonStageDefinition[],
+  reviewStages: readonly LessonStageDefinition[] = [],
+): LessonStageDefinition[] {
+  if (authoredStages.length === 0) return [];
+  const requiredCount = stageCountForEncounter(monster, authoredStages.length);
+  const selectedAuthored = authoredStages.slice(0, requiredCount);
+  const finalAuthored = selectedAuthored.length >= 2
+    ? selectedAuthored.at(-1) ?? null
+    : null;
+  const result = (finalAuthored ? selectedAuthored.slice(0, -1) : selectedAuthored)
+    .map((stage) => retargetStage(stage, monster.id));
+  const authoredIds = new Set(authoredStages.map((stage) => stage.id));
+  const supplements = [...reviewStages]
+    .reverse()
+    .filter((stage) => !authoredIds.has(stage.id));
+
+  let supplementIndex = 0;
+  const supplementTarget = requiredCount - (finalAuthored ? 1 : 0);
+  while (result.length < supplementTarget) {
+    const source = supplements[supplementIndex]
+      ?? authoredStages[result.length % authoredStages.length];
+    result.push(retargetStage(source, monster.id));
+    supplementIndex += 1;
+  }
+  if (finalAuthored) result.push(retargetStage(finalAuthored, monster.id));
+  return result;
+}

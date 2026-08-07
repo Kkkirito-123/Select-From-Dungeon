@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
-import { FLOOR_ONE_MIMIC_MONSTER_ID } from "../src/domain/floorOneTreasure";
+import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
+import { FLOOR_ONE_MIMIC_MONSTER_ID } from "../src/domain/exploration/floorOneTreasure";
 import {
   CURRENT_MONSTER_IDS_BY_FLOOR,
   LEGACY_MONSTER_IDS_BY_FLOOR,
@@ -9,9 +9,9 @@ import {
   currentMonsterIdForLegacy,
   detectMonsterIdScheme,
   legacyMonsterIdForCurrent,
-} from "../src/content/monsterIds";
-import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
-import { SqlEngine } from "../src/sql/SqlEngine";
+} from "../src/content/world/monsterIds";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
 describe("MVP 2.0 monster IDs", () => {
   it("按游戏楼层和内容顺序使用全局连续的 1..89", () => {

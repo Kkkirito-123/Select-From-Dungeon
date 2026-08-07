@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   validateReadOnlyQuery,
   validateSandboxScript,
-} from "../src/domain/queryPolicy";
+} from "../src/domain/learning/queryPolicy";
 
 describe("validateReadOnlyQuery", () => {
   it("接受单条 SELECT 和结尾分号", () => {

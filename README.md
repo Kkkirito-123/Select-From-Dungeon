@@ -366,6 +366,35 @@ left on the monster's tile, and press `E` to process its items.
 
 ## Architecture and Storage
 
+For a first pass through the code, follow this short route:
+
+1. `src/application/main.ts`: startup and dependency assembly.
+2. `src/domain/shared/types.ts` and `src/domain/session/GameSession.ts`: state contracts and the single source of gameplay truth.
+3. `src/infrastructure/storage/localProgress.ts`: save validation, migration dispatch, and restoration.
+   `src/infrastructure/storage/runMigrations.ts` owns the v4-v12 in-memory Run conversion chain.
+4. `src/infrastructure/sql/SqlEngine.ts` and `src/domain/learning/lessonEvaluator.ts`: SQL execution and grading boundaries.
+5. `src/presentation/phaser/` and `src/presentation/dom/`: Phaser and DOM presentation; `agent/` only consumes bounded read-only evidence.
+
+The top-level source tree is:
+
+```text
+src/
+├─ contracts/        cross-layer read-only game, persistence, result, Agent, and storage contracts
+├─ application/       startup, configuration, and page lifecycle
+├─ content/           curriculum, world, narrative, inventory, and SQL content
+├─ domain/            session facade/helpers, combat, exploration, learning, progression, and shared rules
+├─ infrastructure/    audio, feedback, SQLite, storage codecs/migrations, and browser adapters
+└─ presentation/     Phaser scenes, DOM views, and focused renderers
+```
+
+Within the facades, `src/presentation/dom/panels/` owns focused DOM interactions,
+`src/presentation/dom/renderers/` owns HUD/minimap/combat presentation, and
+`src/presentation/phaser/world/` owns world rendering decisions. The learning
+boundary keeps SQL feature tags in `queryFeatureDetector.ts`, the sealed-identity
+firewall in `queryIdentityRules.ts`, stage selection in `lessonLocks.ts`, authored
+result semantics in `lessonResultEvaluator.ts`, and compatibility composition in
+`lessonEvaluator.ts`.
+
 ```text
 AppShell ── HUD, discovery minimap, onboarding, terminal, query evidence
   └─ agent/runtime ── bounded evidence, deterministic recap, cache, coordination
@@ -480,7 +509,7 @@ Run. Valid `run:v10` through `run:v4` saves continue through the existing
 migration chain before v12. Legacy keys are not deleted; earlier Run keys remain
 unread. Valid `profile:v1` and `profile:v2` records migrate to v3, preserving
 learning counters while initializing missing identity records as empty.
-`src/storage/progressPersistence.ts` coalesces non-critical movement and patrol
+`src/infrastructure/storage/progressPersistence.ts` coalesces non-critical movement and patrol
 snapshots, while query, loot, inventory, mode, and topology changes flush
 immediately.
 
@@ -517,133 +546,24 @@ chunk split. Further bundle/startup optimization is deferred to the independent
 MVP 2.1 performance pass; this content release does not change engine,
 dependencies, schema, or save versions for that purpose.
 
-The current eight-floor labyrinth pass has automated evidence plus targeted browser QA.
-Content tests cross-check all eight contracts against map blueprints, curriculum
-Boss gates, authored landmarks, shortcuts, and hidden rooms. Physical acceptance
-then covers the canonical F1-F8 maps: ordered required anchors, unskippable
-floor and area-Boss boundaries, reachable shortcut keys and hidden entrances,
-safe zones without curriculum monsters/area Bosses/traps, distinct floor
-topologies, and deterministic non-critical variation. Browser QA additionally
-previewed F2, F4, and F8, dismissed their story cards, confirmed distinct floor and
-hazard silhouettes, and found no console warnings or errors. Direct safe-room crossings,
-live patrol disappearance outside sight, Reduced Motion, and a complete eight-floor
-Run still require a longer human pass; automated rules and a successful build do not replace it.
+### Current Validation Status
 
-Fresh browser evidence is intentionally narrower than the feature list. This
-revision verified the first-floor challenge prompt, safe exit, one-heart failure,
-successful semantic breach, walking through the opened gate, reload recovery,
-focus without page jumping, and no horizontal overflow at 390x844. The latest
-completion pass additionally verified automatic prefix suggestions,
-`Ctrl+Space`, arrow selection, `Enter`, `Tab`, pointer/touch acceptance,
-two-stage `Escape`, unchanged query counts, and desktop plus 390x844 layouts.
-The Schema Codex pass verified four-table tab and arrow-key navigation, focus
-retention, the 22-field terminal reference, `armor` completion from the
-canonical catalog, 44 px mobile tab targets, no 390 px horizontal overflow, and
-no console warnings/errors. The integrated pass then opened the complete-field
-and query-evidence panels together at 1280x720, reproduced and fixed pointer
-interception over the execute action, completed the HAVING battle by clicking
-that action, moved after terminal close, collected the key, entered floor two
-automatically, recovered the floor-two state after reload, and rechecked the
-390 px layout without console warnings/errors. The v0.1.1 reward pass then
-verified an ambush-only `+1 XP` settlement with no chest, a curriculum victory
-that advanced `1 → 2 XP`, raised `LV.1 → LV.2` and maximum hearts `2 → 3`,
-spawned an `E`-opened Filter Bow chest, applied damage `6 → 7` and heat
-reduction `0 → 1`, and retained zero horizontal overflow at 390×844. The
-v0.2.0 review pass verified the top-console entry, two-column empty state,
-close-button focus, and `Escape` close at 1280×720. Populated records and the
-narrow-screen review overlay are covered by automation and CSS inspection but
-have not yet received a manual post-answer browser visual pass. The v0.3 desktop
-pass at 1280×720 verified two SQL attacks, victory XP and chest rewards, pickup
-explanations, settlement and pickup cards disappearing on exactly the third
-successful move, the physical campfire and safe zone, campfire menu, floor
-review, checkpoint replacement after resting, and two invalid queries leading
-to `YOU DIED`, full-health checkpoint return, and a battle-only death review
-containing both attempts. The console remained free of warnings and errors.
-The gold floor-clear presentation and the 390×844 campfire menu still need a
-fresh browser visual pass. The v0.4 desktop pass verified `B`/`Escape` inventory
-open and close, 12/3 capacity copy, weapon/armor summary, disabled gameplay
-controls while inventory is active, and no functional console error. Full-bag
-replacement, armor absorption, recoverable discards, and stable loot are covered
-by domain/storage tests. At 390×844 the inventory stayed inside the safe viewport
-with no horizontal overflow; a populated loot bundle still needs a manual
-browser pass. The v0.5.0 browser pass then verified the route/shortcut legend,
-revealed one route beacon and one shortcut endpoint through successful physical
-movement, and kept the minimap at `348 / 348 px` scroll/client width. At 390×844,
-the inventory exposed the separate non-slot key section, the document stayed at
-`390 / 390 px`, and the dialog remained within `7–383 px`; the console reported
-zero warnings and errors. Guaranteed-key pickup, permanent opening, two-way
-travel, reload restoration, zero empty dead ends, and the 18-step marker bound
-are covered by domain/storage automation rather than a complete manual Run.
-The v0.6.0 browser pass verified `01 / 08` at desktop and 390×844, moved once,
-reloaded, and recovered the same Seed plus the increased discovered-cell count
-from `run:v9`. The narrow document remained `390 / 390 px`, with zero console
-warnings or errors. Sequential floor-shell transitions through floor eight and
-rejection of malformed campaign/content data are domain/storage evidence, not
-playable third-through-eighth-floor browser evidence.
-The v0.7.0 browser pass entered a real floor-one Slime battle and verified the
-drainage palette, biome label, species-specific pixel actor, full SQL objective,
-and touch controls at desktop and 390×844. The narrow layout showed the complete
-arena and controls without horizontal clipping; the console reported zero
-errors. Seed breadth, biome exclusivity, area-Boss placement, two-stage
-resolution, XP, and the then-current minimum-loot rules were covered by domain
-tests. v1.1 removes those random minimums; its current probabilities are covered
-by the release checklist and loot-domain tests.
-The v0.8.0 pass used the production `GameSession` and SQLite WASM engine to
-continue through floors three and four. It verified the grave-city and elemental
-forge arenas, player-facing monster IDs `1–22`, the five-step
-field→table→relation→filter→full-SQL hint progression, `SELECT`/`WITH`
-autocomplete acceptance, the fourth-floor completion screen, and all 22 mastered
-lesson groups. Desktop and 390×844 remained free of horizontal overflow and
-console warnings/errors.
-The v0.9.0 pass then continuously executed the production lesson SQL through
-floor five while writing defeated-monster HP back into SQLite. That exposed and
-fixed drifting window results by ranking immutable `monster_gear.power`. The
-browser reached the black-iron fortress and dragon transaction nest, accepted
-`OVER` and `INSERT` completions, executed a real disposable `repair_queue`
-sandbox, returned the inserted `claw` row, and displayed
-`COPY → controlled statement → DISCARD` evidence. At 390×844 the document and
-viewport both remained 390 px wide; the console reported zero errors.
-The v0.10.0 automation pass executes all floor-seven reference queries against
-real SQLite query plans, validates deterministic floor-eight incident results,
-walks both floor-one branch orders through all eight floors, completes all 47
-required lesson groups, and verifies lossless `run:v9` to `run:v10` migration.
-The browser startup pass verified `01 / 08`, all 47 Codex entries, and zero
-console warnings/errors at 1280×720 and 390×844; the narrow document and body
-both remained exactly 390 px wide. Late-floor browser visuals remain covered by
-domain content/palette tests rather than a human-operated eight-floor Run.
-The v0.11.0 pass locks the balance contract, coalesces non-critical movement
-saves, pauses rendering/audio while the page is hidden, limits rendering to
-30 FPS, and memoizes unchanged HUD lists. Ten seconds of continuous browser
-movement kept the DOM at 487 nodes, produced no long tasks, and wrote one
-trailing save. Reduced Motion, a 640 px reflow proxy for desktop 200% zoom, and
-390×844 touch input all remained free of horizontal overflow; essential
-controls were at least 44 px, inventory focus landed on its close button, and
-the console reported zero warnings/errors. The production build now separates
-the approximately 22 kB entry, 200 kB interface, 464 kB world-rules, and
-112 kB game-logic chunks from the approximately 40 kB `sql.js` runtime,
-1.38 MB cached Phaser runtime, and 660 kB SQLite WASM. Every first-party
-JavaScript chunk remains below 500 kB; the cacheable upstream runtime/WASM
-assets are not delivered as one monolithic application bundle.
-The v1.0.0 production-preview pass reran all 193 tests, type/build/rule gates,
-and verified the license/attribution copies. Desktop keyboard input increased
-the real movement counter. At 390×844 with Reduced Motion, 32 ordinary touch
-moves physically reached Slime `#101`; the real SQLite query
-`SELECT name FROM monsters WHERE id = 101;` increased the query count from
-0 to 1, reduced HP from 12 to 6, and opened the second stage. The 390×844 and
-640×720 inventory dialogs stayed inside the viewport with focus on the close
-button. All three production-preview viewports had zero horizontal overflow
-and zero console warnings/errors.
-The F1/F2 vertical-slice pass passes 330 automated tests, verifies CC0 runtime
-asset hashes, a production build, desktop visual checks for both authored
-floors and their world-state presets, exact 320 px reflow, audio toggle checks,
-and a clean browser console. Earlier evidence covered startup, HUD, touch
-controls, same-tile combat, pickups, patrol contact, counters, and same-seed
-reload. A complete human-operated eight-floor browser Run and subjective
-headphone/speaker audio review have not yet been run. Unit tests and
-a successful build do not substitute for those checks. Domain automation physically walks
-both floor-one branch orders, all seven automatic transitions, and all 47 lesson
-groups through floor eight without Session travel or positioning helpers; that is
-still not a human-operated browser Run.
+- **Automated coverage:** all eight labyrinth contracts and map blueprints, 47
+  required lesson groups, required anchors and Boss boundaries, shortcut keys
+  and hidden entrances, safe-zone constraints, real SQLite reference results,
+  and compatible save migrations.
+- **Browser spot checks:** representative F1, F2, F4, and F8 scenes plus SQL
+  combat, cipher gates, campfire and death review, inventory, autocomplete,
+  Schema Codex, reload recovery, and floor transitions. Key desktop, narrow,
+  touch, and Reduced Motion paths were checked without horizontal overflow or
+  console errors.
+- **Human checks remaining:** one continuous eight-floor playthrough, open
+  safe-room crossings and patrol visibility details, a few uncovered dialog
+  states, headphone/speaker fatigue review, and a restricted iframe environment.
+
+Automated tests and a production build do not replace browser or human QA.
+Version-by-version evidence is no longer accumulated in the README; use Git
+history when that detail is needed.
 
 To embed a deployed build in a blog:
 

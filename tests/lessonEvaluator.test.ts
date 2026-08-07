@@ -5,16 +5,16 @@ import {
   evaluateStage,
   evaluateUnrevealedIdentityQuery,
   unrevealedIdentityQueryMessage,
-} from "../src/domain/lessonEvaluator";
+} from "../src/domain/learning/lessonEvaluator";
 import {
   INITIAL_MONSTERS,
   LESSONS,
   lessonById,
   practiceStageFor,
   practiceStagesFor,
-} from "../src/content/mvpLevel";
-import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
-import type { SqlQueryResult } from "../src/domain/types";
+} from "../src/content/curriculum/mvpLevel";
+import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
+import type { SqlQueryResult } from "../src/domain/shared/types";
 
 function makeResult(
   sql: string,

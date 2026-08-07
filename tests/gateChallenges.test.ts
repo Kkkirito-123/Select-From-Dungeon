@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
-import { FLOOR_TWO_MONSTERS } from "../src/content/floor2Level";
-import { evaluateGateChallenge } from "../src/content/gateChallenges";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
-import { SqlEngine } from "../src/sql/SqlEngine";
+import { FLOOR_TWO_MONSTERS } from "../src/content/curriculum/floor2Level";
+import { evaluateGateChallenge } from "../src/content/curriculum/gateChallenges";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
 describe("high-difficulty gate challenges", () => {
   const wasmLocation = fileURLToPath(new URL(

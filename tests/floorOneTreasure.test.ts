@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { generateCampfires, safeZoneCellKeys } from "../src/domain/campfire";
-import { generateGuidedMapPlan } from "../src/domain/guidedMap";
-import { generateMazeFloor, mazeTileAt, mazeZoneAt } from "../src/domain/mazeGenerator";
-import { floorOneAreaAt } from "../src/domain/floorOneLabyrinth";
-import { generateRoomGraph } from "../src/domain/runGraph";
-import { GameSession } from "../src/domain/GameSession";
-import { detectQueryFeatures } from "../src/domain/lessonEvaluator";
-import type { SqlQueryResult } from "../src/domain/types";
+import { generateCampfires, safeZoneCellKeys } from "../src/domain/exploration/campfire";
+import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
+import { generateMazeFloor, mazeTileAt, mazeZoneAt } from "../src/domain/exploration/mazeGenerator";
+import { floorOneAreaAt } from "../src/domain/exploration/floorOneLabyrinth";
+import { generateRoomGraph } from "../src/domain/progression/runGraph";
+import { GameSession } from "../src/domain/session/GameSession";
+import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
+import type { SqlQueryResult } from "../src/domain/shared/types";
 import {
   FLOOR_ONE_CHEST_IDS,
   FLOOR_ONE_MIMIC_MONSTER_ID,
   floorOneChestKind,
   floorOneWalkableNeighborCount,
   generateFloorOneChestItems,
-} from "../src/domain/floorOneTreasure";
+} from "../src/domain/exploration/floorOneTreasure";
 
 function result(
   sql: string,

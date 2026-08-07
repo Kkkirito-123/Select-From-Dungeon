@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { generateCampfires } from "../src/domain/campfire";
+import { generateCampfires } from "../src/domain/exploration/campfire";
 import {
   generateGuidedMapPlan,
   nearbyShortcut,
   shortcutNameForFloor,
   shortcutDestination,
   validateGuidedMapPlan,
-} from "../src/domain/guidedMap";
-import { generateMazeFloor } from "../src/domain/mazeGenerator";
-import { generateRoomGraph } from "../src/domain/runGraph";
+} from "../src/domain/exploration/guidedMap";
+import { generateMazeFloor } from "../src/domain/exploration/mazeGenerator";
+import { generateRoomGraph } from "../src/domain/progression/runGraph";
 
 describe("guided map plan", () => {
   it("八层捷径使用各自地图主题的直白名称", () => {

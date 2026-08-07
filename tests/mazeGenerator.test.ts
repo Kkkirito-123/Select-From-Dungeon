@@ -15,18 +15,18 @@ import {
   mazeTileAt,
   type MazeFloor,
   type MazeZone,
-} from "../src/domain/mazeGenerator";
+} from "../src/domain/exploration/mazeGenerator";
 import {
   reachableMazeCells,
   validateMazeFloor,
-} from "../src/domain/mazeValidation";
+} from "../src/domain/exploration/mazeValidation";
 import {
   generateRoomGraph,
   lessonsForFloor,
   type FloorNumber,
   type RoomGraph,
-} from "../src/domain/runGraph";
-import type { Position, SavedRun } from "../src/domain/types";
+} from "../src/domain/progression/runGraph";
+import type { Position, SavedRun } from "../src/domain/shared/types";
 
 const FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const satisfies readonly FloorNumber[];
 const DIRECTIONS = [

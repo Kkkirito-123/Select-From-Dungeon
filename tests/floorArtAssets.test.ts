@@ -4,7 +4,7 @@ import {
   FLOOR_ART_ASSETS,
   FLOOR_ART_KEYS,
   supportsFloorArt,
-} from "../src/game/floorArtAssets";
+} from "../src/presentation/phaser/floorArtAssets";
 
 async function readJson(relativePath: string) {
   return JSON.parse(

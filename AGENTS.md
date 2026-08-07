@@ -195,7 +195,7 @@ complete SQL or MySQL interview curriculum.
 ## Architecture and Execution Flow
 
 ```text
-index.html -> src/main.ts
+index.html -> src/application/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> agent/runtime (bounded evidence, deterministic campfire, cache, coordination)
@@ -263,12 +263,12 @@ OpenZLAgent provider without receiving a browser BYOK Key. The deployed BYOK
 path never sends keys through it. Tools, memory, MCP, gameplay writes, request
 logging, free prompts, and persisted provider credentials are forbidden.
 
-`src/config/` owns Chinese-commented runtime tuning values such as map size,
+`src/application/config/` owns Chinese-commented runtime tuning values such as map size,
 encounter rates, navigation thresholds, storage limits, and DeepSeek defaults.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
 
-`src/content/sqlSchema.ts` owns the canonical field/type/nullability metadata,
+`src/content/sql/sqlSchema.ts` owns the canonical field/type/nullability metadata,
 generated DDL, and teaching relationships for `monsters`, `monster_signals`,
 `rooms`, and `monster_gear`. `SqlEngine` executes that DDL and owns in-memory
 query execution; UI code must not duplicate the table definitions or bypass its
@@ -280,12 +280,12 @@ without `OR`, subqueries, or set operators so required predicates cannot be
 hidden in a dead branch. The same one-statement boundary applies to second-floor
 sorting and join lessons, whose relationship predicates are checked as part of
 the concept lock. Shared curriculum data and fixed room-chest rewards live in
-`src/content/mvpLevel.ts`, with later executable floors in
-`src/content/floor2Level.ts` through `floor8Level.ts`; room flavor and run rewards live in
-`src/content/runContent.ts`; optional Boss-gate questions and semantic result
-contracts live in `src/content/gateChallenges.ts`; onboarding copy lives in
-`src/content/onboarding.ts`. SQL stages intentionally start blank.
-`src/content/lessonTaskBrief.ts` is the player-facing SQL-task presentation
+`src/content/curriculum/mvpLevel.ts`, with later executable floors in
+`src/content/curriculum/floor2Level.ts` through `floor8Level.ts`; room flavor and run rewards live in
+`src/content/world/runContent.ts`; optional Boss-gate questions and semantic result
+contracts live in `src/content/curriculum/gateChallenges.ts`; onboarding copy lives in
+`src/content/curriculum/onboarding.ts`. SQL stages intentionally start blank.
+`src/content/curriculum/lessonTaskBrief.ts` is the player-facing SQL-task presentation
 boundary. It derives the current situation, exact output columns, canonical
 field meanings, JOIN relation, clauses, world effect, difficulty tier, and a
 four-step hint ladder from the authored stage plus `sqlSchema`; `AppShell` only
@@ -294,32 +294,43 @@ stage one contains one current chapter plus baseline projection/filtering;
 mini-elites may add at most one mastered chapter from stage two onward, and
 floor Bosses progress from a single chapter to a final two- or three-chapter
 audit. A complete SQL answer appears only in hint four.
-`src/ui/appShellTemplate.ts` exclusively owns the static AppShell markup;
-`src/ui/appShellDom.ts` owns reusable stable selector bindings. Runtime renderers
+`src/presentation/dom/appShellTemplate.ts` exclusively owns the static AppShell markup;
+`src/presentation/dom/appShellDom.ts` owns reusable stable selector bindings. Runtime renderers
 and event handlers must not duplicate that markup or silently query a second
 selector for the same persistent node.
-`src/content/inventoryCatalog.ts` owns inventory capacities, the current
+`src/presentation/dom/panels/` owns terminal, inventory, campfire, review, narrative,
+and Schema interactions; `src/presentation/dom/renderers/` owns HUD, minimap, and
+combat presentation. Panels receive snapshots and explicit callbacks, never storage,
+Agent workers, or Phaser instances.
+`src/presentation/phaser/world/` owns terrain, fog, world-object visibility, and
+topology rebuild decisions; `DungeonScene` remains the lifecycle and event facade.
+`src/domain/learning/queryFeatureDetector.ts` owns SQL feature tags,
+`queryIdentityRules.ts` owns the sealed-identity firewall, `lessonLocks.ts` owns
+stage selection and the flat beginner-SQL shape guard, and
+`lessonResultEvaluator.ts` owns authored result semantics. `lessonEvaluator.ts`
+keeps the compatibility exports and composition only.
+`src/content/inventory/inventoryCatalog.ts` owns inventory capacities, the current
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
-`src/domain/lootDirector.ts` owns deterministic independent rolls and
+`src/domain/inventory/lootDirector.ts` owns deterministic independent rolls and
 same-battle deduplication. Runtime optional candidates are immediate recovery
 items only; unlocked curriculum room chests still use the inventory flow.
-`src/content/biomeContent.ts` owns the executable eight-floor biome encounter
-pools and optional multi-stage exercises. `src/domain/biome.ts` derives region
+`src/content/world/biomeContent.ts` owns the executable eight-floor biome encounter
+pools and optional multi-stage exercises. `src/domain/exploration/biome.ts` derives region
 ownership, static features, area-Boss positions, and two region portals from
 the maze, campfires, guided map, and seed; this plan is rebuilt during load and
 is not serialized.
-`src/content/floorLabyrinth.ts` owns the stable eight-floor navigation contract;
-`src/domain/floorLabyrinth.ts` resolves that intent against the current saved
+`src/content/world/floorLabyrinth.ts` owns the stable eight-floor navigation contract;
+`src/domain/exploration/floorLabyrinth.ts` resolves that intent against the current saved
 `MazeFloor`, campfires, guided plan, and biome plan. It must not persist derived
 safe-cell, sight, or hazard-position duplicates.
-`src/content/floorContracts.ts` owns campaign curriculum metadata and its
+`src/content/curriculum/floorContracts.ts` owns campaign curriculum metadata and its
 serializable schema. Registered drift `AUTH-003` is closed by cross-authority
 tests, but this file is still not
 the player-facing authority for floor names, biomes, or exact monster rosters.
 Executable monster truth lives in the per-floor level files and
 `biomeContent.ts`; player-facing places and events live in Floor Experience;
 navigation boundaries live in Floor Labyrinth and Floor Map Blueprints.
-`src/domain/campaign.ts` owns the serializable ordered floor slots and must
+`src/domain/progression/campaign.ts` owns the serializable ordered floor slots and must
 reject skipped, duplicated, or rerolled transitions. This campaign must never
 route a floor through another floor's content. The authority register is
 `docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`.
@@ -345,7 +356,7 @@ boundaries:
   armor absorbs first; traps and SQL ciphers remain separate one-damage systems.
 - The four teaching-table DDLs, monster primary/detail-key meanings, and stable
   save versions do not change for narrative work.
-`src/ui/sqlAutocomplete.ts` owns deterministic suggestions derived from the
+`src/presentation/dom/sqlAutocomplete.ts` owns deterministic suggestions derived from the
 complete canonical schema, current task context, and MVP SQL vocabulary. It may
 replace only the active token after explicit keyboard or pointer acceptance; it
 must not generate a complete answer, submit a query, or bypass lesson
@@ -354,19 +365,13 @@ evaluation.
 ## Repository Map
 
 ```text
-agent/              Browser output-only Agent runtime/BYOK UI plus local Python evaluator
-src/config/          Chinese-commented runtime tuning parameters; no credentials
-src/audio/          Public-domain classical-theme electronic Web Audio score and SFX
-src/content/        Curriculum, SQL schema, map/actor/narrative truth, entities,
-                    fixed weapons, rewards, and onboarding copy
-src/domain/         Pure state, combat rules, course graph, physical maze,
-                    validation, roaming, semantic evaluation, and query policy
-src/feedback/       Semantic gameplay-event routing to notices and audio cues
-src/game/           Continuous-maze exploration, battle scene, and bootstrap
-src/runtime/        Page lifecycle coordination for rendering, audio, and saves
-src/sql/            SQLite WASM initialization, schema, execution, HP sync
-src/storage/        Run/profile validation plus question-bank and learning IndexedDB stores
-src/ui/             DOM shell, Lost Name codex, onboarding, and game orchestration
+agent/                  Browser output-only Agent runtime/BYOK UI plus local Python evaluator
+src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
+src/application/        Startup, runtime configuration, and page lifecycle
+src/content/            Static curriculum, world, narrative, inventory, and SQL content
+src/domain/             Session facade/helpers, combat, exploration, learning, progression, inventory, and shared rules
+src/infrastructure/     Audio, feedback, SQLite, storage codecs/migrations, and browser adapters
+src/presentation/       Phaser scenes, DOM application views, and focused renderers
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
                     onboarding, and query policy
 docs/               Current bilingual blueprints, one active roadmap, future

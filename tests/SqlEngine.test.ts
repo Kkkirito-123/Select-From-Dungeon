@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
-import { INITIAL_MONSTERS, LESSONS } from "../src/content/mvpLevel";
-import { FLOOR_FIVE_LESSON_DEFINITIONS } from "../src/content/floor5Level";
-import { FLOOR_SIX_LESSON_DEFINITIONS } from "../src/content/floor6Level";
-import { FLOOR_SEVEN_LESSON_DEFINITIONS } from "../src/content/floor7Level";
-import { FLOOR_EIGHT_LESSON_DEFINITIONS } from "../src/content/floor8Level";
-import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
-import { evaluateLesson, evaluateStage } from "../src/domain/lessonEvaluator";
-import type { FloorNumber } from "../src/domain/runGraph";
-import { SqlEngine } from "../src/sql/SqlEngine";
+import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
+import { FLOOR_FIVE_LESSON_DEFINITIONS } from "../src/content/curriculum/floor5Level";
+import { FLOOR_SIX_LESSON_DEFINITIONS } from "../src/content/curriculum/floor6Level";
+import { FLOOR_SEVEN_LESSON_DEFINITIONS } from "../src/content/curriculum/floor7Level";
+import { FLOOR_EIGHT_LESSON_DEFINITIONS } from "../src/content/curriculum/floor8Level";
+import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
+import { evaluateLesson, evaluateStage } from "../src/domain/learning/lessonEvaluator";
+import type { FloorNumber } from "../src/domain/progression/runGraph";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
 describe("SqlEngine floor-two schema", () => {
   it.each([1, 2, 3, 4, 5, 6, 7, 8] as const)(

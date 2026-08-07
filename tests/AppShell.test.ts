@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { COMPLETE_SCHEMA_LINES } from "../src/content/sqlSchema";
-import { GameSession } from "../src/domain/GameSession";
-import { migrationStepMarkerIds } from "../src/domain/finalMigration";
-import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/types";
-import { answerReviewSummary } from "../src/ui/AnswerReviewView";
+import { COMPLETE_SCHEMA_LINES } from "../src/content/sql/sqlSchema";
+import { GameSession } from "../src/domain/session/GameSession";
+import { migrationStepMarkerIds } from "../src/domain/progression/finalMigration";
+import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/shared/types";
+import { answerReviewSummary } from "../src/presentation/dom/AnswerReviewView";
 import {
   canPresentQueuedNarrativeMoment,
   canPresentFinalMigrationStoryMoment,
@@ -23,12 +23,12 @@ import {
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
-} from "../src/ui/AppShell";
+} from "../src/presentation/dom/AppShell";
 import {
   FloorTransitionCoordinator,
   floorTransitionPolicy,
   type FloorTransitionClock,
-} from "../src/ui/FloorTransitionCoordinator";
+} from "../src/presentation/dom/FloorTransitionCoordinator";
 
 describe("楼层自动传送策略", () => {
   it("第一至第七层的结算卡、钥匙卡或剧情队列只能遮住演出，不能阻止 transition 定时器", () => {

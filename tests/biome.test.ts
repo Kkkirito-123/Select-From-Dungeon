@@ -3,22 +3,22 @@ import {
   BIOME_ENCOUNTERS,
   weightedBiomeEncounterCandidates,
   type BiomeKind,
-} from "../src/content/biomeContent";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
-import { regionPortalsEnabledForFloor } from "../src/content/floorMapBlueprints";
+} from "../src/content/world/biomeContent";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
+import { regionPortalsEnabledForFloor } from "../src/content/world/floorMapBlueprints";
 import {
   biomeRegionAt,
   generateBiomePlan,
   validateBiomePlan,
-} from "../src/domain/biome";
-import { generateCampfires, isSafeZonePosition } from "../src/domain/campfire";
-import { generateGuidedMapPlan } from "../src/domain/guidedMap";
-import { generateMazeFloor } from "../src/domain/mazeGenerator";
+} from "../src/domain/exploration/biome";
+import { generateCampfires, isSafeZonePosition } from "../src/domain/exploration/campfire";
+import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
+import { generateMazeFloor } from "../src/domain/exploration/mazeGenerator";
 import {
   generateRoomGraph,
   lessonsForFloor,
   type FloorNumber,
-} from "../src/domain/runGraph";
+} from "../src/domain/progression/runGraph";
 
 function fixture(seed: string, floorNumber: FloorNumber) {
   const graph = generateRoomGraph(seed, floorNumber);

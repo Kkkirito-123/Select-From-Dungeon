@@ -13,7 +13,7 @@ import {
   stableStringHash,
   validateRoomGraph,
   type RoomGraph,
-} from "../src/domain/runGraph";
+} from "../src/domain/progression/runGraph";
 
 function cloneGraph(graph: RoomGraph): RoomGraph {
   return JSON.parse(JSON.stringify(graph)) as RoomGraph;

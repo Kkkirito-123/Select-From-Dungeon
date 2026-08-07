@@ -1,31 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
   MINI_ELITE_PERCENT_BY_FLOOR,
-} from "../src/content/biomeContent";
+} from "../src/content/world/biomeContent";
 import {
   lootCandidatesForFloor,
-} from "../src/content/inventoryCatalog";
+} from "../src/content/inventory/inventoryCatalog";
 import {
   AGGREGATE_HAMMER,
   INITIAL_MONSTERS,
-} from "../src/content/mvpLevel";
-import { JOIN_CHAIN } from "../src/content/floor2Level";
-import { BONE_BLADE } from "../src/content/floor3Level";
-import { RUNE_STAFF } from "../src/content/floor4Level";
-import { IRON_AXE } from "../src/content/floor5Level";
-import { DRAGON_SPEAR } from "../src/content/floor6Level";
-import { CRYSTAL_BLADE } from "../src/content/floor7Level";
-import { ROYAL_SWORD } from "../src/content/floor8Level";
+} from "../src/content/curriculum/mvpLevel";
+import { JOIN_CHAIN } from "../src/content/curriculum/floor2Level";
+import { BONE_BLADE } from "../src/content/curriculum/floor3Level";
+import { RUNE_STAFF } from "../src/content/curriculum/floor4Level";
+import { IRON_AXE } from "../src/content/curriculum/floor5Level";
+import { DRAGON_SPEAR } from "../src/content/curriculum/floor6Level";
+import { CRYSTAL_BLADE } from "../src/content/curriculum/floor7Level";
+import { ROYAL_SWORD } from "../src/content/curriculum/floor8Level";
 import {
   GameSession,
   LEVEL_XP_THRESHOLDS,
-} from "../src/domain/GameSession";
+} from "../src/domain/session/GameSession";
 import {
   AMBUSH_CHANCE,
   AMBUSH_GUARANTEE_AT,
-} from "../src/domain/encounterDirector";
-import type { FloorNumber } from "../src/domain/runGraph";
-import { createEmptyProfile } from "../src/storage/localProgress";
+} from "../src/domain/exploration/encounterDirector";
+import type { FloorNumber } from "../src/domain/progression/runGraph";
+import { createEmptyProfile } from "../src/infrastructure/storage/localProgress";
 
 const FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const satisfies readonly FloorNumber[];
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/GameSession";
-import { biomeGuardianIdForStep } from "../src/domain/biome";
+import { GameSession } from "../src/domain/session/GameSession";
+import { biomeGuardianIdForStep } from "../src/domain/exploration/biome";
 
 describe("GameSession guided shortcut flow", () => {
   it("必须先到中后段拾取保证钥匙，之后 E 开门并双向穿行", () => {

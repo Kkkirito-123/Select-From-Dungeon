@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   NARRATIVE_ENDINGS,
   NARRATIVE_FLOORS,
-} from "../src/content/narrativeContent";
-import { floorStoryMoments } from "../src/domain/floorStory";
+} from "../src/content/narrative/narrativeContent";
+import { floorStoryMoments } from "../src/domain/progression/floorStory";
 import {
   NarrativeCodexView,
   buildNarrativeCodexModel,
-} from "../src/ui/NarrativeCodexView";
+} from "../src/presentation/dom/NarrativeCodexView";
 
 class FakeClassList {
   constructor(private readonly owner: FakeElement) {}

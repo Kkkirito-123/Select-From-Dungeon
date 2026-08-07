@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SqlChordTracker } from "../src/ui/SqlChordTracker";
+import { SqlChordTracker } from "../src/presentation/dom/SqlChordTracker";
 
 describe("SqlChordTracker", () => {
   it("Q 后按住 S 与 S 后按住 Q 都会触发组合键", () => {

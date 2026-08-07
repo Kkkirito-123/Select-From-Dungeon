@@ -10,8 +10,8 @@ import {
   storyEvidenceMarkerId,
   storyEvidenceMarkerIdsForFloor,
   validateFloorStoryContent,
-} from "../src/domain/floorStory";
-import { storyQuery } from "../src/sql/storyQueryCatalog";
+} from "../src/domain/progression/floorStory";
+import { storyQuery } from "../src/content/sql/storyQueryCatalog";
 
 describe("F1-F8 现场剧情展示适配器", () => {
   it("完成对应课程后可在地图地标按 E 重读已解密 SQL 证据", () => {

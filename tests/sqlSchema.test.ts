@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
 import {
   COMPLETE_SCHEMA_LINES,
   SQL_RELATIONS,
   SQL_TABLES,
   sqlTable,
-} from "../src/content/sqlSchema";
-import { SqlEngine } from "../src/sql/SqlEngine";
-import { parseSchemaLines } from "../src/ui/sqlAutocomplete";
+} from "../src/content/sql/sqlSchema";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
+import { parseSchemaLines } from "../src/presentation/dom/sqlAutocomplete";
 
 describe("complete SQL schema catalog", () => {
   it("完整列出运行时四表和全部字段", () => {

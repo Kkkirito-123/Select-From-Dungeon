@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyPageVisibilityRuntime } from "../src/runtime/pageLifecycle";
+import { applyPageVisibilityRuntime } from "../src/application/runtime/pageLifecycle";
 
 describe("page visibility runtime", () => {
   it("隐藏时同步存档并暂停渲染、音频，恢复时无缝唤醒", async () => {

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { BIOME_ENCOUNTERS } from "../src/content/biomeContent";
+import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
 import {
   lessonTaskBriefFor,
   topicGroupsForStage,
-} from "../src/content/lessonTaskBrief";
+} from "../src/content/curriculum/lessonTaskBrief";
 import {
   INITIAL_MONSTERS,
   LESSONS,
   lessonById,
   practiceStagesFor,
-} from "../src/content/mvpLevel";
+} from "../src/content/curriculum/mvpLevel";
 
 describe("SQL 战斗任务契约", () => {
   it("把 ID #017 的三个易混字段和真实连接键完整说清", () => {

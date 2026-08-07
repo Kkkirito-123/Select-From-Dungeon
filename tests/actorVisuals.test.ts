@@ -4,10 +4,10 @@ import {
   assertActorVisualCatalog,
   monsterActorProfile,
   playerActorProfile,
-} from "../src/content/actorVisuals";
-import { ARMORS, WEAPONS } from "../src/content/inventoryCatalog";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
-import { MONSTER_KIND_VISUALS } from "../src/content/monsterVisuals";
+} from "../src/content/world/actorVisuals";
+import { ARMORS, WEAPONS } from "../src/content/inventory/inventoryCatalog";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
+import { MONSTER_KIND_VISUALS } from "../src/content/world/monsterVisuals";
 
 describe("MVP 2.0 actor visual catalog", () => {
   it("covers every monster archetype without falling back to a wall-like placeholder", () => {

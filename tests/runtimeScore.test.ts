@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { RecordedScorePlayer } from "../src/audio/RecordedScorePlayer";
+import { RecordedScorePlayer } from "../src/infrastructure/audio/RecordedScorePlayer";
 import {
   RUNTIME_SCORE_ASSETS,
   resolveRuntimeScoreUrl,
   runtimeScoreForScene,
-} from "../src/audio/runtimeScoreCatalog";
+} from "../src/infrastructure/audio/runtimeScoreCatalog";
 
 class FakeAudioParam {
   value = 1;

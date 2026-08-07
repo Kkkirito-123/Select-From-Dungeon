@@ -5,14 +5,14 @@ import {
   NARRATIVE_FLOORS,
   type FloorNarrative,
   type NarrativeEnding,
-} from "../src/content/narrativeContent";
+} from "../src/content/narrative/narrativeContent";
 import {
   buildScribeRecap,
   lostNameEvidenceForFloor,
   narrativeBeatsForEvent,
   validateNarrativeContent,
-} from "../src/domain/narrative";
-import type { AnswerAttemptRecord } from "../src/domain/types";
+} from "../src/domain/progression/narrative";
+import type { AnswerAttemptRecord } from "../src/domain/shared/types";
 
 function mutableFloors(): FloorNarrative[] {
   return structuredClone(NARRATIVE_FLOORS) as FloorNarrative[];

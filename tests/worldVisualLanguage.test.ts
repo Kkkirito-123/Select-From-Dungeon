@@ -3,7 +3,7 @@ import {
   landmarkActionVerb,
   landmarkInteractionLabel,
   shouldRenderPassiveFeature,
-} from "../src/game/worldVisualLanguage";
+} from "../src/presentation/phaser/worldVisualLanguage";
 
 describe("world visual language", () => {
   it("uses direct verbs for each interactive landmark role", () => {

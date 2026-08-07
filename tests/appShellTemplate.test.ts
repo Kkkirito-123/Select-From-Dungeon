@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { APP_SHELL_DOM_SELECTORS } from "../src/ui/appShellDom";
-import { appShellTemplate } from "../src/ui/appShellTemplate";
+import { APP_SHELL_DOM_SELECTORS } from "../src/presentation/dom/appShellDom";
+import { appShellTemplate } from "../src/presentation/dom/appShellTemplate";
 
 const CRITICAL_DOM_IDS = [
   "game-root",

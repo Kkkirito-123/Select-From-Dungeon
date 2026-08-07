@@ -5,7 +5,7 @@ import {
   FINAL_MIGRATION_STAGE_NARRATIVES,
   finalMigrationStageNarrative,
   validateFinalMigrationSequence,
-} from "../src/content/finalMigrationSequence";
+} from "../src/content/narrative/finalMigrationSequence";
 
 describe("档案王五阶段与七层史证", () => {
   it("以稳定课程阶段顺序覆盖全部七个 MIGRATE 步骤", () => {

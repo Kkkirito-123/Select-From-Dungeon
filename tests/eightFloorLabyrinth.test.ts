@@ -1,37 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { floorExperience } from "../src/content/floorExperience";
-import { floorLabyrinth } from "../src/content/floorLabyrinth";
+import { floorExperience } from "../src/content/world/floorExperience";
+import { floorLabyrinth } from "../src/content/world/floorLabyrinth";
 import {
   floorMapBlueprint,
   regionPortalsEnabledForFloor,
-} from "../src/content/floorMapBlueprints";
+} from "../src/content/world/floorMapBlueprints";
 import {
   biomeGuardianIdForStep,
   generateBiomePlan,
-} from "../src/domain/biome";
+} from "../src/domain/exploration/biome";
 import {
   generateCampfires,
   safeZoneCellKeys,
-} from "../src/domain/campfire";
+} from "../src/domain/exploration/campfire";
 import {
   crossesIntoFloorLabyrinth,
   floorCurrentSightCellKeys,
   floorLabyrinthAreaAt,
   generateFloorHazards,
-} from "../src/domain/floorLabyrinth";
-import { generateGuidedMapPlan } from "../src/domain/guidedMap";
-import { generateMazeFloor, mazeTileAt } from "../src/domain/mazeGenerator";
+} from "../src/domain/exploration/floorLabyrinth";
+import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
+import { generateMazeFloor, mazeTileAt } from "../src/domain/exploration/mazeGenerator";
 import {
   reachableMazeCells,
   validateMazeFloor,
-} from "../src/domain/mazeValidation";
+} from "../src/domain/exploration/mazeValidation";
 import {
   generateRoomGraph,
   lessonsForFloor,
   type FloorNumber,
   type RunLessonId,
-} from "../src/domain/runGraph";
-import type { Position } from "../src/domain/types";
+} from "../src/domain/progression/runGraph";
+import type { Position } from "../src/domain/shared/types";
 
 const FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const satisfies readonly FloorNumber[];
 const SEED_SAMPLES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"] as const;

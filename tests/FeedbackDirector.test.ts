@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ArcadeSfx } from "../src/audio/ArcadeAudio";
-import { FeedbackDirector } from "../src/feedback/FeedbackDirector";
+import type { ArcadeSfx } from "../src/infrastructure/audio/ArcadeAudio";
+import { FeedbackDirector } from "../src/infrastructure/feedback/FeedbackDirector";
 
 describe("FeedbackDirector", () => {
   it("一次语义事件只映射一个对应音效与一个通知", () => {

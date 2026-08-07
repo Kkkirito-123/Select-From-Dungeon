@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   MONSTER_KIND_VISUALS,
   monsterVisualArchetype,
-} from "../src/content/monsterVisuals";
-import { INITIAL_MONSTERS } from "../src/content/mvpLevel";
-import type { MonsterKind } from "../src/domain/types";
+} from "../src/content/world/monsterVisuals";
+import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
+import type { MonsterKind } from "../src/domain/shared/types";
 
 const ALL_MONSTER_KINDS = [
   "projection-slime",
