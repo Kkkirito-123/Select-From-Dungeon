@@ -7,7 +7,7 @@
 ## 用途
 
 这是 MVP 2.0 的角色视觉参考，不进入运行时 Bundle。运行时仍由 Phaser 几何图元按
-`src/content/actorVisuals.ts` 与 `src/game/PixelActorFactory.ts` 绘制，以保持低开销、
+`src/content/world/actorVisuals.ts` 与 `src/presentation/phaser/PixelActorFactory.ts` 绘制，以保持低开销、
 清晰轮廓和装备即时换色。
 
 ## 生成记录

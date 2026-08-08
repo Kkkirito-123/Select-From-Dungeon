@@ -2,15 +2,9 @@
  * 浏览器 DOM 外壳和交互协调器。
  * AppShell 负责模板挂载、按钮/键盘事件、SQL 终端、篝火/背包/复盘展示
  * 和场景间的消息转发；它只调用 GameSession 公开动作，不直接修改规则或
- * 存档，也不承担 Agent 的输出生成。
+ * 存档，也不承担外部服务或模型输出生成。
  */
 import { ArcadeAudio } from "../../infrastructure/audio/ArcadeAudio";
-import {
-  emptyPreparedAgentOutput,
-  scribeOutputText as scribeInspectionMessage,
-  type AgentOutputPort,
-  type PreparedAgentOutput,
-} from "../../contracts/agent/outputPort";
 import {
   NARRATIVE_ENDINGS,
   NARRATIVE_FLOORS,
@@ -23,10 +17,6 @@ import {
   floorTransitPresentation,
   regionPortalsEnabledForFloor,
 } from "../../content/world/floorMapBlueprints";
-import {
-  floorExperience,
-  hasFloorExperience,
-} from "../../content/world/floorExperience";
 import type { OnboardingMilestone } from "../../content/curriculum/onboarding";
 import {
   INITIAL_MONSTERS,
@@ -56,18 +46,18 @@ import {
 } from "../../domain/progression/finalMigration";
 import {
   monsterIdLabel,
-  monsterIdentityPresentation,
   redactUndiscoveredMonsterIdentityText,
 } from "../../domain/progression/monsterIdentity";
-import type { FloorNumber } from "../../domain/progression/runGraph";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type {
+  CampfireReview,
   ExperienceSettlement,
   PatrolMove,
   QueryResultDisclosure,
   SqlQueryResult,
   TurnResolution,
 } from "../../contracts/game/results";
+import { buildCampfireReview, campfireReviewInput } from "../../domain/learning/campfireReview";
 import type {
   GroundItem,
   LootItem,
@@ -101,6 +91,8 @@ import {
 import { SqlChordTracker } from "./SqlChordTracker";
 import { CampfirePanel } from "./panels/CampfirePanel";
 import { InventoryPanel } from "./panels/InventoryPanel";
+import type { CampfireHook } from "../../application/hooks/campfire";
+import { adminAnswerForInput, shouldAutofillAdminAnswer } from "./adminAnswer";
 export { shapeOnlyQueryResultCopy } from "./panels/TerminalPanel";
 
 function requiredElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
@@ -586,7 +578,7 @@ export class AppShell {
   private unsubscribeSession: (() => void) | null = null;
   private unsubscribeFeedback: (() => void) | null = null;
   private unsubscribeOnboarding: (() => void) | null = null;
-  private unsubscribeAgent: (() => void) | null = null;
+  private unsubscribeCampfireHook: (() => void) | null = null;
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
   private focusBeforeInspection: HTMLElement | null = null;
@@ -853,7 +845,7 @@ export class AppShell {
     private readonly onboarding: OnboardingController,
     private readonly getBattleScene: () => BattleScene | null,
     initialRunSource: "new" | "restored" = "new",
-    private readonly agent: AgentOutputPort | null = null,
+    private readonly campfireHook: CampfireHook | null = null,
   ) {
     this.hudRenderer = new HudRenderer(root);
     this.minimapRenderer = new MinimapRenderer(root);
@@ -941,7 +933,7 @@ export class AppShell {
           preventScroll: true,
         }),
       },
-      (snapshot) => this.preparedAgentOutput(snapshot).campfire,
+      (snapshot) => this.campfireReview(snapshot),
     );
     this.terminalPanel = new TerminalPanel(this.root, {
       executeQuery: () => this.executeQuery(),
@@ -1016,19 +1008,9 @@ export class AppShell {
       () => this.closeAdminMenu(),
       listenerOptions,
     );
-    requiredElement(this.root, "#admin-floor-list").addEventListener(
+    requiredElement(this.root, "#admin-next-floor").addEventListener(
       "click",
-      (event) => this.handleAdminFloorAction(event),
-      listenerOptions,
-    );
-    requiredElement(this.root, "#admin-region-list").addEventListener(
-      "click",
-      (event) => this.handleAdminRegionAction(event),
-      listenerOptions,
-    );
-    requiredElement(this.root, "#admin-preset-list").addEventListener(
-      "click",
-      (event) => this.handleAdminPresetAction(event),
+      () => this.handleAdminNextFloor(),
       listenerOptions,
     );
     requiredElement(this.root, "#close-review").addEventListener("click", () => this.closeReview(), listenerOptions);
@@ -1109,7 +1091,7 @@ export class AppShell {
     this.unsubscribeOnboarding = this.onboarding.subscribe((snapshot) => {
       this.renderOnboarding(snapshot);
     });
-    this.unsubscribeAgent = this.agent?.subscribe(() => {
+    this.unsubscribeCampfireHook = this.campfireHook?.subscribe(() => {
       if (this.lastSnapshot && this.isCampfireMenuOpen()) {
         this.renderCampfireMenu(this.lastSnapshot, false);
       }
@@ -1124,8 +1106,8 @@ export class AppShell {
     this.unsubscribeFeedback = null;
     this.unsubscribeOnboarding?.();
     this.unsubscribeOnboarding = null;
-    this.unsubscribeAgent?.();
-    this.unsubscribeAgent = null;
+    this.unsubscribeCampfireHook?.();
+    this.unsubscribeCampfireHook = null;
     this.releaseAudioGesture?.();
     this.releaseAudioGesture = null;
     this.listenerController.abort();
@@ -1507,13 +1489,8 @@ export class AppShell {
     return this.adminMenu?.classList.contains("is-open") ?? false;
   }
 
-  private handleAdminFloorAction(event: Event): void {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-      "[data-admin-floor]",
-    );
-    const value = Number(button?.dataset.adminFloor);
-    if (!Number.isInteger(value) || value < 1 || value > 8) return;
-    const resolution = this.session.adminLoadFloor(value as FloorNumber);
+  private handleAdminNextFloor(): void {
+    const resolution = this.session.adminNextFloor();
     if (!resolution.ok) {
       this.showFeedbackNotice({ message: resolution.message, tone: "info" });
       return;
@@ -1527,98 +1504,20 @@ export class AppShell {
     this.renderAdminMenu(snapshot);
   }
 
-  private handleAdminRegionAction(event: Event): void {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-      "[data-admin-region]",
-    );
-    const regionId = button?.dataset.adminRegion;
-    if (!regionId) return;
-    const resolution = this.session.adminTravelToRegion(regionId);
-    this.showFeedbackNotice({
-      message: resolution.message,
-      tone: resolution.ok ? "success" : "info",
-    });
-  }
-
-  private handleAdminPresetAction(event: Event): void {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-      "[data-admin-preset]",
-    );
-    const presetId = button?.dataset.adminPreset;
-    if (!presetId) return;
-    const resolution = this.session.adminApplyPreset(presetId);
-    const snapshot = this.session.snapshot();
-    this.showFeedbackNotice({
-      message: redactSnapshotMonsterIdentity(resolution.message, snapshot),
-      tone: resolution.ok ? "success" : "info",
-    });
-    if (!resolution.ok) return;
-    this.sql.reset(snapshot.monsters);
-    this.getBattleScene()?.abortEncounter();
-    this.clearQueryArtifacts();
-    this.resetAdminNarrativePresentation();
-    this.renderAdminMenu(snapshot);
-  }
-
   private renderAdminMenu(snapshot: GameSnapshot): void {
     if (!this.adminMenu) return;
     const living = snapshot.monsters.filter((monster) => monster.hp > 0);
     const bosses = living.filter((monster) => monster.isBoss);
-    const regionPortalCount = regionPortalsEnabledForFloor(snapshot.floor)
-      ? snapshot.biomePlan.portals.length
-      : 0;
     requiredElement(this.adminMenu, "#admin-summary").textContent =
-      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length} · 区域交通 ${regionPortalCount}`;
-    const floors = requiredElement(this.adminMenu, "#admin-floor-list");
-    floors.replaceChildren();
-    for (let floor = 1; floor <= 8; floor += 1) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.adminFloor = String(floor);
-      button.className = floor === snapshot.floor ? "is-active" : "";
-      button.textContent = `F${String(floor).padStart(2, "0")}`;
-      floors.append(button);
-    }
-    const presets = requiredElement(this.adminMenu, "#admin-preset-list");
-    presets.replaceChildren();
-    if (hasFloorExperience(snapshot.floor)) {
-      for (const preset of floorExperience(snapshot.floor).adminPresets) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.adminPreset = preset.id;
-        button.textContent = redactSnapshotMonsterIdentity(preset.label, snapshot);
-        presets.append(button);
-      }
-    } else {
-      const unavailable = document.createElement("p");
-      unavailable.textContent = "本轮世界状态预设目前覆盖完成精修的第一至四层。";
-      presets.append(unavailable);
-    }
-    const regions = requiredElement(this.adminMenu, "#admin-region-list");
-    regions.replaceChildren();
-    snapshot.biomePlan.regions.forEach((region, index) => {
-      const article = document.createElement("article");
-      const boss = region.areaBossId === null
-        ? null
-        : snapshot.monsters.find((monster) => monster.id === region.areaBossId);
-      const heading = document.createElement("strong");
-      heading.textContent = `${index + 1}. ${region.name}`;
-      const detail = document.createElement("p");
-      detail.textContent = boss
-        ? `区域首领：${
-            monsterIdentityPresentation(
-              boss,
-              snapshot.profile.discoveredMonsterIds,
-            ).worldLabel
-          } · ${boss.hp}/${boss.maxHp} HP`
-        : "区域首领：无 · 课程探索区";
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.adminRegion = region.id;
-      button.textContent = "定位到该区域";
-      article.append(heading, detail, button);
-      regions.append(article);
-    });
+      `FLOOR ${snapshot.floor} · ${snapshot.mazeFloor.width}×${snapshot.mazeFloor.height} · 存活怪物 ${living.length} · 首领 ${bosses.length}`;
+    const nextButton = requiredElement<HTMLButtonElement>(
+      this.adminMenu,
+      "#admin-next-floor",
+    );
+    nextButton.disabled = snapshot.floor >= 8;
+    nextButton.textContent = snapshot.floor >= 8
+      ? "已在第八层"
+      : `进入第 ${snapshot.floor + 1} 层初始位置`;
   }
 
   private leaveCampfire(): void {
@@ -1672,17 +1571,27 @@ export class AppShell {
     return this.campfirePanel.isOpen();
   }
 
-  private preparedAgentOutput(snapshot: GameSnapshot): PreparedAgentOutput {
-    return this.agent?.preparedFor(snapshot) ?? emptyPreparedAgentOutput(snapshot);
+  private scribeMessage(authoredMessage: string): string {
+    return redactSnapshotMonsterIdentity(authoredMessage, this.lastSnapshot);
   }
 
-  private scribeMessage(authoredMessage: string): string {
-    const prepared = this.preparedAgentOutput(this.lastSnapshot);
-    const route = authoredMessage.replace(/^抄写员：\s*/u, "");
-    return redactSnapshotMonsterIdentity(
-      `${scribeInspectionMessage(prepared.scribe)}\n\n当前路线\n${route}`,
-      this.lastSnapshot,
-    );
+  private campfireReview(snapshot: GameSnapshot): CampfireReview {
+    const localReview = buildCampfireReview(campfireReviewInput(snapshot));
+    const agentReview = this.campfireHook?.outputFor(snapshot) ?? null;
+    if (
+      !localReview.available ||
+      !agentReview
+    ) {
+      return localReview;
+    }
+    return {
+      ...localReview,
+      headline: agentReview.headline,
+      facts: agentReview.facts,
+      focusConcept: agentReview.focusConcept,
+      nextAction: agentReview.nextAction,
+      message: agentReview.message,
+    };
   }
 
   private renderNarrativeProgress(snapshot: GameSnapshot): void {
@@ -2435,6 +2344,7 @@ export class AppShell {
   }
 
   private render(snapshot: GameSnapshot): void {
+    const previousSnapshot = this.lastSnapshot;
     const floorChanged = Boolean(
       this.lastSnapshot && this.lastSnapshot.floor !== snapshot.floor,
     );
@@ -2627,6 +2537,11 @@ export class AppShell {
               : "怪物行动已预告。请完整写出本回合只读 SQL；第四层起允许从 WITH 开始。"
         : "目标已经变化，请重新写一条完整 SQL。";
       this.queryStatus.dataset.kind = "";
+    }
+    if (shouldAutofillAdminAnswer(previousSnapshot ?? null, snapshot)) {
+      this.textarea.value = adminAnswerForInput(snapshot) ?? "";
+      this.queryStatus.textContent = "管理员模式：当前题目的正确 SQL 已填入，可直接执行。";
+      this.queryStatus.dataset.kind = "success";
     }
     if (snapshot.mode !== "combat" && this.isTerminalOpen()) this.closeTerminal(true);
     if (snapshot.mode !== "challenge" && this.isGateTerminalOpen()) {

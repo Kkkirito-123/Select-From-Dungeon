@@ -61,8 +61,9 @@ depend on random loot. The player must physically reach each key, then press `E`
 beside its shortcut to open and use it; shortcuts reduce repeat walking without
 bypassing required SQL or a living region Boss. If the next fixed objective is
 not reached after 40 successful steps, guidance shows direction and distance;
-at 60 it highlights up to 24 route cells, and at 100 it starts a cancellable
-step-by-step escort that does not teleport or trigger ambushes.
+at 60 it highlights up to 24 route cells, and at 100 it keeps the route
+highlight active at full strength. The player always moves manually; guidance
+does not teleport or trigger ambushes.
 Campfire visible safe zones, plus the entrance
 zone, suppress ambushes and patrol entry. Pressing `E` beside a campfire offers
 `在此休息` and `答案复盘`; resting restores maximum HP and makes that fire the
@@ -80,20 +81,15 @@ minimum count; course rewards, explicit chests, and keys stay deterministic.
 Full bags require explicit replacement, ordinary discards remain
 recoverable on the current floor, and protected base/course/key items cannot be
 discarded.
-Campfires and the Scribe are separate consumers. A physical campfire always
+Campfires and the Scribe are separate game objects. A physical campfire always
 handles rest/checkpoint actions, but its learning recap stays unavailable until
-the current-floor elite is defeated. After that Hook, the campfire renders an
-immediate deterministic recap from bounded current-floor evidence; its review
-button is disabled before the Hook. Each floor also has one physical Scribe.
-Her short output-only response is prepared by four semantic hooks: floor start,
-route-guidance escalation, elite defeat, and floor end. The opening, route, and
-ending hooks supply direction or closure; ordinary movement, patrols, hints, and
-render frames do not call a model. The browser always has a local fallback.
-After explicit consent, a player may enter a DeepSeek API Key into the password
-field; a dedicated Worker keeps it only in tab memory and sends bounded evidence
-directly to `https://api.deepseek.com`. A strictly validated DeepSeek response
-may replace only the Scribe wording. There is no player prompt box and Agent
-output cannot mutate gameplay. Five short narrative
+the current-floor elite is defeated. After that condition, the campfire renders
+an immediate deterministic recap from current-floor records; its review button
+is disabled before the condition. Each floor also has one physical Scribe whose
+short response and route guidance come from authored floor content. There is no
+player prompt box. When `VITE_CAMPFIRE_AGENT_URL` is configured, an optional
+stateless Python Agent may improve only the current-floor recap wording; the
+local result remains the immediate fallback. Five short narrative
 beats and two fixed Lost Name evidence entries per floor still unlock from
 existing Run progress; the local `失名录` distinguishes unknown, confirmed
 `NULL`, and actual values. The eighth floor resolves the sole MVP 2.0 ending,
@@ -120,11 +116,10 @@ The top-console `答题复盘` view reads a browser-local answer log for the lat
 battle and current floor. Each record contains the submitted SQL, explicit
 reference SQL, result category, hint level, and battle outcome. The log is
 capped at 200 SQL turns and never records movement or key presses. The complete
-log remains browser-local. When browser BYOK is explicitly enabled, a projection
-of at most eight current-floor attempts is sent directly from the browser to
-DeepSeek; the Agent projection contains SQL feature tags and result categories,
-not raw submitted or reference SQL, and is never proxied through the project
-server.
+log remains browser-local and is summarized by deterministic game rules. An
+explicitly configured Campfire Agent receives only the current-floor aggregate
+and at most eight submitted SQL projections; reference SQL, movement, and full
+game state never leave the browser.
 Authored monster display names stay direct and easy to type: two or three
 Chinese characters such as `史莱姆`, `水胶怪`, or `幼龙`, without middle-dot
 epithets or SQL-concept suffixes. New content must follow the same rule; SQL
@@ -198,9 +193,9 @@ complete SQL or MySQL interview curriculum.
 index.html -> src/application/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
-  -> agent/runtime (bounded evidence, deterministic campfire, cache, coordination)
-  -> agent/browser (DeepSeek memory-only Worker, strict Scribe output, settings UI)
-  -> agent/src Python output service (default loopback, optional OpenZLAgent provider)
+  -> CampfireReview (current-floor deterministic SQL recap)
+  -> TriggerBus -> AnswerHook/CampfireHook (dirty, distance, dedupe, fallback)
+  -> optional CampfireAgentClient -> agent/contracts/flows/http (bounded recap wording only)
   -> QuestionBankLoader/LearningLedger (verified SQLite content + IndexedDB evidence)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
@@ -235,8 +230,7 @@ player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
   -> HP update in GameSession and SQLite -> Phaser/UI refresh
   -> coalesced v12 Run save + permanent v3 profile save + IndexedDB learning ledger
-meaningful snapshot -> bounded current-floor evidence -> local prepared output
-  -> independent output cache -> optional direct DeepSeek Worker -> current-hash validation
+meaningful snapshot -> current-floor evidence -> deterministic local review output
 ```
 
 `GameSession` owns physical movement, campfires/checkpoints, guided-map
@@ -254,17 +248,24 @@ optional notice, `EncounterDirector` makes repeatable successful-step ambush
 decisions without rerolling on reload, and `OnboardingController` owns the
 separately persisted step-by-step tutorial.
 
-`agent/` owns all Agent code. `agent/runtime/` owns the semantic hooks, read-only evidence
-projection, stable evidence hash, deterministic campfire/Scribe fallback,
-independent output cache, and background coalescing. `agent/browser/` owns the
-DeepSeek-only BYOK Worker and settings UI. `agent/src/` remains a Python 3.11+
-controlled output service; it defaults to loopback and can use the optional
-OpenZLAgent provider without receiving a browser BYOK Key. The deployed BYOK
-path never sends keys through it. Tools, memory, MCP, gameplay writes, request
-logging, free prompts, and persisted provider credentials are forbidden.
+`src/domain/learning/campfireReview.ts` owns the deterministic current-floor SQL
+recap used by the Campfire Panel. It reads snapshot evidence only, does not
+access storage or external services, and cannot mutate gameplay state. The
+Scribe reads authored narrative content and applies the existing identity
+redaction before display.
+
+`src/application/triggers/` converts snapshot changes into semantic events and
+`src/application/hooks/` owns the `dirty / requesting / ready / fallback` state.
+`CampfireHook` requests at most once after the player enters the circular
+two-cell campfire range. `src/infrastructure/agent/CampfireAgentClient.ts`
+projects only the current-floor SQL evidence, sends at most eight submitted
+queries, keeps results in an in-memory evidence-hash cache, and discards stale or
+invalid responses. `agent/` owns the Python 3.11+ contracts, review flow, HTTP
+service, and optional Agent-only trigger store. The store never receives the
+game database or raw SQL; a future death review Agent is a separate boundary.
 
 `src/application/config/` owns Chinese-commented runtime tuning values such as map size,
-encounter rates, navigation thresholds, storage limits, and DeepSeek defaults.
+encounter rates, navigation thresholds, and storage limits.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
 
@@ -301,7 +302,7 @@ selector for the same persistent node.
 `src/presentation/dom/panels/` owns terminal, inventory, campfire, review, narrative,
 and Schema interactions; `src/presentation/dom/renderers/` owns HUD, minimap, and
 combat presentation. Panels receive snapshots and explicit callbacks, never storage,
-Agent workers, or Phaser instances.
+external services, or Phaser instances.
 `src/presentation/phaser/world/` owns terrain, fog, world-object visibility, and
 topology rebuild decisions; `DungeonScene` remains the lifecycle and event facade.
 `src/domain/learning/queryFeatureDetector.ts` owns SQL feature tags,
@@ -365,7 +366,7 @@ evaluation.
 ## Repository Map
 
 ```text
-agent/                  Browser output-only Agent runtime/BYOK UI plus local Python evaluator
+agent/                  Python Campfire Agent contracts, flow, HTTP, optional trigger store, and tests
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
 src/application/        Startup, runtime configuration, and page lifecycle
 src/content/            Static curriculum, world, narrative, inventory, and SQL content
@@ -383,14 +384,11 @@ scripts/            Portable repository-rule validator and its regression tests
 dist/               Generated static build; ignored and never hand-edited
 ```
 
-There is no nested module guide. Root rules govern every module, while
-`agent/README.md` owns the optional Python service setup and verification
-commands.
+There is no nested module guide. Root rules govern every module.
 
 ## Canonical Commands
 
-Requirements: Node.js `>=20.19` and pnpm `11.9.0`; the optional Agent service
-requires Python `>=3.11`.
+Requirements: Node.js `>=20.19`, pnpm `11.9.0`, and Python `>=3.11` for the optional Agent service.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -398,7 +396,7 @@ pnpm question-bank:build
 pnpm dev
 pnpm test
 pnpm build
-PYTHONPATH=agent/src python3 -m unittest discover -s agent/tests
+python3 -m unittest discover -s agent/tests
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 ```
@@ -409,15 +407,18 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 
 ## Runtime and Safety Boundaries
 
-- SQL execution remains entirely in the browser through `sql.js`/SQLite WASM,
-  and Agent is disabled by default. With explicit consent, the browser may send
-  at most eight current-floor attempts with result categories, hint levels,
-  objectives, and derived SQL feature tags, plus bounded lesson, world-change,
-  relic, navigation, trigger, and unlocked-story evidence directly to DeepSeek.
-  Raw submitted/reference SQL is not in the Agent request. The Key exists only in a dedicated Worker's memory and
-  is never written to browser storage, logs, exports, URLs, telemetry, or the
-  project server. Refreshing or closing the tab removes it. The deployed CSP
-  allows only same-origin requests and `https://api.deepseek.com`.
+- SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.
+  Campfire review uses only current-floor local snapshot records, and the Scribe
+  reads authored story content. If explicitly configured, the optional Campfire
+  Agent receives a bounded projection through `POST /v1/campfire/review`; the
+  game remains playable without it and keeps no Agent output in storage.
+- The Agent request contains a request ID, evidence hash, current floor,
+  aggregate counts, and at most eight submitted SQL records. It never contains
+  reference SQL, full `GameSnapshot`, player identity, movement, map, inventory,
+  or gameplay commands. Responses must match the request hash and strict text
+  limits before they can replace the local wording. Python storage is disabled
+  by default; explicit SQLite storage keeps only trigger metadata and validated
+  output.
 - The battle terminal accepts one read-only `SELECT` or `WITH` statement. DML, DDL, `PRAGMA`,
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.
@@ -464,11 +465,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   navigation guidance state, and disposable current Run state),
   `select-from-dungeon:profile:v3` (47 mastered lessons, recovered monster IDs,
   attempts, victories, and best query count), and
-  `select-from-dungeon:onboarding:v1` (finished/skipped guide state). Prepared
-  Agent output is stored separately under
-  `select-from-dungeon:agent-output:v2`; it contains only validated output and
-  bounded identity/hash metadata, never raw submitted or reference SQL, and is
-  not part of Run migration. A valid
+  `select-from-dungeon:onboarding:v1` (finished/skipped guide state). A valid
   `select-from-dungeon:run:v11` is migrated in memory into v12;
   valid `run:v10` and `run:v9` are then migrated through the existing chain;
   valid `run:v8` is upgraded with deterministic eight-floor campaign slots, and `run:v7` is then
@@ -607,8 +604,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   fonts, audio, or copied level text without a license review and attribution
   update.
 - Browser runtime dependencies are pinned in `package.json` and
-  `pnpm-lock.yaml`; the optional OpenZLAgent source revision is pinned in
-  `agent/pyproject.toml`. Dependency changes remain approval-gated and require
+  `pnpm-lock.yaml`. Dependency changes remain approval-gated and require
   license, bundle, build, and browser checks proportional to risk.
 - Never expose credentials, personal data, private endpoints, or sensitive local
   content in code, fixtures, logs, screenshots, manifests, or reports.

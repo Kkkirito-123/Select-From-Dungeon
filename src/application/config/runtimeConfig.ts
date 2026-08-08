@@ -33,6 +33,7 @@ export const NAVIGATION_RUNTIME_CONFIG = {
   /** 迷路后的三级辅助阈值，以及高亮路线的最大格数。 */
   directionHintAt: 40,
   routeHighlightAt: 60,
+  /** 达到该步数后继续显示强化路线高亮，不再自动移动玩家。 */
   escortAt: 100,
   maxHighlightedCells: 24,
 } as const;
@@ -62,23 +63,9 @@ export const WORLD_UI_RUNTIME_CONFIG = {
   monsterLabelDistance: 2,
 } as const;
 
-export const DEEPSEEK_RUNTIME_CONFIG = {
-  /** 固定官方域名；设置面板不允许玩家改写。 */
-  origin: "https://api.deepseek.com",
-  /** 连接成功后优先选择的轻量模型。 */
-  preferredModel: "deepseek-v4-flash",
-  /** 网络与输出上限用于控制等待时间、费用和守卫复杂度。 */
-  requestTimeoutMs: 12_000,
-  temperature: 0.2,
-  maxTokens: 360,
-  maxResponseCharacters: 8_000,
-  credentialMinLength: 8,
-  credentialMaxLength: 512,
-} as const;
-
-export const AGENT_RUNTIME_CONFIG = {
-  /** 单次复盘最多投影的作答证据数量。 */
-  maxEvidenceAttempts: 8,
-  /** 浏览器只保存最近的已验证输出，不保存原始 SQL 或 Key。 */
-  maxOutputCacheEntries: 16,
+export const CAMPFIRE_AGENT_RUNTIME_CONFIG = {
+  /** 未设置时不创建客户端，游戏完全使用本地确定性复盘。 */
+  endpoint: import.meta.env.VITE_CAMPFIRE_AGENT_URL?.trim() || null,
+  /** 本地复盘已经先展示，网络请求只允许在后台等待这一时长。 */
+  requestTimeoutMs: 3_000,
 } as const;

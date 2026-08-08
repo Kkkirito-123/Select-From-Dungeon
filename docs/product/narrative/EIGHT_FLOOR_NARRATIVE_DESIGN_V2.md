@@ -47,8 +47,8 @@
 后续实现预计涉及：
 
 - `docs/product/narrative/FLOOR_01_SCRIPT.md` 至 `FLOOR_08_SCRIPT.md`；
-- `src/content/floorExperience/floor01.ts` 至 `floor08.ts`；
-- `src/content/narrativeContent.ts`、`src/domain/floorStory.ts`；
+- `src/content/world/floorExperience/floor01.ts` 至 `floor08.ts`；
+- `src/content/narrative/narrativeContent.ts`、`src/domain/progression/floorStory.ts`；
 - 剧情主框、失名录、管理员状态与对应测试。
 
 本设计不要求修改 SQLite Schema，也不要求新增永久存档字段；优先复用现有事件完成事实、

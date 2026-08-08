@@ -4,10 +4,10 @@
 
 ## 1. 边界
 
-[`src/content/floorLabyrinth.ts`](../../../src/content/floorLabyrinth.ts) 是八层导航差异的最小内容真源。
+[`src/content/world/floorLabyrinth.ts`](../../../src/content/world/floorLabyrinth.ts) 是八层导航差异的最小内容真源。
 它只记录稳定意图和稳定 ID，不保存坐标、Seed 结果、玩家位置、开门状态或其他 Run 数据。
 
-[`src/domain/floorLabyrinth.ts`](../../../src/domain/floorLabyrinth.ts) 是对应的运行时解析层：它把内容
+[`src/domain/exploration/floorLabyrinth.ts`](../../../src/domain/exploration/floorLabyrinth.ts) 是对应的运行时解析层：它把内容
 契约与当前已保存的 `MazeFloor`、两座篝火、`GuidedMapPlan` 和 `BiomePlan` 组合为安全范围、
 当前视野与实体陷阱。`GameSession` 仍然是移动、承伤、已打开/已触发状态和模式切换的事实权威；
 `DungeonScene` 只渲染当前快照，`AppShell` 只负责入场确认界面。

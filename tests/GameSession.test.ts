@@ -1419,6 +1419,53 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(formalSave.graph.seed).toBe("admin-overview");
   });
 
+  it("管理员只提供进入下一层初始位置的操作", () => {
+    const session = new GameSession(null, null, "admin-next-floor");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminNextFloor()).toMatchObject({ ok: true });
+    expect(session.snapshot()).toMatchObject({
+      floor: 2,
+      currentRoomId: session.snapshot().roomGraph.entryId,
+      mode: "explore",
+    });
+    expect(session.adminNextFloor()).toMatchObject({ ok: true });
+    expect(session.snapshot().floor).toBe(3);
+  });
+
+  it("管理员战斗只提供当前题答案，结算和复盘仍与正式模式一致", () => {
+    const normal = new GameSession(null, null, "admin-answer-flow");
+    const admin = new GameSession(null, null, "admin-answer-flow");
+    expect(admin.enableAdminMode()).toMatchObject({ ok: true });
+
+    enterLesson(normal, "select");
+    enterLesson(admin, "select");
+    expect(normal.snapshot().adminAnswerSql).toBeNull();
+    expect(admin.snapshot().adminAnswerSql).toBe(
+      "SELECT weakness FROM monsters WHERE id = 1;",
+    );
+
+    const normalFirst = normal.resolveQuery(SELECT_WEAKNESS);
+    const adminFirst = admin.resolveQuery(SELECT_WEAKNESS);
+    expect(adminFirst).toEqual(normalFirst);
+    expect(admin.snapshot().battleReview).toEqual(normal.snapshot().battleReview);
+    expect(admin.snapshot().adminAnswerSql).toBe(
+      "SELECT id, status FROM monsters WHERE id = 1;",
+    );
+
+    const normalSecond = normal.resolveQuery(SELECT_NAME);
+    const adminSecond = admin.resolveQuery(SELECT_NAME);
+    expect(adminSecond).toEqual(normalSecond);
+    expect(admin.snapshot().battleReview).toEqual(normal.snapshot().battleReview);
+    expect(admin.toProfile()).toEqual(normal.toProfile());
+    expect({
+      ...admin.toSavedRun(),
+      runInstanceId: "same-run",
+    }).toEqual({
+      ...normal.toSavedRun(),
+      runInstanceId: "same-run",
+    });
+  });
+
   it("管理员状态预设可复现前四层关键世界状态、回燃换装且不污染永久图鉴", () => {
     const session = new GameSession(null, null, "admin-presets");
     const formalProfile = session.toProfile();

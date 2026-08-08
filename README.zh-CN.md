@@ -6,8 +6,6 @@
 [楼层地图与美术蓝图](docs/FLOOR_THEMES.zh-CN.md) |
 [八层剧情 V2](docs/product/narrative/EIGHT_FLOOR_NARRATIVE_DESIGN_V2.md) |
 [怪物分布 V2](docs/product/systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md) |
-[纯输出 Agent MVP](docs/product/systems/OUTPUT_ONLY_AGENT_SPEC.md) |
-[可选 Agent 适配器](agent/README.md) |
 [文档索引与版本路线](docs/README.md) |
 [English curriculum blueprint](docs/CURRICULUM.md) |
 [English map direction](docs/FLOOR_THEMES.md)
@@ -48,8 +46,8 @@
   双向捷径。路线信标把
   主课程路上的可见兴趣点间隔控制在 18 格内；默认编织全部可修复死路，剩余死路都会放置一次性
   补给，不再只有空墙。捷径钥匙不占背包，也不依赖怪物随机掉落。40 步未到下一个固定目标时
-  显示方向与距离，60 步高亮最多 24 格，100 步启动可取消的逐格护送；护送不传送、不触发伏击、
-  不穿锁门，也不绕过必修 SQL。
+  显示方向与距离，60 步高亮最多 24 格，100 步保持强化路线高亮；玩家始终手动移动，高亮不传送、
+  不触发伏击、不穿锁门，也不绕过必修 SQL。
   捷径门或补给按 `E` 交互。捷径只有在玩家先亲自走到钥匙处后才能永久开启，因此只能减少本 Run
   的重复折返，不能跳过必修 SQL。
 - 靠近第一层抄写员、档案水轮或无名宿舍按 `E`，指导会在游戏主画面中央展开；阅读期间暂停
@@ -85,15 +83,15 @@
   错误结果或语法错误触发已预告的怪物反击；空输入不消耗回合。
 - 顶栏 `答题复盘` 会本地记录每次 SQL、对应参考答案、错误类型、提示等级和战斗结果，可分别
   查看最近一场战斗与当前楼层。完整浏览器日志最多保留 200 次 SQL 回合，不记录移动或按键。
-  只有显式启用可选输出 Agent 时，最多八条当前层作答投影（只含结果分类、题目目标、提示等级与
-  派生 SQL 特征）才会由浏览器直接发送到 DeepSeek；原始玩家 SQL 与参考 SQL 不离开浏览器，
-  也绝不经过项目服务器。
+  复盘结果默认保留在浏览器本地，由确定性的游戏规则计算。明确配置
+  `VITE_CAMPFIRE_AGENT_URL` 后，最多八条当前层玩家 SQL 投影可以只改善复盘文案；参考 SQL 和完整
+  游戏状态不会发送。
 - 每层会在中、后学习阶段生成两个稳定的实体篝火；出生区作为前段安全与兜底复活锚点。篝火周围可见区域与本层出生区都是
   安全区，不会触发突发遭遇，巡逻怪也不能进入。站在火堆相邻格按 `E`，可以选择
   `在此休息` 或 `答案复盘`；休息恢复满生命，并把该篝火设为复活点。当前层精英被击败前，
   `答案复盘` 保持禁用；击败后才显示确定性的学习复盘，包括正确率、提示使用、当前关注点和下一步行动。
 - 每层另有一名与篝火分开的实体抄写员。她没有聊天输入框；调查时直接展示已经预生成的角色短回复
-  和手工路线指引。本地降级内容始终可用，可选模型回复只有通过严格校验后才会在后台替换它。
+  和当前楼层内容中的手工路线指引，不调用外部模型。
   每层五个短叙事拍仍随必修进度、休息、Boss 接触和通关解锁；《失名录》明确区分“尚未查询”、
   “已查为 `NULL`”和“已得到实际值”。
 - 第五至八层已经拥有手工运行时地标，不再只是宏观换色占位：窗口查询会重排轮值表和军钟，
@@ -130,8 +128,8 @@
 - 当前迷宫、演员、地面物品、迷雾、两个篝火、出生锚点、复活点与战斗状态和永久档案分开保存。
   开始新 Run 会重置局内状态，但保留已掌握知识、已回收怪物名字、练习次数、通关数和最佳查询数。
 - 桌面支持 WASD/方向键，窄屏提供可见方向键和全屏 SQL 终端，可直接嵌入博客页面操作。
-- 顶栏管理员视图可预览八层全图、全部怪物、首领和三个生态区，并可按楼层/区域定位。管理员
-  状态不会写入正式 Run；刷新页面恢复最后一次正式存档。
+- 顶栏管理员模式只保留进入下一层初始位置的内存预览入口，不再提供楼层列表、区域定位或状态预设；
+  进入战斗后自动填入正确 SQL，战斗结算和复盘仍走正式流程。
 - 地图和战斗共用低开销程序化角色配方：玩家有四段身份显形，抄写员拥有低帧呼吸 / 翻页表现，
   每个怪物族群都有明确轮廓。第八层胜利后完成 MVP 2.0 唯一结局 `MIGRATE`，并在《失名录》
   保留历史与回滚路径。
@@ -232,17 +230,12 @@ pnpm build
 pnpm preview
 ```
 
-游戏默认不需要 Agent 服务，直接使用确定性本地输出。玩家可打开 `AI 复盘设置`，确认授权声明后
-输入自己的 DeepSeek Key。页面会立即清空密码框，专用 Worker 只在当前标签页内存保存 Key，
-并固定直连 DeepSeek 官方域名；刷新或关闭标签页后 Key 消失。模型输出只有通过严格校验后才能
-替换抄写员措辞，不能改变游戏机制。
+游戏默认使用确定性的本地 SQL 复盘和作者编写的抄写员文本。配置
+`VITE_CAMPFIRE_AGENT_URL` 后，可选 Python 3.11+ 篝火 Agent 通过无状态
+`POST /v1/campfire/review` 只改善当前层复盘文案。没有该服务时游戏仍可完整运行，Agent 输出不会持久化。
 
-[agent/README.md](agent/README.md) 中的 Python/OpenZLAgent 适配器是受控输出服务，默认只监听回环地址；
-在线部署必须由明确配置的 HTTPS、认证和限流边界保护。正式网页 BYOK 不会让玩家 Key 经过
-Python 或项目服务器。
-
-顶栏 `⌘ 管理员` 可载入任意楼层、区域和入层/区域首领/隐藏区/Boss 预设，包含剧透。
-预览只存在内存中，不覆盖正式 Run 或永久怪物档案；刷新页面即退出预览并回到最后一次正式存档。
+顶栏 `⌘ 管理员` 只提供下一层初始位置入口，包含剧透的预览只存在内存中，不覆盖正式 Run
+或永久怪物档案；战斗时自动填写当前题目的正确 SQL，刷新页面即退出预览并回到最后一次正式存档。
 
 第一只怪物的两次攻击是：
 
@@ -270,13 +263,13 @@ WHERE id = 1;
 3. `src/infrastructure/storage/localProgress.ts`：理解存档校验、迁移调度与恢复；
    `src/infrastructure/storage/runMigrations.ts` 负责 v4-v12 的内存迁移链。
 4. `src/infrastructure/sql/SqlEngine.ts`、`src/domain/learning/lessonEvaluator.ts`：理解 SQL 执行和判题边界。
-5. `src/presentation/phaser/`、`src/presentation/dom/`：查看 Phaser 与 DOM 表现层；`agent/` 只读消费受限证据。
+5. `src/presentation/phaser/`、`src/presentation/dom/`：查看 Phaser、DOM 表现层、本地复盘与作者剧情展示。
 
 目录主干：
 
 ```text
 src/
-├─ contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
+├─ contracts/          跨层只读游戏、存档、结果、篝火 Agent 与存储契约
 ├─ application/       启动、配置与页面生命周期
 ├─ content/           课程、世界、剧情、背包与 SQL 内容
 ├─ domain/            Session 门面/辅助模块、战斗、探索、学习、成长与共享规则
@@ -292,9 +285,7 @@ src/
 `lessonResultEvaluator.ts` 负责固定课程结果语义，`lessonEvaluator.ts` 只保留兼容导出与组合。
 
 ```text
-AppShell ── HUD、发现式小地图、新手引导、终端与查询证据
-  └─ agent/runtime ── 受限证据、确定性复盘、缓存与调度
-       └─ agent/browser ── 内存 DeepSeek Worker 与设置 UI
+AppShell ── HUD、发现式小地图、新手引导、终端、本地复盘与作者剧情
     │
 GameSession ── 物理世界、篝火、安全区、演员、迷雾、战斗、掉落与档案的事实权威
   ├─ FloorContracts ── 可校验的八层课程与内容 Schema
@@ -325,9 +316,16 @@ GameSession ── 物理世界、篝火、安全区、演员、迷雾、战斗�
   └─ OnboardingController ── 独立持久化的渐进引导
 ```
 
-所有 Agent 代码都位于 `agent/`。运行时把只读 `GameSession` 快照投影为最多八条当前层作答并
-立即生成确定性输出；只有 DeepSeek 专用 Worker 的回复通过 Run / 楼层 / 证据 Hash 与封闭输出
-契约校验后才能替换抄写员措辞。没有游戏工具、存档写入、用户提示词、MCP 或长期记忆。
+`src/domain/learning/campfireReview.ts` 把当前楼层答案记录转换为篝火面板使用的确定性事实。
+它不访问外部服务、不写入存档，也不修改游戏状态。抄写员读取作者编写的剧情内容，展示前只执行
+现有的怪物身份脱敏。
+
+`src/application/triggers/` 将快照变化转换为作答、靠近篝火、换层和死亡事件，
+`src/application/hooks/` 维护 `dirty / requesting / ready / fallback` 状态。新作答标记当前层脏数据，
+玩家进入篝火两格圆形范围后才允许为这份证据发起一次请求。`src/infrastructure/agent/CampfireAgentClient.ts`
+只发送当前层受限投影，按证据 Hash 在内存中缓存，并且只接受请求 ID 与 Hash 都匹配的回复。
+`agent/` 目录负责 Python 契约、复盘流程和 HTTP 服务；默认无状态，可显式启用只保存触发元数据与合法输出的
+Agent 专用 SQLite，不保存游戏数据库或原始 SQL。
 
 `FloorContracts` 定义八层课程与内容边界，`CampaignDomain` 序列化确定性的有序槽位并拒绝
 跳层与重复激活。`RunGraph` 是当前可执行八层的课程依赖图，不负责移动玩家；
@@ -366,8 +364,8 @@ L3 16 道；第二至八层 L1 包含 40 道本层题与 24 道复习题，L2/L3
   不重复保存一份派生数据。
 - `select-from-dungeon:profile:v3`：47 项已掌握课程、已回收怪物编号、练习次数、通关数和最佳查询数。
 - `select-from-dungeon:onboarding:v1`：可选引导是否已完成或跳过。
-- `select-from-dungeon:agent-output:v2`：按不透明 Run 指纹、楼层和证据 Hash 独立索引的一小组
-  已校验预生成输出；不保存玩家 SQL 或参考 SQL，也不参与 Run 迁移。
+- 篝火 Agent 输出在浏览器中只存在当前页面内存，不写入 Run、Profile 或 IndexedDB；Python 服务默认无状态，
+  显式启用时只保存 Agent 专用触发元数据与合法输出，不保存游戏数据库或原始 SQL。
 - IndexedDB `select-from-dungeon-learning`：最多 5000 条完整作答与永久题目/课程聚合，支持 JSON
   导出和显式清除。
 - IndexedDB `select-from-dungeon-content`：已校验的版本化题库字节，保证进行中的 Run 固定题库版本。
@@ -379,9 +377,8 @@ Run Key 不读取也不删除。
 `src/infrastructure/storage/progressPersistence.ts` 会合并非关键移动与巡逻快照；查询、战利品、背包、模式和
 拓扑变化仍立即落盘。
 
-SQL 执行本身仍留在浏览器 SQLite 中，Agent 默认关闭。明确同意后，受限证据与内存 Key 只会由
-浏览器 Worker 直接发送到 `https://api.deepseek.com`；不包含移动、按键、未探索地图、完整存档
-或浏览器存储。
+SQL 执行和复盘证据继续留在浏览器本地 SQLite、Run/Profile 与 IndexedDB 边界内。明确配置后，
+可选 Agent 只接收当前层投影，不是游戏状态来源。
 
 ## 验证、构建与博客嵌入
 

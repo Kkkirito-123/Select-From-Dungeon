@@ -710,10 +710,10 @@ flowchart LR
 - `src/content/prototypes/floor1RegionPrototype.ts`：手工 Tile、地区、地标、篝火 Mask、捷径与锚点；
 - `src/domain/prototypeLayout.ts`：只读原型状态、捷径开关和锚点跳转；
 - `src/domain/prototypeValidation.ts`：可达性、路径、锚点、安全区和捷径不变量；
-- `src/domain/GameSession.ts`：只增加管理员内存快照的原型加载边界；
-- `src/game/DungeonScene.ts`：复用现有玩家、相机与碰撞渲染原型；
-- `src/ui/AppShell.ts`：正式迷宫 / 区域原型选择、状态切换、覆盖层和本地证据导出；
-- `src/style.css`：管理员检查器所需的最小样式；
+- `src/domain/session/GameSession.ts`：只增加管理员内存快照的原型加载边界；
+- `src/presentation/phaser/DungeonScene.ts`：复用现有玩家、相机与碰撞渲染原型；
+- `src/presentation/dom/AppShell.ts`：正式迷宫 / 区域原型选择、状态切换、覆盖层和本地证据导出；
+- `src/presentation/style.css`：管理员检查器所需的最小样式；
 - `tests/`：新增原型布局、路径、管理员隔离与输入冒烟测试。
 
 PR 2 默认不修改：
@@ -730,15 +730,15 @@ Hash 回归证据；无法证明正式行为零变化时，退回独立原型模
 
 只有 PR 2 通过体验门禁后，才重新核对并批准：
 
-- `src/domain/mazeGenerator.ts`：从完整迷宫生成演进为布局策略入口；
-- `src/domain/mazeValidation.ts`：正式加入区域、捷径和锚点不变量；
-- `src/domain/biome.ts`：从迷宫覆盖区演进为明确区域契约；
-- `src/domain/campfire.ts`：复用手工锚点并执行恢复、复活和安全区规则；
-- `src/domain/guidedMap.ts`：从长路线信标转为地标与目标引导；
-- `src/domain/types.ts`：正式布局、捷径和后续移动方式类型；
+- `src/domain/exploration/mazeGenerator.ts`：从完整迷宫生成演进为布局策略入口；
+- `src/domain/exploration/mazeValidation.ts`：正式加入区域、捷径和锚点不变量；
+- `src/domain/exploration/biome.ts`：从迷宫覆盖区演进为明确区域契约；
+- `src/domain/exploration/campfire.ts`：复用手工锚点并执行恢复、复活和安全区规则；
+- `src/domain/exploration/guidedMap.ts`：从长路线信标转为地标与目标引导；
+- `src/domain/shared/types.ts`：正式布局、捷径和后续移动方式类型；
 - `src/content/`：第一层课程锚点、剧情证据与后续船只内容；
-- `src/game/gameInput.ts`：第二层上船 / 下船输入状态；
-- `src/audio/ArcadeAudio.ts`：通过地图原型后再接区域音乐切换。
+- `src/presentation/phaser/gameInput.ts`：第二层上船 / 下船输入状态；
+- `src/infrastructure/audio/ArcadeAudio.ts`：通过地图原型后再接区域音乐切换。
 
 ### 16.3 存档与迁移
 

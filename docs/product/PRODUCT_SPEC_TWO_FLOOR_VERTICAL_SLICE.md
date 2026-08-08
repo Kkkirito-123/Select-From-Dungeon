@@ -700,12 +700,12 @@ assets/vendor/                    # 原始来源与许可，不进入运行时
 public/assets/floors/01-ember-archive/
 public/assets/floors/02-tidal-archipelago/
 
-src/content/floorExperience/
+src/content/world/floorExperience/
   types.ts
   floor01.ts
   floor02.ts
   index.ts
-src/game/
+src/presentation/phaser/
   FloorEnvironmentRenderer.ts
   FloorSetpieceFactory.ts
 src/content/
@@ -716,13 +716,13 @@ src/content/
 src/domain/
   GameSession.ts
   types.ts
-src/game/
+src/presentation/phaser/
   DungeonScene.ts
   BattleScene.ts
-src/ui/
+src/presentation/dom/
   AppShell.ts
   MonsterCodexView.ts
-src/audio/
+src/infrastructure/audio/
 tests/
 ATTRIBUTIONS.md
 ```

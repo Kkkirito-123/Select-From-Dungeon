@@ -28,7 +28,6 @@ export function advancePatrolTick(
   if (
     state.locked ||
     snapshotMode !== "explore" ||
-    state.guidanceLevel === 3 ||
     state.pagePaused ||
     state.blockingOverlay ||
     !state.sceneActive

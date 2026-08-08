@@ -978,68 +978,17 @@ export class GameSession {
   cancelGuidanceEscort(): boolean {
     if (this.guidanceLevel !== 3) return false;
     this.guidanceLevel = 2;
-    this.banner = "自动寻路护送已取消；高亮路线仍会保留。";
+    this.banner = "路线高亮已收起；你可以继续手动探索。";
     this.emit();
     return true;
   }
 
   advanceGuidanceEscort(): boolean {
     if (this.mode !== "explore" || this.guidanceLevel !== 3) return false;
-    const objective = this.guidanceObjective();
-    if (!objective) return false;
-    if (objective.roomNodeId === null && distance(this.player, objective.target) <= 1) {
-      this.guidanceSteps = 0;
-      this.guidanceLevel = 0;
-      this.banner = `护送抵达「${objective.title}」，准备迎战。`;
-      this.emit();
-      return false;
-    }
-    const lockedRegionId = this.lockedGuidanceRegionId();
-    const blockedHazards = new Set(this.floorHazards()
-      .filter((hazard) => !this.openedGateIds.has(hazard.id))
-      .map(positionKey));
-    const path = findGridPath(
-      this.player,
-      objective.target,
-      (x, y) => {
-        const position = { x, y };
-        return isMazeWalkable(
-          this.mazeFloor,
-          x,
-          y,
-          this.completedLessons,
-          this.openedGateIds,
-        ) &&
-          !blockedHazards.has(positionKey(position)) &&
-          !this.campfires.some((campfire) => campfire.x === x && campfire.y === y) &&
-          (
-            lockedRegionId === null ||
-            biomeRegionAt(this.biomePlan, position).id !== lockedRegionId
-          );
-      },
-    );
-    const next = path[1];
-    if (!next || this.livingActorAt(next) || this.regionGuardianAccessMessage(this.player, next)) {
-      return false;
-    }
-    this.player.x = next.x;
-    this.player.y = next.y;
-    this.revealAt(next);
-    this.updateCurrentRoom(next);
-    if (
-      (objective.roomNodeId !== null && this.currentRoomId === objective.roomNodeId) ||
-      (objective.roomNodeId === null && distance(this.player, objective.target) <= 1)
-    ) {
-      this.guidanceSteps = 0;
-      this.guidanceLevel = 0;
-      this.banner = objective.roomNodeId === null
-        ? `护送抵达「${objective.title}」，准备迎战。`
-        : `护送抵达「${objective.title}」，迷路计数已重置。`;
-    } else {
-      this.banner = `路线护送中：前往「${objective.title}」。按 Escape 可取消。`;
-    }
+    // 保留旧接口以兼容历史调用，但不再替玩家修改坐标；L3 现在只表示强化路线高亮。
+    this.banner = "自动寻路已关闭：高亮路线仍然保留，请手动前进并接触目标。";
     this.emit();
-    return true;
+    return false;
   }
 
   setPlayerPosition(x: number, y: number): boolean {
@@ -3204,6 +3153,17 @@ export class GameSession {
     this.banner = `管理员预览：第 ${floor} 层全图已载入。刷新页面可回到最后一次正式存档。`;
     this.emit();
     return { ok: true, kind: "none", message: this.banner };
+  }
+
+  /** 管理员唯一的楼层推进入口：只进入下一层出生点，不跳转到具体地点。 */
+  adminNextFloor(): InteractionResolution {
+    if (!this.adminMode) {
+      return this.interactionFailure("请先开启管理员视图。");
+    }
+    if (this.floorNumber >= 8) {
+      return this.interactionFailure("已经在最后一层，没有下一层初始位置。");
+    }
+    return this.adminLoadFloor((this.floorNumber + 1) as FloorNumber);
   }
 
   adminApplyPreset(presetId: string): InteractionResolution {

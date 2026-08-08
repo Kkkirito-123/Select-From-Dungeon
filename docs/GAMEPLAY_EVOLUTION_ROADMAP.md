@@ -205,8 +205,8 @@ MVP：
 预计主要范围：
 
 - `src/domain/`
-- `src/storage/`
-- `src/ui/`
+- `src/infrastructure/storage/`
+- `src/presentation/dom/`
 - 对应测试和用户文档
 
 ### `v0.3.0`：三篝火、安全区与死亡复活

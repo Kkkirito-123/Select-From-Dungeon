@@ -120,9 +120,9 @@ docs/README.md
 ```text
 src/content/
 src/domain/
-src/game/
-src/ui/
-src/audio/
+src/presentation/phaser/
+src/presentation/dom/
+src/infrastructure/audio/
 src/assets/                 # 若后续批准第三方或自制图集
 tests/
 ATTRIBUTIONS.md

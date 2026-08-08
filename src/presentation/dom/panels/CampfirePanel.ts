@@ -1,12 +1,12 @@
 /**
  * 篝火菜单 Panel。
  *
- * 篝火是游戏内的休息和当前楼层复盘入口。Panel 只展示快照与已经准备好的
- * Agent 输出，并把休息、离开动作交给 AppShell 注入的回调；它不会自行
- * 计算复活点，也不会把 Agent 输出写回游戏状态。
+ * 篝火是游戏内的休息和当前楼层复盘入口。Panel 只展示快照与本地规则复盘，
+ * 并把休息、离开动作交给 AppShell 注入的回调；它不会自行计算复活点，
+ * 也不会写回游戏状态。
  */
 import type { GameSnapshot } from "../../../contracts/game/snapshots";
-import type { CampfireOutput } from "../../../contracts/agent/outputPort";
+import type { CampfireReview } from "../../../contracts/game/results";
 import type { CampfirePanelActions } from "./panelContracts";
 
 function requiredElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
@@ -21,7 +21,7 @@ export class CampfirePanel {
   constructor(
     private readonly root: HTMLElement,
     private readonly actions: CampfirePanelActions,
-    private readonly preparedOutput: (snapshot: GameSnapshot) => CampfireOutput,
+    private readonly reviewFor: (snapshot: GameSnapshot) => CampfireReview,
   ) {
     this.menu = requiredElement(root, "#campfire-menu");
   }
@@ -75,11 +75,14 @@ export class CampfirePanel {
         : "后段篝火";
     requiredElement(this.menu, "#campfire-menu-title").textContent = phaseName;
     const reviewButton = requiredElement<HTMLButtonElement>(this.menu, "#review-at-campfire");
-    const recap = this.preparedOutput(snapshot);
+    const recap = this.reviewFor(snapshot);
     requiredElement(this.menu, "#campfire-menu-status").textContent =
       `生命 ${snapshot.player.hp}/${snapshot.player.maxHp} · 护甲 ${snapshot.player.armorHp}/${snapshot.player.armor?.maxArmor ?? 0}。休息会全部恢复，并把这里设为复活点；${recap.available ? "本层精英记录已解锁复盘。" : "击败本层精英后才会解锁复盘。"}`;
     reviewButton.disabled = !recap.available;
     requiredElement(this.menu, "#campfire-recap-headline").textContent = recap.headline;
+    const message = requiredElement(this.menu, "#campfire-recap-message");
+    message.hidden = !recap.message;
+    message.textContent = recap.message ?? "";
     const facts = requiredElement(this.menu, "#campfire-recap-facts");
     facts.replaceChildren(...recap.facts.map((fact) => {
       const item = document.createElement("li");

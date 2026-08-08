@@ -181,13 +181,13 @@ Seed 必须可重放：相同 Seed 产生相同地图和陷阱；不同 Seed 不
 
 | 范围 | 文件 |
 |---|---|
-| 宏观房间槽位 | `src/content/floorMapBlueprints.ts` |
-| 第一层区域判定与陷阱生成 | `src/domain/floorOneLabyrinth.ts` |
-| V1.1 宝箱类型、稳定生成与安全传送 | `src/domain/floorOneLabyrinth.ts`、`src/domain/GameSession.ts` |
-| 篝火与安全区 | `src/domain/campfire.ts` |
-| 进入确认、伤害与快照 | `src/domain/GameSession.ts`, `src/domain/types.ts` |
-| 迷宫门、陷阱、黑雾与 2.5D 层次 | `src/game/DungeonScene.ts` |
-| 确认弹窗与键盘焦点 | `src/ui/AppShell.ts`, `src/styles.css` 或现有样式入口 |
+| 宏观房间槽位 | `src/content/world/floorMapBlueprints.ts` |
+| 第一层区域判定与陷阱生成 | `src/domain/exploration/floorOneLabyrinth.ts` |
+| V1.1 宝箱类型、稳定生成与安全传送 | `src/domain/exploration/floorOneLabyrinth.ts`、`src/domain/session/GameSession.ts` |
+| 篝火与安全区 | `src/domain/exploration/campfire.ts` |
+| 进入确认、伤害与快照 | `src/domain/session/GameSession.ts`, `src/domain/shared/types.ts` |
+| 迷宫门、陷阱、黑雾与 2.5D 层次 | `src/presentation/phaser/DungeonScene.ts` |
+| 确认弹窗与键盘焦点 | `src/presentation/dom/AppShell.ts`, `src/styles.css` 或现有样式入口 |
 | 回归 | `tests/floorOneLabyrinth.test.ts`、`tests/GameSession.test.ts` 及相关现有测试 |
 
 ## 11. 验收标准
