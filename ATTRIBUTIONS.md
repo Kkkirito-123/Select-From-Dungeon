@@ -116,17 +116,6 @@ edit only the root sources and rebuild instead of maintaining duplicate notices.
   [dedicated to the public domain](https://www.sqlite.org/copyright.html).
 - Status: installed through pnpm and bundled into generated JavaScript/WASM.
 
-### OpenZLAgent (optional)
-
-- Source: [Kkkirito-123/OpenZLAgent at `e1d441afc1af`](https://github.com/Kkkirito-123/OpenZLAgent/tree/e1d441afc1af808e9f436aa80598542c449e9359).
-- Use: optional Python-side OpenAI-compatible model client for one bounded,
-  output-only Scribe response; no OpenZLAgent tool, memory, or MCP runtime is
-  enabled.
-- License: [MIT](https://github.com/Kkkirito-123/OpenZLAgent/blob/e1d441afc1af808e9f436aa80598542c449e9359/LICENSE),
-  copyright 2026 OpenZLAgent.
-- Status: installed only when the `agent` package's `openzl` extra is selected;
-  no upstream source is vendored or included in the browser bundle.
-
 ## Vendored CC0 runtime art / 随包分发的 CC0 运行时美术
 
 Of the vendored art, only the selected PNG files named below enter
@@ -236,7 +225,7 @@ external recording, imported MIDI, or third-party melody. The WAV files are
 review material and are not loaded by the runtime bundle. The first pair under
 `region-01/` is retained as a rejected sharpness reference; the ascent pack is
 retained as a pre-implementation direction record, while
-`src/audio/musicScore.ts` is the current runtime score.
+`src/infrastructure/audio/musicScore.ts` is the current runtime score.
 
 The concept PNG files under `region-01/` and `mvp2/` were generated from
 original project prompts and direction, then reviewed as visual references.
@@ -249,7 +238,7 @@ They are not production sprites, tiles, or runtime assets.
 `scripts/generate-music-ascent-previews.mjs` 根据项目原创的声明式音符数据生成，不使用
 采样、SoundFont、外部录音、导入 MIDI 或第三方旋律；它们只用于评审，不进入运行时 Bundle。
 其中 `region-01/` 的首轮两首保留为尖锐感淘汰对照，音乐上升包保留为实施前方向记录；
-当前运行乐谱以 `src/audio/musicScore.ts` 为准。
+当前运行乐谱以 `src/infrastructure/audio/musicScore.ts` 为准。
 
 `region-01/` 与 `mvp2/` 下的概念 PNG 来自项目原创提示词与方向，并经过人工用途审查；
 MVP 2.0 角色阵容只使用仓库自有的抄写员概念图作为图片参考。生成过程没有输入或复制第三方
@@ -275,11 +264,11 @@ hashes are recorded in `public/assets/audio/audio-source.json` and
 `assets/audio/public-domain-arrangements/audio-source.json`。
 
 Floors 3–8 retain the small real-time procedural score in
-`src/audio/musicScore.ts` as a compatibility fallback. It never loads the
+`src/infrastructure/audio/musicScore.ts` as a compatibility fallback. It never loads the
 F1/F2 recordings or any commercial game audio. In particular, no music from
 *Seer* is copied, transposed, sampled, or arranged.
 
-第三至第八层暂时保留 `src/audio/musicScore.ts` 的轻量实时程序化乐谱作为兼容降级；它不会加载
+第三至第八层暂时保留 `src/infrastructure/audio/musicScore.ts` 的轻量实时程序化乐谱作为兼容降级；它不会加载
 第一、第二层录音或任何商业游戏音频。尤其不会复制、变调、采样或改编《赛尔号》音乐。
 
 ## Learning-game and combat-design references / 教学游戏与战斗设计参考

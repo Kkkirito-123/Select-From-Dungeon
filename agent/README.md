@@ -1,74 +1,64 @@
-# SQL Dungeon output-only Agent
+# 篝火 Agent
 
-Agent 只产生篝火复盘和抄写员文本，不拥有游戏写入权限。游戏仍然负责判题、战斗、地图、奖励和存档。
+这是可选的 Python 3.11+ 篝火复盘服务。它只分析当前楼层的 SQL 作答，不能读取游戏存档、地图、移动、背包或死亡记录，也不能修改游戏状态。
+
+## 目录
 
 ```text
-agent/runtime/              浏览器 Hook、证据投影、缓存、输出守卫
-agent/browser/deepseek/     Worker 内存 Key 与 DeepSeek 直连
-agent/browser/scribe/       固定角色提示词
-agent/browser/ui/           BYOK 设置和学习记录操作
-agent/src/sql_dungeon_agent/
-  contracts.py              Python 与浏览器共用的闭合协议
-  pipeline.py               一次请求同时准备两类输出
-  campfire/analyzer.py      确定性学习复盘
-  scribe/composer.py        抄写员表达与本地降级
-  providers/openzl.py       可选 OpenZLAgent 模型适配器
-  api.py                    受限 HTTP 入口
-agent/tests/                Python 协议和服务测试
+agent/
+├─ contracts/   models.py、hash.py、validate.py：请求/响应和证据哈希
+├─ flows/       review.py：一次复盘流程和确定性生成器
+├─ campfire/    analyzer.py：旧导入路径兼容门面
+├─ storage/     repo.py、sqlite.py：触发状态的内存/SQLite 存储
+├─ http/        routes.py、response.py、server.py：路由、请求体和 HTTP 生命周期
+└─ tests/       协议、流程、HTTP、存储测试
 ```
 
-## 触发边界
+浏览器端的触发模块位于 `src/application/`：
 
-浏览器只在四类语义 Hook 后准备 Agent：
+```text
+triggers/       快照变化 -> answer、campfire、floor、death 事件
+hooks/          AnswerHook 标记 dirty；CampfireHook 负责去重、请求和回退
+```
 
-- `floor-start`：进入楼层时生成开场抄写员内容；默认只使用本地输出，不调用模型。
-- `route-guidance`：方向提示、路线高亮或逐格护送首次升级时，生成路线指引。
-- `elite-defeated`：本层精英生命从大于 0 变为 0，解锁篝火复盘。
-- `floor-end`：进入传送或 Run 胜利态时生成层末抄写员内容。
+数据流是：
 
-普通移动、巡逻、按键、提示按钮和渲染帧不会触发模型请求。相同证据 Hash 只准备一次。
+```text
+战斗结束写入 AnswerAttemptRecord
+  -> AnswerHook: 当前层 dirty
+  -> 进入篝火两格圆形范围
+  -> CampfireHook: requesting / ready / fallback
+  -> CampfireAgentClient: POST /v1/campfire/review
+  -> 结果只替换本地复盘文案
+```
 
-篝火复盘的 `available` 在当前层精英被击败前为 `false`；前端仍可使用篝火休息，但复盘按钮保持禁用。
+同一证据在当前页面只请求一次。请求超时、服务不可用、输出非法或哈希不匹配时，游戏继续使用本地确定性复盘；新的 SQL 作答会生成新的证据并允许下一次请求。Hook 不把 Agent 输出写入 Run、Profile 或 IndexedDB。
 
-Python 输入只包含题目 ID、知识点、结果类别、提示等级、SQL 特征、路线方向和已验证剧情证据，不包含完整 SQL、地图坐标、移动轨迹或 API Key。
+## 运行
 
-## Browser BYOK path
-
-网页不需要 Agent 服务。确定性篝火和抄写员内容始终可用。玩家可以在
-`AI 复盘设置` 中显式启用 DeepSeek：
-
-- Key 只发送一次到专用 Worker，密码输入框立即清空；
-- Worker 只在当前标签页内存中保留 Key，只访问 `https://api.deepseek.com`；
-- 刷新、关闭标签页、清除 Key 或 Worker 终止都会清除 Key；
-- 不写入 localStorage、sessionStorage、IndexedDB、日志、导出文件、URL、存档或项目服务器；
-- DeepSeek 只能提供经过校验的抄写员措辞，不能改变篝火事实、战斗、题目、地图和存档。
-
-## Python service
-
-Python 服务当前作为本机或受控内网的输出服务，用于在线模型适配和回归；它不接收玩家 BYOK Key，也不代理浏览器 Key。
-
-默认服务绑定 loopback：
+在仓库根目录执行：
 
 ```bash
-python3 -m pip install -e ./agent
-sql-dungeon-agent --port 8787
+python3 -m unittest discover -s agent/tests
+python3 -m agent --host 127.0.0.1 --port 8787
 ```
 
-如需启用固定的 OpenZLAgent 适配器：
+前端只有在配置 `VITE_CAMPFIRE_AGENT_URL=http://127.0.0.1:8787/v1/campfire/review` 后才会发起请求；未配置时完全使用本地复盘。
+
+测试 DeepSeek 时，把 Key 设置在 Python 服务进程环境中，不要写入 `VITE_` 变量：
+
+```powershell
+$env:DEEPSEEK_API_KEY = "sk-你的Key"
+$env:DEEPSEEK_MODEL = "deepseek-chat"
+python -m agent --host 127.0.0.1 --port 8787
+```
+
+可直接编辑 [`agent/.env`](.env)；它已被 Git 忽略，只由 Python 服务读取。变量模板见 [`agent/.env.example`](.env.example)。Key 不会进入浏览器、游戏存档、请求正文或响应。未设置 Key 时服务使用确定性生成器，DeepSeek 超时或输出不合法时自动回退本地复盘。
+
+默认服务不创建数据库文件。需要保存触发状态时显式指定 Agent 专用 SQLite：
 
 ```bash
-python3 -m pip install -e './agent[openzl]'
-export SQL_DUNGEON_AGENT_MODEL_BASE_URL=https://provider.example/v1
-export SQL_DUNGEON_AGENT_MODEL_NAME=your-model
-export SQL_DUNGEON_AGENT_API_KEY=your-key
-sql-dungeon-agent --port 8787
+python3 -m agent --db .local/campfire.db
 ```
 
-公开部署前还必须在网关补齐 HTTPS、身份认证、限流和错误监控。服务没有工具、记忆、MCP、游戏存档访问或请求日志。
-
-## Verify
-
-```bash
-pnpm exec vitest run tests/Agent*.test.ts tests/DeepSeek*.test.ts tests/agentContext.test.ts
-PYTHONPATH=agent/src python3 -m unittest discover -s agent/tests
-```
+该数据库只保存 `trigger_id`、类型、范围、楼层、证据哈希、状态、重试次数、错误码和已校验输出，不保存原始 SQL、完整存档或请求日志。生产环境可以在相同 `Store` 接口后替换为 PostgreSQL；第一版不绑定模型供应商。

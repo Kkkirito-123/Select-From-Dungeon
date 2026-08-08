@@ -2351,9 +2351,7 @@ h1 span {
 }
 
 .admin-menu__header p,
-.admin-menu__warning,
-.admin-preset-section p,
-.admin-region-list p {
+.admin-menu__warning {
   margin: 0;
   color: var(--muted);
   font-size: 11px;
@@ -2370,15 +2368,8 @@ h1 span {
   font-size: 11px;
 }
 
-.admin-floor-list {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(58px, 1fr));
-  gap: 6px;
-}
-
-.admin-floor-list button,
-.admin-preset-list button,
-.admin-region-list button {
+.admin-next-floor {
+  width: 100%;
   border: 1px solid #4c5363;
   padding: 9px;
   background: #171b24;
@@ -2387,61 +2378,9 @@ h1 span {
   cursor: pointer;
 }
 
-.admin-floor-list button:hover,
-.admin-preset-list button:hover,
-.admin-region-list button:hover,
-.admin-floor-list button.is-active {
+.admin-next-floor:hover:not(:disabled) {
   border-color: var(--query);
   color: var(--query);
-}
-
-.admin-floor-list button.is-active {
-  background: #17312d;
-}
-
-.admin-preset-section {
-  margin-top: 12px;
-  border: 1px solid #3f4654;
-  padding: 11px;
-  background: rgba(17, 21, 29, 0.72);
-}
-
-.admin-preset-section .card-heading {
-  margin-bottom: 6px;
-}
-
-.admin-preset-list {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.admin-preset-list p {
-  grid-column: 1 / -1;
-  border-left: 2px solid #4d5260;
-  padding-left: 9px;
-}
-
-.admin-region-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-  margin-top: 12px;
-}
-
-.admin-region-list article {
-  display: grid;
-  gap: 9px;
-  border: 1px solid #3f4654;
-  padding: 12px;
-  background: rgba(17, 21, 29, 0.94);
-}
-
-.admin-region-list strong {
-  color: var(--gold-light);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 17px;
 }
 
 .admin-menu__warning {
@@ -4083,18 +4022,6 @@ h1 span {
   }
 
   .monster-codex__entries {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-floor-list {
-    grid-template-columns: repeat(4, minmax(54px, 1fr));
-  }
-
-  .admin-preset-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-region-list {
     grid-template-columns: 1fr;
   }
 

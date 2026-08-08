@@ -44,6 +44,10 @@ describe("AppShell 静态 DOM 契约", () => {
       expect(ids, selector).toContain(selector.slice(1));
     });
     expect(new Set(ids).size).toBe(ids.length);
+    expect(markup).toContain('id="admin-next-floor"');
+    expect(markup).not.toContain("admin-floor-list");
+    expect(markup).not.toContain("admin-region-list");
+    expect(markup).not.toContain("admin-preset-list");
   });
 
   it("只通过模板参数写入 Schema 统计，不依赖运行时全局状态", () => {

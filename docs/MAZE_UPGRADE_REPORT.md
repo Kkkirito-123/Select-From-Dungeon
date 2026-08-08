@@ -69,7 +69,7 @@ Minecraft 官方世界生成说明的核心不是“某一种噪声”，而是�
 - 一层生成 64×48 tile 的完整地图，视口保持 640×416，由相机跟随玩家。
 - 保留现有十个逻辑房间作为课程 POI，但不再把它们当作传送节点。
 - 使用 DFS 走廊、十个固定宏观槽位中的抖动矩形区域、单入口知识门、连接修复和额外环路。
-  `src/content/runContent.ts` 中仍有旧房间模板数据，但当前迷宫生成器没有使用加权模板池。
+  `src/content/world/runContent.ts` 中仍有旧房间模板数据，但当前迷宫生成器没有使用加权模板池。
 - 在当前内容与生成器 v2 下，同 Seed 得到一致的拓扑、POI、初始怪物和关键掉落；当前数据模型
   没有单独的 `contentVersion`。
 - 地图包含入口安全区、教学区、WHERE/IS NULL 自由分支、可选房、聚合门、精英区和 Boss 区。
@@ -156,12 +156,12 @@ HP 等关键信息为 10–12px，交互提示为 11px 并允许换行，不再�
 
 | 范围 | 文件 |
 |---|---|
-| 新增地图领域层 | `src/domain/mazeGenerator.ts`、`mazeValidation.ts`、`monsterRoaming.ts` |
-| 新增反馈与引导 | `src/feedback/FeedbackDirector.ts`、`src/ui/OnboardingController.ts`、`src/content/onboarding.ts`、`src/game/snapshotFeedback.ts` |
-| 状态与存档 | `src/domain/types.ts`、`GameSession.ts`、`src/storage/localProgress.ts`、`src/main.ts` |
-| 游戏呈现 | `src/game/DungeonScene.ts`、`BattleScene.ts`、`createGame.ts` |
-| 音频与界面 | `src/audio/ArcadeAudio.ts`、`src/ui/AppShell.ts`、`src/game/gameInput.ts`、`src/style.css` |
-| 内容 | `src/content/runContent.ts`、必要时调整 `mvpLevel.ts` 的物理出生字段 |
+| 新增地图领域层 | `src/domain/exploration/mazeGenerator.ts`、`mazeValidation.ts`、`monsterRoaming.ts` |
+| 新增反馈与引导 | `src/infrastructure/feedback/FeedbackDirector.ts`、`src/presentation/dom/OnboardingController.ts`、`src/content/curriculum/onboarding.ts`、`src/presentation/phaser/snapshotFeedback.ts` |
+| 状态与存档 | `src/domain/shared/types.ts`、`GameSession.ts`、`src/infrastructure/storage/localProgress.ts`、`src/application/main.ts` |
+| 游戏呈现 | `src/presentation/phaser/DungeonScene.ts`、`BattleScene.ts`、`createGame.ts` |
+| 音频与界面 | `src/infrastructure/audio/ArcadeAudio.ts`、`src/presentation/dom/AppShell.ts`、`src/presentation/phaser/gameInput.ts`、`src/presentation/style.css` |
+| 内容 | `src/content/world/runContent.ts`、必要时调整 `mvpLevel.ts` 的物理出生字段 |
 | 测试 | 新增迷宫、巡逻、引导/反馈测试；修改 Session、存档和完整流程测试 |
 | 文档与发布 | `README*`、`docs/MAZE_UPGRADE_REPORT.md`、`ATTRIBUTIONS.md`、`vite.config.ts`（构建复制许可与归属文件） |
 

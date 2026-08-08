@@ -9,8 +9,8 @@
 > [八层课程](../CURRICULUM.zh-CN.md)
 >
 > 运行时事实：八层原创乐谱已进入
-> [`musicScore.ts`](../../src/audio/musicScore.ts) 与
-> [`ArcadeAudio.ts`](../../src/audio/ArcadeAudio.ts)。下文保留的试听、脚本和“本次不做”
+> [`musicScore.ts`](../../src/infrastructure/audio/musicScore.ts) 与
+> [`ArcadeAudio.ts`](../../src/infrastructure/audio/ArcadeAudio.ts)。下文保留的试听、脚本和“本次不做”
 > 是实施授权前的方案快照；实际调式、速度与验收以主基线第 9、13、16 节和运行代码为准。
 
 ## 1. 本次目标

@@ -33,8 +33,8 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 同一 Seed 还会确定性派生主课程路线信标、所有剩余死路的一次性补给，以及服务前、中、后三段的
 三条保证钥匙双向捷径。路线兴趣点最大间隔为 18 格；钥匙不占背包且不依赖随机掉落。玩家必须先
 走到钥匙处，再在捷径门旁按 `E` 开启并往返，且不能绕过必修 SQL 或存活的区域首领。若连续
-40 步仍未到达下一个固定目标，显示方向与距离；60 步高亮最多 24 格路线；100 步启动可取消的
-逐格护送，不传送，也不触发伏击。
+40 步仍未到达下一个固定目标，显示方向与距离；60 步高亮最多 24 格路线；100 步保持强化路线
+高亮。玩家始终手动移动，指路不传送，也不触发伏击。
 篝火可见安全区和出生安全区都不会触发突发遭遇，巡逻怪也不能进入。靠近篝火按 `E` 可选择
 `在此休息` 或 `答案复盘`；休息会恢复满生命并把该篝火设为复活点。死亡会保留局内进度和敌人
 剩余生命，显示 `YOU DIED`，返回最近休息的篝火（尚未休息则回出生点）、恢复满生命并自动打开
@@ -48,13 +48,11 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 复活时恢复。`v1.1` 的可选随机池只保留自动使用的恢复品：普通怪 2%、小型精英 5%、
 区域首领 10%、层主 0%；不再为精英或 Boss 补足随机掉落。课程奖励、明确宝箱与钥匙保持确定。
 满背包必须显式替换，普通物品丢弃后在当前层可重新拾取，基础/课程/钥匙类保护物品不能丢弃。
-篝火与抄写员是两个独立消费者。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
-复盘按钮保持禁用。精英击败 Hook 发生后，篝火立即根据受限的当前层证据显示确定性复盘。每层另有一名
-实体抄写员，她的纯输出短回复由四类语义 Hook 驱动：入层、寻路升级、精英击败和层末；开头、路线和
-结束分别负责开场、指路和收束。普通移动、巡逻、提示按钮和渲染帧不会调用模型。浏览器始终提供本地降级。
-玩家明确同意后，可在密码框输入 DeepSeek API Key；专用 Worker 只在当前标签页内存保存 Key，
-并把受限证据直接发送到 `https://api.deepseek.com`。严格校验通过的回复只能替换抄写员措辞。玩家不能输入提示词，
-Agent 输出也不能改变游戏状态。每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
+篝火与抄写员是两个独立的游戏对象。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
+复盘按钮保持禁用。达到该条件后，篝火根据当前层本地记录显示确定性复盘。每层另有一名实体抄写员，
+她的短回复和路线指引来自当前楼层的作者内容。当前游戏没有玩家提示词；配置
+`VITE_CAMPFIRE_AGENT_URL` 后，可选的无状态 Python Agent 只改善当前层复盘文案，本地结果仍然立即可用。
+每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
 解锁；证据明确区分未知、已查为 `NULL` 和实际值。第八层完成 MVP 2.0 唯一结局 `MIGRATE`，
 不使用账号、服务端游戏数据库或远程游戏日志。
 第一至第八层各有且仅有一个可选实体隐藏房：第一层“封存旧库”在完成 `WHERE / IS NULL` 后
@@ -66,9 +64,9 @@ Agent 输出也不能改变游戏状态。每层五个短叙事拍和两条固�
 `openedGateIds`，篝火不会生成在隐藏房内，可选证据和装备都不能阻塞主线或必修课程。
 顶栏 `答题复盘` 读取浏览器本地答案记录，分别展示最近一场战斗和当前楼层。每条记录包含玩家
 SQL、明确参考 SQL、结果分类、提示等级和战斗结果；最多保留 200 个 SQL 回合，不记录移动
-或按键。完整日志仍只保存在浏览器；只有显式启用浏览器 BYOK 时，最多八条当前层作答投影
-才会由浏览器直接发送到 DeepSeek。投影只包含结果分类、提示等级、题目目标和 SQL 特征，不包含原始
-玩家 SQL 或参考 SQL，也不经过项目服务器代理。
+或按键。完整日志和复盘结果只保存在浏览器，由确定性的游戏规则计算。明确配置篝火 Agent 后，
+最多八条当前层玩家 SQL 投影和聚合统计才会发送到 `POST /v1/campfire/review`；参考 SQL、移动、
+完整存档和玩家身份不会离开浏览器。
 怪物显示名必须直白且容易输入：统一使用“史莱姆”“水胶怪”“幼龙”这类二到三个汉字，
 不得添加间隔点称号或 SQL 概念后缀。新增内容也遵守同一规则；SQL 含义放在字段、任务与
 遭遇机制中，不塞进显示名。
@@ -112,9 +110,9 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 ```text
 index.html -> src/application/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
-  -> agent/runtime（受限证据、确定性篝火、缓存与后台调度）
-  -> agent/browser（DeepSeek 内存 Worker、严格抄写员输出与设置 UI）
-  -> agent/src Python 输出服务（默认回环，可选 OpenZLAgent Provider）
+  -> CampfireReview（当前楼层确定性 SQL 复盘）
+  -> TriggerBus -> AnswerHook/CampfireHook（脏状态、距离、去重与回退）
+  -> 可选 CampfireAgentClient -> agent/contracts/flows/http（只改善受限复盘文案）
   -> QuestionBankLoader/LearningLedger（经校验 SQLite 题库与 IndexedDB 证据）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
   -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
@@ -149,8 +147,7 @@ index.html -> src/application/main.ts
   -> 结果语义 + 关卡知识锁校验 -> 正确时自动攻击 / 错误时怪物反击
   -> 同步 GameSession 与 SQLite HP -> 刷新 Phaser/UI
   -> 合并写入 v12 Run 存档 + 永久 v3 Profile + IndexedDB 学习账本
-有意义的快照 -> 当前层受限证据 -> 本地预生成输出
-  -> 独立输出缓存 -> 可选 DeepSeek 专用 Worker -> 当前证据 Hash 校验
+有意义的快照 -> 当前层本地证据 -> 确定性篝火复盘与作者剧情展示
 ```
 
 `GameSession` 是物理移动、篝火/复活点、安全区、遭遇计量、课程、演员、迷雾、战斗、生命、
@@ -162,14 +159,19 @@ index.html -> src/application/main.ts
 `EncounterDirector` 根据成功移动做可复现的伏击判定，刷新页面不会重抽；`OnboardingController`
 管理独立持久化的逐步教学。
 
-所有 Agent 代码都位于 `agent/`。`agent/runtime/` 负责只读证据投影、稳定证据 Hash、确定性
-篝火/抄写员降级、独立输出缓存与后台合并；`agent/browser/` 负责只支持 DeepSeek 的 BYOK Worker
-和设置 UI。`agent/src/` 保留默认回环的 Python 输出服务，可选 OpenZLAgent Provider，但不会接收浏览器
-BYOK Key；正式网页 BYOK 不会让 Key 经过它。不得启用工具、记忆、MCP、游戏写入、请求日志、自由提示词
-或持久化 Provider 凭证。
+`src/domain/learning/campfireReview.ts` 负责把当前楼层答案记录转换为篝火面板使用的确定性事实。
+它只读取快照，不访问存储或外部服务，也不能改变游戏状态。抄写员读取作者剧情内容，展示前只执行
+现有的怪物身份脱敏。
+
+`src/application/triggers/` 负责把快照变化转换为语义事件，`src/application/hooks/` 负责
+`dirty / requesting / ready / fallback` 状态。`CampfireHook` 只在玩家进入篝火两格圆形范围后为当前证据
+请求一次。`src/infrastructure/agent/CampfireAgentClient.ts` 只投影当前层 SQL 证据，最多发送八条玩家 SQL，
+并按证据 Hash 在内存中缓存；哈希不匹配或非法回复会被丢弃。`agent/` 负责 Python 契约、复盘流程、HTTP
+服务和可选的 Agent 专用触发存储；存储不接收游戏数据库或原始 SQL。死亡复盘 Agent 未来单独设计，
+不属于篝火服务。
 
 `src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
-和 DeepSeek 默认模型；其中严禁出现 Provider 凭证。内容 ID、文案、SQL 契约与存档版本仍由原有
+内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
 
 `src/content/sql/sqlSchema.ts` 负责 `monsters`、`monster_signals`、`rooms`、
@@ -193,7 +195,7 @@ SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，
 第二套静默选择器。
 `src/presentation/dom/panels/` 负责终端、背包、篝火、复盘、剧情和 Schema 交互，
 `src/presentation/dom/renderers/` 负责 HUD、小地图和战斗展示。Panel 只能接收快照与显式回调，
-不得直接访问存档、Agent Worker 或 Phaser。
+不得直接访问存档、外部服务或 Phaser。
 `src/presentation/phaser/world/` 负责地形、迷雾、世界对象可见性和拓扑重建判断；`DungeonScene`
 仍是 Phaser 生命周期与事件转发门面。
 `src/domain/learning/queryFeatureDetector.ts` 负责 SQL 特征标签，
@@ -228,7 +230,7 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 ## 仓库地图
 
 ```text
-agent/                  浏览器纯输出 Agent/BYOK UI 与本机 Python 评测器
+agent/                  Python 篝火 Agent 契约、流程、HTTP、可选触发存储与测试
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
 src/application/        启动、运行时配置与页面生命周期
 src/content/            课程、世界、剧情、背包与 SQL 静态内容
@@ -243,12 +245,11 @@ scripts/            可移植规则验证器及其回归测试
 dist/               生成的静态构建；被忽略且不得手工修改
 ```
 
-当前不增加模块级指南；根规则约束所有模块，`agent/README.md` 单独记录可选 Python 服务的安装
-与验证命令。
+当前不增加模块级指南；根规则约束所有模块。
 
 ## 标准命令
 
-要求 Node.js `>=20.19` 与 pnpm `11.9.0`；可选 Agent 服务要求 Python `>=3.11`。
+要求 Node.js `>=20.19`、pnpm `11.9.0`；可选 Agent 服务要求 Python `>=3.11`。
 
 ```bash
 pnpm install --frozen-lockfile
@@ -256,7 +257,7 @@ pnpm question-bank:build
 pnpm dev
 pnpm test
 pnpm build
-PYTHONPATH=agent/src python3 -m unittest discover -s agent/tests
+python3 -m unittest discover -s agent/tests
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 ```
@@ -266,11 +267,12 @@ python3 scripts/validate-rules.py
 
 ## 运行与安全边界
 
-- SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行，Agent 默认关闭。明确同意后，浏览器
-  可以把最多八条当前层作答的结果分类、提示等级、题目目标与 SQL 特征，以及受限课程、世界变化、遗物、
-  导航、触发器和已解锁剧情证据直接发送到 DeepSeek，不包含原始玩家 SQL 或参考 SQL。Key 只存在于专用 Worker 内存，不写入浏览器存储、日志、导出、
-  URL、遥测或项目服务器；刷新或关闭标签页即消失。部署 CSP 只允许同源和
-  `https://api.deepseek.com` 网络请求。
+- SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，
+  抄写员只读取作者剧情。明确配置后，可选篝火 Agent 通过 `POST /v1/campfire/review` 接收受限
+  投影；游戏没有 Agent 存档，未配置时完全使用本地复盘。
+- Agent 请求只包含请求 ID、证据 Hash、当前层、聚合统计和最多八条玩家 SQL；不包含参考 SQL、
+  完整 `GameSnapshot`、身份、移动、地图、背包或游戏指令。响应必须匹配请求 Hash 并通过文本限制，
+  才能替换本地复盘文案。Python 存储默认关闭；显式启用 SQLite 时只保存触发元数据和合法输出。
 - 战斗终端只接受一条只读 `SELECT` 或 `WITH`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面
   最多显示 50 行结果。
 - 两个 SQL 输入框都提供 IDE 式 `PLAN ASSIST` Listbox。输入前缀会显示排序后的关键词、函数、
@@ -298,9 +300,7 @@ python3 scripts/validate-rules.py
   本地作答记录、题库牌组、随机练习首次奖励、导航状态与可丢弃的当前 Run 状态）、
   `select-from-dungeon:profile:v3`
   （47 项已掌握课程、已回收怪物编号、练习次数、通关数、
-  最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。预生成 Agent
-  输出独立保存在 `select-from-dungeon:agent-output:v2`；其中只有经校验的输出与受限身份/Hash
-  元数据，不保存玩家 SQL 或参考 SQL，也不参与 Run 迁移。有效的
+  最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。有效的
   `select-from-dungeon:run:v11` 会在内存中迁移为 v12；有效 `run:v10`、`run:v9`、`run:v8` 会继续经过
   兼容链补上确定性的八层
   Campaign 槽位；有效 `run:v7` 再补上空背包/战利品状态与当前已装备物品记录；有效 `run:v6`、
@@ -381,8 +381,8 @@ python3 scripts/validate-rules.py
   当前拆包保持为 MVP 2.0 基线，包体/运行时优化延后到独立 MVP 2.1。
 - 像素角色、地砖、房间装饰、音乐与音效均由项目代码生成。增加第三方图片、字体、音频或复制
   关卡文字前，必须完成许可审查并更新归属。
-- 浏览器运行依赖固定在 `package.json` 与 `pnpm-lock.yaml`；可选 OpenZLAgent 源码版本固定在
-  `agent/pyproject.toml`。依赖变化仍需审批，并按风险检查许可证、包体、构建与浏览器行为。
+- 浏览器运行依赖固定在 `package.json` 与 `pnpm-lock.yaml`。依赖变化仍需审批，并按风险检查许可证、
+  包体、构建与浏览器行为。
 - 不得在代码、Fixture、日志、截图、清单或报告中暴露凭证、个人数据、私有地址或敏感本地内容。
 
 ## 仓库 Skill 与交付

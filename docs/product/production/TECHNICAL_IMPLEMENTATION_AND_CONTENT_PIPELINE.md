@@ -36,7 +36,7 @@
 
 | 领域 | 当前权威 | 主要缺口 |
 |---|---|---|
-| Run / 战斗状态 | `src/domain/GameSession.ts` | 超过 3200 行；没有楼层世界状态契约 |
+| Run / 战斗状态 | `src/domain/session/GameSession.ts` | 超过 3200 行；没有楼层世界状态契约 |
 | 地图 | `floorMapBlueprints.ts` + `mazeGenerator.ts` | 48×36 通用矩形房与走廊，地标语义不足 |
 | 生态 | `biome.ts` / `guidedMap.ts` | 通用三分区，无法表达水位、潮位与航线 |
 | 课程 | `mvpLevel.ts` / `floor2Level.ts` | 题目能运行，但身份揭示与字段文案有冲突 |
@@ -53,7 +53,7 @@
 ## 4. 目标模块边界
 
 ```text
-src/content/floorExperience/
+src/content/world/floorExperience/
   types.ts                    # 楼层内容契约
   floor01.ts                  # F1 地点、地标、NPC、故事、素材键
   floor02.ts                  # F2 同上
@@ -63,23 +63,23 @@ src/domain/
   floorWorldState.ts          # 从权威进度纯派生环境状态
   floorWorldState.test.ts
 
-src/game/
+src/presentation/phaser/
   FloorAssetLoader.ts         # 资源清单和加载状态
   FloorEnvironmentRenderer.ts # Tile、地形、岸线、环境状态
   FloorSetpieceFactory.ts     # 水轮、书架、船、灯塔、篝火等
   FloorActorRenderer.ts       # NPC / 怪物 / 玩家表现
   DungeonScene.ts             # 只保留场景生命周期与协调
 
-src/audio/
+src/infrastructure/audio/
   AudioDirector.ts            # 音乐状态机与总线
   RecordedMusicPlayer.ts      # BGM 文件、循环与交叉淡化
   ProceduralSfx.ts            # 轻量 UI / 战斗 / 世界音效
 
-src/sql/
+src/infrastructure/sql/
   worldStorySchema.ts         # 只读剧情表定义与种子
   storyQueryCatalog.ts        # 环境调查的可审计 SQL
 
-src/ui/
+src/presentation/dom/
   panels/SqlBattlePanel.ts
   panels/CodexPanel.ts
   panels/CampfirePanel.ts

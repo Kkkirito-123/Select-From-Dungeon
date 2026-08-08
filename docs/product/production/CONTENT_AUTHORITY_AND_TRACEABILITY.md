@@ -34,14 +34,14 @@
 
 | 内容 | 第一真源 | 第二真源 | 说明 |
 |---|---|---|---|
-| 怪物 ID、姓名、课程、房间、HP | `src/content/mvpLevel.ts`、`floor2Level.ts` 至 `floor8Level.ts`、`biomeContent.ts` | 对应自动化测试 | 新稿必须映射，不得重编号 |
-| SQL 题目、答案与判定 | 各层 Level 内容 + `src/domain/lessonEvaluator.ts` | 真实 SQLite 测试 | 叙事可换说法，不能偷偷改变结果语义 |
-| 楼层标题、展示子区、地标、隐藏区、故事触发 | `src/content/floorExperience/floor01.ts` 至 `floor08.ts` | Floor Experience 测试 | 这是玩家看见的地点与事件真源 |
-| 三个物理导航区、宏观轮廓 | `src/content/floorMapBlueprints.ts` | 迷宫生成 / 可达性测试 | 展示子区可多于三个，必须显式映射 |
-| 入口、出口、Boss 门、捷径、隐藏门、安全房、视野、陷阱 | `src/content/floorLabyrinth.ts` | `src/domain/floorLabyrinth.ts` 与测试 | 保存稳定意图，不保存 Seed 坐标 |
-| 课程顺序与跨层先修 | 当前课程 Level 内容 + `src/domain/runGraph.ts` | Campaign / RunGraph 测试 | `floorContracts.ts` 仅作运行元数据，不是命名文案权威 |
+| 怪物 ID、姓名、课程、房间、HP | `src/content/curriculum/mvpLevel.ts`、`floor2Level.ts` 至 `floor8Level.ts`、`biomeContent.ts` | 对应自动化测试 | 新稿必须映射，不得重编号 |
+| SQL 题目、答案与判定 | 各层 Level 内容 + `src/domain/learning/lessonEvaluator.ts` | 真实 SQLite 测试 | 叙事可换说法，不能偷偷改变结果语义 |
+| 楼层标题、展示子区、地标、隐藏区、故事触发 | `src/content/world/floorExperience/floor01.ts` 至 `floor08.ts` | Floor Experience 测试 | 这是玩家看见的地点与事件真源 |
+| 三个物理导航区、宏观轮廓 | `src/content/world/floorMapBlueprints.ts` | 迷宫生成 / 可达性测试 | 展示子区可多于三个，必须显式映射 |
+| 入口、出口、Boss 门、捷径、隐藏门、安全房、视野、陷阱 | `src/content/world/floorLabyrinth.ts` | `src/domain/exploration/floorLabyrinth.ts` 与测试 | 保存稳定意图，不保存 Seed 坐标 |
+| 课程顺序与跨层先修 | 当前课程 Level 内容 + `src/domain/progression/runGraph.ts` | Campaign / RunGraph 测试 | `floorContracts.ts` 仅作运行元数据，不是命名文案权威 |
 | 叙事永久事实与唯一结局 | `docs/product/narrative/NARRATIVE_BIBLE.md` | `narrativeContent.ts`、`floorStory.ts`、Floor Experience | 结局固定为 `MIGRATE` |
-| 遭遇率、小型精英权重 | `src/domain/encounterDirector.ts`、`src/content/biomeContent.ts` | 遭遇测试 | 当前为 2% / 30 步保底；权重 5% 至 19% |
+| 遭遇率、小型精英权重 | `src/domain/exploration/encounterDirector.ts`、`src/content/world/biomeContent.ts` | 遭遇测试 | 当前为 2% / 30 步保底；权重 5% 至 19% |
 | 经验、随机掉落、背包 | `AGENTS.md` 对应运行规则 + 领域代码 | progression / loot / inventory 测试 | 当前区域首领 3 XP；随机池仅即时恢复品 |
 | 存档版本与兼容 | storage / types / GameSession 代码 | migration tests | 设计稿不得自行增加永久字段 |
 

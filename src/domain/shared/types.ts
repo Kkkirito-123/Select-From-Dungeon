@@ -631,6 +631,8 @@ export interface GameSnapshot {
   missionBody: string;
   lessonIntro: string;
   taskBrief: LessonTaskBrief | null;
+  /** 管理员战斗辅助答案；普通模式始终为空，且不进入持久化数据。 */
+  adminAnswerSql: string | null;
   schema: string[];
   queryTemplate: string;
   hints: string[];

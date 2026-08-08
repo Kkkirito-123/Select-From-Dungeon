@@ -20,3 +20,18 @@ export type {
   TravelResolution,
   TurnResolution,
 } from "../../domain/shared/types";
+
+/**
+ * 篝火展示的当前楼层 SQL 复盘。
+ *
+ * 这是游戏领域的只读结果，不代表模型输出，也不允许反向修改存档。
+ */
+export interface CampfireReview {
+  available: boolean;
+  headline: string;
+  facts: readonly string[];
+  focusConcept: string | null;
+  nextAction: string;
+  /** Agent 成功返回时显示的短复盘；本地降级结果可以为空。 */
+  message?: string | null;
+}

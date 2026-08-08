@@ -25,6 +25,11 @@ import {
   shouldDismissTransientCard,
 } from "../src/presentation/dom/AppShell";
 import {
+  adminAnswerForInput,
+  shouldAutofillAdminAnswer,
+} from "../src/presentation/dom/adminAnswer";
+import type { GameSnapshot } from "../src/contracts/game/snapshots";
+import {
   FloorTransitionCoordinator,
   floorTransitionPolicy,
   type FloorTransitionClock,
@@ -562,6 +567,57 @@ describe("answerReviewSummary", () => {
       hintUses: 0,
       accuracy: 0,
     });
+  });
+});
+
+describe("管理员 SQL 自动填题", () => {
+  const baseSnapshot = new GameSession(null, null, "admin-answer-ui").snapshot();
+  const combatSnapshot = {
+    ...baseSnapshot,
+    adminMode: true,
+    mode: "combat" as const,
+    lessonStageId: "select-weakness" as const,
+    adminAnswerSql: "SELECT weakness FROM monsters WHERE id = 1;",
+    combat: {
+      targetId: 1,
+      kind: "curriculum" as const,
+      round: 1,
+      successStep: 0,
+      intent: {
+        name: "ID #001",
+        damage: 1,
+        locks: [],
+      },
+    },
+  } as GameSnapshot;
+
+  it("只在进入战斗或进入下一题时填入答案", () => {
+    expect(shouldAutofillAdminAnswer(null, combatSnapshot)).toBe(true);
+    expect(adminAnswerForInput(combatSnapshot)).toBe(
+      "SELECT weakness FROM monsters WHERE id = 1;",
+    );
+    expect(shouldAutofillAdminAnswer(combatSnapshot, {
+      ...combatSnapshot,
+      banner: "普通刷新",
+    })).toBe(false);
+    expect(shouldAutofillAdminAnswer(combatSnapshot, {
+      ...combatSnapshot,
+      lessonStageId: "select-name" as const,
+      adminAnswerSql: "SELECT id, status FROM monsters WHERE id = 1;",
+    })).toBe(true);
+  });
+
+  it("普通模式和非战斗状态不提供管理员答案", () => {
+    expect(adminAnswerForInput({
+      ...combatSnapshot,
+      adminMode: false,
+      adminAnswerSql: null,
+    })).toBeNull();
+    expect(adminAnswerForInput({
+      ...combatSnapshot,
+      mode: "explore",
+      adminAnswerSql: null,
+    })).toBeNull();
   });
 });
 

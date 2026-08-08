@@ -172,9 +172,9 @@ ATTRIBUTIONS.md
 后续真正实现预计才会涉及：
 
 ```text
-src/audio/ArcadeAudio.ts
-src/game/
-src/ui/
+src/infrastructure/audio/ArcadeAudio.ts
+src/presentation/phaser/
+src/presentation/dom/
 src/content/
 tests/
 ```

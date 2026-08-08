@@ -6,8 +6,6 @@
 [Floor map and art direction](docs/FLOOR_THEMES.md) |
 [Eight-floor narrative V2 (Chinese)](docs/product/narrative/EIGHT_FLOOR_NARRATIVE_DESIGN_V2.md) |
 [Monster distribution V2 (Chinese)](docs/product/systems/EIGHT_FLOOR_MONSTER_DISTRIBUTION_V2.md) |
-[Output-only Agent MVP](docs/product/systems/OUTPUT_ONLY_AGENT_SPEC.md) |
-[Optional Agent adapter](agent/README.md) |
 [Document index and roadmap](docs/README.md) |
 [中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
@@ -66,8 +64,9 @@ complete SQLite query, and turn the correct result into an animated attack.
   remaining corridor dead end contains a one-use cache. Shortcut keys consume
   no inventory slot and never depend on random loot. At 40 unsuccessful route
   steps the game shows direction/distance, at 60 it highlights up to 24 cells,
-  and at 100 it starts a cancellable one-cell-at-a-time escort. The escort does
-  not teleport, trigger ambushes, cross locked doors, or bypass required SQL.
+  and at 100 it keeps the route highlight active at full strength. The player
+  still moves manually; highlighting does not trigger ambushes, cross locked
+  doors, or bypass required SQL.
 - Press `E` beside the first-floor Scribe, archive wheel, or nameless dormitory
   to open its guidance in a centered game-stage record. Movement and patrols
   pause while it is open; press `E` again (`Escape` and the visible close action
@@ -124,12 +123,11 @@ complete SQLite query, and turn the correct result into an animated attack.
 - Open `答题复盘` from the top console to review every submitted SQL statement,
   its reference answer, error category, hint level, and battle outcome for the
   latest battle or current floor. The complete browser-local log keeps at most
-  200 SQL turns and never records movement or key presses. If the optional
-  output Agent is explicitly enabled, only a bounded projection of at most
-  eight current-floor attempts—including result categories, objectives, hint
-  levels, and derived SQL feature tags—is sent directly from the browser to
-  DeepSeek. Raw submitted and reference SQL never leave the browser and the
-  projection never passes through the project server.
+  200 SQL turns and never records movement or key presses. The review remains
+  browser-local and is calculated by deterministic game rules by default. When
+  `VITE_CAMPFIRE_AGENT_URL` is explicitly configured, at most eight current-floor
+  submitted SQL projections can improve the wording; the game does not send
+  reference SQL or full game state.
 - Find two seeded physical campfires on every floor, in the middle and rear
   learning phases; the entrance is the front safe/respawn anchor. Their visibly bounded tiles and the floor entrance
   are safe zones with no ambushes, enemy spawns, or patrol entry. Stand beside a
@@ -138,12 +136,11 @@ complete SQLite query, and turn the correct result into an animated attack.
   current-floor elite is defeated; before then, the fire remains fully usable
   for rest and checkpointing but the review action is disabled.
 - Meet one physical Scribe on each floor, separately from the campfires. She has
-  no chat box: inspecting her reveals an already prepared, short character
-  response plus authored route guidance. The local fallback is always ready;
-  an optional validated model response may replace it in the background. Five
-  concise story beats per floor still unlock through required progress, rest,
-  Boss contact, and completion; the local `失名录` distinguishes unknown
-  evidence, confirmed `NULL`, and actual values.
+  no chat box: inspecting her reveals the authored short character response and
+  route guidance already stored in the current floor content. Five concise story
+  beats per floor still unlock through required progress, rest, Boss contact,
+  and completion; the local `失名录` distinguishes unknown evidence, confirmed
+  `NULL`, and actual values.
 - Floors five through eight now have authored runtime landmarks rather than
   macro-theme placeholders. Window queries split and number fortress rosters;
   DML lessons compare original and candidate workshop states; index lessons
@@ -203,8 +200,10 @@ complete SQLite query, and turn the correct result into an animated attack.
 - Play with WASD/arrow keys on desktop or visible touch controls and a full-screen
   SQL terminal on narrow screens.
 - Retreat from any battle to the current checkpoint without healing or resetting
-  the enemy. The admin overview can preview all eight maps and jump among their
-  three regions; its snapshots are never written over the formal Run.
+  the enemy. Admin mode keeps only an in-memory entry for the next floor's
+  starting position; it has no floor list, region jump, or state preset. During
+  combat it fills the correct SQL automatically while settlement and review use
+  the formal flow.
 - Watch the same low-cost procedural actor recipes in the maze and battle
   arena: four player identity stages, an animated Scribe, and explicit
   silhouettes for every monster family. Reaching the eighth-floor victory
@@ -326,23 +325,18 @@ pnpm build
 pnpm preview
 ```
 
-The game needs no Agent service and uses deterministic local output by default.
-Players may open `AI 复盘设置`, accept the disclosure, and enter their own
-DeepSeek Key. The password field is cleared immediately; a dedicated Worker
-keeps the Key only in tab memory and calls the fixed official DeepSeek origin.
-Refresh or close the tab to remove it. Model output can only replace the
-Scribe's wording after strict validation; it cannot change gameplay.
+The game uses deterministic local SQL review and authored Scribe text by default.
+An optional Python 3.11+ Campfire Agent can be enabled with
+`VITE_CAMPFIRE_AGENT_URL`; it is a stateless `POST /v1/campfire/review` service
+that only improves current-floor recap wording. The game remains fully playable
+without the service, and no Agent output is persisted.
 
-The Python/OpenZLAgent adapter in [agent/README.md](agent/README.md) is a
-controlled output service with a loopback-only default. It is suitable for
-online deployment only behind an explicitly configured HTTPS/authenticated
-boundary; the deployed browser BYOK path does not proxy a player's Key through
-Python or the project server.
-
-The top-bar `⌘ 管理员` button opens the spoiler-heavy admin overview. It can
-load any floor, region, or authored entry/area-Boss/hidden/Boss preset, but the
-preview is memory-only and never overwrites the formal Run or permanent monster
-profile. Reload the page to leave admin preview and restore the last formal save.
+The top-bar `⌘ 管理员` button opens the spoiler-heavy admin view. It only
+offers the next floor's starting position; the preview is memory-only and never
+overwrites the formal Run or permanent monster profile. During combat it fills
+the current correct SQL automatically, while settlement and review remain on
+the formal flow. Reload the page to leave admin preview and restore the last
+formal save.
 
 The first two attacks are:
 
@@ -373,13 +367,13 @@ For a first pass through the code, follow this short route:
 3. `src/infrastructure/storage/localProgress.ts`: save validation, migration dispatch, and restoration.
    `src/infrastructure/storage/runMigrations.ts` owns the v4-v12 in-memory Run conversion chain.
 4. `src/infrastructure/sql/SqlEngine.ts` and `src/domain/learning/lessonEvaluator.ts`: SQL execution and grading boundaries.
-5. `src/presentation/phaser/` and `src/presentation/dom/`: Phaser and DOM presentation; `agent/` only consumes bounded read-only evidence.
+5. `src/presentation/phaser/` and `src/presentation/dom/`: Phaser and DOM presentation, including local review and authored narrative display.
 
 The top-level source tree is:
 
 ```text
 src/
-├─ contracts/        cross-layer read-only game, persistence, result, Agent, and storage contracts
+├─ contracts/        cross-layer read-only game, persistence, result, Campfire Agent, and storage contracts
 ├─ application/       startup, configuration, and page lifecycle
 ├─ content/           curriculum, world, narrative, inventory, and SQL content
 ├─ domain/            session facade/helpers, combat, exploration, learning, progression, and shared rules
@@ -396,9 +390,7 @@ result semantics in `lessonResultEvaluator.ts`, and compatibility composition in
 `lessonEvaluator.ts`.
 
 ```text
-AppShell ── HUD, discovery minimap, onboarding, terminal, query evidence
-  └─ agent/runtime ── bounded evidence, deterministic recap, cache, coordination
-       └─ agent/browser ── memory-only DeepSeek Worker + settings UI
+AppShell ── HUD, discovery minimap, onboarding, terminal, local review, authored narrative
     │
 GameSession ── authoritative physical world, actors, fog, combat, loot, profile
   ├─ FloorContracts ── validated eight-floor curriculum and content schema
@@ -426,14 +418,27 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
   ├─ FeedbackDirector ── exploration notices and event audio routing
   ├─ RecordedScorePlayer/ArcadeAudio ── F1/F2 masters + procedural fallback/SFX
   ├─ NarrativeCodexView ── local Lost Name evidence and migration progress
-  └─ OnboardingController ── separately persisted progressive guide
+└─ OnboardingController ── separately persisted progressive guide
 ```
 
-All Agent code lives in `agent/`. Its runtime projects read-only `GameSession`
-snapshots into at most eight current-floor attempts and creates immediate
-deterministic output. Only a direct DeepSeek Worker response that passes the
-run/floor/evidence-hash and closed-output checks can replace the Scribe wording.
-There is no gameplay tool, save write, user prompt, MCP, or long-term memory.
+```text
+agent/
+├─ contracts/ ── models, evidence hash, request/response validation
+├─ flows/     ── one review flow and deterministic generator
+├─ storage/   ── in-memory or optional SQLite trigger store
+└─ http/      ── routes, request body, and HTTP lifecycle
+```
+
+`src/application/triggers/` converts snapshot changes into semantic events;
+`src/application/hooks/` owns the `dirty / requesting / ready / fallback` state.
+A new answer marks the current floor dirty, and entering the circular two-cell
+campfire range starts at most one request for that evidence.
+`src/domain/learning/campfireReview.ts` still produces the immediate local result.
+The optional `src/infrastructure/agent/CampfireAgentClient.ts` sends only the
+bounded current-floor projection, caches by evidence hash in memory, and accepts
+responses only when their request identity and hash match. The Scribe reads
+authored narrative content and only applies the existing monster-identity
+redaction before display.
 
 `FloorContracts` defines the eight-floor curriculum and content boundary, while
 `CampaignDomain` serializes deterministic ordered slots and rejects skips or
@@ -494,10 +499,10 @@ Browser-local storage is split into:
   attempts, victories, and best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
-- `select-from-dungeon:agent-output:v2`: a small bounded set of validated
-  prepared outputs, keyed independently by opaque Run fingerprint, floor, and
-  evidence hash. It stores no submitted or reference SQL and is outside Run
-  migration.
+- Campfire Agent output is memory-only in the browser and is never written to
+  Run, Profile, or IndexedDB. The Python service is stateless by default; an
+  explicit Agent-only SQLite store may persist trigger metadata and validated
+  output, never the game database or raw SQL.
 - IndexedDB `select-from-dungeon-learning`: at most 5,000 full answer attempts
   plus permanent question and lesson aggregates, with JSON export and explicit
   clearing.
@@ -513,10 +518,9 @@ learning counters while initializing missing identity records as empty.
 snapshots, while query, loot, inventory, mode, and topology changes flush
 immediately.
 
-SQL execution itself remains in browser SQLite. Agent is disabled by default.
-With explicit consent, bounded evidence and a memory-only Key go directly from
-the browser Worker to `https://api.deepseek.com`; movement, key presses,
-undiscovered map cells, the full save, and browser storage are not included.
+SQL execution and review evidence remain in browser-local SQLite, Run/Profile,
+and IndexedDB boundaries. The optional Agent receives only the current-floor
+projection when explicitly configured; it is not a source of gameplay truth.
 
 ## Validation and Build
 

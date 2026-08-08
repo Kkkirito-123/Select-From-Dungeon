@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { NAVIGATION_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
 import { GameSession } from "../src/domain/session/GameSession";
 import { isMazeWalkable } from "../src/domain/exploration/mazeGenerator";
+import { advancePatrolTick } from "../src/presentation/phaser/interaction/PatrolController";
+import type { PatrolBatchResolution } from "../src/contracts/game/results";
 import type { SavedRun } from "../src/domain/shared/types";
 
 const DIRECTIONS = [
@@ -59,15 +61,39 @@ describe("navigation guidance", () => {
     }
   });
 
-  it("L3 护送逐格移动、不推进伏击计数，并允许 Escape 对应的取消动作", () => {
+  it("L3 只保留高亮，不自动移动玩家", () => {
     const session = new GameSession(runAtGuidanceStep(NAVIGATION_RUNTIME_CONFIG.escortAt));
     const before = session.snapshot();
-    expect(session.advanceGuidanceEscort()).toBe(true);
+    expect(session.advanceGuidanceEscort()).toBe(false);
     const after = session.snapshot();
-    expect(after.player).not.toMatchObject({ x: before.player.x, y: before.player.y });
+    expect(after.player).toEqual(before.player);
     expect(after.totalMoves).toBe(before.totalMoves);
     expect(after.mode).toBe("explore");
     expect(session.cancelGuidanceEscort()).toBe(true);
     expect(session.snapshot().navigationGuidance.level).toBe(2);
+  });
+
+  it("高亮路线不会暂停怪物巡逻", () => {
+    let patrolCalls = 0;
+    const resolution: PatrolBatchResolution = { moves: [], encounterId: null };
+    const result = advancePatrolTick(
+      {
+        advanceMonsterPatrols: () => {
+          patrolCalls += 1;
+          return resolution;
+        },
+      },
+      {
+        locked: false,
+        pagePaused: false,
+        sceneActive: true,
+        guidanceLevel: 3,
+        blockingOverlay: false,
+      },
+      "explore",
+    );
+
+    expect(result).toEqual(resolution);
+    expect(patrolCalls).toBe(1);
   });
 });

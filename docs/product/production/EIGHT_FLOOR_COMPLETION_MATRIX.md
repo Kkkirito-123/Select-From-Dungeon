@@ -173,12 +173,12 @@
 
 | 范围 | 主要文件 |
 |---|---|
-| 内容真源 | `src/content/floorExperience/floor01.ts` 至 `floor08.ts`、`biomeContent.ts`、`gateChallenges.ts` |
-| 状态与交互 | `src/domain/GameSession.ts`、`floorWorldState.ts`、`floorStory.ts`、`biome.ts` |
-| 地图表现 | `src/game/DungeonScene.ts`、`FloorSetpieceLayer.ts`、`PixelActorFactory.ts` |
-| UI/反馈 | `src/ui/AppShell.ts`、`MonsterCodexView.ts`、`src/style.css` |
-| 音频 | `src/audio/*`、`public/assets/audio/f03` 至 `f08` |
-| 存档 | `src/storage/localProgress.ts`、`src/domain/types.ts` |
+| 内容真源 | `src/content/world/floorExperience/floor01.ts` 至 `floor08.ts`、`biomeContent.ts`、`gateChallenges.ts` |
+| 状态与交互 | `src/domain/session/GameSession.ts`、`floorWorldState.ts`、`floorStory.ts`、`biome.ts` |
+| 地图表现 | `src/presentation/phaser/DungeonScene.ts`、`FloorSetpieceLayer.ts`、`PixelActorFactory.ts` |
+| UI/反馈 | `src/presentation/dom/AppShell.ts`、`MonsterCodexView.ts`、`src/presentation/style.css` |
+| 音频 | `src/infrastructure/audio/*`、`public/assets/audio/f03` 至 `f08` |
+| 存档 | `src/infrastructure/storage/localProgress.ts`、`src/domain/shared/types.ts` |
 | 验证 | `tests/*`、发布清单、真实浏览器证据 |
 
 ## 10. 统一验收门

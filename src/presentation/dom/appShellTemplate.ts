@@ -123,6 +123,7 @@ export function appShellTemplate({
                 <p id="campfire-menu-status">选择接下来的行动。</p>
                 <blockquote class="campfire-recap">
                   <strong id="campfire-recap-headline">篝火记录 · 学习复盘</strong>
+                  <p id="campfire-recap-message" hidden></p>
                   <ul id="campfire-recap-facts"></ul>
                   <p id="campfire-recap-focus" hidden></p>
                   <small id="campfire-recap-next">完成一次作答后，这里会整理下一步。</small>
@@ -388,7 +389,7 @@ export function appShellTemplate({
               <div>
                 <span>LOCAL REVIEW / 本地记录</span>
                 <h2 id="answer-review-title">答题复盘</h2>
-                <p id="answer-review-description">完整复盘只保存在浏览器，不记录移动或按键；启用可选输出 Agent 时，最多 8 条当前层 SQL 与参考答案证据会发送到你配置的 Agent / 模型服务用于预生成。</p>
+              <p id="answer-review-description">完整复盘只保存在浏览器，不记录移动或按键；启用可选篝火 Agent 时，最多 8 条当前层作答证据会发送到配置的复盘服务用于改善文案。</p>
               </div>
               <button id="close-review" type="button" class="icon-action" aria-label="关闭答题复盘">ESC ×</button>
             </header>
@@ -415,24 +416,15 @@ export function appShellTemplate({
           <div class="admin-menu__panel">
             <header class="admin-menu__header">
               <div>
-                <span>DEBUG OVERVIEW / 只读存档边界</span>
-                <h2 id="admin-menu-title">管理员全局视图</h2>
-                <p>可预览 1–8 层全图、怪物与三个生态区。预览状态不写入正式 Run；刷新页面恢复最后存档。</p>
+                <span>ADMIN INPUT / 只读存档边界</span>
+                <h2 id="admin-menu-title">管理员输入辅助</h2>
+                <p>战斗流程、奖励、复盘和存档与正式模式一致；管理员只会自动填入当前题目的正确 SQL。</p>
               </div>
               <button id="close-admin" type="button" class="icon-action">ESC ×</button>
             </header>
             <div id="admin-summary" class="admin-summary"></div>
-            <div id="admin-floor-list" class="admin-floor-list" aria-label="选择预览楼层"></div>
-            <section class="admin-preset-section" aria-labelledby="admin-preset-title">
-              <div class="card-heading">
-                <span id="admin-preset-title">世界状态预设</span>
-                <span>F1–F8 剧情切片</span>
-              </div>
-              <p>直接检查入层、隐藏区、SQL 密文门与通关后的地图变化；只影响本次管理员预览。</p>
-              <div id="admin-preset-list" class="admin-preset-list"></div>
-            </section>
-            <div id="admin-region-list" class="admin-region-list"></div>
-            <p class="admin-menu__warning">管理员模式只用于 Debug，会展示 Boss 位置与剧情状态，但怪物仍只显示稳定 ID。关闭面板仍保持全图可见；刷新页面才退出预览并恢复正式进度。</p>
+            <button id="admin-next-floor" type="button" class="admin-next-floor">进入下一层初始位置</button>
+            <p class="admin-menu__warning">管理员面板不提供地点跳转、区域定位或状态预设。关闭面板后继续正常移动，刷新页面仍恢复正式存档。</p>
           </div>
         </section>
 

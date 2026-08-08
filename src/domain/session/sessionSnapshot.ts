@@ -390,6 +390,10 @@ export function createSessionSnapshot(context: SessionSnapshotContext): GameSnap
       ? "可选越级机关：破解只打开当前物理门，不授予课程掌握、经验或战利品。"
       : context.combat || room.lessonId ? redactIdentity(lesson.intro) : "",
     taskBrief,
+    // 正式玩家永远拿不到答案；管理员只把它交给输入框辅助，不参与存档或 Agent 投影。
+    adminAnswerSql: context.adminMode && context.mode === "combat"
+      ? stage.answerSql
+      : null,
     schema: activeGateChallenge
       ? [...activeGateChallenge.schema]
       : context.combat || room.lessonId
