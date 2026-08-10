@@ -50,8 +50,9 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 满背包必须显式替换，普通物品丢弃后在当前层可重新拾取，基础/课程/钥匙类保护物品不能丢弃。
 篝火与抄写员是两个独立的游戏对象。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
 复盘按钮保持禁用。达到该条件后，篝火根据当前层本地记录显示确定性复盘。每层另有一名实体抄写员，
-她的短回复和路线指引来自当前楼层的作者内容。当前游戏没有玩家提示词；配置
-`VITE_CAMPFIRE_AGENT_URL` 后，可选的无状态 Python Agent 只改善当前层复盘文案，本地结果仍然立即可用。
+作者内容是她的本地回退文案。当前游戏没有玩家提示词；配置
+`VITE_CAMPFIRE_AGENT_URL` 或 `VITE_SCRIBE_AGENT_URL` 后，可选的无状态 Python Agent 只能改善对应的展示文案，
+本地结果仍然立即可用。抄写员在调查、死亡复盘和导航指引等级提升时响应，不能修改游戏状态、路线或存档。
 每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
 解锁；证据明确区分未知、已查为 `NULL` 和实际值。第八层完成 MVP 2.0 唯一结局 `MIGRATE`，
 不使用账号、服务端游戏数据库或远程游戏日志。
@@ -65,8 +66,8 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 顶栏 `答题复盘` 读取浏览器本地答案记录，分别展示最近一场战斗和当前楼层。每条记录包含玩家
 SQL、明确参考 SQL、结果分类、提示等级和战斗结果；最多保留 200 个 SQL 回合，不记录移动
 或按键。完整日志和复盘结果只保存在浏览器，由确定性的游戏规则计算。明确配置篝火 Agent 后，
-最多八条当前层玩家 SQL 投影和聚合统计才会发送到 `POST /v1/campfire/review`；参考 SQL、移动、
-完整存档和玩家身份不会离开浏览器。
+最多八条当前层玩家 SQL 投影和聚合统计才会发送到 `POST /v1/campfire/review`；抄写员 Agent 只接收
+当前场景作者文案以及受限的学习、死亡或导航证据。参考 SQL、移动、地图、背包、身份和完整存档不会离开浏览器。
 怪物显示名必须直白且容易输入：统一使用“史莱姆”“水胶怪”“幼龙”这类二到三个汉字，
 不得添加间隔点称号或 SQL 概念后缀。新增内容也遵守同一规则；SQL 含义放在字段、任务与
 遭遇机制中，不塞进显示名。
@@ -111,8 +112,8 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 index.html -> src/application/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> CampfireReview（当前楼层确定性 SQL 复盘）
-  -> TriggerBus -> AnswerHook/CampfireHook（脏状态、距离、去重与回退）
-  -> 可选 CampfireAgentClient -> agent/contracts/flows/http（只改善受限复盘文案）
+  -> TriggerBus -> AnswerHook/CampfireHook/ScribeHook（脏状态、距离、场景、去重与回退）
+  -> 可选 CampfireAgentClient/ScribeAgentClient -> agent/contracts/flows/http（只改善受限展示文案）
   -> QuestionBankLoader/LearningLedger（经校验 SQLite 题库与 IndexedDB 证据）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
   -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
@@ -160,15 +161,15 @@ index.html -> src/application/main.ts
 管理独立持久化的逐步教学。
 
 `src/domain/learning/campfireReview.ts` 负责把当前楼层答案记录转换为篝火面板使用的确定性事实。
-它只读取快照，不访问存储或外部服务，也不能改变游戏状态。抄写员读取作者剧情内容，展示前只执行
-现有的怪物身份脱敏。
+它只读取快照，不访问存储或外部服务，也不能改变游戏状态。`ScribeHook` 将当前场景投影为受限的学习、
+死亡或导航证据；作者内容始终是本地回退，展示前仍执行现有的怪物身份脱敏。
 
 `src/application/triggers/` 负责把快照变化转换为语义事件，`src/application/hooks/` 负责
 `dirty / requesting / ready / fallback` 状态。`CampfireHook` 只在玩家进入篝火两格圆形范围后为当前证据
-请求一次。`src/infrastructure/agent/CampfireAgentClient.ts` 只投影当前层 SQL 证据，最多发送八条玩家 SQL，
-并按证据 Hash 在内存中缓存；哈希不匹配或非法回复会被丢弃。`agent/` 负责 Python 契约、复盘流程、HTTP
-服务和可选的 Agent 专用触发存储；存储不接收游戏数据库或原始 SQL。死亡复盘 Agent 未来单独设计，
-不属于篝火服务。
+请求一次；`ScribeHook` 在调查实体抄写员、死亡和导航指引等级提升时请求，并按证据键在内存中去重。
+`src/infrastructure/agent/CampfireAgentClient.ts` 与 `ScribeAgentClient.ts` 只投影各自的受限证据，
+哈希不匹配或非法回复会被丢弃。`agent/` 负责 Python 契约、篝火复盘与抄写员流程、HTTP 服务和可选的
+Agent 专用触发存储；存储不接收游戏数据库、原始 SQL 或完整快照。
 
 `src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
 内容 ID、文案、SQL 契约与存档版本仍由原有
@@ -230,7 +231,7 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 ## 仓库地图
 
 ```text
-agent/                  Python 篝火 Agent 契约、流程、HTTP、可选触发存储与测试
+agent/                  Python 篝火/抄写员 Agent 契约、流程、HTTP、可选触发存储与测试
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
 src/application/        启动、运行时配置与页面生命周期
 src/content/            课程、世界、剧情、背包与 SQL 静态内容
@@ -267,12 +268,13 @@ python3 scripts/validate-rules.py
 
 ## 运行与安全边界
 
-- SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，
-  抄写员只读取作者剧情。明确配置后，可选篝火 Agent 通过 `POST /v1/campfire/review` 接收受限
-  投影；游戏没有 Agent 存档，未配置时完全使用本地复盘。
-- Agent 请求只包含请求 ID、证据 Hash、当前层、聚合统计和最多八条玩家 SQL；不包含参考 SQL、
-  完整 `GameSnapshot`、身份、移动、地图、背包或游戏指令。响应必须匹配请求 Hash 并通过文本限制，
-  才能替换本地复盘文案。Python 存储默认关闭；显式启用 SQLite 时只保存触发元数据和合法输出。
+- SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，抄写员使用作者内容
+  和受限场景投影。明确配置后，可选的篝火与抄写员 Agent 分别通过 `POST /v1/campfire/review` 和
+  `POST /v1/scribe/respond` 接收各自投影；游戏没有 Agent 存档，未配置任一服务时完全使用本地文案。
+- Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。篝火请求包含聚合统计和最多八条玩家
+  SQL 投影；抄写员请求只包含作者文案以及受限的学习、死亡或导航证据。两者都不包含参考 SQL、完整
+  `GameSnapshot`、身份、移动、地图、背包或游戏指令。响应必须匹配请求 Hash 并通过文本限制，才能替换本地
+  文案。Python 存储默认关闭；显式启用 SQLite 时只保存触发元数据和合法输出。
 - 战斗终端只接受一条只读 `SELECT` 或 `WITH`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面
   最多显示 50 行结果。
 - 两个 SQL 输入框都提供 IDE 式 `PLAN ASSIST` Listbox。输入前缀会显示排序后的关键词、函数、

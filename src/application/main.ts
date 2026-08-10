@@ -9,6 +9,7 @@ import type Phaser from "phaser";
 import { ArcadeAudio } from "../infrastructure/audio/ArcadeAudio";
 import {
   CAMPFIRE_AGENT_RUNTIME_CONFIG,
+  SCRIBE_AGENT_RUNTIME_CONFIG,
   WORLD_RUNTIME_CONFIG,
 } from "./config/runtimeConfig";
 import { GameSession } from "../domain/session/GameSession";
@@ -27,9 +28,11 @@ import { LearningLedger, LearningProgressRecorder } from "../infrastructure/stor
 import { AppShell } from "../presentation/dom/AppShell";
 import { OnboardingController } from "../presentation/dom/OnboardingController";
 import { createCampfireAgentClient } from "../infrastructure/agent/CampfireAgentClient";
+import { createScribeAgentClient } from "../infrastructure/agent/ScribeAgentClient";
 import { TriggerBus } from "./triggers/bus";
 import { AnswerHook } from "./hooks/answer";
 import { CampfireHook } from "./hooks/campfire";
+import { ScribeHook } from "./hooks/scribe";
 import { HookRegistry } from "./hooks/registry";
 
 function runtimeStorage(): StorageLike {
@@ -77,12 +80,18 @@ async function bootstrap(): Promise<void> {
     CAMPFIRE_AGENT_RUNTIME_CONFIG.endpoint,
     CAMPFIRE_AGENT_RUNTIME_CONFIG.requestTimeoutMs,
   );
+  const scribeAgent = createScribeAgentClient(
+    SCRIBE_AGENT_RUNTIME_CONFIG.endpoint,
+    SCRIBE_AGENT_RUNTIME_CONFIG.requestTimeoutMs,
+  );
   const triggerBus = new TriggerBus();
   const answerHook = new AnswerHook();
   const campfireHook = new CampfireHook(answerHook, campfireAgent);
+  const scribeHook = new ScribeHook(scribeAgent);
   const hooks = new HookRegistry(triggerBus)
     .add(answerHook)
-    .add(campfireHook);
+    .add(campfireHook)
+    .add(scribeHook);
   hooks.start(session);
   let game: Phaser.Game | null = null;
   const app = new AppShell(
@@ -98,6 +107,7 @@ async function bootstrap(): Promise<void> {
     },
     savedRun ? "restored" : "new",
     campfireHook,
+    scribeHook,
   );
   try {
     learningRecorder.start();

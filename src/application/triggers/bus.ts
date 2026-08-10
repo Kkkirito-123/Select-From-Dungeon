@@ -52,6 +52,12 @@ export class TriggerBus {
         ) {
           this.emit({ type: "death", snapshot, previous: oldSnapshot });
         }
+        if (
+          snapshot.navigationGuidance.level > 0 &&
+          snapshot.navigationGuidance.level > oldSnapshot.navigationGuidance.level
+        ) {
+          this.emit({ type: "navigation", snapshot, previous: oldSnapshot });
+        }
       }
 
       snapshot.campfires.forEach((campfire) => {

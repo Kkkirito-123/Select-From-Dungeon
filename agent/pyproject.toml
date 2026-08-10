@@ -1,7 +1,7 @@
 [project]
 name = "select-from-dungeon-campfire-agent"
 version = "0.1.0"
-description = "Stateless current-floor SQL recap service for SELECT * FROM DUNGEON"
+description = "Stateless Campfire and Scribe companion service for SELECT * FROM DUNGEON"
 requires-python = ">=3.11"
 dependencies = []
 

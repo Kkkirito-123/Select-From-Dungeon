@@ -69,3 +69,9 @@ export const CAMPFIRE_AGENT_RUNTIME_CONFIG = {
   /** 本地复盘已经先展示，网络请求只允许在后台等待这一时长。 */
   requestTimeoutMs: 3_000,
 } as const;
+
+export const SCRIBE_AGENT_RUNTIME_CONFIG = {
+  /** 未配置时使用浏览器端确定性抄写员文案，不影响游戏运行。 */
+  endpoint: import.meta.env.VITE_SCRIBE_AGENT_URL?.trim() || null,
+  requestTimeoutMs: 3_000,
+} as const;

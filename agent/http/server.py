@@ -1,4 +1,4 @@
-"""篝火 Agent HTTP 入口。
+"""游戏辅助 Agent HTTP 入口。
 
 本模块只负责生命周期和状态码映射；路由、请求体读取、契约校验及复盘流程
 分别属于 ``routes``、``response``、``contracts`` 和 ``flows``。
@@ -12,8 +12,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from agent.contracts.campfire import ContractError
 from agent.flows.review import DeterministicGenerator, FallbackGenerator, Generator, ReviewFlow
+from agent.flows.scribe import Generator as ScribeGenerator
+from agent.flows.scribe import ScribeFlow
 from agent.http.response import BodyError, read_json, send_json
-from agent.http.routes import REVIEW_PATH, is_review_path
+from agent.http.routes import REVIEW_PATH, is_review_path, is_scribe_path
 from agent.providers.deepseek import DeepSeekGenerator
 from agent.runtime.config import load
 from agent.storage.repo import Store
@@ -29,30 +31,33 @@ def create_server(
     generator: Generator | None = None,
     allowed_origin: str = "*",
     store: Store | None = None,
+    scribe_generator: ScribeGenerator | None = None,
 ) -> ThreadingHTTPServer:
     """创建可测试的 HTTP 服务，不自动启动线程。"""
 
     # 直接创建的服务保持确定性，方便单元测试；正式 serve() 才读取模型配置。
     flow = ReviewFlow(generator or DeterministicGenerator(), store)
+    scribe_flow = ScribeFlow(scribe_generator, store)
 
     class RequestHandler(BaseHTTPRequestHandler):
-        server_version = "CampfireAgent/1"
+        server_version = "DungeonAgent/1"
 
         def reply(self, status: HTTPStatus, payload: dict[str, object]) -> None:
             send_json(self, status, payload, allowed_origin)
 
         def do_OPTIONS(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-            if not is_review_path(self.path):
+            if not is_review_path(self.path) and not is_scribe_path(self.path):
                 self.reply(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
             self.reply(HTTPStatus.NO_CONTENT, {})
 
         def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-            if not is_review_path(self.path):
+            if not is_review_path(self.path) and not is_scribe_path(self.path):
                 self.reply(HTTPStatus.NOT_FOUND, {"error": "not_found"})
                 return
             try:
-                result = flow.run(read_json(self, MAX_BODY_BYTES))
+                payload = read_json(self, MAX_BODY_BYTES)
+                result = scribe_flow.run(payload) if is_scribe_path(self.path) else flow.run(payload)
             except BodyError:
                 self.reply(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request_too_large"})
                 return
@@ -60,7 +65,8 @@ def create_server(
                 self.reply(HTTPStatus.BAD_REQUEST, {"error": "invalid_request"})
                 return
             except Exception:
-                self.reply(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "review_unavailable"})
+                error_code = "scribe_unavailable" if is_scribe_path(self.path) else "review_unavailable"
+                self.reply(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": error_code})
                 return
             self.reply(HTTPStatus.OK, result)
 
@@ -105,7 +111,7 @@ def serve(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SQL 魔王城篝火 Agent")
+    parser = argparse.ArgumentParser(description="SQL 魔王城 Agent 服务")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--allowed-origin", default="*")

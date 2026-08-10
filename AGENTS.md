@@ -85,11 +85,13 @@ Campfires and the Scribe are separate game objects. A physical campfire always
 handles rest/checkpoint actions, but its learning recap stays unavailable until
 the current-floor elite is defeated. After that condition, the campfire renders
 an immediate deterministic recap from current-floor records; its review button
-is disabled before the condition. Each floor also has one physical Scribe whose
-short response and route guidance come from authored floor content. There is no
-player prompt box. When `VITE_CAMPFIRE_AGENT_URL` is configured, an optional
-stateless Python Agent may improve only the current-floor recap wording; the
-local result remains the immediate fallback. Five short narrative
+  is disabled before the condition. Each floor also has one physical Scribe whose
+  authored content is the local fallback. There is no player prompt box. When
+  `VITE_CAMPFIRE_AGENT_URL` or `VITE_SCRIBE_AGENT_URL` is configured, optional
+  stateless Python Agent endpoints may improve only the corresponding display
+  wording; local results remain the immediate fallback. The Scribe responds to
+  inspection, death review, and navigation guidance level changes, and never
+  changes gameplay state, routes, or saves. Five short narrative
 beats and two fixed Lost Name evidence entries per floor still unlock from
 existing Run progress; the local `失名录` distinguishes unknown, confirmed
 `NULL`, and actual values. The eighth floor resolves the sole MVP 2.0 ending,
@@ -116,10 +118,12 @@ The top-console `答题复盘` view reads a browser-local answer log for the lat
 battle and current floor. Each record contains the submitted SQL, explicit
 reference SQL, result category, hint level, and battle outcome. The log is
 capped at 200 SQL turns and never records movement or key presses. The complete
-log remains browser-local and is summarized by deterministic game rules. An
-explicitly configured Campfire Agent receives only the current-floor aggregate
-and at most eight submitted SQL projections; reference SQL, movement, and full
-game state never leave the browser.
+  log remains browser-local and is summarized by deterministic game rules. An
+  explicitly configured Campfire Agent receives only the current-floor aggregate
+  and at most eight submitted SQL projections. The Scribe Agent receives only the
+  current scene's authored message and bounded learning, death, or navigation
+  evidence; reference SQL, movement, map, inventory, identity, and full game
+  state never leave the browser.
 Authored monster display names stay direct and easy to type: two or three
 Chinese characters such as `史莱姆`, `水胶怪`, or `幼龙`, without middle-dot
 epithets or SQL-concept suffixes. New content must follow the same rule; SQL
@@ -194,8 +198,8 @@ index.html -> src/application/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> CampfireReview (current-floor deterministic SQL recap)
-  -> TriggerBus -> AnswerHook/CampfireHook (dirty, distance, dedupe, fallback)
-  -> optional CampfireAgentClient -> agent/contracts/flows/http (bounded recap wording only)
+  -> TriggerBus -> AnswerHook/CampfireHook/ScribeHook (dirty, distance, scene, dedupe, fallback)
+  -> optional CampfireAgentClient/ScribeAgentClient -> agent/contracts/flows/http (bounded display wording only)
   -> QuestionBankLoader/LearningLedger (verified SQLite content + IndexedDB evidence)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
@@ -250,19 +254,21 @@ separately persisted step-by-step tutorial.
 
 `src/domain/learning/campfireReview.ts` owns the deterministic current-floor SQL
 recap used by the Campfire Panel. It reads snapshot evidence only, does not
-access storage or external services, and cannot mutate gameplay state. The
-Scribe reads authored narrative content and applies the existing identity
-redaction before display.
+access storage or external services, and cannot mutate gameplay state. `ScribeHook`
+projects the active scene into bounded learning, death, or navigation evidence;
+authored content remains the local fallback and existing identity redaction still
+applies before display.
 
 `src/application/triggers/` converts snapshot changes into semantic events and
 `src/application/hooks/` owns the `dirty / requesting / ready / fallback` state.
 `CampfireHook` requests at most once after the player enters the circular
-two-cell campfire range. `src/infrastructure/agent/CampfireAgentClient.ts`
-projects only the current-floor SQL evidence, sends at most eight submitted
-queries, keeps results in an in-memory evidence-hash cache, and discards stale or
-invalid responses. `agent/` owns the Python 3.11+ contracts, review flow, HTTP
-service, and optional Agent-only trigger store. The store never receives the
-game database or raw SQL; a future death review Agent is a separate boundary.
+two-cell campfire range. `ScribeHook` requests on physical Scribe inspection,
+death, and navigation guidance level changes, with one in-memory result per
+evidence key. `src/infrastructure/agent/CampfireAgentClient.ts` and
+`ScribeAgentClient.ts` project only their bounded evidence, keep results in
+memory, and discard stale or invalid responses. `agent/` owns the Python 3.11+
+contracts, review and Scribe flows, HTTP service, and optional Agent-only trigger
+store. The store never receives the game database, raw SQL, or full snapshot.
 
 `src/application/config/` owns Chinese-commented runtime tuning values such as map size,
 encounter rates, navigation thresholds, and storage limits.
@@ -366,7 +372,7 @@ evaluation.
 ## Repository Map
 
 ```text
-agent/                  Python Campfire Agent contracts, flow, HTTP, optional trigger store, and tests
+agent/                  Python Campfire/Scribe Agent contracts, flows, HTTP, optional trigger store, and tests
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
 src/application/        Startup, runtime configuration, and page lifecycle
 src/content/            Static curriculum, world, narrative, inventory, and SQL content
@@ -409,16 +415,20 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 
 - SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.
   Campfire review uses only current-floor local snapshot records, and the Scribe
-  reads authored story content. If explicitly configured, the optional Campfire
-  Agent receives a bounded projection through `POST /v1/campfire/review`; the
-  game remains playable without it and keeps no Agent output in storage.
-- The Agent request contains a request ID, evidence hash, current floor,
-  aggregate counts, and at most eight submitted SQL records. It never contains
-  reference SQL, full `GameSnapshot`, player identity, movement, map, inventory,
-  or gameplay commands. Responses must match the request hash and strict text
-  limits before they can replace the local wording. Python storage is disabled
-  by default; explicit SQLite storage keeps only trigger metadata and validated
-  output.
+  uses authored content plus a bounded scene projection. If explicitly configured,
+  the optional Campfire and Scribe Agent endpoints receive only their respective
+  projections through `POST /v1/campfire/review` and `POST /v1/scribe/respond`;
+  the game remains playable without either service and keeps no Agent output in
+  browser storage.
+- Agent requests contain a request ID, evidence hash, current floor, and only
+  the scene-specific bounded evidence. Campfire requests contain aggregate counts
+  and at most eight submitted SQL projections; Scribe requests contain only the
+  authored message plus bounded learning, death, or navigation evidence. Neither
+  request contains reference SQL, full `GameSnapshot`, player identity, movement,
+  map, inventory, or gameplay commands. Responses must match the request hash and
+  strict text limits before they can replace local wording. Python storage is
+  disabled by default; explicit SQLite storage keeps only trigger metadata and
+  validated output.
 - The battle terminal accepts one read-only `SELECT` or `WITH` statement. DML, DDL, `PRAGMA`,
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.

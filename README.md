@@ -127,7 +127,9 @@ complete SQLite query, and turn the correct result into an animated attack.
   browser-local and is calculated by deterministic game rules by default. When
   `VITE_CAMPFIRE_AGENT_URL` is explicitly configured, at most eight current-floor
   submitted SQL projections can improve the wording; the game does not send
-  reference SQL or full game state.
+  reference SQL or full game state. `VITE_SCRIBE_AGENT_URL` optionally enables
+  the Scribe endpoint for inspection, death review, and navigation guidance;
+  it receives only authored text and bounded scene evidence.
 - Find two seeded physical campfires on every floor, in the middle and rear
   learning phases; the entrance is the front safe/respawn anchor. Their visibly bounded tiles and the floor entrance
   are safe zones with no ambushes, enemy spawns, or patrol entry. Stand beside a
@@ -136,9 +138,10 @@ complete SQLite query, and turn the correct result into an animated attack.
   current-floor elite is defeated; before then, the fire remains fully usable
   for rest and checkpointing but the review action is disabled.
 - Meet one physical Scribe on each floor, separately from the campfires. She has
-  no chat box: inspecting her reveals the authored short character response and
-  route guidance already stored in the current floor content. Five concise story
-  beats per floor still unlock through required progress, rest, Boss contact,
+  no chat box: inspecting her reveals authored content immediately, and the
+  optional Scribe endpoint may asynchronously improve the display wording.
+  Death review and navigation guidance use the same bounded, output-only path.
+  Five concise story beats per floor still unlock through required progress, rest, Boss contact,
   and completion; the local `失名录` distinguishes unknown evidence, confirmed
   `NULL`, and actual values.
 - Floors five through eight now have authored runtime landmarks rather than
@@ -326,10 +329,11 @@ pnpm preview
 ```
 
 The game uses deterministic local SQL review and authored Scribe text by default.
-An optional Python 3.11+ Campfire Agent can be enabled with
-`VITE_CAMPFIRE_AGENT_URL`; it is a stateless `POST /v1/campfire/review` service
-that only improves current-floor recap wording. The game remains fully playable
-without the service, and no Agent output is persisted.
+Optional Python 3.11+ Campfire and Scribe Agent endpoints can be enabled with
+`VITE_CAMPFIRE_AGENT_URL` and `VITE_SCRIBE_AGENT_URL`; they are stateless,
+output-only services for `POST /v1/campfire/review` and
+`POST /v1/scribe/respond`. The game remains fully playable without either
+service, and no Agent output is persisted.
 
 The top-bar `⌘ 管理员` button opens the spoiler-heavy admin view. It only
 offers the next floor's starting position; the preview is memory-only and never
@@ -373,7 +377,7 @@ The top-level source tree is:
 
 ```text
 src/
-├─ contracts/        cross-layer read-only game, persistence, result, Campfire Agent, and storage contracts
+├─ contracts/        cross-layer read-only game, persistence, result, Campfire/Scribe Agent, and storage contracts
 ├─ application/       startup, configuration, and page lifecycle
 ├─ content/           curriculum, world, narrative, inventory, and SQL content
 ├─ domain/            session facade/helpers, combat, exploration, learning, progression, and shared rules
@@ -423,22 +427,28 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
 
 ```text
 agent/
-├─ contracts/ ── models, evidence hash, request/response validation
-├─ flows/     ── one review flow and deterministic generator
+├─ contracts/ ── Campfire/Scribe models, evidence hash, request/response validation
+├─ flows/     ── review and Scribe flows with deterministic generators
+├─ campfire/  ── Campfire compatibility entry point
+├─ scribe/    ── Scribe compatibility entry point
 ├─ storage/   ── in-memory or optional SQLite trigger store
 └─ http/      ── routes, request body, and HTTP lifecycle
 ```
 
 `src/application/triggers/` converts snapshot changes into semantic events;
 `src/application/hooks/` owns the `dirty / requesting / ready / fallback` state.
-A new answer marks the current floor dirty, and entering the circular two-cell
-campfire range starts at most one request for that evidence.
+A new answer marks the current floor dirty, entering the circular two-cell
+campfire range starts at most one request for that evidence, and `ScribeHook`
+responds to physical Scribe inspection, death, and navigation guidance level
+changes.
 `src/domain/learning/campfireReview.ts` still produces the immediate local result.
 The optional `src/infrastructure/agent/CampfireAgentClient.ts` sends only the
 bounded current-floor projection, caches by evidence hash in memory, and accepts
-responses only when their request identity and hash match. The Scribe reads
-authored narrative content and only applies the existing monster-identity
-redaction before display.
+responses only when their request identity and hash match. The
+`src/infrastructure/agent/ScribeAgentClient.ts` sends only authored text and
+bounded scene evidence to `POST /v1/scribe/respond`; invalid or stale responses
+are discarded and the authored/local text remains usable. The Scribe never
+modifies gameplay state, routes, or saves.
 
 `FloorContracts` defines the eight-floor curriculum and content boundary, while
 `CampaignDomain` serializes deterministic ordered slots and rejects skips or
@@ -499,8 +509,8 @@ Browser-local storage is split into:
   attempts, victories, and best run query count.
 - `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
   or skipped.
-- Campfire Agent output is memory-only in the browser and is never written to
-  Run, Profile, or IndexedDB. The Python service is stateless by default; an
+- Campfire and Scribe Agent output are memory-only in the browser and are never
+  written to Run, Profile, or IndexedDB. The Python service is stateless by default; an
   explicit Agent-only SQLite store may persist trigger metadata and validated
   output, never the game database or raw SQL.
 - IndexedDB `select-from-dungeon-learning`: at most 5,000 full answer attempts
