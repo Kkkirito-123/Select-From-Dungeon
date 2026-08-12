@@ -31,6 +31,18 @@ export const APP_SHELL_DOM_SELECTORS = {
   gateExecuteButton: "#execute-gate-query",
   sqlButton: "#open-sql",
   audioButton: "#audio-toggle",
+  directorPanel: "#director-panel",
+  directorStatus: "#director-status",
+  directorGuidance: "#director-guidance",
+  agentWorkMode: "#agent-work-mode",
+  agentWorkCampfire: "#agent-work-campfire",
+  agentWorkScribe: "#agent-work-scribe",
+  agentWorkMain: "#agent-work-main",
+  agentWorkAction: "#agent-work-action",
+  agentWorkCurrent: "#agent-work-current",
+  agentWorkPage: "#agent-work-page",
+  agentWorkLog: "#agent-work-log",
+  directorLive: "#director-live",
 } as const;
 
 /**
@@ -57,6 +69,18 @@ export interface AppShellDom {
   gateExecuteButton: HTMLButtonElement;
   sqlButton: HTMLButtonElement;
   audioButton: HTMLButtonElement;
+  directorPanel: HTMLElement;
+  directorStatus: HTMLElement;
+  directorGuidance: HTMLElement;
+  agentWorkMode: HTMLElement;
+  agentWorkCampfire: HTMLElement;
+  agentWorkScribe: HTMLElement;
+  agentWorkMain: HTMLElement;
+  agentWorkAction: HTMLElement;
+  agentWorkCurrent: HTMLElement;
+  agentWorkPage: HTMLElement;
+  agentWorkLog: HTMLElement;
+  directorLive: HTMLElement;
 }
 
 export function bindAppShellDom(root: ParentNode): AppShellDom {
@@ -79,5 +103,17 @@ export function bindAppShellDom(root: ParentNode): AppShellDom {
     gateExecuteButton: requireElement(root, APP_SHELL_DOM_SELECTORS.gateExecuteButton),
     sqlButton: requireElement(root, APP_SHELL_DOM_SELECTORS.sqlButton),
     audioButton: requireElement(root, APP_SHELL_DOM_SELECTORS.audioButton),
+    directorPanel: requireElement(root, APP_SHELL_DOM_SELECTORS.directorPanel),
+    directorStatus: requireElement(root, APP_SHELL_DOM_SELECTORS.directorStatus),
+    directorGuidance: requireElement(root, APP_SHELL_DOM_SELECTORS.directorGuidance),
+    agentWorkMode: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkMode),
+    agentWorkCampfire: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkCampfire),
+    agentWorkScribe: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkScribe),
+    agentWorkMain: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkMain),
+    agentWorkAction: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkAction),
+    agentWorkCurrent: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkCurrent),
+    agentWorkPage: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkPage),
+    agentWorkLog: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkLog),
+    directorLive: requireElement(root, APP_SHELL_DOM_SELECTORS.directorLive),
   };
 }

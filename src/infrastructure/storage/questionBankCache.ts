@@ -1,11 +1,13 @@
 /**
- * 题库二进制的 IndexedDB 缓存。
+ * 统一数据数据库中的题库缓存。
  *
  * 缓存只用于提升启动时加载速度，不能成为题库版本或玩家进度的真相。
  * 读写失败时返回 null/false，让上层决定使用网络资源或本地降级路径。
  */
-export const CONTENT_DATABASE_NAME = "select-from-dungeon-content";
-export const CONTENT_DATABASE_VERSION = 1;
+import { DATA_DB_NAME, DATA_DB_VERSION, openDataDatabase } from "./dataDb";
+
+export const CONTENT_DATABASE_NAME = DATA_DB_NAME;
+export const CONTENT_DATABASE_VERSION = DATA_DB_VERSION;
 
 export interface CachedQuestionBank {
   bankVersion: string;
@@ -29,16 +31,6 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
     transaction.onabort = () => reject(transaction.error ?? new Error("content cache aborted"));
     transaction.onerror = () => reject(transaction.error ?? new Error("content cache failed"));
   });
-}
-
-async function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
-  const request = factory.open(CONTENT_DATABASE_NAME, CONTENT_DATABASE_VERSION);
-  request.onupgradeneeded = () => {
-    if (!request.result.objectStoreNames.contains("question_banks")) {
-      request.result.createObjectStore("question_banks", { keyPath: "bankVersion" });
-    }
-  };
-  return requestResult(request);
 }
 
 export class QuestionBankCache {
@@ -76,7 +68,7 @@ export class QuestionBankCache {
 
   private database(): Promise<IDBDatabase> {
     if (!this.factory) return Promise.reject(new Error("IndexedDB unavailable"));
-    this.databasePromise ??= openDatabase(this.factory);
+    this.databasePromise ??= openDataDatabase(this.factory);
     return this.databasePromise;
   }
 }

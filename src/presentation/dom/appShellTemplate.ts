@@ -38,6 +38,45 @@ export function appShellTemplate({
         </header>
 
         <main class="game-layout">
+          <aside id="director-panel" class="director-panel" aria-label="主 Agent 工作台">
+            <section class="director-card director-card--plan" aria-labelledby="director-guidance-label">
+              <div class="director-card__heading">
+                <span>MAIN AGENT / 主 Agent</span>
+                <strong id="director-status">IDLE</strong>
+              </div>
+              <div class="director-panel__plan">
+                <span id="director-guidance-label">NEXT PLAN / 下一步计划</span>
+                <p id="director-guidance">等待新的记录。</p>
+              </div>
+            </section>
+            <section class="director-card director-card--work" aria-labelledby="agent-work-label">
+              <div class="director-card__heading">
+                <span id="agent-work-label">AGENT WORK / 实时工作</span>
+                <strong id="agent-work-mode">LOCAL</strong>
+              </div>
+              <div class="agent-work__flow" aria-label="Agent 当前状态">
+                <div class="agent-work__row" data-state="idle">
+                  <span class="agent-work__index">01</span><strong>篝火</strong><span id="agent-work-campfire" class="agent-work__state">待命</span>
+                </div>
+                <div class="agent-work__row" data-state="idle">
+                  <span class="agent-work__index">02</span><strong>抄写员</strong><span id="agent-work-scribe" class="agent-work__state">待命</span>
+                </div>
+                <div class="agent-work__row" data-state="idle">
+                  <span class="agent-work__index">03</span><strong>主 Agent</strong><span id="agent-work-main" class="agent-work__state">待命</span>
+                </div>
+              </div>
+              <div class="agent-work__activity">
+                <span>NOW / 当前动作</span>
+                <p id="agent-work-action">等待新的记录。</p>
+              </div>
+              <div class="agent-work__usage" aria-label="Agent Token 用量">
+                <span id="agent-work-current">THIS LOCAL · I 0 · O 0 · T 0</span>
+                <span id="agent-work-page">PAGE · I 0 · O 0 · T 0</span>
+              </div>
+              <pre id="agent-work-log" class="agent-work__log">000 RUNTIME READY</pre>
+            </section>
+            <span id="director-live" class="sr-only" aria-live="polite" aria-atomic="true"></span>
+          </aside>
           <section class="dungeon-panel" aria-label="SQL 魔王城房间">
             <div class="hud-strip">
               <div><span class="hud-label">生命</span><strong id="hp-value">2 / 2</strong></div>

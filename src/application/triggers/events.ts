@@ -32,5 +32,11 @@ export interface DeathEvent {
   previous: GameSnapshot;
 }
 
-export type Trigger = AnswerEvent | CampfireEvent | FloorEvent | DeathEvent;
+export interface NavigationEvent {
+  type: "navigation";
+  snapshot: GameSnapshot;
+  previous: GameSnapshot;
+}
+
+export type Trigger = AnswerEvent | CampfireEvent | FloorEvent | DeathEvent | NavigationEvent;
 export type TriggerListener = (event: Trigger) => void;

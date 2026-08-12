@@ -1,64 +1,87 @@
-# 篝火 Agent
+# Agent 服务
 
-这是可选的 Python 3.11+ 篝火复盘服务。它只分析当前楼层的 SQL 作答，不能读取游戏存档、地图、移动、背包或死亡记录，也不能修改游戏状态。
+这是可选的 Python 3.11+ 只读辅助服务。篝火负责 SQL 学习复盘，抄写员负责剧情陪伴与失败安慰，主 Agent 负责整理当前情况和下一步。服务不能读取游戏存档、地图、移动、背包或玩家身份，也不能修改游戏状态。
 
 ## 目录
 
 ```text
 agent/
-├─ contracts/   models.py、hash.py、validate.py：请求/响应和证据哈希
-├─ flows/       review.py：一次复盘流程和确定性生成器
-├─ campfire/    analyzer.py：旧导入路径兼容门面
-├─ storage/     repo.py、sqlite.py：触发状态的内存/SQLite 存储
-├─ http/        routes.py、response.py、server.py：路由、请求体和 HTTP 生命周期
-└─ tests/       协议、流程、HTTP、存储测试
+├─ campfire/   严格契约、确定性复盘和篝火流程
+├─ scribe/     严格契约、确定性玩法字段和陪伴流程
+├─ director/   schema v2 契约、变化方编排和主 Agent 流程
+├─ shared/     公共契约、Hash、PydanticAI 模型入口和 OpenTelemetry
+├─ runtime/    服务端模型配置
+├─ http/       三个兼容路由和 HTTP 生命周期
+└─ tests/      契约、流程、usage、遥测和 HTTP 测试
 ```
 
-浏览器端的触发模块位于 `src/application/`：
+服务不包含 Agent Store、SQLite、输出持久化、工具、记忆、重试或自主规划。三个角色通过 `shared/` 复用基础能力，业务流程保持独立，由 `http/server.py` 组装。
+
+## 调用流程
+
+浏览器的 `AgentRuntime` 使用 XState 管理篝火、抄写员和 Main 三个并行状态区，`AgentGateway` 统一处理 SHA-256、5 秒中止、端点优先级与严格校验。
 
 ```text
-triggers/       快照变化 -> answer、campfire、floor、death 事件
-hooks/          AnswerHook 标记 dirty；CampfireHook 负责去重、请求和回退
+TriggerBus -> AgentRuntime -> AgentGateway
+  -> POST /v1/director/run
+      -> 只运行变化方子 Agent
+      -> 主 Agent 只生成 guidance
+      -> schema v2 + usage + traceId
 ```
 
-数据流是：
+`POST /v1/campfire/review` 和 `POST /v1/scribe/respond` 继续返回 schema v1。`POST /v1/director/run` 返回 schema v2，并在 `meta.calls` 中提供每次子 Agent/Main 调用的模式、状态、耗时和 token。配置统一端点后浏览器不调用旧子端点；未配置统一端点时旧端点仍可独立使用；全部未配置时游戏使用浏览器本地文案。
 
-```text
-战斗结束写入 AnswerAttemptRecord
-  -> AnswerHook: 当前层 dirty
-  -> 进入篝火两格圆形范围
-  -> CampfireHook: requesting / ready / fallback
-  -> CampfireAgentClient: POST /v1/campfire/review
-  -> 结果只替换本地复盘文案
-```
+抄写员模型只生成 `headline` 与陪伴 `message`，玩法相关的 `facts`、`nextAction` 和 `safeHintId` 由确定性规则补齐。导航不会调用抄写员模型；统一端点仍可让主 Agent 根据确定性导航结果整理下一步。
 
-同一证据在当前页面只请求一次。请求超时、服务不可用、输出非法或哈希不匹配时，游戏继续使用本地确定性复盘；新的 SQL 作答会生成新的证据并允许下一次请求。Hook 不把 Agent 输出写入 Run、Profile 或 IndexedDB。
-
-## 运行
+## 安装与运行
 
 在仓库根目录执行：
 
 ```bash
+python3 -m pip install -e agent
 python3 -m unittest discover -s agent/tests
 python3 -m agent --host 127.0.0.1 --port 8787
 ```
 
-前端只有在配置 `VITE_CAMPFIRE_AGENT_URL=http://127.0.0.1:8787/v1/campfire/review` 后才会发起请求；未配置时完全使用本地复盘。
+前端优先配置统一端点：
 
-测试 DeepSeek 时，把 Key 设置在 Python 服务进程环境中，不要写入 `VITE_` 变量：
-
-```powershell
-$env:DEEPSEEK_API_KEY = "sk-你的Key"
-$env:DEEPSEEK_MODEL = "deepseek-chat"
-python -m agent --host 127.0.0.1 --port 8787
+```text
+VITE_DIRECTOR_AGENT_URL=http://127.0.0.1:8787/v1/director/run
 ```
 
-可直接编辑 [`agent/.env`](.env)；它已被 Git 忽略，只由 Python 服务读取。变量模板见 [`agent/.env.example`](.env.example)。Key 不会进入浏览器、游戏存档、请求正文或响应。未设置 Key 时服务使用确定性生成器，DeepSeek 超时或输出不合法时自动回退本地复盘。
+兼容路径仍可分别配置：
 
-默认服务不创建数据库文件。需要保存触发状态时显式指定 Agent 专用 SQLite：
-
-```bash
-python3 -m agent --db .local/campfire.db
+```text
+VITE_CAMPFIRE_AGENT_URL=http://127.0.0.1:8787/v1/campfire/review
+VITE_SCRIBE_AGENT_URL=http://127.0.0.1:8787/v1/scribe/respond
 ```
 
-该数据库只保存 `trigger_id`、类型、范围、楼层、证据哈希、状态、重试次数、错误码和已校验输出，不保存原始 SQL、完整存档或请求日志。生产环境可以在相同 `Store` 接口后替换为 PostgreSQL；第一版不绑定模型供应商。
+## 模型配置
+
+服务读取进程环境变量，也会读取 Git 忽略的 `agent/.env`。变量名模板见 `agent/.env.example`。不要把 Key 写进任何 `VITE_` 变量；浏览器不需要模型 Key。
+
+```text
+DEEPSEEK_API_KEY=子Agent Key
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_URL=https://api.deepseek.com/chat/completions
+
+DIRECTOR_API_KEY=主Agent Key
+DIRECTOR_MODEL=deepseek-chat
+DIRECTOR_URL=https://api.deepseek.com/chat/completions
+```
+
+两个子 Agent 共用 `DEEPSEEK_*`；主 Agent 只使用 `DIRECTOR_*`，不会借用子 Agent Key。未配置对应 Key时使用确定性回退。完整 `/chat/completions` URL 会自动归一化。
+
+## OpenTelemetry
+
+默认不向外部发送 Trace。设置标准 OTLP/HTTP Collector 地址后启用导出：
+
+```text
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+```
+
+Span 包含 `agent.request`、`agent.child`、`agent.director` 和 PydanticAI 模型调用，只记录请求 ID、楼层、事件、来源、状态、耗时、fallback 和 token；不记录 prompt、completion、SQL、正文、快照、Key 或身份。导出失败不影响游戏。
+
+## 数据边界
+
+篝火只接收当前层聚合和最多八条有限 SQL 投影；抄写员只接收作者文案和受限场景证据；主模型只接收已校验的子 Agent 展示字段。服务不接收参考 SQL、完整快照、地图、移动、背包、身份或游戏指令。浏览器的三份 Agent 缓存只存在页面内存，Python 服务同样不保存请求或输出。
