@@ -5,11 +5,11 @@ remain authoritative.
 
 ## Ownership
 
-- `campfire/` owns SQL-learning review contracts and flow.
-- `scribe/` owns story companionship and defeat comfort contracts and flow.
-- `director/` currently composes the changed child result into Main guidance.
-- `shared/` is the only model, strict-text, hash, error, and telemetry boundary.
-- `http/` parses transport input and assembles flows; it owns no role behavior.
+- `src/dungeon_agents/campfire/` owns SQL-learning review contracts and flow.
+- `src/dungeon_agents/scribe/` owns story companionship and defeat comfort.
+- `src/dungeon_agents/main/` owns the single HTTP contract and changed-role orchestration.
+- `src/dungeon_agents/shared/` is the only model, strict-text, hash, error, and telemetry boundary.
+- `src/dungeon_agents/http/` parses transport input and assembles flows; it owns no role behavior.
 - `tests/` stays centralized because it verifies contracts across all three
   roles and their shared runtime.
 
@@ -34,7 +34,7 @@ Run from repository root:
 ```bash
 python3 -m pip install -e agent
 python3 -m unittest discover -s agent/tests
-python3 -m agent --host 127.0.0.1 --port 8787
+dungeon-agent --host 127.0.0.1 --port 8787
 ```
 
 Use short, readable names. Add Chinese comments only for module responsibility,

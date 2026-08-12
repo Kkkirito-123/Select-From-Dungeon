@@ -86,9 +86,9 @@ the current-floor elite is defeated. After that condition, the campfire renders
 an immediate deterministic recap from current-floor records; its review button
   is disabled before the condition. Each floor also has one physical Scribe whose
   authored content is the local fallback. There is no player prompt box. When
-  `VITE_DIRECTOR_AGENT_URL` is configured, the optional stateless Python Main
-  Agent runs only the changed Campfire or Scribe child and combines validated
-  display text; the legacy child endpoints remain compatible. Local results
+  `VITE_AGENT_URL` is configured, the optional stateless Python service runs
+  only the changed Campfire or Scribe child and then Main guidance through
+  `POST /v1/agent/run`. Local results
   remain the immediate fallback. The Scribe responds to
   inspection, death review, and navigation guidance level changes, and never
   changes gameplay state, routes, or saves. Five short narrative
@@ -199,7 +199,7 @@ index.html -> src/application/main.ts
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> CampfireReview (current-floor deterministic SQL recap)
   -> TriggerBus -> AgentRuntime/XState (parallel Campfire, Scribe, Main lifecycle and memory caches)
-  -> AgentGateway -> optional ../agent/director -> changed PydanticAI child -> Main guidance -> AgentPanel
+  -> AgentGateway -> optional ../agent/src/dungeon_agents -> changed PydanticAI role -> Main guidance -> AgentPanel
   -> OpenTelemetry (content-free request, child, Main, and model spans)
   -> QuestionBankLoader/LearningLedger (verified SQLite content + IndexedDB evidence)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
@@ -265,7 +265,7 @@ fallback and existing identity redaction still applies before display.
 Campfire, Scribe, and Main regions. It handles dirty state, same-source
 cancellation, cross-source concurrency, panel priority, and three independent
 page-memory caches. `src/infrastructure/agent/AgentGateway.ts` is the single
-network boundary for endpoint precedence, stable hashing, five-second aborts,
+network boundary for the single endpoint, stable hashing, five-second aborts,
 and strict response validation. Navigation uses a deterministic Scribe child and
 does not invoke the Scribe model. `agent/` owns the Python 3.11+ strict Pydantic
 contracts, PydanticAI model runner, child and Director flows, content-free
@@ -412,9 +412,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.
   Campfire review uses only current-floor local snapshot records, and the Scribe
   uses authored content plus a bounded scene projection. If explicitly configured,
-  the optional Director endpoint receives one changed child projection and
-  already validated same-floor child display text through `POST /v1/director/run`;
-  the legacy child endpoints remain available. The game remains playable without
+  the optional Agent endpoint receives one changed child projection and
+  already validated same-floor child display text through `POST /v1/agent/run`.
+  The game remains playable without
   any service and keeps no Agent output in browser storage.
 - Agent requests contain a request ID, evidence hash, current floor, and only
   the scene-specific bounded evidence. Campfire requests contain aggregate counts
@@ -424,10 +424,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   full `GameSnapshot`, player identity, movement,
   map, inventory, or gameplay commands. Responses must match the request hash and
   strict text limits before they can replace local wording. The unified route
-  returns schema v2 call metadata for duration, mode, status, token usage, and an
+  returns schema v1 call metadata for duration, mode, status, token usage, and an
   optional trace ID. Agent caches, output, usage totals, and live logs are
   page-memory only; the Python service does not persist requests or output.
-- OpenTelemetry creates `agent.request`, `agent.child`, `agent.director`, and
+- OpenTelemetry creates `agent.request`, `agent.child`, `agent.main`, and
   PydanticAI model spans. No trace is exported unless
   `OTEL_EXPORTER_OTLP_ENDPOINT` is configured. Spans may contain request ID,
   floor, event, source, status, fallback, duration, and token counts, but never

@@ -1,7 +1,7 @@
 [project]
-name = "select-from-dungeon-campfire-agent"
+name = "select-from-dungeon-agent"
 version = "0.1.0"
-description = "Stateless Campfire and Scribe companion service for SELECT * FROM DUNGEON"
+description = "Stateless Campfire, Scribe, and Main Agent service for SELECT * FROM DUNGEON"
 requires-python = ">=3.11"
 dependencies = [
   "pydantic-ai-slim[openai]==2.28.0",
@@ -9,18 +9,12 @@ dependencies = [
   "opentelemetry-exporter-otlp-proto-http==1.44.0",
 ]
 
-[tool.setuptools]
-# 源码当前直接位于 agent/；显式映射可避免 setuptools 把角色目录误判为多个发行包。
-packages = [
-  "agent",
-  "agent.campfire",
-  "agent.director",
-  "agent.http",
-  "agent.runtime",
-  "agent.scribe",
-  "agent.shared",
-]
-package-dir = { agent = "." }
+[project.scripts]
+dungeon-agent = "dungeon_agents.http.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["dungeon_agents*"]
 
 [tool.unittest]
 discover = "agent/tests"

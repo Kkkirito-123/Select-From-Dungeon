@@ -1,19 +1,19 @@
 import type { CampfireAgentContent } from "../../contracts/agent/campfireReview";
-import type { DirectorAgentResponse, DirectorRoleStatus } from "../../contracts/agent/director";
+import type { AgentResponse, AgentRoleStatus } from "../../contracts/agent/main";
 import type { ScribeAgentContent } from "../../contracts/agent/scribe";
 
 export type AgentCacheKind = "campfire" | "scribe" | "main";
 
 interface Entry<T> {
   value: T;
-  status: DirectorRoleStatus;
+  status: AgentRoleStatus;
   savedAt: number;
 }
 
 type Values = {
   campfire: CampfireAgentContent;
   scribe: ScribeAgentContent;
-  main: DirectorAgentResponse;
+  main: AgentResponse;
 };
 
 const READY_TTL_MS = 10 * 60 * 1_000;
@@ -24,7 +24,7 @@ export class AgentCache {
   private readonly maps = {
     campfire: new Map<string, Entry<CampfireAgentContent>>(),
     scribe: new Map<string, Entry<ScribeAgentContent>>(),
-    main: new Map<string, Entry<DirectorAgentResponse>>(),
+    main: new Map<string, Entry<AgentResponse>>(),
   };
 
   constructor(private readonly now: () => number = () => Date.now()) {}
@@ -45,7 +45,7 @@ export class AgentCache {
     kind: K,
     key: string,
     value: Values[K],
-    status: DirectorRoleStatus,
+    status: AgentRoleStatus,
   ): void {
     const map = this.maps[kind] as Map<string, Entry<Values[K]>>;
     map.set(key, { value, status, savedAt: this.now() });

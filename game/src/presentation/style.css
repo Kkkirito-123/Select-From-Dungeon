@@ -222,7 +222,7 @@ h1 span {
   align-items: start;
 }
 
-.director-panel {
+.agent-panel {
   position: sticky;
   top: 10px;
   display: grid;
@@ -236,24 +236,24 @@ h1 span {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-.director-card {
+.agent-card {
   min-width: 0;
   overflow: hidden;
 }
 
-.director-card--plan {
+.agent-card--plan {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   border-top: 3px solid var(--query);
 }
 
-.director-card--work {
+.agent-card--work {
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
   border-top: 3px solid var(--plum-light);
 }
 
-.director-card__heading {
+.agent-card__heading {
   position: relative;
   display: flex;
   align-items: center;
@@ -269,26 +269,26 @@ h1 span {
   line-height: 1.4;
 }
 
-.director-card__heading strong {
+.agent-card__heading strong {
   color: var(--gold-light);
   font-size: 9px;
 }
 
-.director-panel__plan {
+.main-plan {
   min-height: 0;
   overflow-y: auto;
   padding: 22px 16px 24px;
   text-align: center;
 }
 
-.director-panel__plan > span {
+.main-plan > span {
   color: var(--query);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
-.director-panel__plan p {
+.main-plan p {
   min-height: 0;
   margin: 18px auto 0;
   padding: 18px 4px 0;
@@ -302,7 +302,7 @@ h1 span {
   overflow-wrap: anywhere;
 }
 
-.director-panel__plan p::before {
+.main-plan p::before {
   display: block;
   margin-bottom: 10px;
   color: var(--query);
@@ -414,7 +414,7 @@ h1 span {
 }
 
 .dungeon-panel,
-.director-card,
+.agent-card,
 .onboarding-card,
 .mission-card,
 .castle-map-card,
@@ -4119,7 +4119,7 @@ h1 span {
     grid-template-columns: 1fr;
   }
 
-  .director-panel {
+  .agent-panel {
     display: none;
   }
 

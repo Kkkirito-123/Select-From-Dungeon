@@ -28,8 +28,11 @@ Run the optional Agent service in another terminal:
 
 ```bash
 python3 -m pip install -e agent
-python3 -m agent --host 127.0.0.1 --port 8787
+dungeon-agent --host 127.0.0.1 --port 8787
 ```
+
+Copy `game/.env.example` to `game/.env.local` to enable the single optional
+`POST /v1/agent/run` integration. Provider keys stay in `agent/.env`.
 
 `game/node_modules/` is generated dependency content installed by pnpm. It is
 not project source, is ignored by Git, and can be regenerated from

@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentRuntime } from "../src/application/agent/AgentRuntime";
-import type {
-  AgentGatewayPort,
-  DirectorAgentResponse,
-  DirectorEvent,
-  DirectorSource,
-  DirectorView,
-} from "../src/contracts/agent/director";
+import type { AgentGatewayPort, AgentResponse, AgentView } from "../src/contracts/agent/main";
 import type { AnswerAttemptRecord } from "../src/contracts/game/results";
 import type { GameSnapshot } from "../src/contracts/game/snapshots";
 import type { FloorNumber } from "../src/domain/progression/runGraph";
@@ -52,7 +46,7 @@ function snapshot(): GameSnapshot {
   };
 }
 
-function remote(view: DirectorView, serial: number): DirectorAgentResponse {
+function remote(view: AgentView, serial: number): AgentResponse {
   const campfire = view.changedSource === "campfire";
   const content = campfire
     ? {
@@ -72,7 +66,7 @@ function remote(view: DirectorView, serial: number): DirectorAgentResponse {
         message: "你已经走到这里，先稳住节奏。",
       };
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     requestId: `remote-${serial}`,
     composeHash: "b".repeat(64),
     floor: view.floor,
@@ -84,9 +78,8 @@ function remote(view: DirectorView, serial: number): DirectorAgentResponse {
       status: "ready",
       content,
     },
-    director: {
+    main: {
       status: "ready",
-      situation: `${content.headline}：${content.facts[0]}`,
       guidance: `远程下一步 ${serial}`,
     },
     meta: {
@@ -94,7 +87,7 @@ function remote(view: DirectorView, serial: number): DirectorAgentResponse {
       ms: 9,
       calls: [
         { agent: view.changedSource, mode: "model", status: "ready", ms: 4, tokens: { input: 10, output: 4, total: 14 } },
-        { agent: "director", mode: "model", status: "ready", ms: 5, tokens: { input: 8, output: 3, total: 11 } },
+        { agent: "main", mode: "model", status: "ready", ms: 5, tokens: { input: 8, output: 3, total: 11 } },
       ],
     },
   };
@@ -105,7 +98,7 @@ function tick(): Promise<void> {
 }
 
 class ImmediateGateway implements AgentGatewayPort {
-  calls: DirectorView[] = [];
+  calls: AgentView[] = [];
 
   async evidenceHash(value: unknown): Promise<string> {
     const text = stableJson(value);
@@ -115,26 +108,26 @@ class ImmediateGateway implements AgentGatewayPort {
       .slice(-64);
   }
 
-  canRequest(_source: DirectorSource, _event: DirectorEvent): boolean {
+  canRequest(): boolean {
     return true;
   }
 
-  async run(view: DirectorView): Promise<DirectorAgentResponse> {
+  async run(view: AgentView): Promise<AgentResponse> {
     this.calls.push(view);
     return remote(view, this.calls.length);
   }
 }
 
 interface PendingCall {
-  view: DirectorView;
+  view: AgentView;
   signal: AbortSignal;
-  resolve: (response: DirectorAgentResponse) => void;
+  resolve: (response: AgentResponse) => void;
 }
 
 class DeferredGateway extends ImmediateGateway {
   pending: PendingCall[] = [];
 
-  override run(view: DirectorView, signal = new AbortController().signal): Promise<DirectorAgentResponse> {
+  override run(view: AgentView, signal = new AbortController().signal): Promise<AgentResponse> {
     this.calls.push(view);
     return new Promise((resolve) => {
       this.pending.push({ view, signal, resolve });
@@ -175,7 +168,7 @@ describe("AgentRuntime", () => {
     await tick();
 
     expect(runtime.getState().logs.some((line) => line.includes("SCRIBE READY · 4MS · 14 TOKENS"))).toBe(true);
-    expect(runtime.getState().logs.some((line) => line.includes("DIRECTOR READY · 5MS · 11 TOKENS"))).toBe(true);
+    expect(runtime.getState().logs.some((line) => line.includes("MAIN READY · 5MS · 11 TOKENS"))).toBe(true);
     runtime.destroy();
   });
 
@@ -243,7 +236,7 @@ describe("AgentRuntime", () => {
     high.resolve(remote(high.view, 2));
     await tick();
     expect(runtime.getState().event).toBe("scribe-interaction");
-    expect(runtime.getState().situation).toContain("远程抄写员 2");
+    expect(runtime.getState().guidance).toBe("远程下一步 2");
     runtime.destroy();
   });
 
@@ -278,7 +271,7 @@ describe("AgentRuntime", () => {
     expect(runtime.getState().event).toBe("scribe-interaction");
     interaction.resolve(remote(interaction.view, 1));
     await tick();
-    expect(runtime.getState().situation).toContain("远程抄写员 1");
+    expect(runtime.getState().guidance).toBe("远程下一步 1");
     runtime.destroy();
   });
 
@@ -360,7 +353,7 @@ describe("AgentRuntime", () => {
     const state = runtime.getState();
     expect(state.floor).toBe(2);
     expect(state.phases).toEqual({ campfire: "idle", scribe: "idle", main: "idle" });
-    expect(state.situation).toContain("第 2 层");
+    expect(state.guidance).toContain("第 2 层");
     expect(state.campfire.content).toBeNull();
     expect(state.scribe.content).toBeNull();
     runtime.destroy();

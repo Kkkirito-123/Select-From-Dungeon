@@ -125,11 +125,10 @@ complete SQLite query, and turn the correct result into an animated attack.
   latest battle or current floor. The complete browser-local log keeps at most
   200 SQL turns and never records movement or key presses. The review remains
   browser-local and is calculated by deterministic game rules by default. When
-  `VITE_CAMPFIRE_AGENT_URL` is explicitly configured, at most eight current-floor
-  submitted SQL projections can improve the wording; the game does not send
-  reference SQL or full game state. `VITE_SCRIBE_AGENT_URL` optionally enables
-  the Scribe endpoint for inspection, death review, and navigation guidance;
-  it receives only authored text and bounded scene evidence.
+  `VITE_AGENT_URL` is explicitly configured, the single optional Agent service
+  receives at most eight current-floor submitted SQL projections for Campfire
+  review or authored text plus bounded scene evidence for Scribe responses. It
+  never receives reference SQL or full game state.
 - Find two seeded physical campfires on every floor, in the middle and rear
   learning phases; the entrance is the front safe/respawn anchor. Their visibly bounded tiles and the floor entrance
   are safe zones with no ambushes, enemy spawns, or patrol entry. Stand beside a
@@ -329,21 +328,16 @@ pnpm preview
 ```
 
 The game uses deterministic local SQL review and authored Scribe text by default.
-Optional Python 3.11+ Campfire and Scribe Agent endpoints can be enabled with
-`VITE_CAMPFIRE_AGENT_URL` and `VITE_SCRIBE_AGENT_URL`; they are stateless,
-output-only services for `POST /v1/campfire/review` and
-`POST /v1/scribe/respond`. The game remains fully playable without either
-service, and no Agent output is persisted.
-`VITE_DIRECTOR_AGENT_URL` optionally enables the unified Main Agent endpoint
-`POST /v1/director/run`. It runs only the changed child Agent, uses the other
+`VITE_AGENT_URL` optionally enables the stateless Python 3.11+ service through
+the single `POST /v1/agent/run` endpoint. It runs only the changed child Agent, uses the other
 same-floor child result as bounded context, and renders only the Main Agent's
 next-plan text in the upper card of the desktop-only always-on panel. Campfire
 review and Scribe story/companionship remain in their own game views; a separate
 lower card shows a readable three-step Agent status flow, current action,
 current/page token usage, and the latest 40 memory-only runtime log lines. XState owns the browser Agent lifecycle; the Python service uses
 PydanticAI for strict structured model output and OpenTelemetry for content-free
-traces. `DIRECTOR_*` server settings are independent from `DEEPSEEK_*`; without
-the unified endpoint, the legacy child endpoints remain compatible.
+traces. `MAIN_*` server settings are independent from `CHILD_*`. Without the
+endpoint the game stays fully playable and no Agent output is persisted.
 
 The top-bar `⌘ 管理员` button opens the spoiler-heavy admin view. It only
 offers the next floor's starting position; the preview is memory-only and never
@@ -437,12 +431,13 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
 
 ```text
 ../agent/  (independent optional Python service)
-├─ campfire/  ── Campfire contract, validation, flow, local generator, and model adapter
-├─ scribe/    ── Scribe contract, scene flow, local generator, and model adapter
-├─ director/  ── schema-v2 orchestration contract, changed-child flow, and Main Agent
-├─ shared/    ── strict shared models, hashing, PydanticAI model runner, and telemetry
-├─ runtime/   ── child and Main model configuration
-└─ http/      ── three compatible routes and HTTP lifecycle
+└─ src/dungeon_agents/
+   ├─ campfire/  ── Campfire evidence, fallback, and model flow
+   ├─ scribe/    ── Scribe evidence, companionship, and model flow
+   ├─ main/      ── single schema-v1 contract and changed-role orchestration
+   ├─ shared/    ── strict models, hashing, PydanticAI, and telemetry
+   ├─ runtime/   ── child and Main model configuration
+   └─ http/      ── one route and HTTP lifecycle
 ```
 
 `src/application/triggers/` converts snapshot changes into semantic events;
@@ -530,7 +525,7 @@ immediately.
 SQL execution and review evidence remain in browser-local SQLite, Run/Profile,
 and IndexedDB boundaries. The optional Agent receives only the current-floor
 projection when explicitly configured; it is not a source of gameplay truth.
-The unified endpoint returns schema v2 metadata with per-call duration, mode,
+The unified endpoint returns schema v1 metadata with per-call duration, mode,
 status, token usage, and an optional trace ID. Setting
 `OTEL_EXPORTER_OTLP_ENDPOINT` enables OTLP/HTTP export; prompts, completions, SQL,
 display text, snapshots, keys, and identity are never added to spans.

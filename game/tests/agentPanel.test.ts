@@ -9,9 +9,9 @@ function node(): HTMLElement {
 
 type PanelDom = ParentNode & Pick<
   AppShellDom,
-  | "directorPanel"
-  | "directorStatus"
-  | "directorGuidance"
+  | "agentPanel"
+  | "mainStatus"
+  | "mainGuidance"
   | "agentWorkMode"
   | "agentWorkCampfire"
   | "agentWorkScribe"
@@ -20,14 +20,14 @@ type PanelDom = ParentNode & Pick<
   | "agentWorkCurrent"
   | "agentWorkPage"
   | "agentWorkLog"
-  | "directorLive"
+  | "mainLive"
 >;
 
 function root(): PanelDom {
   const nodes = new Map([
-    ["#director-panel", node()],
-    ["#director-status", node()],
-    ["#director-guidance", node()],
+    ["#agent-panel", node()],
+    ["#main-status", node()],
+    ["#main-guidance", node()],
     ["#agent-work-mode", node()],
     ["#agent-work-campfire", node()],
     ["#agent-work-scribe", node()],
@@ -36,15 +36,15 @@ function root(): PanelDom {
     ["#agent-work-current", node()],
     ["#agent-work-page", node()],
     ["#agent-work-log", node()],
-    ["#director-live", node()],
+    ["#main-live", node()],
   ]);
   return {
     querySelector: <T extends Element>(selector: string): T | null => (
       nodes.get(selector) as T | undefined ?? null
     ),
-    directorPanel: nodes.get("#director-panel")!,
-    directorStatus: nodes.get("#director-status")!,
-    directorGuidance: nodes.get("#director-guidance")!,
+    agentPanel: nodes.get("#agent-panel")!,
+    mainStatus: nodes.get("#main-status")!,
+    mainGuidance: nodes.get("#main-guidance")!,
     agentWorkMode: nodes.get("#agent-work-mode")!,
     agentWorkCampfire: nodes.get("#agent-work-campfire")!,
     agentWorkScribe: nodes.get("#agent-work-scribe")!,
@@ -53,7 +53,7 @@ function root(): PanelDom {
     agentWorkCurrent: nodes.get("#agent-work-current")!,
     agentWorkPage: nodes.get("#agent-work-page")!,
     agentWorkLog: nodes.get("#agent-work-log")!,
-    directorLive: nodes.get("#director-live")!,
+    mainLive: nodes.get("#main-live")!,
   } as unknown as PanelDom;
 }
 
@@ -64,7 +64,6 @@ function state(overrides: Partial<AgentRuntimeState> = {}): AgentRuntimeState {
     event: "scribe-interaction",
     source: "scribe",
     requestKey: "main-key",
-    situation: "当前情况",
     guidance: "下一步内容",
     streamKey: "main-key",
     campfire: { requestKey: null, content: null },
@@ -106,8 +105,8 @@ describe("AgentPanel", () => {
 
     panel.render(state());
 
-    expect(dom.querySelector<HTMLElement>("#director-guidance")?.textContent).toBe("下一步内容");
-    expect(dom.querySelector<HTMLElement>("#director-live")?.textContent).toBe("下一步内容");
+    expect(dom.querySelector<HTMLElement>("#main-guidance")?.textContent).toBe("下一步内容");
+    expect(dom.querySelector<HTMLElement>("#main-live")?.textContent).toBe("下一步内容");
   });
 
   it("下方独立显示三 Agent 状态、Token 和内存日志", () => {
@@ -151,12 +150,12 @@ describe("AgentPanel", () => {
 
     panel.render(state());
     expect(raf).toHaveBeenCalledTimes(1);
-    expect(dom.querySelector<HTMLElement>("#director-guidance")?.textContent).toBe("");
+    expect(dom.querySelector<HTMLElement>("#main-guidance")?.textContent).toBe("");
     frames[0]?.(24);
-    expect(dom.querySelector<HTMLElement>("#director-guidance")?.textContent).toBe("下一");
+    expect(dom.querySelector<HTMLElement>("#main-guidance")?.textContent).toBe("下一");
 
     panel.render(state({ requestKey: "cache-key", streamKey: null }));
-    expect(dom.querySelector<HTMLElement>("#director-guidance")?.textContent).toBe("下一步内容");
+    expect(dom.querySelector<HTMLElement>("#main-guidance")?.textContent).toBe("下一步内容");
     const calls = raf.mock.calls.length;
     panel.render(state({ requestKey: "cache-key", streamKey: null }));
     expect(raf).toHaveBeenCalledTimes(calls);
@@ -171,7 +170,7 @@ describe("AgentPanel", () => {
     const dom = root();
     const panel = new AgentPanel(dom);
     panel.render(state());
-    expect(dom.querySelector<HTMLElement>("#director-guidance")?.textContent).toBe("下一步内容");
+    expect(dom.querySelector<HTMLElement>("#main-guidance")?.textContent).toBe("下一步内容");
 
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     panel.render(state({ requestKey: "second", streamKey: "second" }));

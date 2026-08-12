@@ -31,9 +31,9 @@ export const APP_SHELL_DOM_SELECTORS = {
   gateExecuteButton: "#execute-gate-query",
   sqlButton: "#open-sql",
   audioButton: "#audio-toggle",
-  directorPanel: "#director-panel",
-  directorStatus: "#director-status",
-  directorGuidance: "#director-guidance",
+  agentPanel: "#agent-panel",
+  mainStatus: "#main-status",
+  mainGuidance: "#main-guidance",
   agentWorkMode: "#agent-work-mode",
   agentWorkCampfire: "#agent-work-campfire",
   agentWorkScribe: "#agent-work-scribe",
@@ -42,7 +42,7 @@ export const APP_SHELL_DOM_SELECTORS = {
   agentWorkCurrent: "#agent-work-current",
   agentWorkPage: "#agent-work-page",
   agentWorkLog: "#agent-work-log",
-  directorLive: "#director-live",
+  mainLive: "#main-live",
 } as const;
 
 /**
@@ -69,9 +69,9 @@ export interface AppShellDom {
   gateExecuteButton: HTMLButtonElement;
   sqlButton: HTMLButtonElement;
   audioButton: HTMLButtonElement;
-  directorPanel: HTMLElement;
-  directorStatus: HTMLElement;
-  directorGuidance: HTMLElement;
+  agentPanel: HTMLElement;
+  mainStatus: HTMLElement;
+  mainGuidance: HTMLElement;
   agentWorkMode: HTMLElement;
   agentWorkCampfire: HTMLElement;
   agentWorkScribe: HTMLElement;
@@ -80,7 +80,7 @@ export interface AppShellDom {
   agentWorkCurrent: HTMLElement;
   agentWorkPage: HTMLElement;
   agentWorkLog: HTMLElement;
-  directorLive: HTMLElement;
+  mainLive: HTMLElement;
 }
 
 export function bindAppShellDom(root: ParentNode): AppShellDom {
@@ -103,9 +103,9 @@ export function bindAppShellDom(root: ParentNode): AppShellDom {
     gateExecuteButton: requireElement(root, APP_SHELL_DOM_SELECTORS.gateExecuteButton),
     sqlButton: requireElement(root, APP_SHELL_DOM_SELECTORS.sqlButton),
     audioButton: requireElement(root, APP_SHELL_DOM_SELECTORS.audioButton),
-    directorPanel: requireElement(root, APP_SHELL_DOM_SELECTORS.directorPanel),
-    directorStatus: requireElement(root, APP_SHELL_DOM_SELECTORS.directorStatus),
-    directorGuidance: requireElement(root, APP_SHELL_DOM_SELECTORS.directorGuidance),
+    agentPanel: requireElement(root, APP_SHELL_DOM_SELECTORS.agentPanel),
+    mainStatus: requireElement(root, APP_SHELL_DOM_SELECTORS.mainStatus),
+    mainGuidance: requireElement(root, APP_SHELL_DOM_SELECTORS.mainGuidance),
     agentWorkMode: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkMode),
     agentWorkCampfire: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkCampfire),
     agentWorkScribe: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkScribe),
@@ -114,6 +114,6 @@ export function bindAppShellDom(root: ParentNode): AppShellDom {
     agentWorkCurrent: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkCurrent),
     agentWorkPage: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkPage),
     agentWorkLog: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkLog),
-    directorLive: requireElement(root, APP_SHELL_DOM_SELECTORS.directorLive),
+    mainLive: requireElement(root, APP_SHELL_DOM_SELECTORS.mainLive),
   };
 }

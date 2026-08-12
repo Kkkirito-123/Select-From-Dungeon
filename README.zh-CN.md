@@ -26,8 +26,11 @@ pnpm dev
 
 ```bash
 python3 -m pip install -e agent
-python3 -m agent --host 127.0.0.1 --port 8787
+dungeon-agent --host 127.0.0.1 --port 8787
 ```
+
+如需启用唯一的 `POST /v1/agent/run` 集成，将 `game/.env.example` 复制为
+`game/.env.local`；模型密钥只放在 `agent/.env`。
 
 `game/node_modules/` 是 pnpm 安装生成的依赖内容，不是项目源码，不会提交到 Git；删除后可根据
 `game/pnpm-lock.yaml` 完整重新生成。

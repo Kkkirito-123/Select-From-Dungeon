@@ -1,24 +1,15 @@
-/** 统一 Agent 网络边界：哈希、5 秒中止、端点优先级和严格响应校验。 */
+/** 唯一 Agent 网络边界：稳定哈希、五秒中止和严格响应校验。 */
+import type { CampfireAgentContent } from "../../contracts/agent/campfireReview";
 import type {
-  CampfireAgentContent,
-  CampfireAgentOutput,
-  CampfireAgentRequest,
-} from "../../contracts/agent/campfireReview";
-import type {
+  AgentCallMeta,
   AgentGatewayPort,
+  AgentRequest,
+  AgentResponse,
+  AgentSource,
   AgentTokens,
-  DirectorAgentRequest,
-  DirectorAgentResponse,
-  DirectorCallMeta,
-  DirectorEvent,
-  DirectorSource,
-  DirectorView,
-} from "../../contracts/agent/director";
-import type {
-  ScribeAgentContent,
-  ScribeAgentOutput,
-  ScribeAgentRequest,
-} from "../../contracts/agent/scribe";
+  AgentView,
+} from "../../contracts/agent/main";
+import type { ScribeAgentContent } from "../../contracts/agent/scribe";
 import {
   HASH_PATTERN,
   isRecord,
@@ -29,9 +20,7 @@ import {
 } from "./protocol";
 
 export interface AgentGatewayOptions {
-  directorEndpoint?: string | null;
-  campfireEndpoint?: string | null;
-  scribeEndpoint?: string | null;
+  endpoint?: string | null;
   fetcher?: typeof fetch;
   digest?: (value: string) => Promise<string>;
   requestId?: () => string;
@@ -52,14 +41,13 @@ function validInt(value: unknown): value is number {
 }
 
 function validTokens(value: unknown): value is AgentTokens {
-  if (!isRecord(value) || !exactKeys(value, ["input", "output", "total"])) return false;
-  return [value.input, value.output, value.total]
-    .every((token) => token === null || validInt(token));
+  return isRecord(value) && exactKeys(value, ["input", "output", "total"]) &&
+    [value.input, value.output, value.total].every((token) => token === null || validInt(token));
 }
 
-function validCall(value: unknown): value is DirectorCallMeta {
-  if (!isRecord(value) || !exactKeys(value, ["agent", "mode", "status", "ms", "tokens"])) return false;
-  return ["campfire", "scribe", "director"].includes(String(value.agent)) &&
+function validCall(value: unknown): value is AgentCallMeta {
+  return isRecord(value) && exactKeys(value, ["agent", "mode", "status", "ms", "tokens"]) &&
+    ["campfire", "scribe", "main"].includes(String(value.agent)) &&
     (value.mode === "model" || value.mode === "local") &&
     (value.status === "ready" || value.status === "fallback") &&
     validInt(value.ms) && validTokens(value.tokens);
@@ -67,7 +55,7 @@ function validCall(value: unknown): value is DirectorCallMeta {
 
 function validContent(
   value: unknown,
-  source: DirectorSource,
+  source: AgentSource,
 ): value is CampfireAgentContent | ScribeAgentContent {
   if (!isRecord(value) || !exactKeys(value, CONTENT_KEYS[source])) return false;
   if (!validPlainText(value.headline, 80) || !Array.isArray(value.facts) || value.facts.length > 3) return false;
@@ -78,15 +66,11 @@ function validContent(
     : value.safeHintId === null || validPlainText(value.safeHintId, 128);
 }
 
-function situationFor(content: CampfireAgentContent | ScribeAgentContent): string {
-  return (content.facts[0] ? `${content.headline}：${content.facts[0]}` : content.headline).slice(0, 120);
-}
-
-function guidanceFor(content: CampfireAgentContent | ScribeAgentContent): string {
+export function guidanceFor(content: CampfireAgentContent | ScribeAgentContent): string {
   return content.nextAction.slice(0, 240);
 }
 
-export function directorComposePayload(view: DirectorView): Record<string, unknown> {
+export function agentComposePayload(view: AgentView): Record<string, unknown> {
   return {
     floor: view.floor,
     event: view.event,
@@ -101,7 +85,7 @@ export function directorComposePayload(view: DirectorView): Record<string, unkno
   };
 }
 
-export function directorCacheKey(view: DirectorView): string {
+export function agentCacheKey(view: AgentView): string {
   return [
     view.floor,
     view.event,
@@ -114,16 +98,13 @@ export function directorCacheKey(view: DirectorView): string {
   ].join(":");
 }
 
-function validDirectorResponse(
-  value: unknown,
-  request: DirectorAgentRequest,
-): value is DirectorAgentResponse {
+function validResponse(value: unknown, request: AgentRequest): value is AgentResponse {
   if (!isRecord(value) || !exactKeys(value, [
     "schemaVersion", "requestId", "composeHash", "floor", "event", "changedSource",
-    "child", "director", "meta",
+    "child", "main", "meta",
   ])) return false;
   if (
-    value.schemaVersion !== 2 || value.requestId !== request.requestId ||
+    value.schemaVersion !== 1 || value.requestId !== request.requestId ||
     value.composeHash !== request.composeHash || value.floor !== request.floor ||
     value.event !== request.event || value.changedSource !== request.changedSource ||
     !HASH_PATTERN.test(String(value.composeHash))
@@ -136,47 +117,27 @@ function validDirectorResponse(
     (value.child.status !== "ready" && value.child.status !== "fallback") ||
     !validContent(value.child.content, request.changedSource)
   ) return false;
-  if (!isRecord(value.director) || !exactKeys(value.director, ["status", "situation", "guidance"])) return false;
+  if (!isRecord(value.main) || !exactKeys(value.main, ["status", "guidance"])) return false;
   if (
-    (value.director.status !== "ready" && value.director.status !== "fallback") ||
-    value.director.situation !== situationFor(value.child.content) ||
-    !validPlainText(value.director.guidance, 240)
+    (value.main.status !== "ready" && value.main.status !== "fallback") ||
+    !validPlainText(value.main.guidance, 240)
   ) return false;
   if (!isRecord(value.meta) || !exactKeys(value.meta, ["traceId", "ms", "calls"])) return false;
-  if (
-    (value.meta.traceId !== null && !/^[0-9a-f]{32}$/u.test(String(value.meta.traceId))) ||
-    !validInt(value.meta.ms) || !Array.isArray(value.meta.calls) || value.meta.calls.length !== 2 ||
-    !value.meta.calls.every(validCall) || value.meta.calls[0]?.agent !== request.changedSource ||
-    value.meta.calls[1]?.agent !== "director"
-  ) return false;
-  return true;
-}
-
-function validLegacyOutput(
-  value: unknown,
-  source: DirectorSource,
-  requestIdValue: string,
-  evidenceHash: string,
-): value is CampfireAgentOutput | ScribeAgentOutput {
-  if (!isRecord(value) || !exactKeys(value, ["schemaVersion", "requestId", "evidenceHash", ...CONTENT_KEYS[source]])) return false;
-  const content = Object.fromEntries(CONTENT_KEYS[source].map((key) => [key, value[key]]));
-  return value.schemaVersion === 1 && value.requestId === requestIdValue &&
-    value.evidenceHash === evidenceHash && validContent(content, source);
+  return (value.meta.traceId === null || /^[0-9a-f]{32}$/u.test(String(value.meta.traceId))) &&
+    validInt(value.meta.ms) && Array.isArray(value.meta.calls) && value.meta.calls.length === 2 &&
+    value.meta.calls.every(validCall) && value.meta.calls[0]?.agent === request.changedSource &&
+    value.meta.calls[1]?.agent === "main";
 }
 
 export class AgentGateway implements AgentGatewayPort {
-  private readonly directorEndpoint: string | null;
-  private readonly campfireEndpoint: string | null;
-  private readonly scribeEndpoint: string | null;
+  private readonly endpoint: string | null;
   private readonly fetcher: typeof fetch;
   private readonly digest: (value: string) => Promise<string>;
   private readonly makeRequestId: () => string;
   private readonly timeoutMs: number;
 
   constructor(options: AgentGatewayOptions = {}) {
-    this.directorEndpoint = options.directorEndpoint?.trim() || null;
-    this.campfireEndpoint = options.campfireEndpoint?.trim() || null;
-    this.scribeEndpoint = options.scribeEndpoint?.trim() || null;
+    this.endpoint = options.endpoint?.trim() || null;
     this.fetcher = options.fetcher ?? fetch;
     this.digest = options.digest ?? sha256Hex;
     this.makeRequestId = options.requestId ?? (() => requestId("agent"));
@@ -187,72 +148,20 @@ export class AgentGateway implements AgentGatewayPort {
     return this.digest(stableJson(value));
   }
 
-  canRequest(source: DirectorSource, event: DirectorEvent): boolean {
-    if (this.directorEndpoint) return true;
-    if (source === "campfire") return this.campfireEndpoint !== null;
-    return event !== "navigation" && this.scribeEndpoint !== null;
+  canRequest(): boolean {
+    return this.endpoint !== null;
   }
 
-  async run(view: DirectorView, signal?: AbortSignal): Promise<DirectorAgentResponse | null> {
-    const composeHash = await this.evidenceHash(directorComposePayload(view));
-    const request: DirectorAgentRequest = {
+  async run(view: AgentView, signal?: AbortSignal): Promise<AgentResponse | null> {
+    if (!this.endpoint) return null;
+    const request: AgentRequest = {
       protocolVersion: 1,
       requestId: this.makeRequestId(),
-      composeHash,
+      composeHash: await this.evidenceHash(agentComposePayload(view)),
       ...view,
     };
-    if (this.directorEndpoint) {
-      const payload = await this.post(this.directorEndpoint, request, signal);
-      return validDirectorResponse(payload, request) ? payload : null;
-    }
-    if (view.changedSource === "campfire" && this.campfireEndpoint) {
-      return this.sendLegacy(this.campfireEndpoint, request, signal);
-    }
-    if (view.changedSource === "scribe" && view.event !== "navigation" && this.scribeEndpoint) {
-      return this.sendLegacy(this.scribeEndpoint, request, signal);
-    }
-    return null;
-  }
-
-  private async sendLegacy(
-    endpoint: string,
-    request: DirectorAgentRequest,
-    signal?: AbortSignal,
-  ): Promise<DirectorAgentResponse | null> {
-    const started = performance.now();
-    const source = request.changedSource;
-    const childId = `${request.requestId}:${source}`;
-    const childRequest = {
-      protocolVersion: 1,
-      requestId: childId,
-      evidenceHash: request.changed.evidenceHash,
-      ...request.changed.evidence,
-    } as CampfireAgentRequest | ScribeAgentRequest;
-    const payload = await this.post(endpoint, childRequest, signal);
-    if (!validLegacyOutput(payload, source, childId, request.changed.evidenceHash)) return null;
-    const record = payload as unknown as Record<string, unknown>;
-    const content = Object.fromEntries(
-      CONTENT_KEYS[source].map((key) => [key, record[key]]),
-    ) as unknown as CampfireAgentContent | ScribeAgentContent;
-    const ms = Math.max(0, Math.round(performance.now() - started));
-    return {
-      schemaVersion: 2,
-      requestId: request.requestId,
-      composeHash: request.composeHash,
-      floor: request.floor,
-      event: request.event,
-      changedSource: source,
-      child: { source, evidenceHash: request.changed.evidenceHash, status: "ready", content },
-      director: { status: "fallback", situation: situationFor(content), guidance: guidanceFor(content) },
-      meta: {
-        traceId: null,
-        ms,
-        calls: [
-          { agent: source, mode: "model", status: "ready", ms, tokens: { input: null, output: null, total: null } },
-          { agent: "director", mode: "local", status: "fallback", ms: 0, tokens: { input: 0, output: 0, total: 0 } },
-        ],
-      },
-    };
+    const payload = await this.post(this.endpoint, request, signal);
+    return validResponse(payload, request) ? payload : null;
   }
 
   private async post(endpoint: string, body: object, external?: AbortSignal): Promise<unknown> {
@@ -277,5 +186,3 @@ export class AgentGateway implements AgentGatewayPort {
     }
   }
 }
-
-export { guidanceFor, situationFor };
