@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CampfireView } from "../src/contracts/agent/campfireReview";
-import type { DirectorAgentResponse, DirectorView } from "../src/contracts/agent/director";
+import type { AgentResponse, AgentView } from "../src/contracts/agent/main";
 import { AgentGateway } from "../src/infrastructure/agent/AgentGateway";
 
 const evidence: CampfireView = {
@@ -16,7 +16,7 @@ const evidence: CampfireView = {
   attempts: [],
 };
 
-function view(): DirectorView {
+function view(): AgentView {
   return {
     floor: 1,
     event: "campfire-review",
@@ -26,9 +26,9 @@ function view(): DirectorView {
   };
 }
 
-function response(): DirectorAgentResponse {
+function response(): AgentResponse {
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     requestId: "request-1",
     composeHash: "b".repeat(64),
     floor: 1,
@@ -46,29 +46,24 @@ function response(): DirectorAgentResponse {
         message: "先检查结果。",
       },
     },
-    director: {
-      status: "ready",
-      situation: "本层复盘：正确率为 0%。",
-      guidance: "继续检查当前记录。",
-    },
+    main: { status: "ready", guidance: "继续检查当前记录。" },
     meta: {
       traceId: "c".repeat(32),
       ms: 12,
       calls: [
         { agent: "campfire", mode: "model", status: "ready", ms: 7, tokens: { input: 10, output: 4, total: 14 } },
-        { agent: "director", mode: "model", status: "ready", ms: 5, tokens: { input: 8, output: 3, total: 11 } },
+        { agent: "main", mode: "model", status: "ready", ms: 5, tokens: { input: 8, output: 3, total: 11 } },
       ],
     },
   };
 }
 
 describe("AgentGateway", () => {
-  it("统一端点优先，严格接受 schema v2 meta 且请求不含完整快照", async () => {
+  it("只调用唯一端点，严格接受 schema v1 meta 且请求不含完整快照", async () => {
     const endpoints: string[] = [];
     let body = "";
     const gateway = new AgentGateway({
-      directorEndpoint: "/v1/director/run",
-      campfireEndpoint: "/v1/campfire/review",
+      endpoint: "/v1/agent/run",
       digest: async () => "b".repeat(64),
       requestId: () => "request-1",
       fetcher: async (input, init) => {
@@ -80,41 +75,26 @@ describe("AgentGateway", () => {
 
     const result = await gateway.run(view());
 
-    expect(endpoints).toEqual(["/v1/director/run"]);
+    expect(endpoints).toEqual(["/v1/agent/run"]);
     expect(result?.meta.calls[0]?.tokens.total).toBe(14);
     expect(body).not.toContain("answerSql");
     expect(body).not.toContain("inventory");
     expect(body).not.toContain("snapshot");
   });
 
-  it("没有统一端点时兼容旧子端点，并把 token 标记为 N/A", async () => {
-    const gateway = new AgentGateway({
-      campfireEndpoint: "/v1/campfire/review",
-      digest: async (value) => value.includes("changedEvidenceHash") ? "b".repeat(64) : "a".repeat(64),
-      requestId: () => "request-1",
-      fetcher: async () => new Response(JSON.stringify({
-        schemaVersion: 1,
-        requestId: "request-1:campfire",
-        evidenceHash: "a".repeat(64),
-        headline: "旧端点复盘",
-        facts: ["兼容结果"],
-        focusConcept: null,
-        nextAction: "继续",
-        message: "保持节奏",
-      })),
-    });
+  it("未配置端点时不发请求，由运行时使用本地回退", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const gateway = new AgentGateway({ fetcher });
 
-    const result = await gateway.run(view());
-
-    expect(result?.schemaVersion).toBe(2);
-    expect(result?.meta.calls[0]?.tokens.total).toBeNull();
-    expect(result?.director.status).toBe("fallback");
+    expect(gateway.canRequest()).toBe(false);
+    await expect(gateway.run(view())).resolves.toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("5 秒后中止请求，并拒绝额外字段", async () => {
     vi.useFakeTimers();
     const gateway = new AgentGateway({
-      directorEndpoint: "/v1/director/run",
+      endpoint: "/v1/agent/run",
       digest: async () => "b".repeat(64),
       requestId: () => "request-1",
       timeoutMs: 5_000,
@@ -128,10 +108,10 @@ describe("AgentGateway", () => {
     expect(await pending).toBeNull();
     vi.useRealTimers();
 
-    const invalid = response() as DirectorAgentResponse & { extra: boolean };
+    const invalid = response() as AgentResponse & { extra: boolean };
     invalid.extra = true;
     const strict = new AgentGateway({
-      directorEndpoint: "/v1/director/run",
+      endpoint: "/v1/agent/run",
       digest: async () => "b".repeat(64),
       requestId: () => "request-1",
       fetcher: async () => new Response(JSON.stringify(invalid)),
@@ -139,9 +119,9 @@ describe("AgentGateway", () => {
     expect(await strict.run(view())).toBeNull();
   });
 
-  it("统一端点返回非法 JSON 时使用本地回退", async () => {
+  it("唯一端点返回非法 JSON 时交给运行时本地回退", async () => {
     const gateway = new AgentGateway({
-      directorEndpoint: "/v1/director/run",
+      endpoint: "/v1/agent/run",
       digest: async () => "b".repeat(64),
       requestId: () => "request-1",
       fetcher: async () => new Response("not-json"),

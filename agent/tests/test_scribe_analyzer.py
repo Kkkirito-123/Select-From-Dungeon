@@ -1,23 +1,22 @@
 import unittest
 
-from agent.scribe.contract import ScribeModelContent, parse_request
-from agent.scribe.flow import ScribeFlow
-from agent.shared.model import ModelResult, TokenUsage
-from agent.tests.test_scribe_contract import request_payload
+from dungeon_agents.scribe.contract import ScribeModelContent, parse_evidence
+from dungeon_agents.scribe.flow import ScribeFlow
+from dungeon_agents.shared.model import ModelResult, TokenUsage
+from test_scribe_contract import evidence_payload
 
 
 class ScribeAnalyzerTests(unittest.TestCase):
     def test_death_review_names_missing_and_unexpected_fields(self) -> None:
-        result = ScribeFlow().run(request_payload())
+        content, _call = ScribeFlow().execute(parse_evidence(evidence_payload()))
 
-        self.assertEqual(result["requestId"], "scribe-request-1")
-        self.assertEqual(result["safeHintId"], "inner-join-room-hint-2")
-        self.assertIn("sector", " ".join(result["facts"]))
-        self.assertIn("字段", result["nextAction"])
-        self.assertNotIn("answerSql", result)
+        self.assertEqual(content.safe_hint_id, "inner-join-room-hint-2")
+        self.assertIn("sector", " ".join(content.facts))
+        self.assertIn("字段", content.next_action)
+        self.assertNotIn("answerSql", content.model_dump(by_alias=True))
 
     def test_navigation_uses_structured_direction(self) -> None:
-        payload = request_payload()
+        payload = evidence_payload()
         payload["scene"] = "navigation"
         payload["learning"] = None
         payload["death"] = None
@@ -28,15 +27,10 @@ class ScribeAnalyzerTests(unittest.TestCase):
             "distance": 12,
             "guidanceLevel": 1,
         }
-        from agent.shared.hash import evidence_hash
+        content, _call = ScribeFlow().execute(parse_evidence(payload))
 
-        evidence = {key: value for key, value in payload.items() if key not in {"protocolVersion", "requestId", "evidenceHash"}}
-        payload["evidenceHash"] = evidence_hash(evidence)
-
-        result = ScribeFlow().run(payload)
-
-        self.assertIn("东方", " ".join(result["facts"]))
-        self.assertIn("东方", result["nextAction"])
+        self.assertIn("东方", " ".join(content.facts))
+        self.assertIn("东方", content.next_action)
 
     def test_navigation_does_not_call_scribe_model(self) -> None:
         class SpyModel:
@@ -50,7 +44,7 @@ class ScribeAnalyzerTests(unittest.TestCase):
                     TokenUsage(1, 1, 2),
                 )
 
-        payload = request_payload()
+        payload = evidence_payload()
         payload.update({
             "scene": "navigation",
             "learning": None,
@@ -63,13 +57,9 @@ class ScribeAnalyzerTests(unittest.TestCase):
                 "guidanceLevel": 1,
             },
         })
-        from agent.shared.hash import evidence_hash
-
-        evidence = {key: value for key, value in payload.items() if key not in {"protocolVersion", "requestId", "evidenceHash"}}
-        payload["evidenceHash"] = evidence_hash(evidence)
         model = SpyModel()
 
-        _output, call = ScribeFlow(model=model).execute(parse_request(payload))
+        _output, call = ScribeFlow(model=model).execute(parse_evidence(payload))
 
         self.assertEqual(model.calls, 0)
         self.assertEqual(call.mode, "local")

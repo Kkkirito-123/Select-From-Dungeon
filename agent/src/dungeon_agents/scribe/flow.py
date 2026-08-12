@@ -1,4 +1,4 @@
-"""抄写员剧情陪伴流程；玩法字段始终由确定性规则提供。"""
+"""抄写员只负责剧情陪伴和失败安慰；玩法字段由规则决定。"""
 
 from __future__ import annotations
 
@@ -7,18 +7,10 @@ from typing import Protocol
 
 from opentelemetry.sdk.trace import TracerProvider
 
-from agent.runtime.config import Settings
-from agent.shared.hash import canonical_json
-from agent.shared.model import CallInfo, ModelResult, ModelRunner, TokenUsage
-from agent.shared.telemetry import tracer
-from agent.scribe.contract import (
-    ScribeAgentContent,
-    ScribeModelContent,
-    ScribeOutput,
-    ScribeRequest,
-    parse_output,
-    parse_request,
-)
+from dungeon_agents.runtime.config import Settings
+from dungeon_agents.scribe.contract import ScribeAgentContent, ScribeEvidence, ScribeModelContent
+from dungeon_agents.shared.hash import canonical_json
+from dungeon_agents.shared.model import CallInfo, ModelResult, ModelRunner, TokenUsage
 
 
 DIRECTIONS = {"north": "北方", "east": "东方", "south": "南方", "west": "西方"}
@@ -37,12 +29,12 @@ def create_model(settings: Settings, provider: TracerProvider | None = None) -> 
     return ModelRunner(settings, ScribeModelContent, SYSTEM_PROMPT, "scribe", provider)
 
 
-def local_content(request: ScribeRequest) -> ScribeAgentContent:
+def local_content(evidence: ScribeEvidence) -> ScribeAgentContent:
     facts: list[str] = []
     action = "继续观察当前楼层的目标，不要急着重复已经确认的步骤。"
-    message = request.authored_message
-    if request.learning:
-        learning = request.learning
+    message = evidence.authored_message
+    if evidence.learning:
+        learning = evidence.learning
         if learning.missing_columns:
             facts.append(f"缺少字段：{', '.join(learning.missing_columns)}。")
         if learning.unexpected_columns:
@@ -59,39 +51,38 @@ def local_content(request: ScribeRequest) -> ScribeAgentContent:
             message, action = "查询已经执行，但结果语义还没有符合题目要求。", "先确认返回行数和筛选范围，再检查字段含义。"
         else:
             message, action = "这一步已经通过。记住刚才的判断顺序，再把它应用到下一道题。", "继续下一道题，提交前先复核字段、条件和结果含义。"
-    if request.navigation:
-        direction = DIRECTIONS[request.navigation.direction]
-        facts.append(f"目标：{request.navigation.target_label}，在{direction}，约 {request.navigation.distance} 步。")
-        action = f"沿当前可行通道向{direction}前进，优先寻找{request.navigation.target_label}。"
-        message = request.authored_message
-    if request.death:
-        facts.insert(0, f"本轮结束原因：{CAUSES[request.death.cause]}。")
+    if evidence.navigation:
+        direction = DIRECTIONS[evidence.navigation.direction]
+        facts.append(f"目标：{evidence.navigation.target_label}，在{direction}，约 {evidence.navigation.distance} 步。")
+        action = f"沿当前可行通道向{direction}前进，优先寻找{evidence.navigation.target_label}。"
+        message = evidence.authored_message
+    if evidence.death:
+        facts.insert(0, f"本轮结束原因：{CAUSES[evidence.death.cause]}。")
         message = "这次失败会保留为一次可复盘的记录。"
-        message += "先修正记录中最明确的问题，再重新开始。" if request.learning else "先看清一个最值得修正的地方，再重新开始。"
-        if request.learning is None:
+        message += "先修正记录中最明确的问题，再重新开始。" if evidence.learning else "先看清一个最值得修正的地方，再重新开始。"
+        if evidence.learning is None:
             action = "回到最近的安全点后，先确认当前目标，再继续前进。"
     return ScribeAgentContent(
-        headline={"interaction": "抄写员记录", "death-review": "抄写员复盘本轮", "navigation": "路线记录"}[request.scene],
+        headline={"interaction": "抄写员记录", "death-review": "抄写员复盘本轮", "navigation": "路线记录"}[evidence.scene],
         message=message,
         facts=facts[:3],
         next_action=action,
-        safe_hint_id=request.learning.safe_hint_id if request.learning else None,
+        safe_hint_id=evidence.learning.safe_hint_id if evidence.learning else None,
     )
 
 
 class ScribeFlow:
-    def __init__(self, model: ScribeModel | None = None, provider: TracerProvider | None = None) -> None:
+    def __init__(self, model: ScribeModel | None = None) -> None:
         self._model = model
-        self._tracer = tracer(provider)
 
-    def execute(self, request: ScribeRequest) -> tuple[ScribeOutput, CallInfo]:
+    def execute(self, evidence: ScribeEvidence) -> tuple[ScribeAgentContent, CallInfo]:
         started = perf_counter()
-        content = local_content(request)
+        content = local_content(evidence)
         status = "fallback"
         tokens = TokenUsage.local()
-        if self._model is not None and request.scene != "navigation":
+        if self._model is not None and evidence.scene != "navigation":
             try:
-                result = self._model.run(canonical_json(request.evidence_payload()))
+                result = self._model.run(canonical_json(evidence.model_dump(by_alias=True, mode="json")))
                 content = content.model_copy(update={
                     "headline": result.output.headline,
                     "message": result.output.message,
@@ -99,34 +90,13 @@ class ScribeFlow:
                 tokens, status = result.tokens, "ready"
             except Exception:
                 pass
-        output = ScribeOutput(
-            **content.model_dump(),
-            schema_version=1,
-            request_id=request.request_id,
-            evidence_hash=request.evidence_hash,
-        )
-        output = parse_output(output.model_dump(by_alias=True), request)
-        return output, CallInfo(
+        return content, CallInfo(
             "scribe",
             "model" if status == "ready" else "local",
             status,
             round((perf_counter() - started) * 1000),
             tokens,
         )
-
-    def run(self, payload: object) -> dict[str, object]:
-        request = parse_request(payload)
-        with self._tracer.start_as_current_span("agent.request") as root:
-            root.set_attributes({
-                "request.id": request.request_id,
-                "game.floor": request.floor,
-                "agent.source": "scribe",
-                "agent.event": request.scene,
-            })
-            with self._tracer.start_as_current_span("agent.child") as span:
-                output, call = self.execute(request)
-                span.set_attributes(call.span_attributes())
-        return output.to_dict()
 
 
 __all__ = ["ScribeFlow", "create_model", "local_content"]

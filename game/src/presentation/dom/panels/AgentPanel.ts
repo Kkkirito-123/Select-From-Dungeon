@@ -16,9 +16,9 @@ export class AgentPanel {
 
   constructor(private readonly dom: Pick<
     AppShellDom,
-    | "directorPanel"
-    | "directorStatus"
-    | "directorGuidance"
+    | "agentPanel"
+    | "mainStatus"
+    | "mainGuidance"
     | "agentWorkMode"
     | "agentWorkCampfire"
     | "agentWorkScribe"
@@ -27,13 +27,13 @@ export class AgentPanel {
     | "agentWorkCurrent"
     | "agentWorkPage"
     | "agentWorkLog"
-    | "directorLive"
+    | "mainLive"
   >) {}
 
   render(state: AgentRuntimeState): void {
     const phase = state.phases.main;
-    this.dom.directorPanel.dataset.state = phase;
-    this.dom.directorStatus.textContent = STATUS[phase];
+    this.dom.agentPanel.dataset.state = phase;
+    this.dom.mainStatus.textContent = STATUS[phase];
     this.renderWork(state);
 
     if (phase === "running") {
@@ -52,7 +52,7 @@ export class AgentPanel {
       return;
     }
     this.cancelTyping();
-    this.dom.directorGuidance.textContent = state.guidance;
+    this.dom.mainGuidance.textContent = state.guidance;
   }
 
   destroy(): void {
@@ -64,13 +64,13 @@ export class AgentPanel {
     const id = ++this.renderId;
     const guidance = Array.from(state.guidance);
     const started = performance.now();
-    this.dom.directorGuidance.textContent = "";
-    this.dom.directorPanel.dataset.state = "running";
-    this.dom.directorStatus.textContent = "STREAM";
+    this.dom.mainGuidance.textContent = "";
+    this.dom.agentPanel.dataset.state = "running";
+    this.dom.mainStatus.textContent = "STREAM";
     const tick = (now: number): void => {
       if (id !== this.renderId) return;
       const count = Math.min(guidance.length, Math.max(1, Math.floor((now - started) / 24) + 1));
-      this.dom.directorGuidance.textContent = guidance.slice(0, count).join("");
+      this.dom.mainGuidance.textContent = guidance.slice(0, count).join("");
       if (count >= guidance.length) {
         this.complete(state);
         return;
@@ -82,15 +82,15 @@ export class AgentPanel {
 
   private showAll(state: AgentRuntimeState): void {
     this.cancelTyping();
-    this.dom.directorGuidance.textContent = state.guidance;
+    this.dom.mainGuidance.textContent = state.guidance;
     this.complete(state);
   }
 
   private complete(state: AgentRuntimeState): void {
     this.frame = null;
-    this.dom.directorPanel.dataset.state = state.phases.main;
-    this.dom.directorStatus.textContent = STATUS[state.phases.main];
-    this.dom.directorLive.textContent = state.guidance;
+    this.dom.agentPanel.dataset.state = state.phases.main;
+    this.dom.mainStatus.textContent = STATUS[state.phases.main];
+    this.dom.mainLive.textContent = state.guidance;
   }
 
   private cancelTyping(): void {
@@ -156,7 +156,7 @@ export class AgentPanel {
       const name = message.split(" ")[0];
       return `${this.agentName(name)} · 开始处理`;
     }
-    const call = message.match(/^(CAMPFIRE|SCRIBE|DIRECTOR) (READY|FALLBACK) · (\d+)MS · (.+) TOKENS$/);
+    const call = message.match(/^(CAMPFIRE|SCRIBE|MAIN) (READY|FALLBACK) · (\d+)MS · (.+) TOKENS$/);
     if (call) {
       const [, name, status, ms, tokens] = call;
       return `${this.agentName(name)} · ${status === "READY" ? "完成" : "本地回退"} · ${ms}ms · ${tokens} Token`;
@@ -167,7 +167,7 @@ export class AgentPanel {
   }
 
   private agentName(name: string): string {
-    return { CAMPFIRE: "篝火", SCRIBE: "抄写员", DIRECTOR: "主 Agent" }[name] ?? name;
+    return { CAMPFIRE: "篝火", SCRIBE: "抄写员", MAIN: "主 Agent" }[name] ?? name;
   }
 
   private usageLine(label: string, input: number | null, output: number | null, total: number | null): string {

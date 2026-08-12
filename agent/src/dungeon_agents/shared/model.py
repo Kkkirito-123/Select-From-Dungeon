@@ -17,8 +17,8 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
-from agent.runtime.config import Settings
-from agent.shared.telemetry import tracer_provider
+from dungeon_agents.runtime.config import Settings
+from dungeon_agents.shared.telemetry import tracer_provider
 
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
@@ -48,7 +48,7 @@ class ModelResult(Generic[OutputT]):
 
 @dataclass(frozen=True)
 class CallInfo:
-    agent: Literal["campfire", "scribe", "director"]
+    agent: Literal["campfire", "scribe", "main"]
     mode: Literal["model", "local"]
     status: Literal["ready", "fallback"]
     ms: int

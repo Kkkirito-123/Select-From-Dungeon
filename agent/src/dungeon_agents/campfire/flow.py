@@ -1,4 +1,4 @@
-"""篝火 SQL 复盘流程。"""
+"""篝火 SQL 学习复盘；模型失败时返回确定性内容。"""
 
 from __future__ import annotations
 
@@ -7,17 +7,10 @@ from typing import Protocol
 
 from opentelemetry.sdk.trace import TracerProvider
 
-from agent.campfire.contract import (
-    CampfireAgentContent,
-    CampfireReviewOutput,
-    CampfireReviewRequest,
-    canonical_json,
-    parse_output,
-    parse_request,
-)
-from agent.runtime.config import Settings
-from agent.shared.model import CallInfo, ModelResult, ModelRunner, TokenUsage
-from agent.shared.telemetry import tracer
+from dungeon_agents.campfire.contract import CampfireAgentContent, CampfireEvidence
+from dungeon_agents.runtime.config import Settings
+from dungeon_agents.shared.hash import canonical_json
+from dungeon_agents.shared.model import CallInfo, ModelResult, ModelRunner, TokenUsage
 
 
 ERROR_LABELS = {
@@ -39,11 +32,11 @@ def create_model(settings: Settings, provider: TracerProvider | None = None) -> 
     return ModelRunner(settings, CampfireAgentContent, SYSTEM_PROMPT, "campfire", provider)
 
 
-def local_content(request: CampfireReviewRequest) -> CampfireAgentContent:
-    aggregate = request.aggregate
+def local_content(evidence: CampfireEvidence) -> CampfireAgentContent:
+    aggregate = evidence.aggregate
     errors = aggregate.error_counts.model_dump(by_alias=True)
     common_error = max(errors.items(), key=lambda item: (item[1], item[0]))
-    focus_attempt = next((item for item in reversed(request.attempts) if item.result != "correct"), None)
+    focus = next((item for item in reversed(evidence.attempts) if item.result != "correct"), None)
     facts = [
         f"本层共记录 {aggregate.total_attempts} 次作答，正确 {aggregate.correct_count} 次，"
         f"正确率 {aggregate.accuracy}%。"
@@ -56,7 +49,7 @@ def local_content(request: CampfireReviewRequest) -> CampfireAgentContent:
         )
     elif aggregate.correct_count == aggregate.total_attempts and aggregate.total_attempts > 0:
         facts.append("本层记录暂未显示提示依赖，继续保持先读题目再写查询。")
-    if focus_attempt:
+    if focus:
         action = "下一次先圈出题目要求的字段和筛选条件，再检查查询结果是否覆盖全部要求。"
     elif aggregate.total_attempts == 0:
         action = "完成一次当前楼层 SQL 作答后，再回到篝火查看复盘。"
@@ -65,7 +58,7 @@ def local_content(request: CampfireReviewRequest) -> CampfireAgentContent:
     return CampfireAgentContent(
         headline=f"本层 SQL 复盘 · {aggregate.correct_count}/{aggregate.total_attempts} 次正确",
         facts=facts[:3],
-        focus_concept=focus_attempt.stage_objective[:80] if focus_attempt else None,
+        focus_concept=focus.stage_objective[:80] if focus else None,
         next_action=action,
         message=(
             f"这层已经完成 {aggregate.total_attempts} 次 SQL 练习，正确率 {aggregate.accuracy}%。"
@@ -74,30 +67,22 @@ def local_content(request: CampfireReviewRequest) -> CampfireAgentContent:
     )
 
 
-class ReviewFlow:
-    def __init__(self, model: CampfireModel | None = None, provider: TracerProvider | None = None) -> None:
+class CampfireFlow:
+    def __init__(self, model: CampfireModel | None = None) -> None:
         self._model = model
-        self._tracer = tracer(provider)
 
-    def execute(self, request: CampfireReviewRequest) -> tuple[CampfireReviewOutput, CallInfo]:
+    def execute(self, evidence: CampfireEvidence) -> tuple[CampfireAgentContent, CallInfo]:
         started = perf_counter()
+        content = local_content(evidence)
         status = "fallback"
         tokens = TokenUsage.local()
-        content = local_content(request)
         if self._model is not None:
             try:
-                result = self._model.run(canonical_json(request.evidence_payload()))
+                result = self._model.run(canonical_json(evidence.model_dump(by_alias=True, mode="json")))
                 content, tokens, status = result.output, result.tokens, "ready"
             except Exception:
                 pass
-        output = CampfireReviewOutput(
-            **content.model_dump(),
-            schema_version=1,
-            request_id=request.request_id,
-            evidence_hash=request.evidence_hash,
-        )
-        output = parse_output(output.model_dump(by_alias=True), request)
-        return output, CallInfo(
+        return content, CallInfo(
             "campfire",
             "model" if status == "ready" else "local",
             status,
@@ -105,19 +90,5 @@ class ReviewFlow:
             tokens,
         )
 
-    def run(self, payload: object) -> dict[str, object]:
-        request = parse_request(payload)
-        with self._tracer.start_as_current_span("agent.request") as root:
-            root.set_attributes({
-                "request.id": request.request_id,
-                "game.floor": request.floor,
-                "agent.source": "campfire",
-                "agent.event": "campfire-review",
-            })
-            with self._tracer.start_as_current_span("agent.child") as span:
-                output, call = self.execute(request)
-                span.set_attributes(call.span_attributes())
-        return output.to_dict()
 
-
-__all__ = ["ReviewFlow", "create_model", "local_content"]
+__all__ = ["CampfireFlow", "create_model", "local_content"]

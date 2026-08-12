@@ -1,14 +1,10 @@
 import unittest
 
-from agent.campfire.contract import (
-    ContractError,
-    evidence_hash,
-    parse_output,
-    parse_request,
-)
+from dungeon_agents.campfire.contract import CampfireAgentContent, parse_evidence
+from dungeon_agents.shared.errors import ContractError
 
 
-def request_payload(attempt_count: int = 2) -> dict[str, object]:
+def evidence_payload(attempt_count: int = 2) -> dict[str, object]:
     attempts = [
         {
             "attemptId": index + 1,
@@ -22,7 +18,7 @@ def request_payload(attempt_count: int = 2) -> dict[str, object]:
         }
         for index in range(attempt_count)
     ]
-    evidence = {
+    return {
         "floor": 1,
         "aggregate": {
             "totalAttempts": attempt_count,
@@ -38,57 +34,42 @@ def request_payload(attempt_count: int = 2) -> dict[str, object]:
         },
         "attempts": attempts,
     }
-    return {
-        "protocolVersion": 1,
-        "requestId": "request-1",
-        "evidenceHash": evidence_hash(evidence),
-        **evidence,
-    }
 
 
 class CampfireContractTests(unittest.TestCase):
     def test_request_accepts_minimal_projection_and_excludes_reference_sql(self) -> None:
-        request = parse_request(request_payload())
+        evidence = parse_evidence(evidence_payload())
 
-        self.assertEqual(request.floor, 1)
-        self.assertEqual(len(request.attempts), 2)
-        self.assertNotIn("answerSql", request.attempts[0].model_dump(by_alias=True))
+        self.assertEqual(evidence.floor, 1)
+        self.assertEqual(len(evidence.attempts), 2)
+        self.assertNotIn("answerSql", evidence.attempts[0].model_dump(by_alias=True))
 
     def test_request_rejects_extra_fields(self) -> None:
-        payload = request_payload()
+        payload = evidence_payload()
         payload["answerSql"] = "SELECT * FROM monsters"
 
         with self.assertRaises(ContractError):
-            parse_request(payload)
+            parse_evidence(payload)
 
     def test_request_rejects_more_than_eight_attempts(self) -> None:
-        payload = request_payload(9)
-        payload["evidenceHash"] = evidence_hash({
-            "floor": payload["floor"],
-            "aggregate": payload["aggregate"],
-            "attempts": payload["attempts"],
-        })
+        payload = evidence_payload(9)
 
         with self.assertRaises(ContractError):
-            parse_request(payload)
+            parse_evidence(payload)
 
-    def test_output_rejects_hash_mismatch_and_markup(self) -> None:
-        request = parse_request(request_payload())
+    def test_content_rejects_markup(self) -> None:
         valid = {
-            "schemaVersion": 1,
-            "requestId": request.request_id,
-            "evidenceHash": request.evidence_hash,
             "headline": "本层复盘",
             "facts": ["正确率正常"],
             "focusConcept": None,
             "nextAction": "继续练习",
             "message": "保持节奏",
         }
-        parse_output(valid, request)
+        CampfireAgentContent.model_validate(valid)
 
         invalid = {**valid, "message": "<script>alert(1)</script>"}
-        with self.assertRaises(ContractError):
-            parse_output(invalid, request)
+        with self.assertRaises(ValueError):
+            CampfireAgentContent.model_validate(invalid)
 
 
 if __name__ == "__main__":

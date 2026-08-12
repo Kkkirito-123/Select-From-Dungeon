@@ -83,10 +83,9 @@
   错误结果或语法错误触发已预告的怪物反击；空输入不消耗回合。
 - 顶栏 `答题复盘` 会本地记录每次 SQL、对应参考答案、错误类型、提示等级和战斗结果，可分别
   查看最近一场战斗与当前楼层。完整浏览器日志最多保留 200 次 SQL 回合，不记录移动或按键。
-  复盘结果默认保留在浏览器本地，由确定性的游戏规则计算。明确配置
-  `VITE_CAMPFIRE_AGENT_URL` 后，最多八条当前层玩家 SQL 投影可以只改善复盘文案；参考 SQL 和完整
-  游戏状态不会发送。配置 `VITE_SCRIBE_AGENT_URL` 后，抄写员端点可用于调查、死亡复盘和导航指引，
-  只接收作者文案和受限的场景证据。
+  复盘结果默认保留在浏览器本地，由确定性的游戏规则计算。明确配置 `VITE_AGENT_URL` 后，唯一
+  Agent 服务只接收最多八条当前层 SQL 投影用于篝火复盘，或作者文案与受限场景证据用于抄写员；
+  参考 SQL 和完整游戏状态不会发送。
 - 每层会在中、后学习阶段生成两个稳定的实体篝火；出生区作为前段安全与兜底复活锚点。篝火周围可见区域与本层出生区都是
   安全区，不会触发突发遭遇，巡逻怪也不能进入。站在火堆相邻格按 `E`，可以选择
   `在此休息` 或 `答案复盘`；休息恢复满生命，并把该篝火设为复活点。当前层精英被击败前，
@@ -231,15 +230,11 @@ pnpm build
 pnpm preview
 ```
 
-游戏默认使用确定性的本地 SQL 复盘和作者编写的抄写员文本。配置
-`VITE_CAMPFIRE_AGENT_URL` 后，可选 Python 3.11+ 篝火 Agent 通过无状态
-`POST /v1/campfire/review` 只改善当前层复盘文案。配置 `VITE_SCRIBE_AGENT_URL` 后，抄写员端点可用于调查、
-死亡复盘和导航指引，只接收作者文案和受限的场景证据。配置 `VITE_DIRECTOR_AGENT_URL` 后，统一主 Agent
-只运行变化的子 Agent，并把同层另一份子结果作为受限背景。桌面端左侧上卡只常亮显示 Main Agent 的下一步计划；篝火复盘与
+游戏默认使用确定性的本地 SQL 复盘和作者编写的抄写员文本。配置 `VITE_AGENT_URL` 后，可选
+Python 3.11+ 服务通过唯一的 `POST /v1/agent/run` 只运行变化的子 Agent，并把同层另一份子结果作为受限背景。桌面端左侧上卡只常亮显示 Main Agent 的下一步计划；篝火复盘与
 抄写员剧情/陪伴仍留在各自的游戏界面。独立下卡以三行状态流显示三个 Agent 的阶段，并显示当前动作、本次与页面累计 Token，以及最近 40 条可读内存日志。主 Agent 使用独立的
-`DIRECTOR_*` 服务端配置。浏览器用 XState 管理 Agent 生命周期，Python
-使用 PydanticAI 生成严格结构化输出，并通过 OpenTelemetry 提供不含正文的 Trace。没有统一端点时旧子端点保持兼容；
-没有任一服务时游戏仍可完整运行，Agent 输出不会持久化。
+`MAIN_*` 服务端配置，篝火与抄写员共用 `CHILD_*`。浏览器用 XState 管理 Agent 生命周期，Python
+使用 PydanticAI 生成严格结构化输出，并通过 OpenTelemetry 提供不含正文的 Trace。未配置端点时游戏仍可完整运行，Agent 输出不会持久化。
 
 顶栏 `⌘ 管理员` 只提供下一层初始位置入口，包含剧透的预览只存在内存中，不覆盖正式 Run
 或永久怪物档案；战斗时自动填写当前题目的正确 SQL，刷新页面即退出预览并回到最后一次正式存档。
@@ -332,7 +327,7 @@ GameSession ── 物理世界、篝火、安全区、演员、迷雾、战斗�
 当前层脏数据，玩家进入篝火两格圆形范围后才为这份证据发起请求；实体调查、死亡和导航也进入同一个 Runtime。
 `src/infrastructure/agent/AgentGateway.ts` 统一处理 SHA-256、5 秒中止、端点优先级和严格 schema 校验；
 `AgentCache` 在页面内存中分别保存篝火、抄写员和 Main 结果。导航使用确定性抄写员子结果，不调用抄写员模型。
-兄弟工程 `../agent/shared/` 统一 PydanticAI 模型入口与 OpenTelemetry，Python 服务无 Agent 数据库或输出 Store。
+兄弟工程 `../agent/src/dungeon_agents/shared/` 统一 PydanticAI 模型入口与 OpenTelemetry，Python 服务无 Agent 数据库或输出 Store。
 
 `FloorContracts` 定义八层课程与内容边界，`CampaignDomain` 序列化确定性的有序槽位并拒绝
 跳层与重复激活。`RunGraph` 是当前可执行八层的课程依赖图，不负责移动玩家；
@@ -381,7 +376,7 @@ Run Key 不读取也不删除。
 拓扑变化仍立即落盘。
 
 SQL 执行和复盘证据继续留在浏览器本地 SQLite、Run/Profile 与 IndexedDB 边界内。明确配置后，
-可选 Agent 只接收当前层投影，不是游戏状态来源。统一端点返回 schema v2 调用元数据，包括耗时、模式、状态、
+可选 Agent 只接收当前层投影，不是游戏状态来源。统一端点返回 schema v1 调用元数据，包括耗时、模式、状态、
 Token 和可选 Trace ID。配置 `OTEL_EXPORTER_OTLP_ENDPOINT` 后才通过 OTLP/HTTP 导出；Span 不记录 prompt、
 completion、SQL、正文、快照、Key 或身份。
 

@@ -4,11 +4,11 @@
 
 ## 归属
 
-- `campfire/` 负责 SQL 学习复盘契约和流程。
-- `scribe/` 负责剧情陪伴与失败安慰契约和流程。
-- `director/` 当前负责把变化方子结果整理为 Main 下一步指引。
-- `shared/` 是模型调用、纯文本规则、Hash、错误和遥测的唯一公共边界。
-- `http/` 只解析传输输入并装配流程，不承载角色业务。
+- `src/dungeon_agents/campfire/` 负责 SQL 学习复盘契约和流程。
+- `src/dungeon_agents/scribe/` 负责剧情陪伴与失败安慰。
+- `src/dungeon_agents/main/` 负责唯一 HTTP 契约和变化角色编排。
+- `src/dungeon_agents/shared/` 是模型调用、纯文本规则、Hash、错误和遥测的唯一公共边界。
+- `src/dungeon_agents/http/` 只解析传输输入并装配流程，不承载角色业务。
 - `tests/` 集中保留，因为它验证三个角色及共享运行层之间的完整契约。
 
 三个角色属于一个可部署服务，但业务模块相互分开。不得拆成三个服务，也不得复制公共模型客户端。
@@ -28,7 +28,7 @@
 ```bash
 python3 -m pip install -e agent
 python3 -m unittest discover -s agent/tests
-python3 -m agent --host 127.0.0.1 --port 8787
+dungeon-agent --host 127.0.0.1 --port 8787
 ```
 
 命名保持简短可读。中文注释只解释模块职责、非直观编排、公共契约和隐私/安全边界，不逐行复述代码。

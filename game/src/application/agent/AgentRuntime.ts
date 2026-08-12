@@ -1,13 +1,13 @@
 import { createActor, fromPromise, setup } from "xstate";
 import type { CampfireAgentContent, CampfireView } from "../../contracts/agent/campfireReview";
 import type {
-  AgentGatewayPort, AgentTokens, DirectorAgentResponse, DirectorEvent,
-  DirectorRoleContext, DirectorSource, DirectorView,
-} from "../../contracts/agent/director";
+  AgentEvent, AgentGatewayPort, AgentResponse, AgentRoleContext,
+  AgentSource, AgentTokens, AgentView,
+} from "../../contracts/agent/main";
 import type { ScribeAgentContent, ScribePrompt } from "../../contracts/agent/scribe";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import { buildCampfireReview, campfireReviewInput } from "../../domain/learning/campfireReview";
-import { directorCacheKey, directorComposePayload, guidanceFor, situationFor } from "../../infrastructure/agent/AgentGateway";
+import { agentCacheKey, agentComposePayload, guidanceFor } from "../../infrastructure/agent/AgentGateway";
 import { stableJson } from "../../infrastructure/agent/protocol";
 import { inCampfireRange } from "../triggers/policy";
 import type { Trigger } from "../triggers/events";
@@ -29,10 +29,9 @@ export interface AgentUsageState extends AgentTokens {
 export interface AgentRuntimeState {
   phases: { campfire: AgentPhase; scribe: AgentPhase; main: AgentPhase };
   floor: number | null;
-  event: DirectorEvent | null;
-  source: DirectorSource | null;
+  event: AgentEvent | null;
+  source: AgentSource | null;
   requestKey: string | null;
-  situation: string;
   guidance: string;
   streamKey: string | null;
   campfire: { requestKey: string | null; content: CampfireAgentContent | null };
@@ -43,13 +42,13 @@ export interface AgentRuntimeState {
 type RoleContent = CampfireAgentContent | ScribeAgentContent;
 interface ActiveRole { key: string; floor: number; evidenceHash: string }
 interface JobBase {
-  source: DirectorSource; event: DirectorEvent; floor: number; requestKey: string;
+  source: AgentSource; event: AgentEvent; floor: number; requestKey: string;
   local: RoleContent; serial: number; owner: boolean;
 }
 interface CampfireJob extends JobBase { source: "campfire"; evidence: CampfireView; local: CampfireAgentContent }
 interface ScribeJob extends JobBase { source: "scribe"; evidence: ScribePrompt; local: ScribeAgentContent }
 type Job = CampfireJob | ScribeJob;
-interface Outcome { job: Job; response: DirectorAgentResponse; roleKey: string; mainKey: string; mode: "remote" | "cache" | "local" }
+interface Outcome { job: Job; response: AgentResponse; roleKey: string; mainKey: string; mode: "remote" | "cache" | "local" }
 type MachineEvent =
   | { type: "RUN_CAMPFIRE"; job: CampfireJob }
   | { type: "RUN_SCRIBE"; job: ScribeJob }
@@ -72,31 +71,31 @@ const campfireRest = { on: CAMPFIRE_EVENTS } as const;
 const scribeRest = { on: SCRIBE_EVENTS } as const;
 const mainRest = { on: MAIN_EVENTS } as const;
 
-const PRIORITY: Record<DirectorEvent, number> = {
+const PRIORITY: Record<AgentEvent, number> = {
   "scribe-interaction": 80,
   "death-review": 70,
   "campfire-review": 60,
   navigation: 50,
 };
-function eventFor(prompt: ScribePrompt): DirectorEvent {
+function eventFor(prompt: ScribePrompt): AgentEvent {
   return prompt.scene === "interaction" ? "scribe-interaction" : prompt.scene;
 }
 
-function localResponse(view: DirectorView, content: RoleContent, composeHash: string): DirectorAgentResponse {
-  const fallbackCall = (agent: DirectorSource | "director") => ({
+function localResponse(view: AgentView, content: RoleContent, composeHash: string): AgentResponse {
+  const fallbackCall = (agent: AgentSource | "main") => ({
     agent, mode: "local" as const, status: "fallback" as const, ms: 0,
     tokens: { input: 0, output: 0, total: 0 },
   });
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     requestId: "local",
     composeHash,
     floor: view.floor,
     event: view.event,
     changedSource: view.changedSource,
     child: { source: view.changedSource, evidenceHash: view.changed.evidenceHash, status: "fallback", content },
-    director: { status: "fallback", situation: situationFor(content), guidance: guidanceFor(content) },
-    meta: { traceId: null, ms: 0, calls: [fallbackCall(view.changedSource), fallbackCall("director")] },
+    main: { status: "fallback", guidance: guidanceFor(content) },
+    meta: { traceId: null, ms: 0, calls: [fallbackCall(view.changedSource), fallbackCall("main")] },
   };
 }
 
@@ -107,7 +106,7 @@ export class AgentRuntime {
   private activeCampfire: ActiveRole | null = null;
   private activeScribe: ActiveRole | null = null;
   private serial = 0;
-  private panel: { serial: number; priority: number; source: DirectorSource; pending: boolean } | null = null;
+  private panel: { serial: number; priority: number; source: AgentSource; pending: boolean } | null = null;
   private logId = 0;
   private destroyed = false;
   private campfireJob: CampfireJob | null = null;
@@ -117,7 +116,6 @@ export class AgentRuntime {
     event: null,
     source: null,
     requestKey: null,
-    situation: "等待篝火或抄写员记录。",
     guidance: "完成一次调查或进入篝火后，这里会整理当前记录。",
     streamKey: null,
     campfire: { requestKey: null, content: null },
@@ -136,7 +134,7 @@ export class AgentRuntime {
       accept: ({ event, self }) => {
         const output = (event as unknown as { output: Outcome }).output;
         if (this.accept(output)) {
-          self.send({ type: "MAIN_DONE", status: output.response.director.status });
+          self.send({ type: "MAIN_DONE", status: output.response.main.status });
         }
       },
     },
@@ -360,24 +358,24 @@ export class AgentRuntime {
     const roleKey = job.source === "campfire"
       ? `${job.floor}:${evidenceHash}`
       : `${job.floor}:${job.evidence.scene}:${evidenceHash}`;
-    const view: DirectorView = {
+    const view: AgentView = {
       floor: job.floor,
       event: job.event,
       changedSource: job.source,
-      changed: { source: job.source, evidenceHash, evidence: job.evidence } as DirectorView["changed"],
+      changed: { source: job.source, evidenceHash, evidence: job.evidence } as AgentView["changed"],
       context: {
         campfire: job.source === "campfire" ? null : this.roleContext("campfire", this.activeCampfire),
         scribe: job.source === "scribe" ? null : this.roleContext("scribe", this.activeScribe),
       },
     };
-    const mainKey = directorCacheKey(view);
+    const mainKey = agentCacheKey(view);
     const cached = this.cache.get("main", mainKey);
     if (cached) return { job, response: cached, roleKey, mainKey, mode: "cache" };
-    if (this.gateway.canRequest(job.source, job.event)) {
+    if (this.gateway.canRequest()) {
       const remote = await this.gateway.run(view, signal);
       if (remote) return { job, response: remote, roleKey, mainKey, mode: "remote" };
     }
-    const composeHash = await this.gateway.evidenceHash(directorComposePayload(view));
+    const composeHash = await this.gateway.evidenceHash(agentComposePayload(view));
     return { job, response: localResponse(view, job.local, composeHash), roleKey, mainKey, mode: "local" };
   }
 
@@ -386,10 +384,10 @@ export class AgentRuntime {
     const content = response.child.content;
     if (mode !== "cache") {
       this.cache.set(job.source, roleKey, content as never, response.child.status);
-      this.cache.set("main", mainKey, response, response.director.status);
+      this.cache.set("main", mainKey, response, response.main.status);
     }
     if (job.source === "campfire") {
-      if (response.director.status === "ready") this.dirtyFloors.delete(job.floor);
+      if (response.main.status === "ready") this.dirtyFloors.delete(job.floor);
       this.activeCampfire = { key: roleKey, floor: job.floor, evidenceHash: response.child.evidenceHash };
       this.view.campfire = { requestKey: job.requestKey, content: content as CampfireAgentContent };
     } else if (job.evidence.scene !== "navigation") {
@@ -413,9 +411,8 @@ export class AgentRuntime {
       event: response.event,
       source: response.changedSource,
       requestKey: mainKey,
-      situation: response.director.situation,
-      guidance: response.director.guidance,
-      streamKey: mode === "remote" && response.director.status === "ready" ? mainKey : null,
+      guidance: response.main.guidance,
+      streamKey: mode === "remote" && response.main.status === "ready" ? mainKey : null,
     };
     return true;
   }
@@ -423,7 +420,7 @@ export class AgentRuntime {
   private roleContext<T extends RoleContent>(
     source: "campfire" | "scribe",
     active: ActiveRole | null,
-  ): DirectorRoleContext<T> | null {
+  ): AgentRoleContext<T> | null {
     if (!active) return null;
     const content = this.cache.get(source, active.key) as T | null;
     if (!content) {
@@ -434,7 +431,7 @@ export class AgentRuntime {
     return { floor: active.floor, evidenceHash: active.evidenceHash, content };
   }
 
-  private updateUsage(response: DirectorAgentResponse, mode: Outcome["mode"]): void {
+  private updateUsage(response: AgentResponse, mode: Outcome["mode"]): void {
     if (mode !== "remote") {
       this.view.usage = { ...this.view.usage, mode: mode === "cache" ? "CACHE" : "LOCAL", input: 0, output: 0, total: 0 };
       return;
@@ -458,7 +455,7 @@ export class AgentRuntime {
     };
   }
 
-  private claim(event: DirectorEvent, source: DirectorSource): { serial: number; owner: boolean } {
+  private claim(event: AgentEvent, source: AgentSource): { serial: number; owner: boolean } {
     const serial = ++this.serial;
     if (this.panel?.pending && PRIORITY[event] < this.panel.priority) return { serial, owner: false };
     this.panel = { serial, priority: PRIORITY[event], source, pending: true };
@@ -477,8 +474,7 @@ export class AgentRuntime {
       event: null,
       source: null,
       requestKey: null,
-      situation: `已进入第 ${floor} 层，等待新的记录。`,
-      guidance: "靠近篝火或调查抄写员后，这里会整理当前楼层信息。",
+      guidance: `已进入第 ${floor} 层。靠近篝火或调查抄写员后，这里会整理下一步计划。`,
       streamKey: null,
       campfire: { requestKey: null, content: null },
       scribe: { requestKey: null, scene: null, content: null },

@@ -6,9 +6,9 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic_ai.models.test import TestModel
 
-from agent.campfire.contract import CampfireAgentContent
-from agent.runtime.config import Settings
-from agent.shared.model import ModelRunner, normalize_base_url
+from dungeon_agents.campfire.contract import CampfireAgentContent
+from dungeon_agents.runtime.config import Settings
+from dungeon_agents.shared.model import ModelRunner, normalize_base_url
 
 
 class ModelTests(unittest.TestCase):

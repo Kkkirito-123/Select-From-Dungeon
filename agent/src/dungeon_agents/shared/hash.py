@@ -1,4 +1,4 @@
-"""篝火证据的规范化和哈希计算。"""
+"""Agent 证据的稳定序列化和哈希计算。"""
 
 from __future__ import annotations
 

@@ -38,19 +38,19 @@ export function appShellTemplate({
         </header>
 
         <main class="game-layout">
-          <aside id="director-panel" class="director-panel" aria-label="主 Agent 工作台">
-            <section class="director-card director-card--plan" aria-labelledby="director-guidance-label">
-              <div class="director-card__heading">
+          <aside id="agent-panel" class="agent-panel" aria-label="Agent 工作台">
+            <section class="agent-card agent-card--plan" aria-labelledby="main-guidance-label">
+              <div class="agent-card__heading">
                 <span>MAIN AGENT / 主 Agent</span>
-                <strong id="director-status">IDLE</strong>
+                <strong id="main-status">IDLE</strong>
               </div>
-              <div class="director-panel__plan">
-                <span id="director-guidance-label">NEXT PLAN / 下一步计划</span>
-                <p id="director-guidance">等待新的记录。</p>
+              <div class="main-plan">
+                <span id="main-guidance-label">NEXT PLAN / 下一步计划</span>
+                <p id="main-guidance">等待新的记录。</p>
               </div>
             </section>
-            <section class="director-card director-card--work" aria-labelledby="agent-work-label">
-              <div class="director-card__heading">
+            <section class="agent-card agent-card--work" aria-labelledby="agent-work-label">
+              <div class="agent-card__heading">
                 <span id="agent-work-label">AGENT WORK / 实时工作</span>
                 <strong id="agent-work-mode">LOCAL</strong>
               </div>
@@ -75,7 +75,7 @@ export function appShellTemplate({
               </div>
               <pre id="agent-work-log" class="agent-work__log">000 RUNTIME READY</pre>
             </section>
-            <span id="director-live" class="sr-only" aria-live="polite" aria-atomic="true"></span>
+            <span id="main-live" class="sr-only" aria-live="polite" aria-atomic="true"></span>
           </aside>
           <section class="dungeon-panel" aria-label="SQL 魔王城房间">
             <div class="hud-strip">

@@ -27,9 +27,9 @@ const CRITICAL_DOM_IDS = [
   "audio-toggle",
   "audio-volume",
   "reset-game",
-  "director-panel",
-  "director-status",
-  "director-guidance",
+  "agent-panel",
+  "main-status",
+  "main-guidance",
   "agent-work-mode",
   "agent-work-campfire",
   "agent-work-scribe",
@@ -38,7 +38,7 @@ const CRITICAL_DOM_IDS = [
   "agent-work-current",
   "agent-work-page",
   "agent-work-log",
-  "director-live",
+  "main-live",
 ] as const;
 
 describe("AppShell 静态 DOM 契约", () => {
@@ -56,9 +56,9 @@ describe("AppShell 静态 DOM 契约", () => {
       expect(ids, selector).toContain(selector.slice(1));
     });
     expect(new Set(ids).size).toBe(ids.length);
-    expect((markup.match(/class="director-card director-card--plan"/g) ?? []).length).toBe(1);
-    expect((markup.match(/class="director-card director-card--work"/g) ?? []).length).toBe(1);
-    expect(markup).not.toContain("director-situation");
+    expect((markup.match(/class="agent-card agent-card--plan"/g) ?? []).length).toBe(1);
+    expect((markup.match(/class="agent-card agent-card--work"/g) ?? []).length).toBe(1);
+    expect(markup).not.toContain("main-situation");
     expect(markup).not.toContain("agent-scribe-title");
     expect(markup).toContain('id="admin-next-floor"');
     expect(markup).not.toContain("admin-floor-list");

@@ -1,11 +1,11 @@
 import unittest
 
-from agent.shared.hash import evidence_hash
-from agent.scribe.contract import ContractError, parse_output, parse_request
+from dungeon_agents.scribe.contract import ScribeAgentContent, parse_evidence
+from dungeon_agents.shared.errors import ContractError
 
 
-def request_payload() -> dict[str, object]:
-    evidence = {
+def evidence_payload() -> dict[str, object]:
+    return {
         "floor": 2,
         "scene": "death-review",
         "scribeId": "npc-scribe-f2",
@@ -32,46 +32,36 @@ def request_payload() -> dict[str, object]:
             "lastOutcome": "defeat",
         },
     }
-    return {
-        "protocolVersion": 1,
-        "requestId": "scribe-request-1",
-        "evidenceHash": evidence_hash(evidence),
-        **evidence,
-    }
 
 
 class ScribeContractTests(unittest.TestCase):
     def test_request_validates_scene_evidence_and_hash(self) -> None:
-        request = parse_request(request_payload())
+        evidence = parse_evidence(evidence_payload())
 
-        self.assertEqual(request.scene, "death-review")
-        self.assertIsNotNone(request.learning)
-        self.assertEqual(request.learning.missing_columns, ["sector"])
-        self.assertEqual(request.death.cause if request.death else None, "combat")
+        self.assertEqual(evidence.scene, "death-review")
+        self.assertIsNotNone(evidence.learning)
+        self.assertEqual(evidence.learning.missing_columns, ["sector"])
+        self.assertEqual(evidence.death.cause if evidence.death else None, "combat")
 
     def test_navigation_requires_navigation_evidence(self) -> None:
-        payload = request_payload()
+        payload = evidence_payload()
         payload["scene"] = "navigation"
         payload["navigation"] = None
 
         with self.assertRaises(ContractError):
-            parse_request(payload)
+            parse_evidence(payload)
 
-    def test_output_cannot_change_safe_hint(self) -> None:
-        request = parse_request(request_payload())
+    def test_content_rejects_markup(self) -> None:
         output = {
-            "schemaVersion": 1,
-            "requestId": request.request_id,
-            "evidenceHash": request.evidence_hash,
             "headline": "抄写员复盘本轮",
             "facts": ["缺少字段：sector。"],
             "nextAction": "先核对 SELECT 字段。",
-            "safeHintId": "complete-answer",
-            "message": "先检查字段列表。",
+            "safeHintId": "inner-join-room-hint-2",
+            "message": "<script>错误内容</script>",
         }
 
-        with self.assertRaises(ContractError):
-            parse_output(output, request)
+        with self.assertRaises(ValueError):
+            ScribeAgentContent.model_validate(output)
 
 
 if __name__ == "__main__":

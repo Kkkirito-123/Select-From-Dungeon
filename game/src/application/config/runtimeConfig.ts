@@ -64,9 +64,7 @@ export const WORLD_UI_RUNTIME_CONFIG = {
 } as const;
 
 export const AGENT_RUNTIME_CONFIG = {
-  /** 统一主 Agent；未设置时保留旧子 Agent 端点或本地回退。 */
-  directorEndpoint: import.meta.env.VITE_DIRECTOR_AGENT_URL?.trim() || null,
-  campfireEndpoint: import.meta.env.VITE_CAMPFIRE_AGENT_URL?.trim() || null,
-  scribeEndpoint: import.meta.env.VITE_SCRIBE_AGENT_URL?.trim() || null,
+  /** 唯一 Agent 服务入口；未设置时三个角色全部使用本地规则。 */
+  endpoint: import.meta.env.VITE_AGENT_URL?.trim() || null,
   timeoutMs: 5_000,
 } as const;

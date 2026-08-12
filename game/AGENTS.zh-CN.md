@@ -49,9 +49,8 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 满背包必须显式替换，普通物品丢弃后在当前层可重新拾取，基础/课程/钥匙类保护物品不能丢弃。
 篝火与抄写员是两个独立的游戏对象。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
 复盘按钮保持禁用。达到该条件后，篝火根据当前层本地记录显示确定性复盘。每层另有一名实体抄写员，
-作者内容是她的本地回退文案。当前游戏没有玩家提示词；配置
-`VITE_DIRECTOR_AGENT_URL` 后，可选的无状态 Python 主 Agent 只运行变化的篝火或抄写员子 Agent，
-再综合已经校验的展示文案；旧子端点继续兼容。本地结果仍然立即可用。抄写员在调查、死亡复盘和导航指引等级提升时响应，不能修改游戏状态、路线或存档。
+作者内容是她的本地回退文案。当前游戏没有玩家提示词；配置 `VITE_AGENT_URL` 后，可选的无状态
+Python 服务通过 `POST /v1/agent/run` 只运行变化的篝火或抄写员角色，再生成 Main 指引。本地结果仍然立即可用。抄写员在调查、死亡复盘和导航指引等级提升时响应，不能修改游戏状态、路线或存档。
 每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
 解锁；证据明确区分未知、已查为 `NULL` 和实际值。第八层完成 MVP 2.0 唯一结局 `MIGRATE`，
 不使用账号、服务端游戏数据库或远程游戏日志。
@@ -65,7 +64,7 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 顶栏 `答题复盘` 读取浏览器本地答案记录，分别展示最近一场战斗和当前楼层。每条记录包含玩家
 SQL、明确参考 SQL、结果分类、提示等级和战斗结果；最多保留 200 个 SQL 回合，不记录移动
 或按键。完整日志和复盘结果只保存在浏览器，由确定性的游戏规则计算。明确配置篝火 Agent 后，
-最多八条当前层玩家 SQL 投影和聚合统计才会发送到 `POST /v1/campfire/review`；抄写员 Agent 只接收
+最多八条当前层玩家 SQL 投影和聚合统计才会发送到唯一 Agent 入口；抄写员只接收
 当前场景作者文案以及受限的学习、死亡或导航证据。参考 SQL、移动、地图、背包、身份和完整存档不会离开浏览器。
 怪物显示名必须直白且容易输入：统一使用“史莱姆”“水胶怪”“幼龙”这类二到三个汉字，
 不得添加间隔点称号或 SQL 概念后缀。新增内容也遵守同一规则；SQL 含义放在字段、任务与
@@ -112,7 +111,7 @@ index.html -> src/application/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> CampfireReview（当前楼层确定性 SQL 复盘）
   -> TriggerBus -> AgentRuntime/XState（并行篝火、抄写员、Main 生命周期与内存缓存）
-  -> AgentGateway -> 可选 ../agent/director -> 变化的 PydanticAI 子 Agent -> Main 引导 -> AgentPanel
+  -> AgentGateway -> 可选 ../agent/src/dungeon_agents -> 变化的 PydanticAI 角色 -> Main 引导 -> AgentPanel
   -> OpenTelemetry（不含正文的请求、子 Agent、Main 与模型 Span）
   -> QuestionBankLoader/LearningLedger（经校验 SQLite 题库与 IndexedDB 证据）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
@@ -166,9 +165,9 @@ index.html -> src/application/main.ts
 
 `src/application/triggers/` 负责把快照变化转换为语义事件，`src/application/agent/AgentRuntime.ts` 用一个 XState
 actor 管理篝火、抄写员和 Main 三个并行状态区，并负责脏状态、同源取消、跨源并发、面板优先级和三份独立
-页面内存缓存。`src/infrastructure/agent/AgentGateway.ts` 是端点优先级、稳定 Hash、5 秒中止和严格回复校验的
+页面内存缓存。`src/infrastructure/agent/AgentGateway.ts` 是唯一端点、稳定 Hash、5 秒中止和严格回复校验的
 唯一网络边界。导航使用确定性抄写员子结果，不调用抄写员模型。`agent/` 负责 Python 3.11+ 严格 Pydantic
-契约、PydanticAI 模型入口、子 Agent/Main 流程、不含正文的 OpenTelemetry Span 与三个 HTTP 路由；服务没有
+契约、PydanticAI 模型入口、子 Agent/Main 流程、不含正文的 OpenTelemetry Span 与一个 HTTP 路由；服务没有
 Agent 数据库或输出 Store。
 
 `src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
@@ -263,14 +262,13 @@ pnpm build
 ## 运行与安全边界
 
 - SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，抄写员使用作者内容
-  和受限场景投影。明确配置后，主 Agent 通过 `POST /v1/director/run` 接收变化方投影和同层子结果；旧的
-  `POST /v1/campfire/review` 与 `POST /v1/scribe/respond` 继续兼容。游戏没有 Agent 存档，未配置服务时完全使用本地文案。
+  和受限场景投影。明确配置后，唯一 `POST /v1/agent/run` 接收变化方投影和同层子结果。游戏没有 Agent 存档，未配置服务时完全使用本地文案。
 - Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。主 Agent 只看到已经校验的子 Agent 展示文本；
   子请求仍遵守篝火最多八条 SQL 投影和抄写员受限场景证据边界。请求不包含参考 SQL、完整
   `GameSnapshot`、身份、移动、地图、背包或游戏指令。响应必须匹配请求 Hash 并通过文本限制，才能替换本地
-  文案。统一路由返回 schema v2 调用元数据，包括耗时、模式、状态、Token 和可选 Trace ID。Agent 缓存、
+  文案。统一路由返回 schema v1 调用元数据，包括耗时、模式、状态、Token 和可选 Trace ID。Agent 缓存、
   输出、页面 Token 累计和实时日志都只存在页面内存；Python 服务不持久化请求或输出。
-- OpenTelemetry 创建 `agent.request`、`agent.child`、`agent.director` 与 PydanticAI 模型 Span。只有配置
+- OpenTelemetry 创建 `agent.request`、`agent.child`、`agent.main` 与 PydanticAI 模型 Span。只有配置
   `OTEL_EXPORTER_OTLP_ENDPOINT` 才向外导出；Span 可以记录请求 ID、楼层、事件、来源、状态、fallback、耗时
   和 Token 数字，但不得记录 prompt、completion、SQL、展示正文、快照、API Key 或身份。
 - 战斗终端只接受一条只读 `SELECT` 或 `WITH`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面

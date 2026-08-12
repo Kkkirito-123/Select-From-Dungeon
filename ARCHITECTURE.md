@@ -19,12 +19,14 @@ repository/
 game/TriggerBus
   -> game/AgentRuntime
   -> HTTP（受限证据与严格响应）
-  -> agent/HTTP service
-      -> Campfire / Scribe / Main
+  -> POST /v1/agent/run
+  -> agent/src/dungeon_agents
+      -> Campfire 或 Scribe -> Main
 ```
 
 - `game/` 不导入 Python 包；`agent/` 不导入游戏 TypeScript、存档或资源。
 - Agent 是可选增强层，未配置或不可用时，游戏使用确定性本地文案。
+- Agent 是一个部署服务、一个 HTTP 入口和三个职责独立的角色模块。
 - 两个工程分别管理依赖。`game/node_modules/` 和 Python 虚拟环境都是可再生内容，不属于源码。
 - 根目录不提供第二套游戏入口或聚合业务代码，防止同一能力出现双轨实现。
 
