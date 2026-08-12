@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 REVIEW_PATH = "/v1/campfire/review"
 SCRIBE_RESPONSE_PATH = "/v1/scribe/respond"
+DIRECTOR_RUN_PATH = "/v1/director/run"
 
 
 def is_review_path(value: str) -> bool:
@@ -22,3 +23,9 @@ def is_scribe_path(value: str) -> bool:
     """判断 URL 是否指向抄写员场景响应路由。"""
 
     return urlsplit(value).path == SCRIBE_RESPONSE_PATH
+
+
+def is_director_path(value: str) -> bool:
+    """判断 URL 是否指向主 Agent 编排路由。"""
+
+    return urlsplit(value).path == DIRECTOR_RUN_PATH

@@ -8,8 +8,7 @@ import "../presentation/style.css";
 import type Phaser from "phaser";
 import { ArcadeAudio } from "../infrastructure/audio/ArcadeAudio";
 import {
-  CAMPFIRE_AGENT_RUNTIME_CONFIG,
-  SCRIBE_AGENT_RUNTIME_CONFIG,
+  AGENT_RUNTIME_CONFIG,
   WORLD_RUNTIME_CONFIG,
 } from "./config/runtimeConfig";
 import { GameSession } from "../domain/session/GameSession";
@@ -18,22 +17,15 @@ import type { BattleScene } from "../presentation/phaser/BattleScene";
 import { applyPageVisibilityRuntime } from "./runtime/pageLifecycle";
 import { loadBundledQuestionBank } from "./runtime/questionBankLoader";
 import { SqlEngine } from "../infrastructure/sql/SqlEngine";
-import {
-  loadProfile,
-  loadRun,
-} from "../infrastructure/storage/localProgress";
 import type { StorageLike } from "../contracts/storage/storageLike";
+import { BrowserDataStore } from "../infrastructure/storage/browserDataStore";
 import { startProgressPersistence } from "../infrastructure/storage/progressPersistence";
 import { LearningLedger, LearningProgressRecorder } from "../infrastructure/storage/learningLedger";
 import { AppShell } from "../presentation/dom/AppShell";
 import { OnboardingController } from "../presentation/dom/OnboardingController";
-import { createCampfireAgentClient } from "../infrastructure/agent/CampfireAgentClient";
-import { createScribeAgentClient } from "../infrastructure/agent/ScribeAgentClient";
+import { AgentGateway } from "../infrastructure/agent/AgentGateway";
+import { AgentRuntime } from "./agent/AgentRuntime";
 import { TriggerBus } from "./triggers/bus";
-import { AnswerHook } from "./hooks/answer";
-import { CampfireHook } from "./hooks/campfire";
-import { ScribeHook } from "./hooks/scribe";
-import { HookRegistry } from "./hooks/registry";
 
 function runtimeStorage(): StorageLike {
   try {
@@ -54,8 +46,9 @@ async function bootstrap(): Promise<void> {
   root.innerHTML = `<div class="boot-screen"><span class="boot-cursor"></span>正在生成魔王城查询计划…</div>`;
 
   const storage = runtimeStorage();
-  const savedRun = loadRun(storage);
-  const profile = loadProfile(storage);
+  const data = await BrowserDataStore.open(storage);
+  const savedRun = data.loadRun();
+  const profile = data.loadProfile();
   const questionBank = await loadBundledQuestionBank(
     import.meta.env.BASE_URL,
     fetch,
@@ -73,26 +66,15 @@ async function bootstrap(): Promise<void> {
   ]);
   const audio = new ArcadeAudio({ mode: "explore", volume: 0.55 });
   const feedback = new FeedbackDirector(audio);
-  const onboarding = new OnboardingController(storage);
+  const onboarding = new OnboardingController(data);
   const learningLedger = new LearningLedger();
   const learningRecorder = new LearningProgressRecorder(session, learningLedger);
-  const campfireAgent = createCampfireAgentClient(
-    CAMPFIRE_AGENT_RUNTIME_CONFIG.endpoint,
-    CAMPFIRE_AGENT_RUNTIME_CONFIG.requestTimeoutMs,
-  );
-  const scribeAgent = createScribeAgentClient(
-    SCRIBE_AGENT_RUNTIME_CONFIG.endpoint,
-    SCRIBE_AGENT_RUNTIME_CONFIG.requestTimeoutMs,
-  );
+  const agentRuntime = new AgentRuntime(new AgentGateway({
+    ...AGENT_RUNTIME_CONFIG,
+  }));
   const triggerBus = new TriggerBus();
-  const answerHook = new AnswerHook();
-  const campfireHook = new CampfireHook(answerHook, campfireAgent);
-  const scribeHook = new ScribeHook(scribeAgent);
-  const hooks = new HookRegistry(triggerBus)
-    .add(answerHook)
-    .add(campfireHook)
-    .add(scribeHook);
-  hooks.start(session);
+  const unsubscribeAgentEvents = triggerBus.subscribe((event) => agentRuntime.handle(event));
+  const disconnectTriggers = triggerBus.connect(session);
   let game: Phaser.Game | null = null;
   const app = new AppShell(
     root,
@@ -106,8 +88,7 @@ async function bootstrap(): Promise<void> {
       return game.scene.getScene("BattleScene") as BattleScene;
     },
     savedRun ? "restored" : "new",
-    campfireHook,
-    scribeHook,
+    agentRuntime,
   );
   try {
     learningRecorder.start();
@@ -115,7 +96,9 @@ async function bootstrap(): Promise<void> {
     game = createGame(session, audio, feedback);
     root.dataset.runtimeState = "active";
   } catch (error) {
-    hooks.stop();
+    disconnectTriggers();
+    unsubscribeAgentEvents();
+    agentRuntime.destroy();
     learningRecorder.destroy();
     app.destroy();
     game?.destroy(true);
@@ -124,7 +107,7 @@ async function bootstrap(): Promise<void> {
 
   const persistence = startProgressPersistence(
     session,
-    storage,
+    data,
     JSON.stringify(profile),
   );
 
@@ -147,7 +130,9 @@ async function bootstrap(): Promise<void> {
     persistence.destroy();
     window.removeEventListener("pagehide", pageHideHandler);
     document.removeEventListener("visibilitychange", visibilityChangeHandler);
-    hooks.stop();
+    disconnectTriggers();
+    unsubscribeAgentEvents();
+    agentRuntime.destroy();
     learningRecorder.destroy();
     app.destroy();
     game?.destroy(true);

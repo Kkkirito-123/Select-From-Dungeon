@@ -4,8 +4,6 @@
  * 这里描述的是经过游戏端投影的只读证据，不是 GameSnapshot 的替代品。
  * Agent 只能返回文案结果，不能决定复盘是否解锁，也不能写回游戏状态。
  */
-import type { GameSnapshot } from "../game/snapshots";
-
 export type CampfireAgentResult =
   | "correct"
   | "missing-concept"
@@ -47,6 +45,11 @@ export interface CampfireAgentRequest {
   attempts: CampfireAgentAttempt[];
 }
 
+export type CampfireView = Omit<
+  CampfireAgentRequest,
+  "protocolVersion" | "requestId" | "evidenceHash"
+>;
+
 export interface CampfireAgentOutput {
   schemaVersion: 1;
   requestId: string;
@@ -58,7 +61,10 @@ export interface CampfireAgentOutput {
   message: string;
 }
 
-export interface CampfireAgentPort {
-  /** 根据只读快照请求当前楼层复盘；失败时返回 null。 */
-  review(snapshot: GameSnapshot): Promise<CampfireAgentOutput | null>;
+export interface CampfireAgentContent {
+  headline: string;
+  facts: string[];
+  focusConcept: string | null;
+  nextAction: string;
+  message: string;
 }

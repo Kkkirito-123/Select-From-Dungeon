@@ -91,9 +91,9 @@ import {
 import { SqlChordTracker } from "./SqlChordTracker";
 import { CampfirePanel } from "./panels/CampfirePanel";
 import { InventoryPanel } from "./panels/InventoryPanel";
-import type { CampfireHook } from "../../application/hooks/campfire";
 import type { ScribeAgentContent } from "../../contracts/agent/scribe";
-import type { ScribeHook, ScribeHookState } from "../../application/hooks/scribe";
+import type { AgentRuntime, AgentRuntimeState } from "../../application/agent/AgentRuntime";
+import { AgentPanel } from "./panels/AgentPanel";
 import { adminAnswerForInput, shouldAutofillAdminAnswer } from "./adminAnswer";
 export { shapeOnlyQueryResultCopy } from "./panels/TerminalPanel";
 
@@ -574,14 +574,14 @@ export class AppShell {
   private readonly combatRenderer: CombatRenderer;
   private inventoryPanel!: InventoryPanel;
   private campfirePanel!: CampfirePanel;
+  private agentPanel!: AgentPanel;
   private readonly schemaPanel = new SchemaPanel();
   private terminalPanel!: TerminalPanel;
   private readonly listenerController = new AbortController();
   private unsubscribeSession: (() => void) | null = null;
   private unsubscribeFeedback: (() => void) | null = null;
   private unsubscribeOnboarding: (() => void) | null = null;
-  private unsubscribeCampfireHook: (() => void) | null = null;
-  private unsubscribeScribeHook: (() => void) | null = null;
+  private unsubscribeAgent: (() => void) | null = null;
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
   private focusBeforeInspection: HTMLElement | null = null;
@@ -624,8 +624,8 @@ export class AppShell {
         : message;
       if (typeof detail.landmarkId === "string") {
         const isScribe = detail.landmarkId.startsWith("npc-scribe-f");
-        const scribeOutput = isScribe && this.scribeHook
-          ? this.scribeHook.interact(
+        const scribeOutput = isScribe && this.agentRuntime
+          ? this.agentRuntime.interactScribe(
             this.lastSnapshot,
             detail.landmarkId,
             inspectionMessage,
@@ -645,7 +645,7 @@ export class AppShell {
           if (scribeOutput) {
             this.openScribeOverlay(
               scribeOutput,
-              this.scribeHook?.getState().requestKey ?? null,
+              this.agentRuntime?.getState().scribe.requestKey ?? null,
             );
           } else {
             this.openStoryMoment(inspectMoment, this.lastSnapshot, inspectionMessage);
@@ -655,7 +655,7 @@ export class AppShell {
         if (scribeOutput) {
           this.openScribeOverlay(
             scribeOutput,
-            this.scribeHook?.getState().requestKey ?? null,
+            this.agentRuntime?.getState().scribe.requestKey ?? null,
           );
           return;
         }
@@ -871,8 +871,7 @@ export class AppShell {
     private readonly onboarding: OnboardingController,
     private readonly getBattleScene: () => BattleScene | null,
     initialRunSource: "new" | "restored" = "new",
-    private readonly campfireHook: CampfireHook | null = null,
-    private readonly scribeHook: ScribeHook | null = null,
+    private readonly agentRuntime: AgentRuntime | null = null,
   ) {
     this.hudRenderer = new HudRenderer(root);
     this.minimapRenderer = new MinimapRenderer(root);
@@ -909,6 +908,7 @@ export class AppShell {
     this.inventoryMenu = dom.inventoryMenu;
     this.lootMenu = dom.lootMenu;
     this.adminMenu = dom.adminMenu;
+    this.agentPanel = new AgentPanel(dom);
     this.answerReview = new ReviewPanel(this.root);
     this.narrativeCodex = new NarrativePanel(this.root, {
       onClose: () => {
@@ -1118,13 +1118,12 @@ export class AppShell {
     this.unsubscribeOnboarding = this.onboarding.subscribe((snapshot) => {
       this.renderOnboarding(snapshot);
     });
-    this.unsubscribeCampfireHook = this.campfireHook?.subscribe(() => {
+    this.unsubscribeAgent = this.agentRuntime?.subscribe((state) => {
       if (this.lastSnapshot && this.isCampfireMenuOpen()) {
         this.renderCampfireMenu(this.lastSnapshot, false);
       }
-    }) ?? null;
-    this.unsubscribeScribeHook = this.scribeHook?.subscribe((state) => {
       this.renderScribeState(state);
+      this.agentPanel.render(state);
     }) ?? null;
     this.unsubscribeSession = this.session.subscribe((snapshot) => this.render(snapshot));
   }
@@ -1136,15 +1135,14 @@ export class AppShell {
     this.unsubscribeFeedback = null;
     this.unsubscribeOnboarding?.();
     this.unsubscribeOnboarding = null;
-    this.unsubscribeCampfireHook?.();
-    this.unsubscribeCampfireHook = null;
-    this.unsubscribeScribeHook?.();
-    this.unsubscribeScribeHook = null;
+    this.unsubscribeAgent?.();
+    this.unsubscribeAgent = null;
     this.releaseAudioGesture?.();
     this.releaseAudioGesture = null;
     this.listenerController.abort();
     this.narrativeCodex.destroy();
     this.monsterCodex.destroy();
+    this.agentPanel?.destroy();
     if (this.toastTimer !== null) window.clearTimeout(this.toastTimer);
     this.toastTimer = null;
     this.activeNotice = null;
@@ -1607,31 +1605,28 @@ export class AppShell {
     return redactSnapshotMonsterIdentity(authoredMessage, this.lastSnapshot);
   }
 
-  private renderScribeState(state: ScribeHookState): void {
-    if (!state.output || !state.requestKey) return;
-    if (state.scene === "interaction") {
+  private renderScribeState(state: AgentRuntimeState): void {
+    const scribe = state.scribe;
+    if (!scribe.content || !scribe.requestKey) return;
+    if (scribe.scene === "interaction") {
       if (
         this.isInspectionOpen() &&
         this.inspectionOverlay.dataset.recordKind === "scribe" &&
-        this.inspectionOverlay.dataset.scribeRequestKey === state.requestKey
+        this.inspectionOverlay.dataset.scribeRequestKey === scribe.requestKey
       ) {
-        this.renderScribeOverlay(state.output);
+        this.renderScribeOverlay(scribe.content);
       }
       return;
     }
-    const noticeKey = `${state.requestKey}:${state.status}`;
+    if (scribe.scene === "navigation") return;
+    const noticeKey = `${scribe.requestKey}:${state.phases.scribe}`;
     if (noticeKey === this.lastScribeNoticeKey) return;
     this.lastScribeNoticeKey = noticeKey;
-    this.showScribeNotice(state.output, state.scene === "death-review");
+    this.showScribeNotice(scribe.content, scribe.scene === "death-review");
   }
 
   private scribeBody(output: ScribeAgentContent): string {
-    const facts = output.facts.length > 0
-      ? `记录\n${output.facts.map((fact) => `· ${fact}`).join("\n")}`
-      : "";
-    return [output.message, facts, `下一步：${output.nextAction}`]
-      .filter(Boolean)
-      .join("\n\n");
+    return output.message;
   }
 
   private renderScribeOverlay(output: ScribeAgentContent): void {
@@ -1676,7 +1671,7 @@ export class AppShell {
 
   private campfireReview(snapshot: GameSnapshot): CampfireReview {
     const localReview = buildCampfireReview(campfireReviewInput(snapshot));
-    const agentReview = this.campfireHook?.outputFor(snapshot) ?? null;
+    const agentReview = this.agentRuntime?.campfireFor(snapshot) ?? null;
     if (
       !localReview.available ||
       !agentReview

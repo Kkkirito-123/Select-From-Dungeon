@@ -14,6 +14,9 @@ importers:
       sql.js:
         specifier: 1.14.1
         version: 1.14.1
+      xstate:
+        specifier: 5.32.5
+        version: 5.32.5
     devDependencies:
       '@types/sql.js':
         specifier: 1.4.10
@@ -603,6 +606,9 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  xstate@5.32.5:
+    resolution: {integrity: sha512-ULazi1oe6wGrXl0Frb6otSlkm5HLifbbVTkMk5kkSKqz4TkxJaVpnl6jOJwKeid3ORPxYyZQgNLUSYX9q65SIA==}
+
 snapshots:
 
   '@emnapi/core@1.11.1':
@@ -1021,3 +1027,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  xstate@5.32.5: {}

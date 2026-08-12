@@ -1,7 +1,7 @@
 import unittest
 
-from agent.contracts.hash import evidence_hash
-from agent.contracts.scribe import ContractError, parse_output, parse_request
+from agent.shared.hash import evidence_hash
+from agent.scribe.contract import ContractError, parse_output, parse_request
 
 
 def request_payload() -> dict[str, object]:
@@ -46,7 +46,7 @@ class ScribeContractTests(unittest.TestCase):
 
         self.assertEqual(request.scene, "death-review")
         self.assertIsNotNone(request.learning)
-        self.assertEqual(request.learning.missing_columns, ("sector",))
+        self.assertEqual(request.learning.missing_columns, ["sector"])
         self.assertEqual(request.death.cause if request.death else None, "combat")
 
     def test_navigation_requires_navigation_evidence(self) -> None:

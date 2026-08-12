@@ -1,13 +1,13 @@
 import unittest
 
-from agent.campfire.analyzer import CampfireReviewService
+from agent.campfire.flow import ReviewFlow
 from agent.tests.test_campfire_contract import request_payload
 
 
 class CampfireAnalyzerTests(unittest.TestCase):
     def test_deterministic_review_contains_current_floor_statistics(self) -> None:
         payload = request_payload()
-        result = CampfireReviewService().review(payload)
+        result = ReviewFlow().run(payload)
 
         self.assertEqual(result["requestId"], "request-1")
         self.assertEqual(result["evidenceHash"], payload["evidenceHash"])

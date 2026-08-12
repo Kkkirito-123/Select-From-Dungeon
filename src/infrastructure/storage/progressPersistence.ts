@@ -13,6 +13,7 @@ import {
   saveRun,
 } from "./localProgress";
 import type { StorageLike } from "../../contracts/storage/storageLike";
+import type { ProfileProgress, SavedRun } from "../../domain/shared/types";
 
 export const PROGRESS_SAVE_DEBOUNCE_MS = STORAGE_RUNTIME_CONFIG.progressSaveDebounceMs;
 
@@ -38,6 +39,18 @@ type ProgressSource = Pick<
   GameSession,
   "subscribe" | "snapshot" | "toSavedRun" | "toProfile"
 >;
+
+export interface ProgressStore {
+  saveRun(value: SavedRun): void;
+  saveProfile(value: ProfileProgress): void;
+}
+
+type StorageTarget = StorageLike | ProgressStore;
+
+function isProgressStore(value: StorageTarget): value is ProgressStore {
+  return typeof (value as Partial<ProgressStore>).saveRun === "function" &&
+    typeof (value as Partial<ProgressStore>).saveProfile === "function";
+}
 
 export function persistenceFingerprint(
   snapshot: GameSnapshot,
@@ -83,7 +96,7 @@ export function isCriticalPersistenceChange(
  */
 export function startProgressPersistence(
   source: ProgressSource,
-  storage: StorageLike,
+  storage: StorageTarget,
   initialProfileJson: string,
   timerApi: TimerApi = window,
 ): ProgressPersistenceController {
@@ -99,12 +112,19 @@ export function startProgressPersistence(
     timer = null;
   };
   const persistCurrent = (): void => {
-    saveRun(storage, source.toSavedRun());
-    lastProfileJson = persistProfileIfChanged(
-      storage,
-      source.toProfile(),
-      lastProfileJson,
-    );
+    const run = source.toSavedRun();
+    const profile = source.toProfile();
+    if (isProgressStore(storage)) {
+      storage.saveRun(run);
+      const nextProfileJson = JSON.stringify(profile);
+      if (nextProfileJson !== lastProfileJson) {
+        storage.saveProfile(profile);
+        lastProfileJson = nextProfileJson;
+      }
+      return;
+    }
+    saveRun(storage, run);
+    lastProfileJson = persistProfileIfChanged(storage, profile, lastProfileJson);
   };
   const flush = (): void => {
     if (destroyed) return;

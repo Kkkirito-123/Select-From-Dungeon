@@ -1,7 +1,5 @@
-"""抄写员 Agent 领域入口。"""
+"""抄写员 Agent。"""
 
-from agent.flows.scribe import ScribeFlow
-from agent.scribe.analyzer import ScribeService
+from agent.scribe.flow import ScribeFlow, create_model
 
-
-__all__ = ["ScribeFlow", "ScribeService"]
+__all__ = ["ScribeFlow", "create_model"]

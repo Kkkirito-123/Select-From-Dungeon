@@ -87,9 +87,10 @@ the current-floor elite is defeated. After that condition, the campfire renders
 an immediate deterministic recap from current-floor records; its review button
   is disabled before the condition. Each floor also has one physical Scribe whose
   authored content is the local fallback. There is no player prompt box. When
-  `VITE_CAMPFIRE_AGENT_URL` or `VITE_SCRIBE_AGENT_URL` is configured, optional
-  stateless Python Agent endpoints may improve only the corresponding display
-  wording; local results remain the immediate fallback. The Scribe responds to
+  `VITE_DIRECTOR_AGENT_URL` is configured, the optional stateless Python Main
+  Agent runs only the changed Campfire or Scribe child and combines validated
+  display text; the legacy child endpoints remain compatible. Local results
+  remain the immediate fallback. The Scribe responds to
   inspection, death review, and navigation guidance level changes, and never
   changes gameplay state, routes, or saves. Five short narrative
 beats and two fixed Lost Name evidence entries per floor still unlock from
@@ -198,8 +199,9 @@ index.html -> src/application/main.ts
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> CampfireReview (current-floor deterministic SQL recap)
-  -> TriggerBus -> AnswerHook/CampfireHook/ScribeHook (dirty, distance, scene, dedupe, fallback)
-  -> optional CampfireAgentClient/ScribeAgentClient -> agent/contracts/flows/http (bounded display wording only)
+  -> TriggerBus -> AgentRuntime/XState (parallel Campfire, Scribe, Main lifecycle and memory caches)
+  -> AgentGateway -> optional agent/director -> changed PydanticAI child -> Main guidance -> AgentPanel
+  -> OpenTelemetry (content-free request, child, Main, and model spans)
   -> QuestionBankLoader/LearningLedger (verified SQLite content + IndexedDB evidence)
   -> SqlAutocomplete (complete-schema vocabulary, ranking, replacement, listbox)
   -> SqlSchemaCatalog (canonical fields, types, generated DDL, teaching relations)
@@ -254,21 +256,22 @@ separately persisted step-by-step tutorial.
 
 `src/domain/learning/campfireReview.ts` owns the deterministic current-floor SQL
 recap used by the Campfire Panel. It reads snapshot evidence only, does not
-access storage or external services, and cannot mutate gameplay state. `ScribeHook`
-projects the active scene into bounded learning, death, or navigation evidence;
-authored content remains the local fallback and existing identity redaction still
-applies before display.
+access storage or external services, and cannot mutate gameplay state.
+`src/application/agent/scribeView.ts` projects the active scene into bounded
+learning, death, or navigation evidence; authored content remains the local
+fallback and existing identity redaction still applies before display.
 
 `src/application/triggers/` converts snapshot changes into semantic events and
-`src/application/hooks/` owns the `dirty / requesting / ready / fallback` state.
-`CampfireHook` requests at most once after the player enters the circular
-two-cell campfire range. `ScribeHook` requests on physical Scribe inspection,
-death, and navigation guidance level changes, with one in-memory result per
-evidence key. `src/infrastructure/agent/CampfireAgentClient.ts` and
-`ScribeAgentClient.ts` project only their bounded evidence, keep results in
-memory, and discard stale or invalid responses. `agent/` owns the Python 3.11+
-contracts, review and Scribe flows, HTTP service, and optional Agent-only trigger
-store. The store never receives the game database, raw SQL, or full snapshot.
+`src/application/agent/AgentRuntime.ts` owns one XState actor with parallel
+Campfire, Scribe, and Main regions. It handles dirty state, same-source
+cancellation, cross-source concurrency, panel priority, and three independent
+page-memory caches. `src/infrastructure/agent/AgentGateway.ts` is the single
+network boundary for endpoint precedence, stable hashing, five-second aborts,
+and strict response validation. Navigation uses a deterministic Scribe child and
+does not invoke the Scribe model. `agent/` owns the Python 3.11+ strict Pydantic
+contracts, PydanticAI model runner, child and Director flows, content-free
+OpenTelemetry spans, and the three HTTP routes. It has no Agent database or
+output store.
 
 `src/application/config/` owns Chinese-commented runtime tuning values such as map size,
 encounter rates, navigation thresholds, and storage limits.
@@ -372,7 +375,7 @@ evaluation.
 ## Repository Map
 
 ```text
-agent/                  Python Campfire/Scribe Agent contracts, flows, HTTP, optional trigger store, and tests
+agent/                  Python Campfire/Scribe/Main Agents, PydanticAI runtime, telemetry, HTTP, and tests
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
 src/application/        Startup, runtime configuration, and page lifecycle
 src/content/            Static curriculum, world, narrative, inventory, and SQL content
@@ -416,19 +419,26 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.
   Campfire review uses only current-floor local snapshot records, and the Scribe
   uses authored content plus a bounded scene projection. If explicitly configured,
-  the optional Campfire and Scribe Agent endpoints receive only their respective
-  projections through `POST /v1/campfire/review` and `POST /v1/scribe/respond`;
-  the game remains playable without either service and keeps no Agent output in
-  browser storage.
+  the optional Director endpoint receives one changed child projection and
+  already validated same-floor child display text through `POST /v1/director/run`;
+  the legacy child endpoints remain available. The game remains playable without
+  any service and keeps no Agent output in browser storage.
 - Agent requests contain a request ID, evidence hash, current floor, and only
   the scene-specific bounded evidence. Campfire requests contain aggregate counts
   and at most eight submitted SQL projections; Scribe requests contain only the
-  authored message plus bounded learning, death, or navigation evidence. Neither
-  request contains reference SQL, full `GameSnapshot`, player identity, movement,
+  authored message plus bounded learning, death, or navigation evidence. The Main
+  Agent model sees only child display text. Neither request contains reference SQL,
+  full `GameSnapshot`, player identity, movement,
   map, inventory, or gameplay commands. Responses must match the request hash and
-  strict text limits before they can replace local wording. Python storage is
-  disabled by default; explicit SQLite storage keeps only trigger metadata and
-  validated output.
+  strict text limits before they can replace local wording. The unified route
+  returns schema v2 call metadata for duration, mode, status, token usage, and an
+  optional trace ID. Agent caches, output, usage totals, and live logs are
+  page-memory only; the Python service does not persist requests or output.
+- OpenTelemetry creates `agent.request`, `agent.child`, `agent.director`, and
+  PydanticAI model spans. No trace is exported unless
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is configured. Spans may contain request ID,
+  floor, event, source, status, fallback, duration, and token counts, but never
+  prompt, completion, SQL, display text, snapshot, API key, or identity.
 - The battle terminal accepts one read-only `SELECT` or `WITH` statement. DML, DDL, `PRAGMA`,
   `ATTACH`, and multi-statement input are rejected before execution. Results are
   capped at 50 displayed rows.
@@ -463,19 +473,13 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   New Runs pin the active bank version and draw deterministic no-repeat decks.
   IndexedDB stores at most 5,000 full attempts plus permanent question/lesson
   aggregates; export and explicit clearing never include an API Key.
-- Save data is browser-local and split between
-  `select-from-dungeon:run:v12` (eight-floor campaign slots plus current floor,
-  maze, actors, ground items, loot
-  bundles, inventory, armor, consumables, unique-item history, key items, fog,
-  two campfires, the entrance anchor, active checkpoint, encounter meter,
-  level/XP, opened
-  SQL cipher gates/shortcuts/dead-end caches/eight-floor hidden rooms,
-  active gate challenge, at most 200
-  local answer records, question-bank/deck state, first-reward practice state,
-  navigation guidance state, and disposable current Run state),
-  `select-from-dungeon:profile:v3` (47 mastered lessons, recovered monster IDs,
-  attempts, victories, and best query count), and
-  `select-from-dungeon:onboarding:v1` (finished/skipped guide state). A valid
+- Browser data is stored in one IndexedDB database,
+  `select-from-dungeon-data`. Its `run_nodes` and `floor_nodes` stores keep
+  global Run data separate from the active floor; `profile_nodes` keeps the
+  v3 permanent profile; `guide_nodes` keeps onboarding; `attempts`,
+  `question_stats`, and `lesson_stats` keep learning evidence; and
+  `question_banks` keeps verified question-bank bytes. A valid
+  `select-from-dungeon:run:v12` still defines the Run format, and a valid
   `select-from-dungeon:run:v11` is migrated in memory into v12;
   valid `run:v10` and `run:v9` are then migrated through the existing chain;
   valid `run:v8` is upgraded with deterministic eight-floor campaign slots, and `run:v7` is then
@@ -485,7 +489,9 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   unread.
   Valid `select-from-dungeon:profile:v1` and `profile:v2` records migrate into
   v3; missing identity records start empty while existing learning counters are
-  preserved. `progressPersistence`
+  preserved. The old localStorage keys and the old learning/content IndexedDB
+  databases remain as read-only migration sources and are not deleted.
+  `progressPersistence`
   coalesces non-critical movement/patrol snapshots while flushing query, loot,
   inventory, mode, and topology changes immediately; changing a shape requires
   a version or recovery decision.

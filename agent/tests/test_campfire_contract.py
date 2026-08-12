@@ -1,6 +1,6 @@
 import unittest
 
-from agent.contracts.campfire import (
+from agent.campfire.contract import (
     ContractError,
     evidence_hash,
     parse_output,
@@ -52,7 +52,7 @@ class CampfireContractTests(unittest.TestCase):
 
         self.assertEqual(request.floor, 1)
         self.assertEqual(len(request.attempts), 2)
-        self.assertNotIn("answerSql", request.attempts[0].to_dict())
+        self.assertNotIn("answerSql", request.attempts[0].model_dump(by_alias=True))
 
     def test_request_rejects_extra_fields(self) -> None:
         payload = request_payload()

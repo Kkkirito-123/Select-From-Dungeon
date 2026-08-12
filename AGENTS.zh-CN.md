@@ -51,8 +51,8 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 篝火与抄写员是两个独立的游戏对象。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
 复盘按钮保持禁用。达到该条件后，篝火根据当前层本地记录显示确定性复盘。每层另有一名实体抄写员，
 作者内容是她的本地回退文案。当前游戏没有玩家提示词；配置
-`VITE_CAMPFIRE_AGENT_URL` 或 `VITE_SCRIBE_AGENT_URL` 后，可选的无状态 Python Agent 只能改善对应的展示文案，
-本地结果仍然立即可用。抄写员在调查、死亡复盘和导航指引等级提升时响应，不能修改游戏状态、路线或存档。
+`VITE_DIRECTOR_AGENT_URL` 后，可选的无状态 Python 主 Agent 只运行变化的篝火或抄写员子 Agent，
+再综合已经校验的展示文案；旧子端点继续兼容。本地结果仍然立即可用。抄写员在调查、死亡复盘和导航指引等级提升时响应，不能修改游戏状态、路线或存档。
 每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
 解锁；证据明确区分未知、已查为 `NULL` 和实际值。第八层完成 MVP 2.0 唯一结局 `MIGRATE`，
 不使用账号、服务端游戏数据库或远程游戏日志。
@@ -112,8 +112,9 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 index.html -> src/application/main.ts
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> CampfireReview（当前楼层确定性 SQL 复盘）
-  -> TriggerBus -> AnswerHook/CampfireHook/ScribeHook（脏状态、距离、场景、去重与回退）
-  -> 可选 CampfireAgentClient/ScribeAgentClient -> agent/contracts/flows/http（只改善受限展示文案）
+  -> TriggerBus -> AgentRuntime/XState（并行篝火、抄写员、Main 生命周期与内存缓存）
+  -> AgentGateway -> 可选 agent/director -> 变化的 PydanticAI 子 Agent -> Main 引导 -> AgentPanel
+  -> OpenTelemetry（不含正文的请求、子 Agent、Main 与模型 Span）
   -> QuestionBankLoader/LearningLedger（经校验 SQLite 题库与 IndexedDB 证据）
   -> SqlAutocomplete（完整 Schema 词汇、排序、替换与 Listbox）
   -> SqlSchemaCatalog（权威字段、类型、生成 DDL 与教学关系）
@@ -161,15 +162,15 @@ index.html -> src/application/main.ts
 管理独立持久化的逐步教学。
 
 `src/domain/learning/campfireReview.ts` 负责把当前楼层答案记录转换为篝火面板使用的确定性事实。
-它只读取快照，不访问存储或外部服务，也不能改变游戏状态。`ScribeHook` 将当前场景投影为受限的学习、
-死亡或导航证据；作者内容始终是本地回退，展示前仍执行现有的怪物身份脱敏。
+它只读取快照，不访问存储或外部服务，也不能改变游戏状态。`src/application/agent/scribeView.ts` 将当前场景
+投影为受限的学习、死亡或导航证据；作者内容始终是本地回退，展示前仍执行现有的怪物身份脱敏。
 
-`src/application/triggers/` 负责把快照变化转换为语义事件，`src/application/hooks/` 负责
-`dirty / requesting / ready / fallback` 状态。`CampfireHook` 只在玩家进入篝火两格圆形范围后为当前证据
-请求一次；`ScribeHook` 在调查实体抄写员、死亡和导航指引等级提升时请求，并按证据键在内存中去重。
-`src/infrastructure/agent/CampfireAgentClient.ts` 与 `ScribeAgentClient.ts` 只投影各自的受限证据，
-哈希不匹配或非法回复会被丢弃。`agent/` 负责 Python 契约、篝火复盘与抄写员流程、HTTP 服务和可选的
-Agent 专用触发存储；存储不接收游戏数据库、原始 SQL 或完整快照。
+`src/application/triggers/` 负责把快照变化转换为语义事件，`src/application/agent/AgentRuntime.ts` 用一个 XState
+actor 管理篝火、抄写员和 Main 三个并行状态区，并负责脏状态、同源取消、跨源并发、面板优先级和三份独立
+页面内存缓存。`src/infrastructure/agent/AgentGateway.ts` 是端点优先级、稳定 Hash、5 秒中止和严格回复校验的
+唯一网络边界。导航使用确定性抄写员子结果，不调用抄写员模型。`agent/` 负责 Python 3.11+ 严格 Pydantic
+契约、PydanticAI 模型入口、子 Agent/Main 流程、不含正文的 OpenTelemetry Span 与三个 HTTP 路由；服务没有
+Agent 数据库或输出 Store。
 
 `src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
 内容 ID、文案、SQL 契约与存档版本仍由原有
@@ -231,7 +232,7 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 ## 仓库地图
 
 ```text
-agent/                  Python 篝火/抄写员 Agent 契约、流程、HTTP、可选触发存储与测试
+agent/                  Python 篝火/抄写员/Main Agent、PydanticAI 运行层、遥测、HTTP 与测试
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
 src/application/        启动、运行时配置与页面生命周期
 src/content/            课程、世界、剧情、背包与 SQL 静态内容
@@ -269,12 +270,16 @@ python3 scripts/validate-rules.py
 ## 运行与安全边界
 
 - SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，抄写员使用作者内容
-  和受限场景投影。明确配置后，可选的篝火与抄写员 Agent 分别通过 `POST /v1/campfire/review` 和
-  `POST /v1/scribe/respond` 接收各自投影；游戏没有 Agent 存档，未配置任一服务时完全使用本地文案。
-- Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。篝火请求包含聚合统计和最多八条玩家
-  SQL 投影；抄写员请求只包含作者文案以及受限的学习、死亡或导航证据。两者都不包含参考 SQL、完整
+  和受限场景投影。明确配置后，主 Agent 通过 `POST /v1/director/run` 接收变化方投影和同层子结果；旧的
+  `POST /v1/campfire/review` 与 `POST /v1/scribe/respond` 继续兼容。游戏没有 Agent 存档，未配置服务时完全使用本地文案。
+- Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。主 Agent 只看到已经校验的子 Agent 展示文本；
+  子请求仍遵守篝火最多八条 SQL 投影和抄写员受限场景证据边界。请求不包含参考 SQL、完整
   `GameSnapshot`、身份、移动、地图、背包或游戏指令。响应必须匹配请求 Hash 并通过文本限制，才能替换本地
-  文案。Python 存储默认关闭；显式启用 SQLite 时只保存触发元数据和合法输出。
+  文案。统一路由返回 schema v2 调用元数据，包括耗时、模式、状态、Token 和可选 Trace ID。Agent 缓存、
+  输出、页面 Token 累计和实时日志都只存在页面内存；Python 服务不持久化请求或输出。
+- OpenTelemetry 创建 `agent.request`、`agent.child`、`agent.director` 与 PydanticAI 模型 Span。只有配置
+  `OTEL_EXPORTER_OTLP_ENDPOINT` 才向外导出；Span 可以记录请求 ID、楼层、事件、来源、状态、fallback、耗时
+  和 Token 数字，但不得记录 prompt、completion、SQL、展示正文、快照、API Key 或身份。
 - 战斗终端只接受一条只读 `SELECT` 或 `WITH`；执行前拒绝 DML、DDL、`PRAGMA`、`ATTACH` 和多语句输入；界面
   最多显示 50 行结果。
 - 两个 SQL 输入框都提供 IDE 式 `PLAN ASSIST` Listbox。输入前缀会显示排序后的关键词、函数、
@@ -295,18 +300,14 @@ python3 scripts/validate-rules.py
   空结果题必须在题面明确说明。固定课程怪与层主继续使用作者题；普通怪、小精英、区域首领分别
   抽取 1 道 L1、2 道 L2、3 道 L3。新 Run 固定题库版本并使用确定性不重复牌组。IndexedDB 最多保留 5000 条完整作答，
   题目/课程聚合永久保留；导出与清除内容绝不包含 API Key。
-- 存档只保存在浏览器，并拆为 `select-from-dungeon:run:v12`（八层 Campaign 槽位、当前楼层、
-  迷宫、演员、地面物品、
-  战利品包、装备背包、护甲、恢复品、唯一物品记录、关键物品、迷雾、两个篝火、出生锚点、当前复活点、
-  遭遇计量、等级/经验、已打开的 SQL 密文门/捷径/死路补给/八层隐藏房、当前机关题、最多 200 条
-  本地作答记录、题库牌组、随机练习首次奖励、导航状态与可丢弃的当前 Run 状态）、
-  `select-from-dungeon:profile:v3`
-  （47 项已掌握课程、已回收怪物编号、练习次数、通关数、
-  最佳查询数）和 `select-from-dungeon:onboarding:v1`（引导完成/跳过状态）。有效的
-  `select-from-dungeon:run:v11` 会在内存中迁移为 v12；有效 `run:v10`、`run:v9`、`run:v8` 会继续经过
+- 浏览器数据统一保存在 IndexedDB `select-from-dungeon-data`：`run_nodes` 与 `floor_nodes` 分开保存
+  Run 全局数据和当前楼层；`profile_nodes` 保存 v3 永久档案；`guide_nodes` 保存引导；`attempts`、
+  `question_stats`、`lesson_stats` 保存学习记录；`question_banks` 保存经校验的题库字节。有效的
+  `select-from-dungeon:run:v12` 仍是 Run 格式；有效的 `select-from-dungeon:run:v11` 会在内存中迁移为 v12；有效 `run:v10`、`run:v9`、`run:v8` 会继续经过
   兼容链补上确定性的八层
   Campaign 槽位；有效 `run:v7` 再补上空背包/战利品状态与当前已装备物品记录；有效 `run:v6`、
-  `run:v5` 和 `run:v4` 继续经过原有迁移后进入 v12。旧 Key 不删除；
+  `run:v5` 和 `run:v4` 继续经过原有迁移后进入 v12。旧 localStorage Key 以及旧的两个 IndexedDB
+  会作为只读迁移来源保留，不会自动删除；
   更旧 Run Key 不读取。
   有效的 `profile:v1` 与 `profile:v2` 会迁移为 v3；缺失的怪物身份记录从空集合开始，原有
   学习计数保持。

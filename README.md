@@ -334,6 +334,16 @@ Optional Python 3.11+ Campfire and Scribe Agent endpoints can be enabled with
 output-only services for `POST /v1/campfire/review` and
 `POST /v1/scribe/respond`. The game remains fully playable without either
 service, and no Agent output is persisted.
+`VITE_DIRECTOR_AGENT_URL` optionally enables the unified Main Agent endpoint
+`POST /v1/director/run`. It runs only the changed child Agent, uses the other
+same-floor child result as bounded context, and renders only the Main Agent's
+next-plan text in the upper card of the desktop-only always-on panel. Campfire
+review and Scribe story/companionship remain in their own game views; a separate
+lower card shows a readable three-step Agent status flow, current action,
+current/page token usage, and the latest 40 memory-only runtime log lines. XState owns the browser Agent lifecycle; the Python service uses
+PydanticAI for strict structured model output and OpenTelemetry for content-free
+traces. `DIRECTOR_*` server settings are independent from `DEEPSEEK_*`; without
+the unified endpoint, the legacy child endpoints remain compatible.
 
 The top-bar `⌘ 管理员` button opens the spoiler-heavy admin view. It only
 offers the next floor's starting position; the preview is memory-only and never
@@ -427,28 +437,25 @@ GameSession ── authoritative physical world, actors, fog, combat, loot, prof
 
 ```text
 agent/
-├─ contracts/ ── Campfire/Scribe models, evidence hash, request/response validation
-├─ flows/     ── review and Scribe flows with deterministic generators
-├─ campfire/  ── Campfire compatibility entry point
-├─ scribe/    ── Scribe compatibility entry point
-├─ storage/   ── in-memory or optional SQLite trigger store
-└─ http/      ── routes, request body, and HTTP lifecycle
+├─ campfire/  ── Campfire contract, validation, flow, local generator, and model adapter
+├─ scribe/    ── Scribe contract, scene flow, local generator, and model adapter
+├─ director/  ── schema-v2 orchestration contract, changed-child flow, and Main Agent
+├─ shared/    ── strict shared models, hashing, PydanticAI model runner, and telemetry
+├─ runtime/   ── child and Main model configuration
+└─ http/      ── three compatible routes and HTTP lifecycle
 ```
 
 `src/application/triggers/` converts snapshot changes into semantic events;
-`src/application/hooks/` owns the `dirty / requesting / ready / fallback` state.
-A new answer marks the current floor dirty, entering the circular two-cell
-campfire range starts at most one request for that evidence, and `ScribeHook`
-responds to physical Scribe inspection, death, and navigation guidance level
-changes.
-`src/domain/learning/campfireReview.ts` still produces the immediate local result.
-The optional `src/infrastructure/agent/CampfireAgentClient.ts` sends only the
-bounded current-floor projection, caches by evidence hash in memory, and accepts
-responses only when their request identity and hash match. The
-`src/infrastructure/agent/ScribeAgentClient.ts` sends only authored text and
-bounded scene evidence to `POST /v1/scribe/respond`; invalid or stale responses
-are discarded and the authored/local text remains usable. The Scribe never
-modifies gameplay state, routes, or saves.
+`src/application/agent/AgentRuntime.ts` owns one XState actor with parallel
+Campfire, Scribe, and Main regions. A new answer marks the current floor dirty,
+entering the circular two-cell campfire range starts at most one request for that
+evidence, and physical Scribe inspection, death, and navigation guidance changes
+enter the same runtime. `src/infrastructure/agent/AgentGateway.ts` is the single
+network boundary for SHA-256, five-second cancellation, endpoint precedence, and
+strict schema validation. `AgentCache` keeps separate Campfire, Scribe, and Main
+maps in page memory; stale or invalid responses cannot replace current text.
+Navigation uses a deterministic Scribe child and never invokes the Scribe model.
+The Scribe never modifies gameplay state, routes, or saves.
 
 `FloorContracts` defines the eight-floor curriculum and content boundary, while
 `CampaignDomain` serializes deterministic ordered slots and rejects skips or
@@ -493,31 +500,23 @@ about the MySQL optimizer. Floor-eight concurrency and distribution exercises
 read deterministic incident fixtures rather than claiming native SQLite
 behavior.
 
-Browser-local storage is split into:
+Browser data is stored in one IndexedDB database, `select-from-dungeon-data`:
 
-- `select-from-dungeon:run:v12`: disposable current Run, including the
-  deterministic eight-floor campaign scaffold, current executable floor,
-  generated maze, world actors, ground items, pending loot bundles,
-  equipment inventory, armor/armor HP, consumables, unique-item history, key
-  items, discovered fog cells, two campfires, the entrance anchor, active checkpoint, HP,
-  level/XP, encounter meter, relics, combat progress, opened challenge gates,
-  opened shortcut/cache state, the active gate challenge, and up to 200 local
-  SQL answer records, question-bank/deck state, first-reward random-practice
-  state, and guidance counters. The guided plan itself is rebuilt from the seed instead
-  of storing a duplicate copy.
-- `select-from-dungeon:profile:v3`: 47 mastered lessons, recovered monster IDs,
-  attempts, victories, and best run query count.
-- `select-from-dungeon:onboarding:v1`: whether the optional guide was completed
-  or skipped.
-- Campfire and Scribe Agent output are memory-only in the browser and are never
-  written to Run, Profile, or IndexedDB. The Python service is stateless by default; an
-  explicit Agent-only SQLite store may persist trigger metadata and validated
-  output, never the game database or raw SQL.
-- IndexedDB `select-from-dungeon-learning`: at most 5,000 full answer attempts
-  plus permanent question and lesson aggregates, with JSON export and explicit
-  clearing.
-- IndexedDB `select-from-dungeon-content`: verified versioned question-bank
-  bytes used to keep an in-progress Run pinned to its bank version.
+- `run_nodes` and `floor_nodes`: the v12 Run is split into global Run data and
+  the active floor. The floor node contains the generated maze, actors, fog,
+  rooms, encounters, combat, gates, and local answer records.
+- `profile_nodes`: the v3 permanent profile with mastered lessons, recovered
+  monster IDs, attempts, victories, and best run query count.
+- `guide_nodes`: optional onboarding progress.
+- `attempts`, `question_stats`, and `lesson_stats`: full learning attempts and
+  permanent aggregates.
+- `question_banks`: verified question-bank bytes used to pin an active Run.
+- Campfire, Scribe, and Main Agent output and live logs are memory-only in the
+  browser and are never written to Run, Profile, or IndexedDB. The Python service
+  has no Agent database or output store.
+
+The old localStorage keys and the old learning/content IndexedDB databases are
+kept as read-only migration sources and are not deleted automatically.
 
 A valid `run:v11` is migrated in memory into v12 without changing the current
 Run. Valid `run:v10` through `run:v4` saves continue through the existing
@@ -531,6 +530,10 @@ immediately.
 SQL execution and review evidence remain in browser-local SQLite, Run/Profile,
 and IndexedDB boundaries. The optional Agent receives only the current-floor
 projection when explicitly configured; it is not a source of gameplay truth.
+The unified endpoint returns schema v2 metadata with per-call duration, mode,
+status, token usage, and an optional trace ID. Setting
+`OTEL_EXPORTER_OTLP_ENDPOINT` enables OTLP/HTTP export; prompts, completions, SQL,
+display text, snapshots, keys, and identity are never added to spans.
 
 ## Validation and Build
 

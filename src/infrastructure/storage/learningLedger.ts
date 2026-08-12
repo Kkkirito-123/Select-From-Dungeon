@@ -1,5 +1,5 @@
 /**
- * IndexedDB 学习记录边界。
+ * 统一数据数据库中的学习记录边界。
  *
  * 这里保存的是 SQL 作答和聚合统计，不是游戏 Run 的权威状态。记录器
  * 从只读快照提取证据后异步写入；IndexedDB 不可用或写入失败时返回失败
@@ -9,9 +9,10 @@ import type { AnswerAttemptRecord } from "../../contracts/game/results";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { LessonId } from "../../domain/shared/types";
 import { STORAGE_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { DATA_DB_NAME, DATA_DB_VERSION, openDataDatabase } from "./dataDb";
 
-export const LEARNING_DATABASE_NAME = "select-from-dungeon-learning";
-export const LEARNING_DATABASE_VERSION = 1;
+export const LEARNING_DATABASE_NAME = DATA_DB_NAME;
+export const LEARNING_DATABASE_VERSION = DATA_DB_VERSION;
 export const MAX_FULL_LEARNING_ATTEMPTS = STORAGE_RUNTIME_CONFIG.maxLearningAttempts;
 
 export interface HintSourceCounts {
@@ -77,24 +78,6 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
     transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed"));
   });
-}
-
-async function openLearningDatabase(factory: IDBFactory): Promise<IDBDatabase> {
-  const request = factory.open(LEARNING_DATABASE_NAME, LEARNING_DATABASE_VERSION);
-  request.onupgradeneeded = () => {
-    const database = request.result;
-    if (!database.objectStoreNames.contains("attempts")) {
-      const attempts = database.createObjectStore("attempts", { keyPath: "attemptId" });
-      attempts.createIndex("recordedAt", "recordedAt");
-    }
-    if (!database.objectStoreNames.contains("question_stats")) {
-      database.createObjectStore("question_stats", { keyPath: "key" });
-    }
-    if (!database.objectStoreNames.contains("lesson_stats")) {
-      database.createObjectStore("lesson_stats", { keyPath: "key" });
-    }
-  };
-  return requestResult(request);
 }
 
 export function buildLearningAttempt(
@@ -255,7 +238,7 @@ export class LearningLedger {
 
   private database(): Promise<IDBDatabase> {
     if (!this.factory) return Promise.reject(new Error("IndexedDB unavailable"));
-    this.databasePromise ??= openLearningDatabase(this.factory);
+    this.databasePromise ??= openDataDatabase(this.factory);
     return this.databasePromise;
   }
 

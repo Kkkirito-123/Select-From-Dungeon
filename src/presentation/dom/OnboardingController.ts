@@ -9,8 +9,9 @@ import {
   type OnboardingStep,
   type OnboardingStepId,
 } from "../../content/curriculum/onboarding";
+import { GUIDE_KEY } from "../../contracts/storage/keys";
 
-export const ONBOARDING_SAVE_KEY = "select-from-dungeon:onboarding:v1";
+export const ONBOARDING_SAVE_KEY = GUIDE_KEY;
 
 export interface OnboardingStorage {
   getItem(key: string): string | null;

@@ -63,15 +63,10 @@ export const WORLD_UI_RUNTIME_CONFIG = {
   monsterLabelDistance: 2,
 } as const;
 
-export const CAMPFIRE_AGENT_RUNTIME_CONFIG = {
-  /** 未设置时不创建客户端，游戏完全使用本地确定性复盘。 */
-  endpoint: import.meta.env.VITE_CAMPFIRE_AGENT_URL?.trim() || null,
-  /** 本地复盘已经先展示，网络请求只允许在后台等待这一时长。 */
-  requestTimeoutMs: 3_000,
-} as const;
-
-export const SCRIBE_AGENT_RUNTIME_CONFIG = {
-  /** 未配置时使用浏览器端确定性抄写员文案，不影响游戏运行。 */
-  endpoint: import.meta.env.VITE_SCRIBE_AGENT_URL?.trim() || null,
-  requestTimeoutMs: 3_000,
+export const AGENT_RUNTIME_CONFIG = {
+  /** 统一主 Agent；未设置时保留旧子 Agent 端点或本地回退。 */
+  directorEndpoint: import.meta.env.VITE_DIRECTOR_AGENT_URL?.trim() || null,
+  campfireEndpoint: import.meta.env.VITE_CAMPFIRE_AGENT_URL?.trim() || null,
+  scribeEndpoint: import.meta.env.VITE_SCRIBE_AGENT_URL?.trim() || null,
+  timeoutMs: 5_000,
 } as const;

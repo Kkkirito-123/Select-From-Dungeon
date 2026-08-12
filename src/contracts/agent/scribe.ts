@@ -86,7 +86,3 @@ export interface ScribeAgentContent {
   safeHintId: string | null;
   message: string;
 }
-
-export interface ScribeAgentPort {
-  respond(prompt: ScribePrompt): Promise<ScribeAgentOutput | null>;
-}
