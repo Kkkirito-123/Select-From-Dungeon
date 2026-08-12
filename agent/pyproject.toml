@@ -9,5 +9,18 @@ dependencies = [
   "opentelemetry-exporter-otlp-proto-http==1.44.0",
 ]
 
+[tool.setuptools]
+# 源码当前直接位于 agent/；显式映射可避免 setuptools 把角色目录误判为多个发行包。
+packages = [
+  "agent",
+  "agent.campfire",
+  "agent.director",
+  "agent.http",
+  "agent.runtime",
+  "agent.scribe",
+  "agent.shared",
+]
+package-dir = { agent = "." }
+
 [tool.unittest]
 discover = "agent/tests"
