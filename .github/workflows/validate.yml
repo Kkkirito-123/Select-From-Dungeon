@@ -29,11 +29,21 @@ jobs:
         run: python3 scripts/test_validate_rules.py
       - name: Validate portable package
         run: python3 scripts/validate-rules.py
+      - name: Install Agent service
+        run: python3 -m pip install -e agent
+      - name: Test Agent service
+        run: python3 -m unittest discover -s agent/tests
       - name: Install pnpm
         run: npm install --global pnpm@11.9.0
-      - name: Install dependencies
+      - name: Install game dependencies
+        working-directory: game
         run: pnpm install --frozen-lockfile
-      - name: Run unit tests
+      - name: Run game unit tests
+        working-directory: game
         run: pnpm test
+      - name: Check game architecture
+        working-directory: game
+        run: pnpm architecture:check
       - name: Build static game
+        working-directory: game
         run: pnpm build

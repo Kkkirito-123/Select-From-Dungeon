@@ -12,7 +12,7 @@ function copyDistributionDocuments(): Plugin {
         copyFile: (source: URL, destination: string) => Promise<void>;
       };
       await Promise.all(DISTRIBUTION_DOCUMENTS.map((fileName) => (
-        copyFile(new URL(`./${fileName}`, import.meta.url), `${outputOptions.dir}/${fileName}`)
+        copyFile(new URL(`../${fileName}`, import.meta.url), `${outputOptions.dir}/${fileName}`)
       )));
     },
   };
