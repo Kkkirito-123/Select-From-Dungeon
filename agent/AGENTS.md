@@ -25,7 +25,8 @@ not split them into independent services or duplicate shared model clients.
 - OpenTelemetry spans may contain identifiers, status, duration, fallback, and
   token counts, but never prompts, completions, SQL, display text, or secrets.
 - Deterministic fallback must keep the game usable when a key, model, or trace
-  exporter is unavailable.
+  exporter is unavailable. Code maintenance and browser playtesting belong to
+  the separate `dungeon-maintainer` repository and must not add tools here.
 
 ## Commands
 

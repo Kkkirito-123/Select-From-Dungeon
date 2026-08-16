@@ -230,6 +230,10 @@ index.html -> src/application/main.ts
   -> NarrativeCodexView/MonsterCodexView (story and recovered identities)
   -> OnboardingController (move -> encounter -> terminal -> query -> pickup)
 
+development localhost + explicit ?playtest=agent
+  -> dynamic PlaytestBridge -> bounded player view / real DOM actions
+  -> temporary GameSession -> hidden judge -> external dungeon-maintainer runner
+
 player movement -> MazeFloor collision/gates -> fog, pickup, or encounter meter
 player SQL -> read-only policy -> SQLite result + EXPLAIN QUERY PLAN
   -> result semantics + lesson-lock validation -> auto attack or enemy counter
@@ -276,6 +280,23 @@ output store.
 encounter rates, navigation thresholds, and storage limits.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
+
+`src/application/playtest/` owns the development-only player projection and
+browser bridge. It is enabled only when `import.meta.env.DEV`, localhost, and an
+explicit `?playtest=agent` parameter all match. The separate
+`dungeon-maintainer` runner cannot receive answers, hidden maps, saves, profiles,
+or full snapshots; the Pi Agent selects bounded game tools while the bridge performs
+BFS movement, DOM interaction, internal answer submission, Boss defeat, and floor
+transition. Hidden judge output is used only for final assertions and never enters
+model context. The playtest console receives only redacted turn, tool, status, and
+usage events. When Playwright injects all three parameterless Dashboard bindings,
+the same console may render a bounded diagnosis and request diagnose, fix, or apply;
+the page cannot supply paths, prompts, SQL, commands, or approval tokens. A source
+refresh may first save one Run/Profile checkpoint in the temporary Context's
+`sessionStorage`; startup consumes it once, and a missing or mismatched recovery
+must block retest. The checkpoint never enters IndexedDB, model context, logs, or
+reports. The production build must not
+register `window.__DUNGEON_PLAYTEST__` or include the dynamic bridge chunk.
 
 `src/content/sql/sqlSchema.ts` owns the canonical field/type/nullability metadata,
 generated DDL, and teaching relationships for `monsters`, `monster_signals`,

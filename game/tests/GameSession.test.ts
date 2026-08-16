@@ -754,6 +754,10 @@ describe("GameSession SQL 魔王城 Run", () => {
     );
     if (!hammerShrine || !groupGate) throw new Error("缺少聚合战锤房或 GROUP BY 物理门");
 
+    expect(session.snapshot().navigationGuidance).toMatchObject({
+      objectiveRoomId: hammerShrine.id,
+      objectiveTitle: hammerShrine.title,
+    });
     expect(session.snapshot().availableRoomIds).not.toContain(groupRoomId);
     expect(session.travelToRoom(groupRoomId)).toMatchObject({
       ok: false,
@@ -778,6 +782,7 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().player.weapon.id).toBe("aggregate-hammer");
     expect(session.snapshot().completedRoomIds).toContain(hammerShrine.id);
     expect(session.snapshot().availableRoomIds).toContain(groupRoomId);
+    expect(session.snapshot().navigationGuidance.objectiveRoomId).toBe(groupRoomId);
 
     expect(session.setPlayerPosition(groupGate.outside.x, groupGate.outside.y)).toBe(true);
     expect(session.attemptPlayerMove(
@@ -1417,6 +1422,20 @@ describe("GameSession SQL 魔王城 Run", () => {
 
     expect(formalSave.floor).toBe(1);
     expect(formalSave.graph.seed).toBe("admin-overview");
+  });
+
+  it("管理员视图可退出且不改变当前游戏进度", () => {
+    const session = new GameSession(null, null, "admin-disable");
+    expect(session.enableAdminMode()).toMatchObject({ ok: true });
+    expect(session.adminLoadFloor(2)).toMatchObject({ ok: true });
+    const before = session.snapshot();
+
+    expect(session.disableAdminMode()).toMatchObject({ ok: true });
+    const after = session.snapshot();
+    expect(after.adminMode).toBe(false);
+    expect(after.floor).toBe(before.floor);
+    expect(after.completedLessons).toEqual(before.completedLessons);
+    expect(after.player).toEqual(before.player);
   });
 
   it("管理员只提供进入下一层初始位置的操作", () => {

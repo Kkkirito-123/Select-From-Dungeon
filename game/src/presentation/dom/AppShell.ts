@@ -168,6 +168,21 @@ export function shouldDismissTransientCard(
   return shownAtMove !== null && currentTotalMoves - shownAtMove >= 3;
 }
 
+/**
+ * 判断已有战斗结算是否需要补启层末自动收口。
+ *
+ * Boss 结算可能先在 explore 状态出现，玩家随后领取钥匙才进入 transition/victory。
+ * 此时已经无法继续移动三步关闭卡片，必须补上层末计时器，才能让剧情队列和传送层
+ * 正常展示。普通 explore 结算仍由真实移动关闭，不改变玩家可见节奏。
+ */
+export function shouldAutoCloseCombatSettlement(
+  mode: GameSnapshot["mode"],
+  visible: boolean,
+  timerScheduled: boolean,
+): boolean {
+  return visible && !timerScheduled && (mode === "transition" || mode === "victory");
+}
+
 export function narrativeMomentUsesRecordOverlay(
   presentation: FloorStoryPresentation,
 ): boolean {
@@ -2311,18 +2326,26 @@ export class AppShell {
     card.classList.add("is-visible");
     if (this.settlementAutoCloseTimer !== null) {
       window.clearTimeout(this.settlementAutoCloseTimer);
+      this.settlementAutoCloseTimer = null;
     }
-    if (resolution.mode === "transition" || resolution.mode === "victory") {
-      const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? 900
-        : 1_800;
-      this.settlementAutoCloseTimer = window.setTimeout(() => {
-        this.settlementAutoCloseTimer = null;
-        this.hideCombatSettlement();
-        this.renderNarrativeProgress(this.lastSnapshot);
-        this.renderFloorTransition(this.lastSnapshot);
-      }, delay);
-    }
+    this.scheduleCombatSettlementClose(resolution.mode);
+  }
+
+  private scheduleCombatSettlementClose(mode: GameSnapshot["mode"]): void {
+    if (!shouldAutoCloseCombatSettlement(
+      mode,
+      this.isCombatSettlementVisible(),
+      this.settlementAutoCloseTimer !== null,
+    )) return;
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 900
+      : 1_800;
+    this.settlementAutoCloseTimer = window.setTimeout(() => {
+      this.settlementAutoCloseTimer = null;
+      this.hideCombatSettlement();
+      this.renderNarrativeProgress(this.lastSnapshot);
+      this.renderFloorTransition(this.lastSnapshot);
+    }, delay);
   }
 
   private hidePickupCard(): void {
@@ -2512,6 +2535,7 @@ export class AppShell {
     } else {
       this.dismissTransientCards(snapshot);
     }
+    this.scheduleCombatSettlementClose(snapshot.mode);
 
     requiredElement(this.root, "#floor-value").textContent =
       `${String(snapshot.floor).padStart(2, "0")} / 08`;

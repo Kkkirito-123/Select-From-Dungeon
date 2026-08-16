@@ -142,6 +142,10 @@ index.html -> src/application/main.ts
   -> NarrativeCodexView/MonsterCodexView（本地剧情档案与名字回收记录）
   -> OnboardingController（移动 -> 遭遇 -> 终端 -> 查询 -> 拾取）
 
+本机开发态 + 显式 ?playtest=agent
+  -> 动态 PlaytestBridge -> 受限玩家投影 / 真实 DOM 动作
+  -> 临时 GameSession -> 隐藏裁判 -> 外部 dungeon-maintainer Runner
+
 玩家移动 -> MazeFloor 碰撞/知识门 -> 迷雾、拾取或步数遭遇判定
 玩家 SQL -> 只读策略 -> SQLite 结果 + EXPLAIN QUERY PLAN
   -> 结果语义 + 关卡知识锁校验 -> 正确时自动攻击 / 错误时怪物反击
@@ -173,6 +177,17 @@ Agent 数据库或输出 Store。
 `src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
 内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
+
+`src/application/playtest/` 负责仅限开发态的玩家投影和浏览器桥；必须同时满足
+`import.meta.env.DEV`、本机地址和显式 `?playtest=agent` 才启用。独立 `dungeon-maintainer`
+Runner 不能获得答案、隐藏地图、存档、Profile 或完整快照；Pi Agent 只选择受限游戏工具，
+桥内部执行 BFS、真实 DOM 操作、答案提交、Boss 击败和换层。隐藏裁判结果只供最终断言，不进入
+模型上下文。试玩控制台只接收脱敏的回合、工具、状态和用量事件。
+当 Playwright 注入全部三个无参数 Dashboard 绑定时，同一控制台可以展示有限诊断并请求排查、
+修复或应用；页面不能提供路径、Prompt、SQL、命令或批准 token。源码刷新前可以把一份 Run/Profile
+检查点写入临时 Context 的 `sessionStorage`，启动时只消费一次；恢复信号或公开状态核对失败必须
+阻断复测。检查点不得进入 IndexedDB、模型上下文、日志或报告。
+生产构建不得注册 `window.__DUNGEON_PLAYTEST__` 或包含动态桥 Chunk。
 
 `src/content/sql/sqlSchema.ts` 负责 `monsters`、`monster_signals`、`rooms`、
 `monster_gear` 的权威字段、类型、可空性元数据、生成 DDL 与教学关系；`SqlEngine` 执行该 DDL

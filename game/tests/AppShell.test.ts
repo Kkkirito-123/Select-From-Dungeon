@@ -22,6 +22,7 @@ import {
   schemaRenderSignature,
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
+  shouldAutoCloseCombatSettlement,
   shouldDismissTransientCard,
 } from "../src/presentation/dom/AppShell";
 import {
@@ -431,6 +432,16 @@ describe("shouldDismissTransientCard", () => {
     expect(shouldDismissTransientCard(9, 10)).toBe(false);
     expect(shouldDismissTransientCard(9, 11)).toBe(false);
     expect(shouldDismissTransientCard(9, 12)).toBe(true);
+  });
+});
+
+describe("shouldAutoCloseCombatSettlement", () => {
+  it("Boss 结算先出现、随后进入层末状态时补启计时器", () => {
+    expect(shouldAutoCloseCombatSettlement("explore", true, false)).toBe(false);
+    expect(shouldAutoCloseCombatSettlement("transition", true, false)).toBe(true);
+    expect(shouldAutoCloseCombatSettlement("victory", true, false)).toBe(true);
+    expect(shouldAutoCloseCombatSettlement("victory", false, false)).toBe(false);
+    expect(shouldAutoCloseCombatSettlement("victory", true, true)).toBe(false);
   });
 });
 

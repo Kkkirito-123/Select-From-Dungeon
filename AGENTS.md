@@ -22,7 +22,7 @@ nested `AGENTS.md`: `game/AGENTS.md` owns browser-game rules and
 
 ```text
 game/                  Independent TypeScript/Vite browser game
-agent/                 Independent Python Campfire/Scribe/Main service
+agent/                 Stateless Python Campfire, Scribe, and Main service
 scripts/               Repository-rule validator and its regression tests
 .github/workflows/     Cross-project validation and game Pages deployment
 .agents/skills/        Requirement, implementation, delivery, and guide workflows
@@ -48,6 +48,14 @@ pnpm --dir game build
 
 Generated directories such as `game/node_modules/`, `game/dist/`, Python
 virtual environments, and caches are not source and must not be committed.
+
+The development-only protocol-v2 game bridge may be consumed by the separate
+`dungeon-maintainer` repository. The bridge executes bounded browser actions for
+the Pi Agent playtest. Its local Dashboard may bind three parameterless diagnose,
+fix, and apply commands and use a one-shot `sessionStorage` checkpoint before a
+source refresh. These capabilities require the same development/localhost/query
+gate, and local maintainer task data does not belong to this repository or the
+online Python service.
 
 ## Skills and Delivery
 

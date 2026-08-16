@@ -19,7 +19,8 @@
 - 不接收参考 SQL、完整游戏快照、地图、移动、背包、身份或浏览器 Provider 密钥。
 - OpenTelemetry 只能记录标识、状态、耗时、fallback 和 Token 数，不记录 prompt、completion、
   SQL、展示正文或凭证。
-- 未配置 Key、模型失败或遥测导出失败时，确定性回退仍须保证游戏可用。
+- 未配置 Key、模型失败或遥测导出失败时，确定性回退仍须保证游戏可用。代码维护和浏览器试玩
+  属于独立 `dungeon-maintainer` 仓库，不得为此给线上服务增加工具。
 
 ## 命令
 

@@ -75,6 +75,47 @@ export function appShellTemplate({
               </div>
               <pre id="agent-work-log" class="agent-work__log">000 RUNTIME READY</pre>
             </section>
+            <section id="playtest-agent-console" class="playtest-agent-console" aria-label="Pi Agent 指挥日志" hidden>
+              <div class="playtest-agent-console__head">
+                <span>PI AGENT / 指挥日志</span>
+                <strong id="playtest-agent-status">READY</strong>
+              </div>
+              <div class="playtest-agent-console__meta">
+                <span id="playtest-agent-turn">TURN 0</span>
+                <span id="playtest-agent-phase">OBSERVE</span>
+                <span id="playtest-agent-tool">WAIT</span>
+              </div>
+              <div class="playtest-agent-console__pipeline" aria-label="Agent 诊断阶段">
+                <span data-agent-phase="observe">OBSERVE</span>
+                <span data-agent-phase="plan">PLAN</span>
+                <span data-agent-phase="act">ACT</span>
+                <span data-agent-phase="verify">VERIFY</span>
+                <span data-agent-phase="finding">FINDING</span>
+                <span data-agent-phase="fix">FIX</span>
+                <span data-agent-phase="check">CHECK</span>
+              </div>
+              <div id="playtest-dashboard-controls" class="playtest-dashboard-controls" hidden>
+                <button id="playtest-quick-check" type="button">快速排查</button>
+                <button id="playtest-quick-fix" type="button" disabled>现场修复</button>
+                <button id="playtest-apply-fix" type="button" disabled>应用到项目</button>
+              </div>
+              <section id="playtest-diagnosis" class="playtest-diagnosis" aria-label="结构化诊断结果" hidden>
+                <div class="playtest-diagnosis__head">
+                  <span>DIAGNOSIS / 诊断</span>
+                  <strong id="playtest-diagnosis-result">待排查</strong>
+                </div>
+                <dl>
+                  <div><dt>故障</dt><dd id="playtest-diagnosis-issue">--</dd></div>
+                  <div><dt>原因</dt><dd id="playtest-diagnosis-cause">--</dd></div>
+                  <div><dt>证据</dt><dd id="playtest-diagnosis-evidence">--</dd></div>
+                  <div><dt>解决方案</dt><dd id="playtest-diagnosis-fix">--</dd></div>
+                  <div><dt>修改文件</dt><dd id="playtest-diagnosis-paths">--</dd></div>
+                  <div><dt>风险</dt><dd id="playtest-diagnosis-risk">--</dd></div>
+                </dl>
+              </section>
+              <pre id="playtest-agent-log" class="playtest-agent-console__log">000 BOOT / 等待 Agent</pre>
+              <div id="playtest-agent-usage" class="playtest-agent-console__usage">TOKEN I 0 / O 0 / T 0</div>
+            </section>
             <span id="main-live" class="sr-only" aria-live="polite" aria-atomic="true"></span>
           </aside>
           <section class="dungeon-panel" aria-label="SQL 魔王城房间">

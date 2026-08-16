@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { FLOOR_TWO_MONSTERS } from "../src/content/curriculum/floor2Level";
-import { evaluateGateChallenge } from "../src/content/curriculum/gateChallenges";
+import type { FloorNumber } from "../src/domain/progression/runGraph";
+import {
+  evaluateGateChallenge,
+} from "../src/content/curriculum/gateChallenges";
+import { gateAnswer } from "../src/application/playtest/gateAnswers";
 import { INITIAL_MONSTERS } from "../src/content/curriculum/mvpLevel";
 import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
@@ -10,6 +14,15 @@ describe("high-difficulty gate challenges", () => {
     "../node_modules/sql.js/dist/sql-wasm.wasm",
     import.meta.url,
   ));
+
+  it("管理员辅助答案仍通过真实 SQLite 与八层机关判定", async () => {
+    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    for (let floor = 1; floor <= 8; floor += 1) {
+      const current = floor as FloorNumber;
+      const result = engine.executeSelect(gateAnswer(current));
+      expect(evaluateGateChallenge(current, result)).toMatchObject({ accepted: true });
+    }
+  });
 
   it("第一层接受真实 JOIN + 聚合结果，并拒绝缺少核心结构的常量答案", async () => {
     const engine = await SqlEngine.create(

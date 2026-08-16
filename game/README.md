@@ -317,6 +317,14 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+The separate `dungeon-maintainer` repository may consume the protocol-v2
+localhost bridge for Pi-directed browser diagnostics. The bridge is available
+only in a development build with an explicit `?playtest=agent` parameter, uses
+a temporary in-memory Run, and does not enter the production bundle. Its local
+`dashboard` command adds parameterless diagnose/fix/apply buttons to the same
+window; verified source refreshes use a one-shot Context-local checkpoint and
+never write the player's IndexedDB save.
+
 Open the URL printed by Vite, normally `http://localhost:5173/`. Do not open
 `index.html` through `file://`; the SQLite WASM file must be fetched over HTTP.
 

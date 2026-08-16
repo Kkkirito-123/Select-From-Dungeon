@@ -220,6 +220,11 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+独立 `dungeon-maintainer` 仓库可调用协议 v2 本机桥执行 Pi Agent 指挥的浏览器诊断。测试桥只在开发构建且
+显式携带 `?playtest=agent` 时可用，使用临时内存 Run，不进入生产包。其本地 `dashboard` 命令会在
+同一窗口加入无参数排查、修复和应用按钮；源码刷新只使用 Context 内一次性检查点，不写玩家的
+IndexedDB 存档。
+
 打开 Vite 输出的地址，通常是 `http://localhost:5173/`。不要通过 `file://` 直接打开
 `index.html`，SQLite WASM 必须通过 HTTP 加载。
 

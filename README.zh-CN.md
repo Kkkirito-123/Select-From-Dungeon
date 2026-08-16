@@ -12,6 +12,10 @@
 不启动 Agent 服务时，游戏仍可完整游玩。两个工程不共享源码导入或依赖目录，运行时只通过严格
 HTTP 契约连接。模块归属和执行边界见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
+独立 `dungeon-maintainer` 可通过仅限开发态的本机桥启动同窗 Dashboard：Pi Agent 排查当前楼层，
+在隔离 worktree 修复并复测，用户最后显式应用补丁。它不属于本仓库的在线 Python Agent 服务，
+也不读取正式游戏存档。
+
 ## 快速开始
 
 启动浏览器游戏：
@@ -31,6 +35,10 @@ dungeon-agent --host 127.0.0.1 --port 8787
 
 如需启用唯一的 `POST /v1/agent/run` 集成，将 `game/.env.example` 复制为
 `game/.env.local`；模型密钥只放在 `agent/.env`。
+
+仅限开发态的游戏协议 v2 桥由独立 `dungeon-maintainer` 仓库调用，用于受限代码维护和 Pi Agent
+指挥的八层浏览器试玩。BFS 路径与答案提交留在游戏桥内部，Agent 只选择受限工具。Runner 使用
+临时 Chromium Context 与内存 Run，不属于本仓库的 Python Agent 服务，也不会污染正式存档。
 
 `game/node_modules/` 是 pnpm 安装生成的依赖内容，不是项目源码，不会提交到 Git；删除后可根据
 `game/pnpm-lock.yaml` 完整重新生成。

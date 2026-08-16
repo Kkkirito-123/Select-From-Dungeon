@@ -2238,7 +2238,15 @@ export class GameSession {
     const nextLessonId = lessonsForFloor(this.floorNumber)
       .find((lessonId) => !this.completedLessons.has(lessonId));
     if (!nextLessonId) return null;
-    const room = this.graph.nodes.find((node) => node.lessonId === nextLessonId);
+    const lessonRoom = this.graph.nodes.find((node) => node.lessonId === nextLessonId);
+    if (!lessonRoom) return null;
+    // 下一门课可能还依赖一处必须亲自领取的固定奖励。导航先指向缺失的前置房，
+    // 避免玩家和确定性试玩器沿“下一课”路线反复撞上尚未解锁的物理门。
+    const requiredRoomId = this.requiredCompletedRoomIds(lessonRoom)
+      .find((roomId) => !this.completedRoomIds.has(roomId));
+    const room = requiredRoomId
+      ? this.graph.nodes.find((node) => node.id === requiredRoomId)
+      : lessonRoom;
     const target = room ? this.mazeFloor.anchors[room.id] : null;
     if (!room || !target) return null;
 
@@ -3073,6 +3081,17 @@ export class GameSession {
       kind: "none",
       message: "管理员视图已开启：全图、怪物与区域交通均可见；预览操作不会写入正式存档。",
     };
+  }
+
+  /** 退出只存在于内存的管理员视图；不修改当前楼层进度或任何存档字段。 */
+  disableAdminMode(): InteractionResolution {
+    if (!this.adminMode) {
+      return { ok: true, kind: "none", message: "管理员视图已经关闭。" };
+    }
+    this.adminMode = false;
+    this.adminPanelOpen = false;
+    this.emit();
+    return { ok: true, kind: "none", message: "管理员视图已关闭。" };
   }
 
   setAdminPanelOpen(open: boolean): boolean {

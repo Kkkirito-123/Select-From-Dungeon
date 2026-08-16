@@ -16,7 +16,7 @@
 
 ```text
 game/                  独立 TypeScript/Vite 浏览器游戏
-agent/                 独立 Python 篝火/抄写员/Main 服务
+agent/                 无状态 Python 篝火、抄写员和 Main 服务
 scripts/               仓库规则校验器及其回归测试
 .github/workflows/     跨工程验证和游戏 Pages 部署
 .agents/skills/        需求、实现、交付与指南同步流程
@@ -39,6 +39,11 @@ pnpm --dir game build
 ```
 
 `game/node_modules/`、`game/dist/`、Python 虚拟环境和缓存都是生成内容，不属于源码，不得提交。
+
+仅限开发态的游戏协议 v2 桥可由独立 `dungeon-maintainer` 仓库调用。游戏桥为 Pi Agent 试玩
+执行受限浏览器动作。其本地 Dashboard 可绑定三个无参数排查、修复和应用命令，并在源码刷新前
+使用一次性 `sessionStorage` 检查点；这些能力仍必须满足开发态、本机地址和显式查询参数三重条件。
+维护器本地任务数据不属于本仓库，也不属于线上 Python 服务。
 
 ## Skill 与交付
 

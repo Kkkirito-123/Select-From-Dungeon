@@ -26,6 +26,11 @@ import { OnboardingController } from "../presentation/dom/OnboardingController";
 import { AgentGateway } from "../infrastructure/agent/AgentGateway";
 import { AgentRuntime } from "./agent/AgentRuntime";
 import { TriggerBus } from "./triggers/bus";
+import {
+  createPlaytestStore,
+  playtestLaunchFromUrl,
+} from "./playtest/mode";
+import { installPlaytestAgentPanel } from "./playtest/panel";
 
 function runtimeStorage(): StorageLike {
   try {
@@ -40,13 +45,27 @@ function runtimeStorage(): StorageLike {
   }
 }
 
+function playtestCheckpointStorage(): StorageLike | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 async function bootstrap(): Promise<void> {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("缺少应用根节点。 ");
   root.innerHTML = `<div class="boot-screen"><span class="boot-cursor"></span>正在生成魔王城查询计划…</div>`;
 
+  const playtest = import.meta.env.DEV
+    ? playtestLaunchFromUrl(new URL(window.location.href), true)
+    : null;
+  if (playtest) root.dataset.playtestMode = "agent";
   const storage = runtimeStorage();
-  const data = await BrowserDataStore.open(storage);
+  const checkpointStorage = playtest ? playtestCheckpointStorage() : null;
+  const playtestData = playtest ? createPlaytestStore(checkpointStorage) : null;
+  const data = playtestData ?? await BrowserDataStore.open(storage);
   const savedRun = data.loadRun();
   const profile = data.loadProfile();
   const questionBank = await loadBundledQuestionBank(
@@ -54,12 +73,28 @@ async function bootstrap(): Promise<void> {
     fetch,
     savedRun?.questionBankVersion ?? null,
   );
+  let initialRun = savedRun;
+  if (playtest && !savedRun && playtest.floor !== 1) {
+    // 隔离初始化器先生成目标层数据，再用临时 Session 载入；该数据不会进入正式存储。
+    const setup = new GameSession(
+      null,
+      profile,
+      WORLD_RUNTIME_CONFIG.fixedWorldSeed,
+      questionBank,
+    );
+    setup.enableAdminMode();
+    setup.adminLoadFloor(playtest.floor);
+    initialRun = setup.toSavedRun();
+  }
   const session = new GameSession(
-    savedRun,
+    initialRun,
     profile,
-    savedRun?.graph.seed ?? WORLD_RUNTIME_CONFIG.fixedWorldSeed,
+    initialRun?.graph.seed ?? WORLD_RUNTIME_CONFIG.fixedWorldSeed,
     questionBank,
   );
+  if (playtest?.mode === "agent") {
+    session.enableAdminMode();
+  }
   const [sql, { createGame }] = await Promise.all([
     SqlEngine.create(session.snapshot().monsters),
     import("../presentation/phaser/createGame"),
@@ -67,15 +102,18 @@ async function bootstrap(): Promise<void> {
   const audio = new ArcadeAudio({ mode: "explore", volume: 0.55 });
   const feedback = new FeedbackDirector(audio);
   const onboarding = new OnboardingController(data);
-  const learningLedger = new LearningLedger();
+  const learningLedger = new LearningLedger(playtest ? null : undefined);
   const learningRecorder = new LearningProgressRecorder(session, learningLedger);
   const agentRuntime = new AgentRuntime(new AgentGateway({
     ...AGENT_RUNTIME_CONFIG,
+    endpoint: playtest ? null : AGENT_RUNTIME_CONFIG.endpoint,
   }));
   const triggerBus = new TriggerBus();
   const unsubscribeAgentEvents = triggerBus.subscribe((event) => agentRuntime.handle(event));
   const disconnectTriggers = triggerBus.connect(session);
   let game: Phaser.Game | null = null;
+  let removePlaytestBridge: (() => void) | null = null;
+  let removePlaytestPanel: (() => void) | null = null;
   const app = new AppShell(
     root,
     session,
@@ -93,7 +131,18 @@ async function bootstrap(): Promise<void> {
   try {
     learningRecorder.start();
     app.mount();
+    if (playtest) removePlaytestPanel = installPlaytestAgentPanel(root);
     game = createGame(session, audio, feedback);
+    if (import.meta.env.DEV && playtest) {
+      const { installPlaytestBridge } = await import("./playtest/bridge");
+      removePlaytestBridge = installPlaytestBridge({
+        root,
+        session,
+        launch: playtest,
+        checkpointStorage,
+        checkpointRestored: playtestData?.checkpointState === "restored",
+      });
+    }
     root.dataset.runtimeState = "active";
   } catch (error) {
     disconnectTriggers();
@@ -102,14 +151,14 @@ async function bootstrap(): Promise<void> {
     learningRecorder.destroy();
     app.destroy();
     game?.destroy(true);
+    removePlaytestBridge?.();
+    removePlaytestPanel?.();
     throw error;
   }
 
-  const persistence = startProgressPersistence(
-    session,
-    data,
-    JSON.stringify(profile),
-  );
+  const persistence = playtest
+    ? { flush: () => undefined, destroy: () => undefined }
+    : startProgressPersistence(session, data, JSON.stringify(profile));
 
   const pageHideHandler = (): void => persistence.flush();
   const visibilityChangeHandler = (): void => {
@@ -134,6 +183,8 @@ async function bootstrap(): Promise<void> {
     unsubscribeAgentEvents();
     agentRuntime.destroy();
     learningRecorder.destroy();
+    removePlaytestBridge?.();
+    removePlaytestPanel?.();
     app.destroy();
     game?.destroy(true);
   };

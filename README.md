@@ -34,6 +34,14 @@ dungeon-agent --host 127.0.0.1 --port 8787
 Copy `game/.env.example` to `game/.env.local` to enable the single optional
 `POST /v1/agent/run` integration. Provider keys stay in `agent/.env`.
 
+The development-only protocol-v2 game bridge is consumed by the separate
+`dungeon-maintainer` repository for restricted code maintenance and Pi Agent-guided
+eight-floor browser playtests. The bridge keeps BFS and answer submission inside the
+game process, while the Agent chooses bounded tools. The runner uses a temporary
+Chromium context and in-memory Run; its optional same-window Dashboard can diagnose,
+repair in an isolated worktree, retest, and explicitly apply a verified patch. It is
+not part of this repository's Python Agent service.
+
 `game/node_modules/` is generated dependency content installed by pnpm. It is
 not project source, is ignored by Git, and can be regenerated from
 `game/pnpm-lock.yaml`.
