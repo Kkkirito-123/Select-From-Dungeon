@@ -195,6 +195,7 @@ complete SQL or MySQL interview curriculum.
 
 ```text
 index.html -> src/application/main.ts
+  -> DEV-only DungeonAgentBridge (localhost + ?playtest=agent, memory-only store)
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> CampfireReview (current-floor deterministic SQL recap)
@@ -276,6 +277,16 @@ output store.
 encounter rates, navigation thresholds, and storage limits.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
+
+`src/devtools/dungeon-agent/` owns the external maintainer protocol v2 and remains development-only.
+`protocol.ts` owns types and temporary storage, `actions.ts` owns fixed DOM actions and visible
+overlays, `projection.ts` owns the player-visible view, `navigation.ts` owns internal target/frontier
+BFS and stop reasons, `query.ts` owns browser-only fixed query execution, `trace.ts` owns the bounded
+semantic ring, and `bridge.ts` only composes the protocol lifecycle. `src/application/main.ts` may load
+it only behind `import.meta.env.DEV`, a localhost URL, and `?playtest=agent`. This mode uses an in-memory
+DataStore, disables the optional remote Agent endpoint, never opens the player's IndexedDB or local
+Run/Profile, and must not return SQL, admin answers, the complete map, saves, inventory, identity, or
+hidden judge data.
 
 `src/content/sql/sqlSchema.ts` owns the canonical field/type/nullability metadata,
 generated DDL, and teaching relationships for `monsters`, `monster_signals`,
@@ -380,6 +391,7 @@ src/content/            Static curriculum, world, narrative, inventory, and SQL 
 src/domain/             Session facade/helpers, combat, exploration, learning, progression, inventory, and shared rules
 src/infrastructure/     Audio, feedback, SQLite, storage codecs/migrations, and browser adapters
 src/presentation/       Phaser scenes, DOM application views, and focused renderers
+src/devtools/           Development-only external maintainer bridge; no production import path
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
                     onboarding, and query policy
 docs/               Current bilingual blueprints, one active roadmap, future
@@ -409,6 +421,12 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 
 ## Runtime and Safety Boundaries
 
+- The Dungeon Maintainer bridge is installed only when `import.meta.env.DEV`, a localhost
+  hostname, and `?playtest=agent` all match. It uses a page-memory DataStore and a temporary
+  Chromium `sessionStorage` checkpoint that is deleted immediately after restore. The bridge
+  exposes only `checkpoint/look/go/use/query/judge/events`; Node and the model never receive
+  SQL, answers, complete maps, saves, inventory, identity, or hidden judge details. Production
+  builds must not contain an accessible `window.__DUNGEON_PLAYTEST__`.
 - SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.
   Campfire review uses only current-floor local snapshot records, and the Scribe
   uses authored content plus a bounded scene projection. If explicitly configured,

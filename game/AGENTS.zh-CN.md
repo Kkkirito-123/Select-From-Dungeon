@@ -108,6 +108,7 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 
 ```text
 index.html -> src/application/main.ts
+  -> 仅开发态 DungeonAgentBridge（localhost + ?playtest=agent，纯内存存储）
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> CampfireReview（当前楼层确定性 SQL 复盘）
   -> TriggerBus -> AgentRuntime/XState（并行篝火、抄写员、Main 生命周期与内存缓存）
@@ -174,6 +175,14 @@ Agent 数据库或输出 Store。
 内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
 
+`src/devtools/dungeon-agent/` 负责外部维护器协议 v2，并且始终只在开发态使用：`protocol.ts` 负责
+协议类型与临时存储，`actions.ts` 负责固定 DOM 动作和可见覆盖层，`projection.ts` 负责玩家可见投影，
+`navigation.ts` 负责页面内部目标/frontier BFS 与停止原因，`query.ts` 负责浏览器内部固定查询执行，
+`trace.ts` 负责有限语义环形 Trace，`bridge.ts` 只负责协议生命周期装配。`src/application/main.ts` 只能
+在 `import.meta.env.DEV`、本机 URL 和 `?playtest=agent` 同时满足时加载该目录。试玩模式使用内存
+DataStore、关闭可选远程 Agent endpoint，不打开玩家 IndexedDB 或正式 Run/Profile，也不得返回 SQL、
+管理员答案、完整地图、存档、背包、身份或隐藏裁判数据。
+
 `src/content/sql/sqlSchema.ts` 负责 `monsters`、`monster_signals`、`rooms`、
 `monster_gear` 的权威字段、类型、可空性元数据、生成 DDL 与教学关系；`SqlEngine` 执行该 DDL
 并负责内存查询，UI 不得重复维护表定义或绕开只读边界。目录中的关系是 JOIN 教学提示，不是
@@ -236,6 +245,7 @@ src/content/            课程、世界、剧情、背包与 SQL 静态内容
 src/domain/             Session 门面/辅助模块、战斗、探索、学习、成长、背包与共享规则
 src/infrastructure/     音频、反馈、SQLite、存档编解码/迁移与浏览器适配器
 src/presentation/       Phaser 场景、DOM 应用视图与职责明确的渲染器
+src/devtools/           仅开发态外部维护器桥；生产入口不得导入
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
 docs/               双语蓝图、活跃路线图、docs/design/ 后续候选设计与历史报告
 scripts/            游戏资源、题库和架构脚本
@@ -261,6 +271,10 @@ pnpm build
 
 ## 运行与安全边界
 
+- Dungeon Maintainer 桥只有在 `import.meta.env.DEV`、本机主机名和 `?playtest=agent` 同时匹配时安装。
+  它使用页面内存 DataStore 和临时 Chromium `sessionStorage` 检查点，恢复后立即删除。桥只暴露
+  `checkpoint/look/go/use/query/judge/events`；Node 和模型都不能收到 SQL、答案、完整地图、存档、
+  背包、身份或隐藏裁判详情。生产构建不得暴露 `window.__DUNGEON_PLAYTEST__`。
 - SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，抄写员使用作者内容
   和受限场景投影。明确配置后，唯一 `POST /v1/agent/run` 接收变化方投影和同层子结果。游戏没有 Agent 存档，未配置服务时完全使用本地文案。
 - Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。主 Agent 只看到已经校验的子 Agent 展示文本；
