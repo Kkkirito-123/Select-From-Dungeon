@@ -26,6 +26,7 @@ agent/                 Independent Python Campfire/Scribe/Main service
 scripts/               Repository-rule validator and its regression tests
 .github/workflows/     Cross-project validation and game Pages deployment
 .agents/skills/        Requirement, implementation, delivery, and guide workflows
+.maintainer/project.json  Fixed identity for the external Dungeon Maintainer
 ```
 
 The projects share no source imports or dependency tree. The game may call the
@@ -33,6 +34,10 @@ Agent only through its strict HTTP contract and must remain playable without it.
 The Agent must never read game saves, maps, inventory, identity, complete
 snapshots, or provider secrets from the browser. Legal files stay at repository
 root and are copied into `game/dist/` by the game build.
+The external Dungeon Maintainer may recognize this repository only through the
+fixed `.maintainer/project.json` marker. Its browser bridge is owned by
+`game/src/devtools/`, is available only on a local Vite development page with
+`?playtest=agent`, and must be absent from production output.
 
 ## Canonical Commands
 

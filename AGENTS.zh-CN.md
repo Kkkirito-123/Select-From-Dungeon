@@ -20,11 +20,14 @@ agent/                 独立 Python 篝火/抄写员/Main 服务
 scripts/               仓库规则校验器及其回归测试
 .github/workflows/     跨工程验证和游戏 Pages 部署
 .agents/skills/        需求、实现、交付与指南同步流程
+.maintainer/project.json  外部 Dungeon Maintainer 的固定项目标识
 ```
 
 两个工程不共享源码导入或依赖树。游戏只能通过严格 HTTP 契约调用 Agent，而且未启动 Agent 时仍
 必须可玩。Agent 不得读取游戏存档、地图、背包、身份、完整快照或浏览器中的 Provider 密钥。
 法律文件保留在仓库根，游戏构建时复制到 `game/dist/`。
+外部 Dungeon Maintainer 只能通过固定 `.maintainer/project.json` 标识识别本仓库。浏览器开发桥由
+`game/src/devtools/` 持有，只能在本机 Vite 开发页加 `?playtest=agent` 时启用，生产产物不得包含该桥。
 
 ## 标准命令
 
