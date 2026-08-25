@@ -22,7 +22,7 @@ import type {
 } from "../../content/world/biomeContent";
 import type { BiomePlan } from "../exploration/biome";
 import type { FloorHazard } from "../exploration/floorLabyrinth";
-import { STORAGE_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { STORAGE_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 
 export type LessonId = RunLessonId;
 

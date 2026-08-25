@@ -228,14 +228,13 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 
 ## 游戏工程地图
 
-机器可读路由权威是 `../.maintainer/architecture-map.json`。schema v2 登记稳定 layer/area 边界和
-选定的目录级 partition；它是路由数据，不是代码或文件索引。已登记 partition 内普通文件和内部目录
-变化无需更新地图。`domain/session` 等扁平高密度区域有意保留 area 级路由，由 Inspect 的符号窗口
-继续缩小读取范围。
+机器可读路由权威是 `../.maintainer/architecture-map.json`。schema v3 在稳定 layer/area/partition 之外
+登记八个跨层 `floorScopes`；它是路由数据，不是代码或文件索引。普通文件变化无需更新地图。
 
-首批 partition 覆盖 `content/world/floorExperience`、DOM 的 `focus` / `panels` / `renderers`，
-以及 Phaser 的 `actors` / `effects` / `interaction` / `world`。其中 `signals` 用于选择小搜索根，
-`neighbors` 只声明允许的扩展关系，不表示运行时依赖。
+正常 Inspect 依次搜索当前楼层、直接相邻楼层、父级共享 partition；area/仓库只作失败开放回退。
+每个楼层 scope 可包含同编号的内容与表现目录，但楼层子单元不得引用兄弟楼层。共同算法和服务必须
+上提到父级 shared partition，由唯一 registry 装配后单向提供给子单元。`neighbors` 仅允许前后一层，
+不表示运行时依赖。`GameSession` 继续是唯一状态提交者，楼层模块不得各自持有第二份可变会话状态。
 
 ```text
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约

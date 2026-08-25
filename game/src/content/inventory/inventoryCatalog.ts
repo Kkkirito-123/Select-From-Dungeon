@@ -5,7 +5,7 @@ import type {
   LootItem,
   Weapon,
 } from "../../domain/shared/types";
-import { INVENTORY_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { INVENTORY_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import type { FloorNumber } from "../../domain/progression/runGraph";
 import {
   type BiomeEncounterRole,

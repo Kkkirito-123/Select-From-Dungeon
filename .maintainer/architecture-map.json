@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "projectRoot": "game",
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
@@ -37,6 +37,15 @@
       "notResponsibleFor": ["IndexedDB 实现", "迁移执行"],
       "signals": ["存储契约", "存档接口", "持久化端口"],
       "neighbors": ["infrastructure.storage", "domain.session"]
+    },
+    {
+      "id": "contracts.config",
+      "parentId": "contracts",
+      "root": "game/src/contracts/config",
+      "responsibility": "跨层只读运行参数与题库配置契约",
+      "notResponsibleFor": ["环境变量读取", "服务装配", "作者正文"],
+      "signals": ["运行参数", "题库配置", "容量", "阈值", "固定种子"],
+      "neighbors": ["application.config", "domain.session", "content.curriculum"]
     },
     {
       "id": "application.agent",
@@ -246,12 +255,21 @@
       "neighbors": ["domain.exploration", "content.world", "application.runtime"]
     },
     {
+      "id": "presentation.styles",
+      "parentId": "presentation",
+      "root": "game/src/presentation/styles",
+      "responsibility": "浏览器页面基础、外壳、面板和响应式视觉样式",
+      "notResponsibleFor": ["DOM 交互逻辑", "游戏规则", "Phaser 绘制"],
+      "signals": ["样式", "css", "布局", "主题", "响应式"],
+      "neighbors": ["presentation.dom", "presentation.phaser"]
+    },
+    {
       "id": "devtools.dungeon-agent",
       "parentId": "devtools",
       "root": "game/src/devtools/dungeon-agent",
       "responsibility": "仅开发态维护器协议、玩家投影、语义动作和有限 Trace",
       "notResponsibleFor": ["生产游戏规则", "管理员答案暴露"],
-      "signals": ["维护器工具", "bridge", "协议", "look", "go", "use", "工具卡住"],
+      "signals": ["维护器工具", "bridge", "协议", "终端动作", "终端动作不可用", "动作不可用", "工具不可用", "维护器不可用", "look", "go", "use", "工具卡住"],
       "neighbors": ["contracts.game", "domain.session", "presentation.phaser"]
     }
   ],
@@ -264,6 +282,15 @@
       "notResponsibleFor": ["领域推进规则", "Phaser 世界绘制"],
       "signals": ["楼层体验", "区域节奏", "floor experience", "世界事件配置"],
       "neighbors": ["presentation.phaser.world"]
+    },
+    {
+      "id": "content.world.floors-shared",
+      "parentId": "content.world",
+      "root": "game/src/content/world/floors/shared",
+      "responsibility": "楼层作者模块共用的无状态内容契约、类型和装配辅助",
+      "notResponsibleFor": ["楼层专属正文", "领域推进规则", "Phaser 世界绘制"],
+      "signals": ["楼层共享契约", "floor shared", "map blueprint contract", "biome encounter contract", "landmark resolver contract"],
+      "neighbors": ["content.world.floor-experience", "presentation.phaser.world"]
     },
     {
       "id": "presentation.dom.focus",
@@ -327,6 +354,80 @@
       "notResponsibleFor": ["探索规则", "楼层作者数据"],
       "signals": ["世界绘制", "地图显示", "world renderer", "地标显示", "区域显示"],
       "neighbors": ["content.world.floor-experience", "presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction"]
+    }
+  ],
+  "floorScopes": [
+    {
+      "id": "floor.01",
+      "floor": 1,
+      "roots": ["game/src/content/world/floors/floor01"],
+      "responsibility": "第一层 SQL 入门世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第一层", "floor 1", "select from", "where clause", "is null", "档案水轮"],
+      "neighbors": ["floor.02"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.02",
+      "floor": 2,
+      "roots": ["game/src/content/world/floors/floor02"],
+      "responsibility": "第二层 JOIN 世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第二层", "floor 2", "order by", "distinct", "inner join", "沉水村落"],
+      "neighbors": ["floor.01", "floor.03"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.03",
+      "floor": 3,
+      "roots": ["game/src/content/world/floors/floor03"],
+      "responsibility": "第三层关系链世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第三层", "floor 3", "self join", "union all", "relation chain", "骨桥"],
+      "neighbors": ["floor.02", "floor.04"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.04",
+      "floor": 4,
+      "roots": ["game/src/content/world/floors/floor04"],
+      "responsibility": "第四层聚合世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第四层", "floor 4", "group by", "having", "aggregate query", "熔炉"],
+      "neighbors": ["floor.03", "floor.05"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.05",
+      "floor": 5,
+      "roots": ["game/src/content/world/floors/floor05"],
+      "responsibility": "第五层窗口函数世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第五层", "floor 5", "window over", "row number", "dense rank", "巡逻"],
+      "neighbors": ["floor.04", "floor.06"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.06",
+      "floor": 6,
+      "roots": ["game/src/content/world/floors/floor06"],
+      "responsibility": "第六层写事务世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第六层", "floor 6", "insert into", "update where", "delete where", "transaction rollback"],
+      "neighbors": ["floor.05", "floor.07"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.07",
+      "floor": 7,
+      "roots": ["game/src/content/world/floors/floor07"],
+      "responsibility": "第七层索引世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第七层", "floor 7", "btree", "composite index", "covering index", "执行计划"],
+      "neighbors": ["floor.06", "floor.08"],
+      "sharedPartitions": ["content.world.floors-shared"]
+    },
+    {
+      "id": "floor.08",
+      "floor": 8,
+      "roots": ["game/src/content/world/floors/floor08"],
+      "responsibility": "第八层综合迁移世界内容与楼层专属地标、生态和地图作者数据",
+      "signals": ["第八层", "floor 8", "MVCC", "deadlock", "isolation level", "replication lag", "sharding", "零行礼拜堂", "终局迁移"],
+      "neighbors": ["floor.07"],
+      "sharedPartitions": ["content.world.floors-shared"]
     }
   ]
 }

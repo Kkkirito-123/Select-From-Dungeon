@@ -16,6 +16,8 @@ import {
 } from "./musicScore";
 import { RecordedScorePlayer } from "./RecordedScorePlayer";
 import { runtimeScoreForScene } from "./runtimeScoreCatalog";
+import { AudioVoiceBank } from "./AudioVoiceBank";
+import { ArcadeSfxPlayer, type ArcadeSfx } from "./ArcadeSfxPlayer";
 
 export type {
   ArcadeMusicMode,
@@ -23,27 +25,7 @@ export type {
   ScoreFocus,
   ScoreScene,
 } from "./musicScore";
-
-export type ArcadeSfx =
-  | "step"
-  | "bump"
-  | "encounter"
-  | "query-cast"
-  | "enemy-hurt"
-  | "player-hurt"
-  | "stage-clear"
-  | "drop"
-  | "pickup-weapon"
-  | "pickup-relic"
-  | "heal"
-  | "gate"
-  | "victory"
-  | "defeat"
-  // 为第一版 MVP 的调用位置保留兼容别名。
-  | "room"
-  | "attack"
-  | "hit"
-  | "reward";
+export type { ArcadeSfx } from "./ArcadeSfxPlayer";
 
 export interface ArcadeAudioOptions {
   mode?: ArcadeMusicMode;
@@ -107,7 +89,8 @@ export class ArcadeAudio {
   private musicFilter: BiquadFilterNode | null = null;
   private sfxGain: GainNode | null = null;
   private recordedScorePlayer: RecordedScorePlayer | null = null;
-  private noiseBuffer: AudioBuffer | null = null;
+  private voiceBank: AudioVoiceBank | null = null;
+  private sfxPlayer: ArcadeSfxPlayer | null = null;
   private schedulerTimer: ReturnType<typeof setTimeout> | null = null;
   private modeTransitionTimer: ReturnType<typeof setTimeout> | null = null;
   private nextMusicStepAt = 0;
@@ -121,7 +104,6 @@ export class ArcadeAudio {
   private completedTrackCycles = 0;
   private readonly musicSources = new Set<AudioScheduledSourceNode>();
   private readonly sfxSources = new Set<AudioScheduledSourceNode>();
-  private readonly sourceCleanups = new Map<AudioScheduledSourceNode, () => void>();
   private gestureCleanup: (() => void) | null = null;
   private initializing: Promise<boolean> | null = null;
   private disposed = false;
@@ -373,7 +355,7 @@ export class ArcadeAudio {
     musicGain.gain.cancelScheduledValues(now);
     musicGain.gain.setValueAtTime(Math.max(SILENCE, musicGain.gain.value), now);
     musicGain.gain.linearRampToValueAtTime(SILENCE, switchAt);
-    this.stopSourcesAt(this.musicSources, switchAt + 0.005);
+    this.voiceBank?.stopSourcesAt(this.musicSources, switchAt + 0.005);
 
     this.modeTransitionTimer = globalThis.setTimeout(() => {
       this.modeTransitionTimer = null;
@@ -405,7 +387,7 @@ export class ArcadeAudio {
       this.clearModeTransition(true);
       this.stopMusicScheduler(true);
       this.recordedScorePlayer?.stop();
-      this.stopSources(this.sfxSources);
+      this.voiceBank?.stopSources(this.sfxSources);
     } else {
       void this.resume();
     }
@@ -431,7 +413,7 @@ export class ArcadeAudio {
       this.clearModeTransition(true);
       this.stopMusicScheduler(true);
       this.recordedScorePlayer?.stop();
-      this.stopSources(this.sfxSources);
+      this.voiceBank?.stopSources(this.sfxSources);
       if (context?.state === "running") {
         try {
           await context.suspend();
@@ -452,7 +434,7 @@ export class ArcadeAudio {
     if (!(await this.resume()) || !this.context || !this.sfxGain) return false;
 
     const startAt = this.context.currentTime + 0.012;
-    this.scheduleEffect(effect, startAt);
+    this.sfxPlayer?.schedule(effect, startAt);
     return true;
   }
 
@@ -465,7 +447,7 @@ export class ArcadeAudio {
     this.stopMusicScheduler(true);
     this.recordedScorePlayer?.dispose();
     this.recordedScorePlayer = null;
-    this.stopSources(this.sfxSources);
+    this.voiceBank?.stopSources(this.sfxSources);
 
     const context = this.context;
     if (context) {
@@ -479,7 +461,8 @@ export class ArcadeAudio {
     this.musicGain = null;
     this.musicFilter = null;
     this.sfxGain = null;
-    this.noiseBuffer = null;
+    this.sfxPlayer = null;
+    this.voiceBank = null;
     this.context = null;
 
     if (context && context.state !== "closed") {
@@ -511,7 +494,7 @@ export class ArcadeAudio {
     let musicGain: GainNode;
     let musicFilter: BiquadFilterNode;
     let sfxGain: GainNode;
-    let noiseBuffer: AudioBuffer;
+    let voiceBank: AudioVoiceBank;
     try {
       masterGain = context.createGain();
       musicGain = context.createGain();
@@ -526,7 +509,7 @@ export class ArcadeAudio {
       musicFilter.connect(masterGain);
       sfxGain.connect(masterGain);
       masterGain.connect(context.destination);
-      noiseBuffer = this.createNoiseBuffer(context);
+      voiceBank = new AudioVoiceBank(context);
     } catch {
       void context.close().catch(() => undefined);
       return false;
@@ -537,7 +520,8 @@ export class ArcadeAudio {
     this.musicGain = musicGain;
     this.musicFilter = musicFilter;
     this.sfxGain = sfxGain;
-    this.noiseBuffer = noiseBuffer;
+    this.voiceBank = voiceBank;
+    this.sfxPlayer = new ArcadeSfxPlayer(voiceBank, sfxGain, this.sfxSources);
     this.recordedScorePlayer = RecordedScorePlayer.canUse(context)
       ? new RecordedScorePlayer(context, musicGain)
       : null;
@@ -683,7 +667,7 @@ export class ArcadeAudio {
       globalThis.clearTimeout(this.schedulerTimer);
       this.schedulerTimer = null;
     }
-    if (stopScheduledSources) this.stopSources(this.musicSources);
+    if (stopScheduledSources) this.voiceBank?.stopSources(this.musicSources);
   }
 
   private clearModeTransition(resetGain = false): void {
@@ -701,7 +685,8 @@ export class ArcadeAudio {
   }
 
   private scheduleMusicStep(startAt: number): void {
-    if (!this.musicGain) return;
+    const voiceBank = this.voiceBank;
+    if (!this.musicGain || !voiceBank) return;
     const pattern = this.currentMusicPattern();
     const step = this.musicStep % pattern.phraseSteps;
     const melodyNote = pattern.melody[step];
@@ -716,7 +701,7 @@ export class ArcadeAudio {
     if (step === 0 && pattern.mode === "explore") {
       pattern.bed.forEach((note) => {
         if (!claimVoice()) return;
-        this.schedulePadTone(
+        voiceBank.schedulePadTone(
           this.musicGain!,
           this.musicSources,
           startAt,
@@ -728,7 +713,7 @@ export class ArcadeAudio {
       });
     }
     if (bassNote !== null && claimVoice()) {
-      this.scheduleTone(
+      voiceBank.scheduleTone(
         this.musicGain,
         this.musicSources,
         startAt,
@@ -739,7 +724,7 @@ export class ArcadeAudio {
       );
     }
     if (melodyNote !== null && claimVoice()) {
-      this.scheduleTone(
+      voiceBank.scheduleTone(
         this.musicGain,
         this.musicSources,
         startAt,
@@ -750,7 +735,7 @@ export class ArcadeAudio {
       );
     }
     if (pattern.kicks.includes(step) && claimVoice()) {
-      this.scheduleTone(
+      voiceBank.scheduleTone(
         this.musicGain,
         this.musicSources,
         startAt,
@@ -762,7 +747,7 @@ export class ArcadeAudio {
       );
     }
     if (pattern.hats.includes(step) && claimVoice()) {
-      this.scheduleNoise(
+      voiceBank.scheduleNoise(
         this.musicGain,
         this.musicSources,
         startAt,
@@ -797,250 +782,5 @@ export class ArcadeAudio {
 
   private currentMusicPattern(): MusicPattern {
     return this.activePlaylist[this.activeTrackIndex] ?? this.activePlaylist[0];
-  }
-
-  private scheduleEffect(effect: ArcadeSfx, startAt: number): void {
-    if (!this.sfxGain) return;
-    const output = this.sfxGain;
-    const sources = this.sfxSources;
-
-    switch (effect) {
-      case "step":
-        this.scheduleTone(output, sources, startAt, 168, 0.028, "sine", 0.012, 132);
-        break;
-      case "bump":
-        this.scheduleTone(output, sources, startAt, 92, 0.075, "triangle", 0.075, 52);
-        this.scheduleNoise(output, sources, startAt, 0.032, 0.04);
-        break;
-      case "encounter":
-        [48, 55, 60, 67].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.052, midiToFrequency(note), 0.13, "square", 0.1);
-        });
-        this.scheduleTone(output, sources, startAt, 128, 0.25, "sawtooth", 0.09, 54);
-        break;
-      case "attack":
-      case "query-cast":
-        [72, 76, 79].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.038, midiToFrequency(note), 0.1, "square", 0.085);
-        });
-        this.scheduleTone(output, sources, startAt + 0.09, 820, 0.14, "sawtooth", 0.14, 170);
-        this.scheduleNoise(output, sources, startAt + 0.12, 0.055, 0.055);
-        break;
-      case "enemy-hurt":
-        this.scheduleNoise(output, sources, startAt, 0.085, 0.13);
-        this.scheduleTone(output, sources, startAt, 310, 0.13, "square", 0.16, 72);
-        this.scheduleTone(output, sources, startAt + 0.025, 860, 0.065, "sine", 0.08, 240);
-        break;
-      case "hit":
-      case "player-hurt":
-        this.scheduleNoise(output, sources, startAt, 0.15, 0.17);
-        this.scheduleTone(output, sources, startAt, 132, 0.18, "sawtooth", 0.16, 46);
-        this.scheduleTone(output, sources, startAt + 0.055, 66, 0.14, "square", 0.07, 41);
-        break;
-      case "stage-clear":
-        [60, 64, 67, 72].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.07, midiToFrequency(note), 0.2, "square", 0.1);
-        });
-        break;
-      case "drop":
-        [84, 79, 76].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.045, midiToFrequency(note), 0.12, "square", 0.075);
-        });
-        this.scheduleTone(output, sources, startAt + 0.12, 112, 0.1, "triangle", 0.08, 64);
-        break;
-      case "pickup-weapon":
-        this.scheduleNoise(output, sources, startAt, 0.055, 0.055);
-        [55, 67, 74, 79].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.055, midiToFrequency(note), 0.19, "square", 0.11);
-        });
-        this.scheduleTone(output, sources, startAt + 0.19, 1_080, 0.1, "sine", 0.075, 430);
-        break;
-      case "reward":
-      case "pickup-relic":
-        [67, 71, 74, 79].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.085, midiToFrequency(note), 0.22, "square", 0.11);
-        });
-        this.scheduleTone(output, sources, startAt + 0.26, midiToFrequency(55), 0.34, "triangle", 0.08);
-        this.scheduleTone(output, sources, startAt + 0.285, midiToFrequency(91), 0.28, "sine", 0.055);
-        break;
-      case "heal":
-        [60, 64, 67, 72, 76].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.052, midiToFrequency(note), 0.22, "sine", 0.09);
-        });
-        break;
-      case "room":
-      case "gate":
-        this.scheduleNoise(output, sources, startAt, 0.12, 0.055);
-        this.scheduleTone(output, sources, startAt, 78, 0.18, "triangle", 0.08, 48);
-        [60, 67, 74].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.065, midiToFrequency(note), 0.13, "square", 0.12);
-        });
-        break;
-      case "victory":
-        [60, 64, 67, 72, 67, 76, 79].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.09, midiToFrequency(note), 0.27, "square", 0.12);
-        });
-        [36, 43, 48].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.18, midiToFrequency(note), 0.34, "triangle", 0.09);
-        });
-        break;
-      case "defeat":
-        [64, 60, 57, 52].forEach((note, index) => {
-          this.scheduleTone(output, sources, startAt + index * 0.14, midiToFrequency(note), 0.24, "sawtooth", 0.115);
-        });
-        this.scheduleNoise(output, sources, startAt + 0.44, 0.24, 0.08);
-        break;
-    }
-  }
-
-  private scheduleTone(
-    output: GainNode,
-    sourceSet: Set<AudioScheduledSourceNode>,
-    startAt: number,
-    frequency: number,
-    duration: number,
-    wave: OscillatorType,
-    level: number,
-    slideTo?: number,
-  ): void {
-    const context = this.context;
-    if (!context || context.state === "closed") return;
-
-    const oscillator = context.createOscillator();
-    const envelope = context.createGain();
-    const endAt = startAt + Math.max(0.02, duration);
-    oscillator.type = wave;
-    oscillator.frequency.setValueAtTime(Math.max(1, frequency), startAt);
-    if (slideTo !== undefined) {
-      oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), endAt);
-    }
-    envelope.gain.setValueAtTime(SILENCE, startAt);
-    envelope.gain.linearRampToValueAtTime(level, startAt + Math.min(0.008, duration * 0.2));
-    envelope.gain.exponentialRampToValueAtTime(SILENCE, endAt);
-    oscillator.connect(envelope);
-    envelope.connect(output);
-    this.trackSource(oscillator, envelope, sourceSet);
-    oscillator.start(startAt);
-    oscillator.stop(endAt + 0.015);
-  }
-
-  private schedulePadTone(
-    output: GainNode,
-    sourceSet: Set<AudioScheduledSourceNode>,
-    startAt: number,
-    frequency: number,
-    duration: number,
-    wave: OscillatorType,
-    level: number,
-  ): void {
-    const context = this.context;
-    if (!context || context.state === "closed") return;
-
-    const oscillator = context.createOscillator();
-    const envelope = context.createGain();
-    const endAt = startAt + Math.max(0.5, duration);
-    const attackEnd = startAt + Math.min(0.28, duration * 0.12);
-    const releaseStart = Math.max(attackEnd, endAt - Math.min(0.36, duration * 0.14));
-    oscillator.type = wave;
-    oscillator.frequency.setValueAtTime(Math.max(1, frequency), startAt);
-    envelope.gain.setValueAtTime(SILENCE, startAt);
-    envelope.gain.linearRampToValueAtTime(level, attackEnd);
-    envelope.gain.setValueAtTime(level, releaseStart);
-    envelope.gain.exponentialRampToValueAtTime(SILENCE, endAt);
-    oscillator.connect(envelope);
-    envelope.connect(output);
-    this.trackSource(oscillator, envelope, sourceSet);
-    oscillator.start(startAt);
-    oscillator.stop(endAt + 0.015);
-  }
-
-  private scheduleNoise(
-    output: GainNode,
-    sourceSet: Set<AudioScheduledSourceNode>,
-    startAt: number,
-    duration: number,
-    level: number,
-  ): void {
-    const context = this.context;
-    if (!context || context.state === "closed" || !this.noiseBuffer) return;
-
-    const source = context.createBufferSource();
-    const envelope = context.createGain();
-    const endAt = startAt + Math.max(0.02, duration);
-    source.buffer = this.noiseBuffer;
-    envelope.gain.setValueAtTime(level, startAt);
-    envelope.gain.exponentialRampToValueAtTime(SILENCE, endAt);
-    source.connect(envelope);
-    envelope.connect(output);
-    this.trackSource(source, envelope, sourceSet);
-    source.start(startAt);
-    source.stop(endAt + 0.01);
-  }
-
-  private trackSource(
-    source: AudioScheduledSourceNode,
-    envelope: GainNode,
-    sourceSet: Set<AudioScheduledSourceNode>,
-  ): void {
-    let cleaned = false;
-    const cleanup = (): void => {
-      if (cleaned) return;
-      cleaned = true;
-      sourceSet.delete(source);
-      this.sourceCleanups.delete(source);
-      try {
-        source.disconnect();
-      } catch {
-        // 上下文在回调中途关闭时，断开节点只能尽力完成。
-      }
-      try {
-        envelope.disconnect();
-      } catch {
-        // 正在销毁的上下文可能已经断开包络节点。
-      }
-    };
-    sourceSet.add(source);
-    this.sourceCleanups.set(source, cleanup);
-    source.addEventListener("ended", cleanup, { once: true });
-  }
-
-  private stopSourcesAt(
-    sourceSet: Set<AudioScheduledSourceNode>,
-    stopAt: number,
-  ): void {
-    [...sourceSet].forEach((source) => {
-      try {
-        source.stop(stopAt);
-      } catch {
-        // 音源可能在安排过渡和本次调用之间自然结束。
-      }
-    });
-  }
-
-  private stopSources(sourceSet: Set<AudioScheduledSourceNode>): void {
-    [...sourceSet].forEach((source) => {
-      try {
-        source.stop();
-      } catch {
-        // 音源可能在复制引用与调用停止之间自然结束。
-      }
-      const cleanup = this.sourceCleanups.get(source);
-      if (cleanup) cleanup();
-      else sourceSet.delete(source);
-    });
-  }
-
-  private createNoiseBuffer(context: AudioContext): AudioBuffer {
-    const frameCount = Math.max(1, Math.floor(context.sampleRate * 0.28));
-    const buffer = context.createBuffer(1, frameCount, context.sampleRate);
-    const samples = buffer.getChannelData(0);
-    let state = 0x5f3759df;
-    for (let index = 0; index < samples.length; index += 1) {
-      state ^= state << 13;
-      state ^= state >>> 17;
-      state ^= state << 5;
-      samples[index] = ((state >>> 0) / 0xffffffff) * 2 - 1;
-    }
-    return buffer;
   }
 }

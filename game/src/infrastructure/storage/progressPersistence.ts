@@ -7,7 +7,7 @@
  */
 import type { GameSession } from "../../domain/session/GameSession";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
-import { STORAGE_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { STORAGE_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import {
   persistProfileIfChanged,
   saveRun,

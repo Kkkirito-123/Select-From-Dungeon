@@ -366,16 +366,15 @@ evaluation.
 ## Game Project Map
 
 The machine-readable routing authority is `../.maintainer/architecture-map.json`.
-Schema v2 records stable layer/area boundaries plus selected directory partitions;
-it is routing data, not a code or file index. Ordinary files and internal folders
-below a registered partition do not require map updates. Flat high-density areas
-such as `domain/session` intentionally remain area-level routes and are narrowed by
-symbol windows during inspection.
+Schema v3 records stable layer/area/partition boundaries and eight cross-layer
+`floorScopes`; it remains routing data rather than a code or file index. Ordinary
+file changes do not update the map.
 
-The first partition set owns `content/world/floorExperience`, the DOM `focus`,
-`panels`, and `renderers` directories, and the Phaser `actors`, `effects`,
-`interaction`, and `world` directories. Their `signals` select a small search
-root; `neighbors` describe permitted expansion, not runtime dependencies.
+Normal inspection searches the current floor, its direct neighbors, then parent
+shared partitions; area and repository search are failure-open fallbacks. Floor
+children must not import sibling floors. Common algorithms and services move to a
+parent shared partition and a single registry composes them one-way. `GameSession`
+remains the only mutable session-state committer.
 
 ```text
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts

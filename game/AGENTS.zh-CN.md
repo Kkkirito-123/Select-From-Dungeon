@@ -28,11 +28,12 @@
 
 ## 游戏边界
 
-- 依赖方向应指向契约与领域规则。Domain 不得导入 Presentation 或 Infrastructure；Content 不得
-  导入 Infrastructure。引入新的持久层级边界时，应扩展 `scripts/check-architecture.mjs`。
-- `.maintainer/architecture-map.json` 是稳定 area 与选定职责 partition 的机器路由权威，不是代码索引。
-  已有 partition 内普通文件和内部目录变化不更新地图；只有新增、迁移、拆分、合并 area/稳定
-  partition，或改变其边界关系时才更新。
+- 依赖方向应指向父级契约与共享规则。Domain、Content 与 Infrastructure 不得反向导入 Application、
+  Presentation 或 Devtools；纯运行参数由 `contracts/config` 单向提供。引入新的持久层级边界时，应扩展
+  `scripts/check-architecture.mjs`。
+- `.maintainer/architecture-map.json` 是稳定 area、职责 partition 与八层 `floorScopes` 的机器路由权威，
+  不是代码索引。楼层子单元不得引用兄弟楼层；共同逻辑上提到父级 shared partition，再由唯一 registry
+  装配。普通文件变化不更新地图；只有稳定边界或楼层根变化时才更新。
 - `GameSession` 与聚焦的领域模块拥有游戏规则。DOM 和 Phaser 只呈现快照并转发明确意图，不能
   成为第二套规则引擎或存储所有者。
 - 未启动可选 Python Agent 时，浏览器游戏仍必须可玩。跨工程行为只能通过严格 HTTP 契约完成，

@@ -8,7 +8,7 @@
 import type { AnswerAttemptRecord } from "../../contracts/game/results";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { LessonId } from "../../domain/shared/types";
-import { STORAGE_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { STORAGE_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import { DATA_DB_NAME, DATA_DB_VERSION, openDataDatabase } from "./dataDb";
 
 export const LEARNING_DATABASE_NAME = DATA_DB_NAME;

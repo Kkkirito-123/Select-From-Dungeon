@@ -1,0 +1,216 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --abyss: #08090c;
+  --basalt: #171a21;
+  --basalt-raised: #21252f;
+  --iron: #353a47;
+  --iron-light: #666c7e;
+  --plum: #4e375c;
+  --plum-light: #8b6996;
+  --gold: #d7ad55;
+  --gold-light: #f1d28b;
+  --query: #78c9b8;
+  --query-deep: #2d786c;
+  --ember: #c75248;
+  --paper: #e8dfc7;
+  --muted: #a2a6b2;
+  --line: #3b404d;
+  background: var(--abyss);
+  color: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  min-width: 320px;
+  background: var(--abyss);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background-color: var(--abyss);
+  background-image:
+    linear-gradient(90deg, rgba(215, 173, 85, 0.025) 1px, transparent 1px),
+    linear-gradient(rgba(120, 201, 184, 0.025) 1px, transparent 1px),
+    linear-gradient(135deg, transparent 47%, rgba(78, 55, 92, 0.08) 48%, rgba(78, 55, 92, 0.08) 52%, transparent 53%);
+  background-size: 32px 32px, 32px 32px, 128px 128px;
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+summary:focus-visible,
+.game-root:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  opacity: 0.42;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  border: 1px solid #697083;
+  border-bottom-width: 3px;
+  padding: 1px 5px;
+  background: #111319;
+  color: var(--paper);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.76em;
+  line-height: 1.35;
+}
+
+.page-frame {
+  width: min(1840px, 100%);
+  margin: 0 auto;
+  padding: 18px clamp(12px, 2vw, 32px) 20px;
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 26px;
+  margin-bottom: 16px;
+  padding: 0 2px 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow,
+.mission-kicker,
+.hud-label,
+.terminal-prompt,
+.target-card__kicker,
+.run-console span,
+.volume-control span {
+  margin: 0;
+  color: var(--query);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 3px 0 0;
+  color: var(--paper);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(32px, 4.7vw, 64px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  text-shadow: 4px 4px 0 #32233b;
+}
+
+h1 span {
+  color: var(--gold);
+  font-family: "Arial Narrow", Impact, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.title-sub {
+  margin: 7px 0 0;
+  color: #7f8492;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+
+.run-console {
+  display: grid;
+  grid-template-columns: auto minmax(110px, auto) auto auto auto auto minmax(105px, 138px);
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.36);
+}
+
+.run-console > div,
+.run-console > button,
+.volume-control {
+  min-height: 48px;
+  padding: 8px 11px;
+  background: #13161c;
+}
+
+.run-console > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.run-console strong {
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--gold-light);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-toggle,
+.monster-codex-toggle,
+.narrative-toggle,
+.review-toggle,
+.admin-toggle {
+  color: var(--paper);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.admin-toggle.is-active {
+  background: #17312d;
+  color: #8df2dc;
+  box-shadow: inset 0 -3px 0 var(--query);
+}
+
+.audio-toggle:hover,
+.monster-codex-toggle:hover,
+.review-toggle:hover,
+.admin-toggle:hover {
+  color: var(--gold-light);
+}
+
+.review-toggle {
+  white-space: nowrap;
+}
+
+.volume-control {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.volume-control input {
+  width: 100%;
+  accent-color: var(--gold);
+}

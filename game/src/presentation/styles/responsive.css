@@ -1,0 +1,431 @@
+@media (max-width: 1140px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-panel {
+    display: none;
+  }
+
+  .dungeon-panel {
+    position: relative;
+    top: auto;
+  }
+
+  .castle-rail {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.85fr);
+    align-items: stretch;
+  }
+
+  .castle-map-card {
+    grid-row: span 2;
+  }
+
+  .dpad {
+    display: grid;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 780px) {
+  .page-frame {
+    padding: 11px 8px 16px;
+  }
+
+  .masthead {
+    display: block;
+    margin-bottom: 9px;
+    padding-bottom: 10px;
+  }
+
+  .eyebrow { font-size: 7px; }
+  h1 { font-size: clamp(29px, 11vw, 44px); }
+
+  .run-console {
+    grid-template-columns: 62px minmax(0, 1fr) auto auto auto;
+    margin-top: 11px;
+  }
+
+  .volume-control {
+    display: none;
+  }
+
+  .run-console > div,
+  .run-console > button {
+    min-height: 44px;
+    padding: 6px 8px;
+  }
+
+  .answer-review {
+    padding: 7px;
+  }
+
+  .answer-review__panel {
+    max-height: calc(100dvh - 14px);
+    overflow: auto;
+    box-shadow: none;
+  }
+
+  .narrative-codex {
+    padding: 7px;
+  }
+
+  .narrative-codex__dialog {
+    max-height: calc(100dvh - 14px);
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .narrative-codex__body {
+    grid-template-columns: 1fr;
+  }
+
+  .narrative-codex__chapter {
+    grid-row: auto;
+  }
+
+  .narrative-codex__moment-section {
+    grid-column: auto;
+  }
+
+  .narrative-codex__migration {
+    grid-column: auto;
+  }
+
+  .narrative-codex__ascent-list,
+  .narrative-codex__moment-list,
+  .narrative-codex__evidence-list {
+    grid-template-columns: 1fr;
+  }
+
+  .monster-codex {
+    padding: 7px;
+  }
+
+  .monster-codex__dialog {
+    max-height: calc(100dvh - 14px);
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .monster-codex__header,
+  .monster-codex__navigator {
+    align-items: stretch;
+  }
+
+  .monster-codex__entries {
+    grid-template-columns: 1fr;
+  }
+
+  .answer-review__columns {
+    grid-template-columns: 1fr;
+  }
+
+  .answer-review__list {
+    max-height: 42dvh;
+  }
+
+  .hud-strip {
+    grid-template-columns: auto minmax(44px, 1fr) auto minmax(36px, 0.5fr);
+    gap: 7px;
+    min-height: 51px;
+    padding: 7px 8px;
+  }
+
+  .weapon-chip,
+  .armor-chip,
+  .level-chip,
+  .relic-chip {
+    grid-column: span 2;
+    min-width: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding: 6px 0 0;
+  }
+
+  .game-stage {
+    overflow: visible;
+  }
+
+  .target-card {
+    top: 6px;
+    right: 6px;
+    width: min(190px, 54%);
+    padding: 7px 8px;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.58);
+  }
+
+  .target-card__kicker,
+  .target-card__meta,
+  .target-card__intent,
+  .target-card__intent b {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .target-card strong {
+    margin: 4px 0;
+    font-size: 12px;
+  }
+
+  .target-card__meta,
+  .target-card__hp-row {
+    margin-bottom: 5px;
+  }
+
+  #target-hp-value {
+    font-size: 10px;
+  }
+
+  .pickup-card {
+    top: 6px;
+    right: 6px;
+    left: 6px;
+    width: auto;
+  }
+
+  .narrative-beat-card {
+    top: 6px;
+    right: 6px;
+    left: 6px;
+    width: auto;
+  }
+
+  .combat-result-card {
+    top: 6px;
+    right: 6px;
+    left: 6px;
+    width: auto;
+    transform: translateY(-8px);
+  }
+
+  .combat-result-card.is-visible {
+    transform: translateY(0);
+  }
+
+  .combat-result-card__xp {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .campfire-menu {
+    position: fixed;
+    top: 50%;
+    width: calc(100% - 22px);
+    max-height: calc(100dvh - 22px);
+    overflow: auto;
+    padding: 18px 14px 13px;
+    box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.68);
+  }
+
+  .campfire-menu__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .loadout-menu {
+    position: fixed;
+    inset: 7px;
+    max-height: calc(100dvh - 14px);
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .inspection-overlay {
+    position: fixed;
+    padding: 14px;
+  }
+
+  .inspection-overlay__frame {
+    width: 100%;
+    max-height: calc(100dvh - 28px);
+    overflow: auto;
+    padding: 22px 18px;
+    box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.72);
+  }
+
+  .inspection-overlay__frame button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .inspection-overlay__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-grid,
+  .inventory-grid--consumables,
+  .loot-grid,
+  .equipped-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .campfire-menu__actions button,
+  .campfire-menu__leave {
+    min-height: 44px;
+  }
+
+  .interaction-prompt {
+    bottom: 5px;
+    overflow: visible;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .combat-terminal {
+    position: fixed;
+    inset: 7px;
+    width: auto;
+    height: calc(100dvh - 14px);
+    margin: 0;
+    max-height: calc(100dvh - 14px);
+    border-width: 1px;
+    padding: 9px;
+    box-shadow: none;
+  }
+
+  #app.inspection-active .dungeon-panel {
+    z-index: 50;
+  }
+
+  .terminal-topline {
+    margin-bottom: 7px;
+    padding-bottom: 7px;
+  }
+
+  .icon-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .terminal-grid,
+  .evidence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-grid {
+    flex: 0 0 auto;
+  }
+
+  .terminal-brief,
+  .terminal-editor {
+    padding: 8px;
+  }
+
+  #sql-editor,
+  #gate-sql-editor {
+    min-height: 170px;
+    font-size: 16px;
+  }
+
+  .sql-editor-shell {
+    min-height: 195px;
+  }
+
+  .sql-suggestions {
+    right: 5px;
+    bottom: 29px;
+    left: 5px;
+    max-height: 166px;
+  }
+
+  .sql-suggestion {
+    min-height: 40px;
+    grid-template-columns: 43px minmax(96px, 0.8fr) minmax(90px, 1fr);
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .primary-action,
+  .quiet-action {
+    min-height: 44px;
+  }
+
+  .terminal-schema-reference summary,
+  .schema-table-tabs button {
+    min-height: 44px;
+  }
+
+  .touch-controls {
+    display: grid;
+    grid-template-columns: 1fr 74px 74px 74px;
+  }
+
+  .dpad {
+    grid-template-columns: repeat(2, minmax(38px, 1fr));
+    margin: 0;
+  }
+
+  .dpad button {
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .touch-action {
+    min-width: 0;
+    padding: 5px;
+    font-size: 10px;
+  }
+
+  .castle-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .castle-map-card {
+    grid-row: auto;
+  }
+
+  .castle-map {
+    min-height: 240px;
+  }
+
+  .onboarding-card__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .feedback-toast {
+    right: 10px;
+    bottom: 96px;
+    left: 10px;
+    max-width: none;
+  }
+
+  .page-footer {
+    justify-content: flex-start;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 390px) {
+  .title-sub { display: none; }
+  .run-console { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .run-console .audio-toggle { grid-column: 1 / -1; }
+  .audio-toggle,
+  .monster-codex-toggle,
+  .narrative-toggle,
+  .review-toggle,
+  .admin-toggle { padding-inline: 5px !important; }
+  .target-card { width: 57%; }
+  .touch-controls { grid-template-columns: 1fr 62px 62px 62px; }
+  .onboarding-card__actions { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,133 @@
+.agent-settings-trigger {
+  position: fixed;
+  z-index: 1200;
+  right: 18px;
+  bottom: 18px;
+  border: 1px solid #78c9b8;
+  border-radius: 4px;
+  padding: 9px 12px;
+  color: #d9fff5;
+  background: rgb(8 15 18 / 92%);
+  box-shadow: 0 0 0 2px rgb(4 7 9 / 70%), 0 8px 24px rgb(0 0 0 / 42%);
+  font: inherit;
+  cursor: pointer;
+}
+
+.agent-settings-dialog {
+  width: min(620px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  border: 1px solid #78c9b8;
+  padding: 0;
+  color: #e8eee9;
+  background: #11191b;
+  box-shadow: 0 20px 80px rgb(0 0 0 / 72%);
+}
+
+.agent-settings-dialog::backdrop {
+  background: rgb(2 5 6 / 78%);
+  backdrop-filter: blur(3px);
+}
+
+.agent-settings-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.agent-settings-card header,
+.agent-settings-actions,
+.agent-consent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-settings-card header {
+  justify-content: space-between;
+}
+
+.agent-settings-card h2,
+.agent-settings-card p {
+  margin: 0;
+}
+
+.agent-settings-card label:not(.agent-consent-row) {
+  display: grid;
+  gap: 6px;
+  color: #bed3cc;
+}
+
+.agent-settings-card input[type="password"],
+.agent-settings-card select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #42575a;
+  border-radius: 3px;
+  padding: 10px;
+  color: #f1f5ef;
+  background: #091012;
+  font: inherit;
+}
+
+.agent-settings-card button {
+  border: 1px solid #78c9b8;
+  border-radius: 3px;
+  padding: 8px 11px;
+  color: #06100e;
+  background: #78c9b8;
+  font: inherit;
+  cursor: pointer;
+}
+
+.agent-settings-card button.secondary,
+.agent-settings-close {
+  color: #c9ddd7;
+  background: transparent;
+}
+
+.agent-settings-card button.danger {
+  border-color: #c76262;
+  color: #ffdede;
+  background: #481e22;
+}
+
+.agent-settings-close {
+  min-width: 36px;
+  font-size: 22px;
+}
+
+.agent-security-copy {
+  padding: 12px;
+  border-left: 3px solid #d7ad55;
+  color: #d7d0b4;
+  background: #1d1a12;
+  line-height: 1.55;
+}
+
+.agent-consent-row {
+  align-items: flex-start;
+  color: #bec8c4;
+  line-height: 1.45;
+}
+
+.agent-status {
+  min-height: 1.5em;
+  color: #aebbb7;
+}
+
+.agent-status[data-kind="success"] { color: #8ee2b3; }
+.agent-status[data-kind="warning"] { color: #e4c875; }
+.agent-status[data-kind="error"] { color: #ef9696; }
+.agent-status[data-kind="pending"] { color: #8ddae1; }
+
+@media (max-width: 680px) {
+  .agent-settings-trigger {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .agent-settings-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
