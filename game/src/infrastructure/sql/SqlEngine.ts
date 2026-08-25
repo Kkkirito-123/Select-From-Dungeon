@@ -1,6 +1,6 @@
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
-import { SQL_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { SQL_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import { SQL_SCHEMA_DDL } from "../../content/sql/sqlSchema";
 import { detectQueryFeatures } from "../../domain/learning/queryFeatureDetector";
 import type { SqlQueryResult } from "../../contracts/game/results";

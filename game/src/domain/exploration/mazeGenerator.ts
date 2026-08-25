@@ -13,7 +13,7 @@ import {
   type FloorMapBlueprint,
   type FloorMapSlot,
 } from "../../content/world/floorMapBlueprints";
-import { WORLD_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { WORLD_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import type { LessonId, Position } from "../shared/types";
 import {
   createSeededRandom,

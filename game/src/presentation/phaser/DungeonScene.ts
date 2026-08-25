@@ -10,17 +10,7 @@ import {
   hasFloorExperience,
   type StoryAction,
 } from "../../content/world/floorExperience";
-import {
-  floorMapBlueprint,
-  floorTransitPresentation,
-  regionPortalsEnabledForFloor,
-} from "../../content/world/floorMapBlueprints";
-import { type MazeZone } from "../../domain/exploration/mazeGenerator";
 import { floorCurrentSightCellKeys } from "../../domain/exploration/floorLabyrinth";
-import {
-  floorOneChestKind,
-  isFloorOneChestItem,
-} from "../../domain/exploration/floorOneTreasure";
 import { GameSession } from "../../domain/session/GameSession";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { MoveResolution } from "../../contracts/game/results";
@@ -30,11 +20,8 @@ import type {
   Position,
 } from "../../domain/shared/types";
 import type { FeedbackDirector } from "../../infrastructure/feedback/FeedbackDirector";
-import {
-  isGameplayShortcutCaptured,
-  parseExternalMoveDetail,
-} from "./gameInput";
 import { canStartMovement } from "./interaction/MovementController";
+import { DungeonInputController } from "./interaction/DungeonInputController";
 import {
   advancePatrolTick,
   type PatrolTickState,
@@ -53,6 +40,17 @@ import { TerrainRenderer } from "./world/TerrainRenderer";
 import { FogRenderer } from "./world/FogRenderer";
 import { WorldRenderer } from "./world/WorldRenderer";
 import { WorldObjectRenderer } from "./world/WorldObjectRenderer";
+import { WorldDecorationRenderer } from "./world/WorldDecorationRenderer";
+import { WorldItemRenderer } from "./world/WorldItemRenderer";
+import {
+  BIOME_COLORS,
+  COLORS,
+  HAZARD_STYLES,
+  colorsForFloor,
+  zoneColorsForFloor,
+  type HazardKind,
+  type HazardStyle,
+} from "./world/DungeonPalette";
 import { SceneEffects } from "./effects/SceneEffects";
 import { PlayerRenderer } from "./actors/PlayerRenderer";
 import { MonsterRenderer } from "./actors/MonsterRenderer";
@@ -62,23 +60,12 @@ import {
   queueFloorArtAssets,
   supportsFloorArt,
 } from "./floorArtAssets";
-import {
-  WORLD_VISUAL_LANGUAGE,
-  shouldRenderPassiveFeature,
-} from "./worldVisualLanguage";
 
 interface MonsterView {
   container: Phaser.GameObjects.Container;
   hpBack: Phaser.GameObjects.Rectangle;
   hpFill: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
-}
-
-interface ItemView {
-  container: Phaser.GameObjects.Container;
-  label: Phaser.GameObjects.Text;
-  position: Position;
-  tween?: Phaser.Tweens.Tween;
 }
 
 interface GateView {
@@ -105,297 +92,12 @@ interface ZoneLabelView {
   roomNodeId: string;
 }
 
-const COLORS = {
-  void: 0x08090c,
-  wall: 0x252a34,
-  wallTop: 0x505766,
-  floor: 0x171b22,
-  floorAlt: 0x1d222b,
-  line: 0x0e1117,
-  query: 0x78c9b8,
-  gold: 0xd7ad55,
-  ember: 0xc75248,
-  paper: 0xe8dfc7,
-  plum: 0x7f5a87,
-  fog: 0x030407,
-} as const;
-
-const HAZARD_STYLES = {
-  "archive-cutter": { base: 0x2a3137, accent: 0xc75850, blade: 0xd9c9ad, motion: "spin", duration: 1_500 },
-  "tidal-current": { base: 0x163a63, accent: 0x66e3ff, blade: 0x9fe8f2, motion: "spin", duration: 2_100 },
-  "frost-crack": { base: 0x273143, accent: 0x9ad9ef, blade: 0xd9f4ff, motion: "pulse", duration: 2_600 },
-  "elemental-vent": { base: 0x3c2431, accent: 0xf0a64d, blade: 0xd9c6ff, motion: "pulse", duration: 1_300 },
-  "alarm-wire": { base: 0x322a25, accent: 0xd7ad55, blade: 0xa9a39a, motion: "sway", duration: 1_100 },
-  "magma-fissure": { base: 0x421d18, accent: 0xff765a, blade: 0xffc06a, motion: "pulse", duration: 1_700 },
-  "root-snare": { base: 0x203427, accent: 0xa6cf79, blade: 0x78c9b8, motion: "sway", duration: 2_300 },
-  "migration-rift": { base: 0x17131f, accent: 0xd2b36b, blade: 0xa58ad8, motion: "spin", duration: 1_900 },
-} as const;
-
-type HazardKind = keyof typeof HAZARD_STYLES;
-type HazardStyle = (typeof HAZARD_STYLES)[HazardKind];
-
-const ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x25231d,
-  tutorial: 0x16302e,
-  lesson: 0x261f2b,
-  rest: 0x2d211d,
-  treasure: 0x2a291a,
-  event: 0x221d2a,
-  elite: 0x31281a,
-  boss: 0x32191e,
-};
-
-const FLOOR_TWO_COLORS = {
-  void: 0x070b18,
-  wall: 0x281f4d,
-  wallTop: 0x664f9f,
-  floor: 0x102844,
-  floorAlt: 0x163a63,
-  line: 0x0a1528,
-  query: 0x66e3ff,
-  gold: 0xffd166,
-  ember: 0xff4d8d,
-  paper: 0xe9f7ff,
-  plum: 0x8d6dff,
-  fog: 0x030611,
-} as const;
-
-const FLOOR_TWO_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x142e52,
-  tutorial: 0x163c5d,
-  lesson: 0x27255a,
-  rest: 0x19374b,
-  treasure: 0x34304f,
-  event: 0x2d2054,
-  elite: 0x39224f,
-  boss: 0x411b48,
-};
-
-const FLOOR_THREE_COLORS = {
-  void: 0x080706,
-  wall: 0x35302b,
-  wallTop: 0x726657,
-  floor: 0x25211f,
-  floorAlt: 0x302925,
-  line: 0x13100f,
-  query: 0xa8d7c2,
-  gold: 0xd5ba78,
-  ember: 0x9c5149,
-  paper: 0xeee6d1,
-  plum: 0x785c83,
-  fog: 0x050403,
-} as const;
-
-const FLOOR_THREE_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x2b2924,
-  tutorial: 0x293630,
-  lesson: 0x322d35,
-  rest: 0x3b2921,
-  treasure: 0x38321f,
-  event: 0x2e2835,
-  elite: 0x44331f,
-  boss: 0x421f25,
-};
-
-const FLOOR_FOUR_COLORS = {
-  void: 0x09060a,
-  wall: 0x37233b,
-  wallTop: 0x8a5c84,
-  floor: 0x291a2d,
-  floorAlt: 0x332039,
-  line: 0x160d19,
-  query: 0x7ce4ed,
-  gold: 0xffc65c,
-  ember: 0xef604e,
-  paper: 0xfff1d8,
-  plum: 0x9b57bb,
-  fog: 0x050207,
-} as const;
-
-const FLOOR_FOUR_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x2e2137,
-  tutorial: 0x233b45,
-  lesson: 0x3a2348,
-  rest: 0x43241d,
-  treasure: 0x493b20,
-  event: 0x2b2a4d,
-  elite: 0x552923,
-  boss: 0x571c27,
-};
-
-const FLOOR_FIVE_COLORS = {
-  void: 0x05080b,
-  wall: 0x222b32,
-  wallTop: 0x687681,
-  floor: 0x161d22,
-  floorAlt: 0x1e272d,
-  line: 0x0b1115,
-  query: 0x82d5c8,
-  gold: 0xe0ae4b,
-  ember: 0xb94d42,
-  paper: 0xe9e4d6,
-  plum: 0x735b82,
-  fog: 0x020405,
-} as const;
-
-const FLOOR_FIVE_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x22292b,
-  tutorial: 0x213538,
-  lesson: 0x2b3035,
-  rest: 0x332820,
-  treasure: 0x37321e,
-  event: 0x282936,
-  elite: 0x40311f,
-  boss: 0x421d1b,
-};
-
-const FLOOR_SIX_COLORS = {
-  void: 0x0b0303,
-  wall: 0x352421,
-  wallTop: 0x8a5a43,
-  floor: 0x241512,
-  floorAlt: 0x311b16,
-  line: 0x160a08,
-  query: 0x6ce0d5,
-  gold: 0xf0bd55,
-  ember: 0xf15a3f,
-  paper: 0xffead2,
-  plum: 0x8b4f86,
-  fog: 0x050101,
-} as const;
-
-const FLOOR_SIX_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x31211b,
-  tutorial: 0x22403c,
-  lesson: 0x3d241e,
-  rest: 0x43271c,
-  treasure: 0x49361f,
-  event: 0x382237,
-  elite: 0x52251c,
-  boss: 0x5d1815,
-};
-
-const FLOOR_SEVEN_COLORS = {
-  void: 0x030909,
-  wall: 0x163a35,
-  wallTop: 0x58b9a8,
-  floor: 0x102824,
-  floorAlt: 0x173832,
-  line: 0x071512,
-  query: 0x8ff5df,
-  gold: 0xd8ef8a,
-  ember: 0x62d7bb,
-  paper: 0xeafff8,
-  plum: 0x6e82b9,
-  fog: 0x010504,
-} as const;
-
-const FLOOR_SEVEN_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x173c36,
-  tutorial: 0x174a40,
-  lesson: 0x203f3b,
-  rest: 0x354126,
-  treasure: 0x3d4622,
-  event: 0x21394a,
-  elite: 0x34522e,
-  boss: 0x1b593f,
-};
-
-const FLOOR_EIGHT_COLORS = {
-  void: 0x020205,
-  wall: 0x171522,
-  wallTop: 0x5f5874,
-  floor: 0x0e0d15,
-  floorAlt: 0x171522,
-  line: 0x050409,
-  query: 0x82ded0,
-  gold: 0xf0c75e,
-  ember: 0xb8424f,
-  paper: 0xf7edd2,
-  plum: 0x704d8c,
-  fog: 0x010102,
-} as const;
-
-const FLOOR_EIGHT_ZONE_COLORS: Record<MazeZone["type"], number> = {
-  entry: 0x191721,
-  tutorial: 0x17302f,
-  lesson: 0x211a2a,
-  rest: 0x302019,
-  treasure: 0x352d18,
-  event: 0x241b31,
-  elite: 0x3c2b1b,
-  boss: 0x43141d,
-};
-
-const BIOME_COLORS = {
-  drainage: { floor: 0x203138, wall: 0x364a50, accent: 0x6d9da5 },
-  "slime-pool": { floor: 0x21372f, wall: 0x344b3d, accent: 0x70c489 },
-  "ember-cellar": { floor: 0x3a2922, wall: 0x56352a, accent: 0xd78a4b },
-  lake: { floor: 0x173b52, wall: 0x244e62, accent: 0x66c9e8 },
-  swamp: { floor: 0x303b27, wall: 0x475136, accent: 0x91ad57 },
-  forest: { floor: 0x17352b, wall: 0x284b39, accent: 0x62bd78 },
-  "bone-yard": { floor: 0x36312a, wall: 0x51493d, accent: 0xd8c89f },
-  "grave-mire": { floor: 0x2f3429, wall: 0x465044, accent: 0x9ab18b },
-  "spirit-crypt": { floor: 0x2d243d, wall: 0x493759, accent: 0xb88ad6 },
-  "fire-forge": { floor: 0x4a211c, wall: 0x682d24, accent: 0xff8c51 },
-  "frost-vault": { floor: 0x18384b, wall: 0x28556b, accent: 0x8cdef4 },
-  "storm-core": { floor: 0x282451, wall: 0x403a72, accent: 0xc58df4 },
-  "iron-yard": { floor: 0x202a2d, wall: 0x38464b, accent: 0x94b9bd },
-  barracks: { floor: 0x352b22, wall: 0x504136, accent: 0xd39d5e },
-  "black-citadel": { floor: 0x28282c, wall: 0x434248, accent: 0xd5b65b },
-  "magma-nest": { floor: 0x482018, wall: 0x682d21, accent: 0xff7749 },
-  "crystal-cavern": { floor: 0x263046, wall: 0x3f4d68, accent: 0x75dfdc },
-  "dragon-throne": { floor: 0x3d171b, wall: 0x5a252b, accent: 0xf0b955 },
-  "crystal-grove": { floor: 0x173c35, wall: 0x27584e, accent: 0x8debd3 },
-  "root-maze": { floor: 0x28392c, wall: 0x3d5941, accent: 0xa6cf79 },
-  "index-heart": { floor: 0x173c3d, wall: 0x28595d, accent: 0xa9f1df },
-  "obsidian-hall": { floor: 0x17151e, wall: 0x2a2736, accent: 0x8c829f },
-  "void-court": { floor: 0x21162b, wall: 0x382043, accent: 0xa96fc6 },
-  "data-throne": { floor: 0x2c2017, wall: 0x4c3820, accent: 0xf0c75e },
-} as const;
-
-function colorsForFloor(floor: GameSnapshot["floor"]) {
-  if (floor === 2) return FLOOR_TWO_COLORS;
-  if (floor === 3) return FLOOR_THREE_COLORS;
-  if (floor === 4) return FLOOR_FOUR_COLORS;
-  if (floor === 5) return FLOOR_FIVE_COLORS;
-  if (floor === 6) return FLOOR_SIX_COLORS;
-  if (floor === 7) return FLOOR_SEVEN_COLORS;
-  if (floor === 8) return FLOOR_EIGHT_COLORS;
-  return COLORS;
-}
-
-function zoneColorsForFloor(floor: GameSnapshot["floor"]): Record<MazeZone["type"], number> {
-  if (floor === 2) return FLOOR_TWO_ZONE_COLORS;
-  if (floor === 3) return FLOOR_THREE_ZONE_COLORS;
-  if (floor === 4) return FLOOR_FOUR_ZONE_COLORS;
-  if (floor === 5) return FLOOR_FIVE_ZONE_COLORS;
-  if (floor === 6) return FLOOR_SIX_ZONE_COLORS;
-  if (floor === 7) return FLOOR_SEVEN_ZONE_COLORS;
-  if (floor === 8) return FLOOR_EIGHT_ZONE_COLORS;
-  return ZONE_COLORS;
-}
-
-const KEY_TO_DIRECTION: Record<string, Position> = {
-  KeyW: { x: 0, y: -1 },
-  ArrowUp: { x: 0, y: -1 },
-  KeyS: { x: 0, y: 1 },
-  ArrowDown: { x: 0, y: 1 },
-  KeyA: { x: -1, y: 0 },
-  ArrowLeft: { x: -1, y: 0 },
-  KeyD: { x: 1, y: 0 },
-  ArrowRight: { x: 1, y: 0 },
-};
 
 function gridToPixels(position: Position): Position {
   return {
     x: position.x * TILE_SIZE + TILE_SIZE / 2,
     y: position.y * TILE_SIZE + TILE_SIZE / 2,
   };
-}
-
-function positionKey(position: Position): string {
-  return `${position.x}:${position.y}`;
 }
 
 function emitMilestone(type: string): void {
@@ -416,40 +118,31 @@ export class DungeonScene extends Phaser.Scene {
   private readonly fogRenderer = new FogRenderer();
   private readonly worldRenderer = new WorldRenderer();
   private readonly worldObjectRenderer = new WorldObjectRenderer();
+  private readonly worldDecorationRenderer = new WorldDecorationRenderer();
+  private readonly worldItemRenderer = new WorldItemRenderer();
   private readonly playerRenderer = new PlayerRenderer();
   private readonly monsterRenderer = new MonsterRenderer();
   private readonly interactionOverlay = new InteractionOverlay();
   private readonly sceneEffects: SceneEffects;
-  private readonly itemViews = new Map<string, ItemView>();
   private readonly gateViews = new Map<string, GateView>();
   private readonly shortcutViews = new Map<string, GateView[]>();
   private readonly campfireViews = new Map<string, CampfireView>();
   private readonly hazardViews = new Map<string, HazardView>();
   private readonly zoneLabelViews: ZoneLabelView[] = [];
-  private readonly pressedDirections = new Map<string, Position>();
+  private readonly inputController: DungeonInputController;
   private renderedTopology = -1;
   private moveLocked = false;
-  private nextHeldMoveAt = 0;
   private battleTransitioning = false;
-  private pagePaused = false;
   private patrolTimer: Phaser.Time.TimerEvent | null = null;
   private pendingArtFloor: GameSnapshot["floor"] | null = null;
   private readonly reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
 
-  private readonly externalMoveHandler = (event: Event): void => {
-    if (!this.canAcceptGameplayInput()) return;
-    const direction = parseExternalMoveDetail((event as CustomEvent<unknown>).detail);
-    if (!direction) return;
-    this.tryMove(direction.x, direction.y);
-  };
-
-  private readonly externalInteractHandler = (): void => {
-    if (!this.canAcceptGameplayInput()) return;
+  private handleInteract(): void {
     const resolution = this.session.interact();
     if (resolution.ok && resolution.kind === "inspection") {
-      this.resetPlayerMovement();
+      this.inputController.reset();
       window.dispatchEvent(new CustomEvent("dungeon:inspection", {
         detail: {
           message: resolution.message,
@@ -457,13 +150,11 @@ export class DungeonScene extends Phaser.Scene {
         },
       }));
     }
-  };
+  }
 
-  private readonly storyActionsHandler = (event: Event): void => {
-    const actions = (event as CustomEvent<{
-      actions?: readonly StoryAction[];
-    }>).detail?.actions;
-    if (!actions || actions.length === 0) return;
+  private handleStoryActions(
+    actions: readonly StoryAction[],
+  ): void {
     const focus = actions.find(
       (action) => action.type === "camera-focus",
     );
@@ -480,61 +171,25 @@ export class DungeonScene extends Phaser.Scene {
         y: this.playerView.y,
       });
     }
-  };
-
-  private readonly keyDownHandler = (event: KeyboardEvent): void => {
-    if (!this.canAcceptGameplayInput(event)) return;
-    if (event.code === "KeyE") {
-      if (!event.repeat) this.externalInteractHandler();
-      return;
-    }
-    const direction = KEY_TO_DIRECTION[event.code];
-    if (!direction) return;
-    event.preventDefault();
-    this.pressedDirections.set(event.code, direction);
-    if (!event.repeat) {
-      this.tryMove(direction.x, direction.y);
-      this.nextHeldMoveAt = performance.now() + 150;
-    }
-  };
-
-  private readonly keyUpHandler = (event: KeyboardEvent): void => {
-    this.pressedDirections.delete(event.code);
-  };
-
-  private readonly blurHandler = (): void => {
-    this.pagePaused = true;
-    this.resetPlayerMovement();
-  };
-
-  private readonly focusHandler = (): void => {
-    this.pagePaused = document.hidden;
-    if (!this.pagePaused) this.resetPlayerMovement();
-  };
-
-  private readonly visibilityHandler = (): void => {
-    this.pagePaused = document.hidden;
-    if (this.pagePaused) this.resetPlayerMovement();
-  };
+  }
 
   private readonly wakeHandler = (): void => {
     this.battleTransitioning = false;
-    this.resetPlayerMovement();
+    this.inputController.reset();
     this.snapshot = this.session.snapshot();
     this.syncViews();
     this.cameras.main.startFollow(this.playerView, true, 0.18, 0.18);
   };
 
-  private canAcceptGameplayInput(event?: KeyboardEvent): boolean {
+  private canAcceptGameplayInput(): boolean {
     if (
       !this.scene.isActive() ||
       this.snapshot.mode !== "explore" ||
       this.battleTransitioning ||
-      this.pagePaused ||
+      this.inputController.pagePaused ||
       this.hasBlockingExplorationOverlay()
     ) return false;
-    if (!event) return true;
-    return !isGameplayShortcutCaptured(event.target);
+    return true;
   }
 
   private hasBlockingExplorationOverlay(): boolean {
@@ -555,6 +210,14 @@ export class DungeonScene extends Phaser.Scene {
       () => this.playerView,
       { query: COLORS.query, gold: COLORS.gold },
     );
+    this.inputController = new DungeonInputController({
+      canAccept: () => this.canAcceptGameplayInput(),
+      canMove: () => !this.moveLocked && this.canAcceptGameplayInput(),
+      move: ({ x, y }) => this.tryMove(x, y),
+      interact: () => this.handleInteract(),
+      storyActions: (actions) => this.handleStoryActions(actions),
+      resetMovement: () => this.resetPlayerVisual(),
+    });
   }
 
   preload(): void {
@@ -569,14 +232,7 @@ export class DungeonScene extends Phaser.Scene {
     this.fog = this.add.graphics().setDepth(40);
     this.rebuildWorld();
 
-    window.addEventListener("keydown", this.keyDownHandler);
-    window.addEventListener("keyup", this.keyUpHandler);
-    window.addEventListener("blur", this.blurHandler);
-    window.addEventListener("focus", this.focusHandler);
-    document.addEventListener("visibilitychange", this.visibilityHandler);
-    window.addEventListener("dungeon:move", this.externalMoveHandler);
-    window.addEventListener("dungeon:interact", this.externalInteractHandler);
-    window.addEventListener("dungeon:story-actions", this.storyActionsHandler);
+    this.inputController.bind();
     this.unsubscribe = this.session.subscribe((snapshot) => this.receiveSnapshot(snapshot));
     if (this.snapshot.mode === "combat") {
       this.time.delayedCall(0, () => this.beginBattle());
@@ -592,27 +248,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   update(time: number): void {
-    if (
-      time < this.nextHeldMoveAt ||
-      this.moveLocked ||
-      !this.canAcceptGameplayInput() ||
-      this.pressedDirections.size === 0
-    ) return;
-    const direction = [...this.pressedDirections.values()].at(-1);
-    if (!direction) return;
-    this.tryMove(direction.x, direction.y);
-    this.nextHeldMoveAt = time + 125;
+    this.inputController.update(time);
   }
 
   private cleanup(): void {
-    window.removeEventListener("keydown", this.keyDownHandler);
-    window.removeEventListener("keyup", this.keyUpHandler);
-    window.removeEventListener("blur", this.blurHandler);
-    window.removeEventListener("focus", this.focusHandler);
-    document.removeEventListener("visibilitychange", this.visibilityHandler);
-    window.removeEventListener("dungeon:move", this.externalMoveHandler);
-    window.removeEventListener("dungeon:interact", this.externalInteractHandler);
-    window.removeEventListener("dungeon:story-actions", this.storyActionsHandler);
+    this.inputController.unbind();
     this.events.off(Phaser.Scenes.Events.WAKE, this.wakeHandler);
     this.unsubscribe?.();
     this.unsubscribe = null;
@@ -620,8 +260,8 @@ export class DungeonScene extends Phaser.Scene {
     this.patrolTimer = null;
     this.setpieceLayer?.destroy();
     this.setpieceLayer = null;
+    this.worldItemRenderer.clear();
     this.clearCampfireViews();
-    this.pressedDirections.clear();
   }
 
   private storyLandmarkPoint(landmarkId: string): Position | null {
@@ -772,6 +412,7 @@ export class DungeonScene extends Phaser.Scene {
     this.objectiveBeacon = null;
     this.clearCampfireViews();
     this.setpieceLayer?.destroy();
+    this.worldItemRenderer.clear();
     this.entityLayer?.removeAll(true);
     this.setpieceLayer = new FloorSetpieceLayer(
       this,
@@ -779,8 +420,6 @@ export class DungeonScene extends Phaser.Scene {
       this.reducedMotion,
     );
     this.monsterViews.clear();
-    this.itemViews.forEach((view) => view.tween?.destroy());
-    this.itemViews.clear();
     this.gateViews.clear();
     this.shortcutViews.clear();
     this.hazardViews.clear();
@@ -791,7 +430,7 @@ export class DungeonScene extends Phaser.Scene {
     const worldHeight = floor.height * TILE_SIZE;
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.drawTerrain();
-    this.drawDecorations();
+    this.worldDecorationRenderer.render(this, this.entityLayer, this.snapshot);
     this.setpieceLayer.build(this.snapshot);
     this.drawZoneLabels();
     this.createGates();
@@ -819,206 +458,6 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private drawDecorations(): void {
-    const colors = colorsForFloor(this.snapshot.floor);
-    this.snapshot.mazeFloor.decorations.forEach((decoration, index) => {
-      if (decoration.kind !== "torch" && index % 3 !== 0) return;
-      const pixel = gridToPixels(decoration);
-      const parts: Phaser.GameObjects.GameObject[] = [];
-      if (decoration.kind === "torch") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 3, 3, 10, colors.wallTop, 0.46),
-          this.add.triangle(pixel.x, pixel.y - 4, -3, 5, 0, -6, 3, 5, colors.gold, 0.58),
-        );
-      } else if (decoration.kind === "rubble") {
-        parts.push(
-          this.add.rectangle(
-            pixel.x - 3,
-            pixel.y + 2,
-            7,
-            4,
-            colors.wallTop,
-            WORLD_VISUAL_LANGUAGE.passiveDecorationAlpha,
-          ).setAngle(-12),
-          this.add.rectangle(
-            pixel.x + 3,
-            pixel.y,
-            5,
-            3,
-            colors.wallTop,
-            WORLD_VISUAL_LANGUAGE.passiveDecorationAlpha * 0.8,
-          ).setAngle(18),
-        );
-      } else {
-        parts.push(
-          this.add.rectangle(
-            pixel.x,
-            pixel.y,
-            5,
-            5,
-            colors.query,
-            WORLD_VISUAL_LANGUAGE.passiveDecorationAlpha * 0.72,
-          ).setAngle(45),
-        );
-      }
-      parts.forEach((part) => this.entityLayer.add(part));
-    });
-    // 路线菱形只保留在小地图中；若在世界中重复绘制，会让被动引导看起来
-    // 像铺满一地的可交互对象。
-    this.snapshot.biomePlan.features.forEach((feature, index) => {
-      if (!shouldRenderPassiveFeature(index)) return;
-      const pixel = gridToPixels(feature);
-      const parts: Phaser.GameObjects.Shape[] = [];
-      if (feature.kind === "water") {
-        parts.push(
-          this.add.ellipse(pixel.x, pixel.y + 3, 22, 10, 0x4b9fbe, 0.7)
-            .setStrokeStyle(1, 0x8bd9eb, 0.72),
-          this.add.rectangle(pixel.x + 2, pixel.y, 10, 2, 0xb5eff7, 0.55),
-        );
-      } else if (feature.kind === "reeds") {
-        parts.push(
-          this.add.rectangle(pixel.x - 5, pixel.y + 2, 3, 15, 0x718d43).setAngle(-14),
-          this.add.rectangle(pixel.x + 2, pixel.y, 3, 18, 0x92ad58).setAngle(9),
-          this.add.rectangle(pixel.x + 7, pixel.y + 3, 3, 13, 0x5b7739).setAngle(18),
-        );
-      } else if (feature.kind === "tree") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 6, 5, 14, 0x765035),
-          this.add.rectangle(pixel.x - 6, pixel.y - 2, 13, 13, 0x356a43),
-          this.add.rectangle(pixel.x + 6, pixel.y - 4, 15, 14, 0x468351),
-        );
-      } else if (feature.kind === "slime") {
-        parts.push(
-          this.add.ellipse(pixel.x, pixel.y + 4, 19, 10, 0x5ead75, 0.72)
-            .setStrokeStyle(1, 0x8cdda0, 0.7),
-          this.add.rectangle(pixel.x + 3, pixel.y + 1, 4, 3, 0xd5f2c9, 0.72),
-        );
-      } else if (feature.kind === "ember") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 4, 13, 4, 0x6a4932),
-          this.add.triangle(pixel.x, pixel.y - 4, -5, 8, 0, -7, 5, 8, 0xd87b3f, 0.82),
-        );
-      } else if (feature.kind === "bones") {
-        parts.push(
-          this.add.rectangle(pixel.x - 4, pixel.y, 16, 4, 0xd7ccb0).setAngle(32),
-          this.add.rectangle(pixel.x + 5, pixel.y + 1, 14, 4, 0xbcae91).setAngle(-38),
-        );
-      } else if (feature.kind === "grave") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 2, 13, 20, 0x655f58)
-            .setStrokeStyle(1, 0xa39b8c),
-          this.add.rectangle(pixel.x, pixel.y - 8, 8, 3, 0x918879),
-        );
-      } else if (feature.kind === "ghost-flame") {
-        parts.push(
-          this.add.ellipse(pixel.x, pixel.y + 3, 15, 9, 0x7250a1, 0.54),
-          this.add.triangle(pixel.x, pixel.y - 4, -6, 8, 0, -9, 6, 8, 0xb985dc, 0.85),
-        );
-      } else if (feature.kind === "lava") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 2, 22, 8, 0x9d3124, 0.86)
-            .setStrokeStyle(1, 0xff7a3d),
-          this.add.rectangle(pixel.x + 4, pixel.y, 8, 2, 0xffc15b, 0.88),
-        );
-      } else if (feature.kind === "ice") {
-        parts.push(
-          this.add.polygon(
-            pixel.x,
-            pixel.y,
-            [0, -12, 8, -2, 5, 11, -6, 9, -9, -2],
-            0x75cbe8,
-            0.72,
-          ).setStrokeStyle(1, 0xc7f3ff),
-        );
-      } else if (feature.kind === "crystal") {
-        parts.push(
-          this.add.triangle(pixel.x - 4, pixel.y, -5, 9, 0, -12, 5, 9, 0x9d78dc, 0.9),
-          this.add.triangle(pixel.x + 5, pixel.y + 3, -4, 7, 0, -8, 4, 7, 0x6fdbe6, 0.86),
-        );
-      } else if (feature.kind === "iron") {
-        parts.push(
-          this.add.rectangle(pixel.x - 4, pixel.y, 18, 5, 0x85939a).setAngle(36),
-          this.add.rectangle(pixel.x + 4, pixel.y, 18, 5, 0x59656b).setAngle(-36),
-          this.add.rectangle(pixel.x, pixel.y + 7, 14, 3, 0xd0a94d),
-        );
-      } else if (feature.kind === "banner") {
-        parts.push(
-          this.add.rectangle(pixel.x - 6, pixel.y, 3, 25, 0xa7a08e),
-          this.add.rectangle(pixel.x + 3, pixel.y - 6, 15, 13, 0x99453d)
-            .setStrokeStyle(1, 0xd5aa52),
-        );
-      } else if (feature.kind === "battlement") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 4, 24, 14, 0x4d5559)
-            .setStrokeStyle(1, 0x899397),
-          this.add.rectangle(pixel.x - 8, pixel.y - 5, 6, 8, 0x697378),
-          this.add.rectangle(pixel.x + 8, pixel.y - 5, 6, 8, 0x697378),
-        );
-      } else if (feature.kind === "egg") {
-        parts.push(
-          this.add.ellipse(pixel.x, pixel.y + 2, 16, 23, 0xc8b58b)
-            .setStrokeStyle(2, 0xe96845),
-          this.add.rectangle(pixel.x + 3, pixel.y - 2, 4, 6, 0x754b47, 0.76),
-        );
-      } else if (feature.kind === "magma") {
-        parts.push(
-          this.add.ellipse(pixel.x, pixel.y + 3, 25, 12, 0xa93424, 0.88)
-            .setStrokeStyle(1, 0xff7b40),
-          this.add.rectangle(pixel.x - 3, pixel.y + 1, 11, 2, 0xffc257, 0.92),
-        );
-      } else if (feature.kind === "dragon-bone") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 3, 24, 4, 0xd9c7a2).setAngle(-18),
-          this.add.triangle(pixel.x - 11, pixel.y - 2, -5, 6, 0, -7, 5, 6, 0xbda782),
-          this.add.triangle(pixel.x + 11, pixel.y + 3, -4, 5, 0, -6, 4, 5, 0xbda782),
-        );
-      } else if (feature.kind === "crystal-tree") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 6, 4, 15, 0x47745f),
-          this.add.triangle(pixel.x - 5, pixel.y - 3, -6, 8, 0, -11, 6, 8, 0x74d7c1, 0.88),
-          this.add.triangle(pixel.x + 5, pixel.y, -5, 7, 0, -9, 5, 7, 0xa5f0dd, 0.82),
-        );
-      } else if (feature.kind === "root") {
-        parts.push(
-          this.add.rectangle(pixel.x - 5, pixel.y, 18, 4, 0x7b6943).setAngle(28),
-          this.add.rectangle(pixel.x + 5, pixel.y + 2, 18, 4, 0x5e5738).setAngle(-31),
-        );
-      } else if (feature.kind === "index-rune") {
-        parts.push(
-          this.add.polygon(pixel.x, pixel.y, [0, -10, 9, 0, 0, 10, -9, 0], 0x5fcdbb, 0.55)
-            .setStrokeStyle(2, 0xb7f4e6),
-          this.add.rectangle(pixel.x, pixel.y, 3, 13, 0xe5d76d, 0.85),
-        );
-      } else if (feature.kind === "obsidian") {
-        parts.push(
-          this.add.polygon(pixel.x, pixel.y, [0, -11, 8, -4, 7, 9, -7, 9, -9, -3], 0x272334)
-            .setStrokeStyle(1, 0x817691),
-        );
-      } else if (feature.kind === "void-flame") {
-        parts.push(
-          this.add.ellipse(pixel.x, pixel.y + 4, 14, 8, 0x42205f, 0.55),
-          this.add.triangle(pixel.x, pixel.y - 4, -6, 8, 0, -10, 6, 8, 0x9b55be, 0.86),
-        );
-      } else if (feature.kind === "gold-throne") {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y + 4, 19, 12, 0x4b3521)
-            .setStrokeStyle(2, 0xd9b84f),
-          this.add.rectangle(pixel.x, pixel.y - 5, 15, 9, 0x71512a),
-        );
-      } else {
-        parts.push(
-          this.add.rectangle(pixel.x, pixel.y, 18, 8, 0x385563, 0.56)
-            .setStrokeStyle(1, 0x6b909c, 0.65),
-          this.add.rectangle(pixel.x, pixel.y, 3, 8, 0x101820, 0.8),
-        );
-      }
-      parts.forEach((part) => {
-        part.setData("cell", positionKey(feature));
-        part.setAlpha(Math.min(part.alpha, WORLD_VISUAL_LANGUAGE.passiveFeatureAlpha));
-        this.entityLayer.add(part);
-      });
-    });
-  }
 
   private drawZoneLabels(): void {
     this.snapshot.mazeFloor.zones.forEach((zone) => {
@@ -1562,7 +1001,13 @@ export class DungeonScene extends Phaser.Scene {
       view.hpFill.setVisible(showDetails);
       view.label.setVisible(visible);
     });
-    this.syncItemViews();
+    this.worldItemRenderer.sync(
+      this,
+      this.entityLayer,
+      this.snapshot,
+      this.reducedMotion,
+      this.worldObjectRenderer,
+    );
     this.syncGateViews();
     this.syncShortcutViews();
     this.syncCampfireViews();
@@ -1685,252 +1130,6 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private syncItemViews(): void {
-    const discovered = new Set(this.snapshot.discoveredCells);
-    const routeTransit = floorMapBlueprint(this.snapshot.floor).routeTransit;
-    const transitPresentation = floorTransitPresentation(routeTransit);
-    const regionTransitLabel =
-      transitPresentation.regionLabel ?? transitPresentation.label;
-    const portalItems: GroundItem[] = (
-      regionPortalsEnabledForFloor(this.snapshot.floor)
-        ? this.snapshot.biomePlan.portals
-        : []
-    ).flatMap(
-      (portal) => [
-        {
-          id: `${portal.id}:entry`,
-          sourceRoomId: portal.fromRegionId,
-          ...portal.entry,
-          name: regionTransitLabel,
-          description: `${regionTransitLabel} · ${portal.name}`,
-          kind: "event" as const,
-          collection: "interact" as const,
-          rewardId: null,
-        },
-        {
-          id: `${portal.id}:exit`,
-          sourceRoomId: portal.toRegionId,
-          ...portal.exit,
-          name: regionTransitLabel,
-          description: `${regionTransitLabel} · ${portal.name}`,
-          kind: "event" as const,
-          collection: "interact" as const,
-          rewardId: null,
-        },
-      ],
-    );
-    const guidedItems: GroundItem[] = [
-      ...this.snapshot.guidedMap.shortcuts
-        .filter((shortcut) => !this.snapshot.keyItems.includes(shortcut.keyId))
-        .map((shortcut) => ({
-          id: shortcut.keyId,
-          sourceRoomId: shortcut.keyRoomNodeId,
-          ...shortcut.keyPosition,
-          name: "捷径钥匙",
-          description: `保证开启${shortcut.name}，不依赖随机掉落。`,
-          kind: "key" as const,
-          collection: "interact" as const,
-          rewardId: null,
-        })),
-      ...this.snapshot.guidedMap.deadEndCaches
-        .filter((cache) => !this.snapshot.openedGateIds.includes(cache.id))
-        .map((cache) => ({
-          id: cache.id,
-          sourceRoomId: cache.sourceRoomId,
-          x: cache.x,
-          y: cache.y,
-          name: "死路补给",
-          description: "空支路改为可选探索收益。",
-          kind: "event" as const,
-          collection: "interact" as const,
-          rewardId: cache.rewardId,
-        })),
-    ];
-    const currentIds = new Set([
-      ...this.snapshot.groundItems.map((item) => item.id),
-      ...guidedItems.map((item) => item.id),
-      ...portalItems.map((item) => item.id),
-      ...this.snapshot.lootBundles.map((bundle) => `loot-bundle:${bundle.id}`),
-    ]);
-    this.itemViews.forEach((view, id) => {
-      if (currentIds.has(id)) return;
-      view.tween?.destroy();
-      view.container.destroy(true);
-      this.itemViews.delete(id);
-    });
-    [...this.snapshot.groundItems, ...guidedItems, ...portalItems].forEach((item) => {
-      let view = this.itemViews.get(item.id);
-      if (!view) {
-        const pixel = gridToPixels(item);
-        const container = this.add.container(pixel.x, pixel.y).setDepth(24);
-        const sourceRoom = this.snapshot.roomGraph.nodes.find(
-          (room) => room.id === item.sourceRoomId,
-        );
-        const floorOneChest = isFloorOneChestItem(item) ? floorOneChestKind(item.id) : null;
-        const isChest = item.collection === "interact" && (
-          floorOneChest !== null ||
-          item.id.startsWith("lesson-drop:") ||
-          (item.id.startsWith("room-reward:") && Boolean(sourceRoom?.lessonId)) ||
-          item.id.startsWith("guided-cache:") ||
-          sourceRoom?.type === "treasure"
-        );
-        const isPortal = item.id.startsWith("biome-portal:");
-        const parts: Phaser.GameObjects.GameObject[] = [];
-        if (isPortal) {
-          parts.push(...this.worldObjectRenderer.createTransitParts(this, routeTransit, true));
-        } else if (isChest) {
-          if (floorOneChest === "mimic") {
-            parts.push(
-              this.add.rectangle(0, 3, 26, 15, 0x5f463c)
-                .setStrokeStyle(2, COLORS.plum),
-              this.add.rectangle(0, -6, 26, 8, 0x9a694c)
-                .setStrokeStyle(2, COLORS.paper),
-              this.add.rectangle(-6, -1, 3, 3, COLORS.paper),
-              this.add.rectangle(6, -1, 3, 3, COLORS.paper),
-              this.add.triangle(0, 7, -7, 0, 7, 0, 0, 7, COLORS.ember),
-            );
-          } else if (floorOneChest === "warp") {
-            parts.push(
-              this.add.ellipse(0, 8, 30, 10, 0x2d6070, 0.64)
-                .setStrokeStyle(2, COLORS.query),
-              this.add.rectangle(0, 2, 24, 12, 0x7d5b43)
-                .setStrokeStyle(2, COLORS.gold),
-              this.add.rectangle(0, -6, 24, 7, 0xb88745)
-                .setStrokeStyle(2, COLORS.paper),
-              this.add.rectangle(0, 1, 5, 6, COLORS.query)
-                .setStrokeStyle(1, COLORS.paper),
-            );
-          } else {
-            parts.push(
-              this.add.rectangle(0, 3, 24, 14, 0x8f6338)
-                .setStrokeStyle(2, COLORS.gold),
-              this.add.rectangle(0, -6, 24, 8, 0xb88745)
-                .setStrokeStyle(2, COLORS.paper),
-              this.add.rectangle(0, 1, 5, 7, COLORS.gold)
-                .setStrokeStyle(1, COLORS.paper),
-            );
-          }
-        } else {
-          const color = item.kind === "weapon"
-            ? COLORS.gold
-            : item.kind === "heal"
-              ? COLORS.query
-              : item.kind === "key"
-                ? COLORS.ember
-                : COLORS.plum;
-          parts.push(
-            this.add.rectangle(0, 0, 13, 13, color, 0.95)
-              .setAngle(45)
-              .setStrokeStyle(2, COLORS.paper),
-            this.add.rectangle(0, 0, 5, 5, COLORS.paper),
-          );
-        }
-        const label = this.add.text(
-          0,
-          -24,
-          isPortal
-            ? `E · ${regionTransitLabel}`
-            : isChest
-              ? `E · ${item.name}`
-              : item.name,
-          {
-            color: "#f1d28b",
-            fontFamily: "monospace",
-            fontSize: "7px",
-            backgroundColor: "#08090cdd",
-            padding: { x: 3, y: 2 },
-            wordWrap: { width: 82, useAdvancedWrap: true },
-            align: "center",
-          },
-        ).setOrigin(0.5);
-        parts.push(label);
-        container.add(parts);
-        this.entityLayer.add(container);
-        const tween = this.reducedMotion
-          ? undefined
-          : this.tweens.add({
-              targets: container,
-              y: pixel.y - 4,
-              yoyo: true,
-              repeat: -1,
-              duration: 620,
-              ease: "Sine.inOut",
-            });
-        view = {
-          container,
-          label,
-          position: { x: item.x, y: item.y },
-          tween,
-        };
-        this.itemViews.set(item.id, view);
-      }
-      const visible = this.worldObjectRenderer.isDiscovered(discovered, item);
-      view.container.setVisible(visible);
-      view.label.setVisible(
-        visible &&
-        isNearPlayer(
-          this.snapshot.player,
-          view.position,
-          INTERACTION_LABEL_DISTANCE,
-        ),
-      );
-    });
-    this.snapshot.lootBundles.forEach((bundle) => {
-      const viewId = `loot-bundle:${bundle.id}`;
-      let view = this.itemViews.get(viewId);
-      if (!view) {
-        const pixel = gridToPixels(bundle);
-        const container = this.add.container(pixel.x, pixel.y).setDepth(24);
-        const colors = colorsForFloor(this.snapshot.floor);
-        const label = this.add.text(0, -27, `E · 战利品 ×${bundle.items.length}`, {
-          color: "#ffe09a",
-          fontFamily: "monospace",
-          fontSize: "7px",
-          fontStyle: "bold",
-          backgroundColor: "#08090cdd",
-          padding: { x: 4, y: 2 },
-        }).setOrigin(0.5);
-        const parts: Phaser.GameObjects.GameObject[] = [
-          this.add.rectangle(0, 3, 28, 16, 0x8f6338)
-            .setStrokeStyle(2, colors.gold),
-          this.add.rectangle(0, -7, 28, 9, 0xb88745)
-            .setStrokeStyle(2, colors.paper),
-          this.add.rectangle(0, 1, 6, 8, colors.gold)
-            .setStrokeStyle(1, colors.paper),
-          label,
-        ];
-        container.add(parts);
-        this.entityLayer.add(container);
-        const tween = this.reducedMotion
-          ? undefined
-          : this.tweens.add({
-              targets: container,
-              y: pixel.y - 3,
-              yoyo: true,
-              repeat: -1,
-              duration: 720,
-              ease: "Sine.inOut",
-            });
-        view = {
-          container,
-          label,
-          position: { x: bundle.x, y: bundle.y },
-          tween,
-        };
-        this.itemViews.set(viewId, view);
-      }
-      const visible = this.worldObjectRenderer.isDiscovered(discovered, bundle);
-      view.container.setVisible(visible);
-      view.label.setVisible(
-        visible &&
-        isNearPlayer(
-          this.snapshot.player,
-          view.position,
-          INTERACTION_LABEL_DISTANCE,
-        ),
-      );
-    });
-  }
 
   private drawFog(): void {
     this.fogRenderer.render(
@@ -2020,9 +1219,7 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private resetPlayerMovement(): void {
-    this.pressedDirections.clear();
-    this.nextHeldMoveAt = 0;
+  private resetPlayerVisual(): void {
     if (this.playerView) {
       this.tweens.killTweensOf(this.playerView);
       const pixel = gridToPixels(this.snapshot.player);
@@ -2034,7 +1231,7 @@ export class DungeonScene extends Phaser.Scene {
   private advancePatrols(): void {
     const state: PatrolTickState = {
       locked: this.moveLocked,
-      pagePaused: this.pagePaused,
+      pagePaused: this.inputController.pagePaused,
       sceneActive: this.scene.isActive(),
       guidanceLevel: this.snapshot.navigationGuidance.level,
       blockingOverlay: this.hasBlockingExplorationOverlay(),
@@ -2075,7 +1272,7 @@ export class DungeonScene extends Phaser.Scene {
   private beginBattle(): void {
     if (this.battleTransitioning || !this.scene.isActive()) return;
     this.battleTransitioning = true;
-    this.pressedDirections.clear();
+    this.inputController.clearHeldDirections();
     this.moveLocked = false;
     this.scene.launch("BattleScene");
     if (this.sys.isActive()) this.scene.sleep();

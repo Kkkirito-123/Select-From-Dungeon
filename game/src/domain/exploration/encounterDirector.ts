@@ -5,7 +5,7 @@
  * 刷新页面不会重新抽取结果。模块不创建怪物、不改变玩家生命，调用方
  * 负责把 targetId 转成实际遭遇。
  */
-import { ENCOUNTER_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { ENCOUNTER_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import { stableStringHash } from "../progression/runGraph";
 
 export const INITIAL_SAFE_STEPS: number = ENCOUNTER_RUNTIME_CONFIG.initialSafeSteps;

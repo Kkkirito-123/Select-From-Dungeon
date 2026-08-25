@@ -40,15 +40,15 @@ silently choosing one source.
 
 ## Game Boundaries
 
-- Keep dependency direction toward contracts and domain rules. Domain code must
-  not import presentation or infrastructure; content must not import
-  infrastructure. Extend `scripts/check-architecture.mjs` when a new durable
-  layer boundary is introduced.
+- Keep dependencies pointing toward parent contracts and shared rules. Domain,
+  content, and infrastructure must not import application, presentation, or
+  devtools implementations. Pure runtime constants are supplied one-way by
+  `contracts/config`. Extend `scripts/check-architecture.mjs` for new boundaries.
 - `.maintainer/architecture-map.json` is the machine routing authority for
-  stable areas and selected responsibility partitions; it is not a code index.
-  Ordinary file changes and internal folders below an existing partition do not
-  update it. Change the map only when an area or stable partition is added,
-  moved, split, merged, or given a different boundary relationship.
+  stable areas, responsibility partitions, and the eight `floorScopes`; it is
+  not a code index. A floor child must not import a sibling floor. Shared logic
+  moves to a parent shared partition and one registry composes the children.
+  Ordinary file changes do not update the map; stable boundary/root changes do.
 - `GameSession` and focused domain modules own game rules. DOM and Phaser code
   render snapshots and forward explicit intent; they must not become a second
   rule engine or storage owner.

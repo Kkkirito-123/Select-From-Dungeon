@@ -4,7 +4,7 @@
  */
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { LessonId, Position } from "../../domain/shared/types";
-import { WORLD_UI_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { WORLD_UI_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 
 export const INTERACTION_LABEL_DISTANCE = WORLD_UI_RUNTIME_CONFIG.interactionLabelDistance;
 export const MONSTER_LABEL_DISTANCE = WORLD_UI_RUNTIME_CONFIG.monsterLabelDistance;

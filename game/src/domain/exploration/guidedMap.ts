@@ -4,7 +4,7 @@
  * 规划依赖地图、房间和篝火，只生成导航证据与可交互位置；它不能传送
  * 玩家、跳过课程门，也不负责更新 openedGateIds。
  */
-import { NAVIGATION_RUNTIME_CONFIG } from "../../application/config/runtimeConfig";
+import { NAVIGATION_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import { mazeTileAt, mazeZoneAt, type MazeFloor } from "./mazeGenerator";
 import { findGridPath } from "./pathfinding";
 import {

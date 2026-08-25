@@ -17,11 +17,11 @@ import {
 import {
   QUESTION_BANK_CONFIG,
   type PracticeQuestionTier,
-} from "../../application/config/questionBankConfig";
+} from "../../contracts/config/questionBank";
 
 export const QUESTION_BANK_VERSION = QUESTION_BANK_CONFIG.version;
 export const QUESTIONS_PER_FLOOR = QUESTION_BANK_CONFIG.questionsPerFloor;
-export type { PracticeQuestionTier } from "../../application/config/questionBankConfig";
+export type { PracticeQuestionTier } from "../../contracts/config/questionBank";
 
 export type PracticeQuestionScope = "current" | "review";
 
