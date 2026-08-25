@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "projectRoot": "game",
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
@@ -253,6 +253,80 @@
       "notResponsibleFor": ["生产游戏规则", "管理员答案暴露"],
       "signals": ["维护器工具", "bridge", "协议", "look", "go", "use", "工具卡住"],
       "neighbors": ["contracts.game", "domain.session", "presentation.phaser"]
+    }
+  ],
+  "partitions": [
+    {
+      "id": "content.world.floor-experience",
+      "parentId": "content.world",
+      "root": "game/src/content/world/floorExperience",
+      "responsibility": "楼层体验、区域节奏和固定世界事件的作者配置",
+      "notResponsibleFor": ["领域推进规则", "Phaser 世界绘制"],
+      "signals": ["楼层体验", "区域节奏", "floor experience", "世界事件配置"],
+      "neighbors": ["presentation.phaser.world"]
+    },
+    {
+      "id": "presentation.dom.focus",
+      "parentId": "presentation.dom",
+      "root": "game/src/presentation/dom/focus",
+      "responsibility": "DOM 焦点、键盘可达性和交互焦点恢复",
+      "notResponsibleFor": ["面板内容", "游戏输入规则"],
+      "signals": ["焦点", "focus", "键盘焦点", "焦点恢复"],
+      "neighbors": ["presentation.dom.panels", "presentation.dom.renderers", "presentation.phaser.interaction"]
+    },
+    {
+      "id": "presentation.dom.panels",
+      "parentId": "presentation.dom",
+      "root": "game/src/presentation/dom/panels",
+      "responsibility": "终端、背包、故事和其他 DOM 面板交互",
+      "notResponsibleFor": ["通用快照渲染", "领域状态修改"],
+      "signals": ["面板", "panel", "终端界面", "背包界面", "故事面板"],
+      "neighbors": ["presentation.dom.focus", "presentation.dom.renderers"]
+    },
+    {
+      "id": "presentation.dom.renderers",
+      "parentId": "presentation.dom",
+      "root": "game/src/presentation/dom/renderers",
+      "responsibility": "把游戏快照投影为 HUD 和 DOM 展示",
+      "notResponsibleFor": ["焦点管理", "领域规则"],
+      "signals": ["hud 渲染", "dom 渲染", "快照显示", "renderer"],
+      "neighbors": ["presentation.dom.focus", "presentation.dom.panels"]
+    },
+    {
+      "id": "presentation.phaser.actors",
+      "parentId": "presentation.phaser",
+      "root": "game/src/presentation/phaser/actors",
+      "responsibility": "玩家、怪物和世界角色的 Phaser 表现",
+      "notResponsibleFor": ["角色领域状态", "作者怪物配置"],
+      "signals": ["角色显示", "actor", "玩家精灵", "怪物精灵"],
+      "neighbors": ["presentation.phaser.effects", "presentation.phaser.interaction", "presentation.phaser.world"]
+    },
+    {
+      "id": "presentation.phaser.effects",
+      "parentId": "presentation.phaser",
+      "root": "game/src/presentation/phaser/effects",
+      "responsibility": "战斗、移动和世界反馈的 Phaser 视觉效果",
+      "notResponsibleFor": ["伤害计算", "音频反馈"],
+      "signals": ["特效", "effect", "动画反馈", "战斗效果"],
+      "neighbors": ["presentation.phaser.actors", "presentation.phaser.world"]
+    },
+    {
+      "id": "presentation.phaser.interaction",
+      "parentId": "presentation.phaser",
+      "root": "game/src/presentation/phaser/interaction",
+      "responsibility": "Phaser 输入、空间交互和交互提示转发",
+      "notResponsibleFor": ["领域移动规则", "DOM 面板逻辑"],
+      "signals": ["交互", "interaction", "输入无效", "碰撞交互", "操作提示"],
+      "neighbors": ["presentation.dom.focus", "presentation.phaser.actors", "presentation.phaser.world"]
+    },
+    {
+      "id": "presentation.phaser.world",
+      "parentId": "presentation.phaser",
+      "root": "game/src/presentation/phaser/world",
+      "responsibility": "地图、地标、区域和世界对象的 Phaser 绘制",
+      "notResponsibleFor": ["探索规则", "楼层作者数据"],
+      "signals": ["世界绘制", "地图显示", "world renderer", "地标显示", "区域显示"],
+      "neighbors": ["content.world.floor-experience", "presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction"]
     }
   ]
 }

@@ -365,9 +365,17 @@ evaluation.
 
 ## Game Project Map
 
-The machine-readable area routing authority is `../.maintainer/architecture-map.json`.
-It records stable responsibility directories, not files; ordinary changes inside an
-existing area do not require map updates.
+The machine-readable routing authority is `../.maintainer/architecture-map.json`.
+Schema v2 records stable layer/area boundaries plus selected directory partitions;
+it is routing data, not a code or file index. Ordinary files and internal folders
+below a registered partition do not require map updates. Flat high-density areas
+such as `domain/session` intentionally remain area-level routes and are narrowed by
+symbol windows during inspection.
+
+The first partition set owns `content/world/floorExperience`, the DOM `focus`,
+`panels`, and `renderers` directories, and the Phaser `actors`, `effects`,
+`interaction`, and `world` directories. Their `signals` select a small search
+root; `neighbors` describe permitted expansion, not runtime dependencies.
 
 ```text
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts

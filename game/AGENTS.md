@@ -44,10 +44,11 @@ silently choosing one source.
   not import presentation or infrastructure; content must not import
   infrastructure. Extend `scripts/check-architecture.mjs` when a new durable
   layer boundary is introduced.
-- `.maintainer/architecture-map.json` owns area-level Maintainer routing. Normal
-  file changes and nested folders inside an existing area do not update it;
-  update it only when an immediate responsibility area is added, moved, split,
-  merged, or given a different boundary relationship.
+- `.maintainer/architecture-map.json` is the machine routing authority for
+  stable areas and selected responsibility partitions; it is not a code index.
+  Ordinary file changes and internal folders below an existing partition do not
+  update it. Change the map only when an area or stable partition is added,
+  moved, split, merged, or given a different boundary relationship.
 - `GameSession` and focused domain modules own game rules. DOM and Phaser code
   render snapshots and forward explicit intent; they must not become a second
   rule engine or storage owner.
