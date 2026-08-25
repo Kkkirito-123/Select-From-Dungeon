@@ -1,38 +1,73 @@
-# 仓库架构
+# Current Repository Architecture
 
-仓库根目录只负责工程治理和发布入口，产品代码分别归属 `game/` 与 `agent/`。
+This file records verified current repository facts. Stable rules live in
+`AGENTS.md`; the current L1/L2 contract and checkpoint live in `TASK.md`.
+`ARCHITECTURE.zh-CN.md` is the synchronized Chinese translation.
+
+## Repository Map
 
 ```text
-repository/
-├─ game/                 浏览器游戏：源码、测试、资源、文档、Node 依赖与构建
-├─ agent/                Python Agent：三个角色、共享运行层、HTTP 与测试
-├─ scripts/              仓库级规则校验，不包含游戏生成脚本
-├─ .github/workflows/    同时验证两个工程并部署 game/dist
-├─ .agents/skills/       仓库协作流程
-├─ LICENSE
-└─ ATTRIBUTIONS.md
+game/                    Independent TypeScript/Vite browser game
+agent/                   Independent Python Campfire/Scribe/Main service
+scripts/                 Repository-rule validator and regression tests
+.github/workflows/       Cross-project validation and game Pages deployment
+.agents/skills/          Requirement, implementation, delivery, and sync workflows
+.maintainer/project.json Fixed identity for the external Dungeon Maintainer
+LICENSE                  Repository license
+ATTRIBUTIONS.md          External-source and third-party attribution register
 ```
 
-## 运行边界
+The root owns repository governance and distribution entry points. Product
+code belongs to `game/` and `agent/`. Detailed game facts live in
+`game/ARCHITECTURE.md`; Python-service facts are governed by `agent/AGENTS.md`
+until that subtree needs its own current-facts map.
+
+## Runtime and Dependency Boundaries
 
 ```text
-game/TriggerBus
-  -> game/AgentRuntime
-  -> HTTP（受限证据与严格响应）
+game TriggerBus
+  -> game AgentRuntime
+  -> strict HTTP request with bounded evidence
   -> POST /v1/agent/run
   -> agent/src/dungeon_agents
-      -> Campfire 或 Scribe -> Main
+      -> Campfire or Scribe -> Main
 ```
 
-- `game/` 不导入 Python 包；`agent/` 不导入游戏 TypeScript、存档或资源。
-- Agent 是可选增强层，未配置或不可用时，游戏使用确定性本地文案。
-- Agent 是一个部署服务、一个 HTTP 入口和三个职责独立的角色模块。
-- 两个工程分别管理依赖。`game/node_modules/` 和 Python 虚拟环境都是可再生内容，不属于源码。
-- 根目录不提供第二套游戏入口或聚合业务代码，防止同一能力出现双轨实现。
+- The projects share no source imports or dependency tree. `game/` does not
+  import Python packages; `agent/` does not import game TypeScript, saves, or
+  assets.
+- The Agent is an optional enhancement. The game uses deterministic local copy
+  when the service is absent or unavailable.
+- Game rules, SQL execution, saves, maps, combat, and UI belong to `game/`.
+  Campfire synthesis, Scribe companionship, Main guidance, provider calls, and
+  content-free telemetry belong to `agent/`.
+- Cross-project changes update both sides of the HTTP contract and validate both
+  projects. Static game publication uploads only `game/dist/`; the Agent is
+  deployed separately and never enters the browser bundle.
+- Legal files stay at repository root and are copied into `game/dist/` by the
+  game build.
 
-## 责任划分
+## Maintainer Boundary
 
-- 游戏规则、SQL 执行、存档、地图、战斗和 UI 只属于 `game/`。
-- 篝火复盘、抄写员陪伴、Main 指引、模型调用和无正文遥测只属于 `agent/`。
-- 跨工程变化必须同时更新 HTTP 契约两端，并通过两个工程的测试。
-- 发布静态游戏时只上传 `game/dist/`；Agent 服务独立部署，不进入浏览器构建。
+The external Dungeon Maintainer recognizes this repository only through the
+fixed `.maintainer/project.json` marker. Its browser bridge is owned by
+`game/src/devtools/`, runs only on a local Vite development page with
+`?playtest=agent`, uses a temporary in-memory playtest store, and must be absent
+from production output. Its exact tool and projection contract is documented
+in `game/ARCHITECTURE.md`.
+
+## Canonical Validation Commands
+
+```text
+python3 scripts/test_validate_rules.py
+python3 scripts/validate-rules.py
+python3 -m unittest discover -s agent/tests
+pnpm --dir game install --frozen-lockfile
+pnpm --dir game test
+pnpm --dir game architecture:check
+pnpm --dir game build
+```
+
+On Windows, `python` can replace `python3` when it points to Python 3.
+`game/node_modules/`, `game/dist/`, Python virtual environments, and caches are
+generated content and are not source.

@@ -72,6 +72,8 @@ export interface SessionSnapshotContext {
   questionBankVersion: string;
   mode: GameSnapshot["mode"];
   adminMode: boolean;
+  /** 仅普通管理员预览可把答案交给输入框；Agent 试玩必须保持玩家输入。 */
+  exposeAdminAnswer: boolean;
   adminPanelOpen: boolean;
   adminIdentityMonsterIds: Set<number>;
   regionTransfer: GameSnapshot["regionTransfer"];
@@ -391,7 +393,7 @@ export function createSessionSnapshot(context: SessionSnapshotContext): GameSnap
       : context.combat || room.lessonId ? redactIdentity(lesson.intro) : "",
     taskBrief,
     // 正式玩家永远拿不到答案；管理员只把它交给输入框辅助，不参与存档或 Agent 投影。
-    adminAnswerSql: context.adminMode && context.mode === "combat"
+    adminAnswerSql: context.exposeAdminAnswer && context.mode === "combat"
       ? stage.answerSql
       : null,
     schema: activeGateChallenge

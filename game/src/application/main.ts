@@ -91,7 +91,7 @@ async function bootstrap(): Promise<void> {
       WORLD_RUNTIME_CONFIG.fixedWorldSeed,
       questionBank,
     );
-    setupSession.enableAdminMode();
+    setupSession.enableAgentPlaytestMode();
     setupSession.adminLoadFloor(dungeonAgentLaunch.floor);
     initialRun = setupSession.toSavedRun();
   }
@@ -101,7 +101,7 @@ async function bootstrap(): Promise<void> {
     initialRun?.graph.seed ?? WORLD_RUNTIME_CONFIG.fixedWorldSeed,
     questionBank,
   );
-  if (dungeonAgentLaunch) session.enableAdminMode();
+  if (dungeonAgentLaunch) session.enableAgentPlaytestMode();
   const [sql, { createGame }] = await Promise.all([
     SqlEngine.create(session.snapshot().monsters),
     import("../presentation/phaser/createGame"),
@@ -145,7 +145,6 @@ async function bootstrap(): Promise<void> {
       removeDungeonAgentBridge = installDungeonAgentBridge({
         root,
         session,
-        sql,
         launch: dungeonAgentLaunch,
         checkpointStorage,
         checkpointRestored: dungeonAgentStore?.checkpointState === "restored",

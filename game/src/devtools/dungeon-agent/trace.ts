@@ -1,7 +1,7 @@
 /**
  * 开发桥的页面内低敏语义 Trace。
  *
- * 本文件只记录 look/go/use/query/checkpoint 等高层动作的顺序和有限结果摘要，采用
+ * 本文件只记录 look/go/use/inputSql/query/checkpoint 等高层动作的顺序和有限结果摘要，采用
  * 固定容量环形缓冲；不记录鼠标轨迹、渲染帧、SQL、答案、完整地图、存档或身份。
  * Trace 仅存在于当前页面内存，刷新或关闭临时 Chromium Context 后自然消失。
  */

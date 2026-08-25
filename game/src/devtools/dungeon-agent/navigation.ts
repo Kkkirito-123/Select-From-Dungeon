@@ -37,12 +37,21 @@ const DIRECTIONS: readonly DungeonAgentPosition[] = [
  * 查找当前主线目标坐标。
  *
  * @param snapshot 当前楼层快照。
- * @returns 课程怪物、房间锚点或楼层钥匙坐标；无目标时返回 `null`。
+ * @returns 当前课程奖励、课程怪物、房间锚点或楼层钥匙坐标；无目标时返回 `null`。
  * @remarks 坐标仅在浏览器内部用于寻路，不进入协议投影或 Trace。
  */
 export function findDungeonAgentObjective(
   snapshot: GameSnapshot,
 ): DungeonAgentPosition | null {
+  const claimableReward = snapshot.claimableReward
+    ? snapshot.groundItems.find((item) => (
+        item.sourceRoomId === snapshot.currentRoomId
+        && item.collection === "interact"
+        && item.rewardId === snapshot.claimableReward?.id
+      ))
+    : null;
+  if (claimableReward) return { x: claimableReward.x, y: claimableReward.y };
+
   const objectiveId = snapshot.navigationGuidance.objectiveRoomId;
   if (objectiveId?.startsWith("area-boss:")) {
     const monsterId = Number(objectiveId.slice("area-boss:".length));

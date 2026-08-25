@@ -28,15 +28,14 @@ without discarding the reusable personal engineering baseline.
    - dependency, protocol, compatibility, security, generated-code, license,
      distribution, or runtime boundaries
    - sensitive areas and runtime truths that are easy to miss
-4. Rewrite the root guide as one coherent project document:
-   - preserve the operative intent of authority, working-contract, Skill-routing,
-     architecture-sync, evidence, and publication boundaries
-   - remove template-only bootstrap instructions after they have served their
-     purpose
-   - replace the current-template map with verified project positioning,
-     architecture, flow, directory responsibilities, commands, boundaries, and
-     validation
-   - omit headings with no useful verified content
+4. Split the verified result by authority:
+   - retain stable authority, working-contract, Skill-routing, evidence, and
+     publication boundaries in root `AGENTS.md`
+   - replace template facts in `ARCHITECTURE.md` with verified positioning,
+     flow, directory responsibilities, commands, boundaries, and validation
+   - keep `TASK.md` as the approved bootstrap contract and checkpoint until
+     evidence is preserved, then restore it to `IDLE`
+   - omit Architecture headings with no useful verified content
 5. Retain `.agents/skills/` as the repository workflow layer. Adapt a Skill only
    when a real project constraint requires it; do not delete the personal
    baseline merely because bootstrap is complete.
@@ -77,7 +76,8 @@ without discarding the reusable personal engineering baseline.
   for a subtree with distinct technology, commands, ownership, architecture, or
   risk.
 - Put user-facing setup and behavior in `README.md`; keep current agent-facing
-  architecture and safety boundaries in the closest `AGENTS.md`.
+  facts in the closest `ARCHITECTURE.md` and stable safety rules in the closest
+  `AGENTS.md`.
 
 ## Completion Evidence
 

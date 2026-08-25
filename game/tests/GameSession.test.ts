@@ -1432,14 +1432,41 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.snapshot().floor).toBe(3);
   });
 
+  it("普通管理员预览不推进楼层，Agent 试玩可从第一层 transition 进入第二层", () => {
+    const completeFloorOne = (session: GameSession): void => {
+      expect(session.adminApplyPreset("f1-admin-shortcut")).toMatchObject({ ok: true });
+      enterLesson(session, "having");
+      expect(session.resolveQuery(HAVING_SHIELD).accepted).toBe(true);
+      expect(session.resolveQuery(HAVING_CORE).lessonCompleted).toBe("having");
+      collectLessonChest(session, "having");
+    };
+
+    const admin = new GameSession(null, null, "admin-floor-transition");
+    expect(admin.enableAdminMode()).toMatchObject({ ok: true });
+    completeFloorOne(admin);
+    expect(admin.snapshot()).toMatchObject({ adminMode: true, floor: 1, mode: "explore" });
+    expect(admin.advanceFloor()).toBe(false);
+
+    const playtest = new GameSession(null, null, "agent-floor-transition");
+    expect(playtest.enableAgentPlaytestMode()).toMatchObject({ ok: true });
+    completeFloorOne(playtest);
+    expect(playtest.snapshot()).toMatchObject({ adminMode: true, floor: 1, mode: "transition" });
+    expect(playtest.advanceFloor()).toBe(true);
+    expect(playtest.snapshot()).toMatchObject({ adminMode: true, floor: 2, mode: "explore" });
+  });
+
   it("管理员战斗只提供当前题答案，结算和复盘仍与正式模式一致", () => {
     const normal = new GameSession(null, null, "admin-answer-flow");
     const admin = new GameSession(null, null, "admin-answer-flow");
+    const playtest = new GameSession(null, null, "agent-answer-flow");
     expect(admin.enableAdminMode()).toMatchObject({ ok: true });
+    expect(playtest.enableAgentPlaytestMode()).toMatchObject({ ok: true });
 
     enterLesson(normal, "select");
     enterLesson(admin, "select");
+    enterLesson(playtest, "select");
     expect(normal.snapshot().adminAnswerSql).toBeNull();
+    expect(playtest.snapshot().adminAnswerSql).toBeNull();
     expect(admin.snapshot().adminAnswerSql).toBe(
       "SELECT weakness FROM monsters WHERE id = 1;",
     );

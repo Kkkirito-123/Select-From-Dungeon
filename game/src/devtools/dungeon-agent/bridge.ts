@@ -14,7 +14,6 @@ import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { StorageLike } from "../../contracts/storage/storageLike";
 import { finalMigrationProgress } from "../../domain/progression/finalMigration";
 import type { GameSession } from "../../domain/session/GameSession";
-import type { SqlEngine } from "../../infrastructure/sql/SqlEngine";
 import {
   saveDungeonAgentCheckpoint,
   type DungeonAgentJudge,
@@ -26,11 +25,15 @@ import {
 import {
   clickDungeonAgentAction,
   DUNGEON_AGENT_ACTION_SELECTORS,
+  DUNGEON_AGENT_SQL_MAX_LENGTH,
   dungeonAgentMovementSettleDelay,
   isDungeonAgentVisible,
   readDungeonAgentOverlay,
+  writeDungeonAgentSql,
   sleepDungeonAgent,
+  waitDungeonAgentInteractionApplied,
   waitDungeonAgentUiReady,
+  type VisibleOverlayState,
 } from "./actions";
 import {
   dungeonAgentMoveStopReason,
@@ -50,7 +53,6 @@ const UI_POLL_INTERVAL_MS = 24;
 export interface DungeonAgentBridgeOptions {
   root: HTMLElement;
   session: GameSession;
-  sql: SqlEngine;
   launch: DungeonAgentLaunch;
   checkpointStorage: StorageLike | null;
   checkpointRestored: boolean;
@@ -60,7 +62,7 @@ export interface DungeonAgentBridgeOptions {
  * 组合隐藏的确定性验证摘要。
  *
  * @param snapshot 当前隔离游戏快照。
- * @returns 只供维护器固定验证层读取的摘要；look/go/use/query 不会返回它。
+ * @returns 只供维护器固定验证层读取的摘要；look/go/use/inputSql/query 不会返回它。
  */
 function judgeSnapshot(snapshot: GameSnapshot): DungeonAgentJudge {
   const requiredLessons = snapshot.roomGraph.nodes.filter(
@@ -82,6 +84,50 @@ function judgeSnapshot(snapshot: GameSnapshot): DungeonAgentJudge {
     migrationComplete: migration.complete,
     advanced: false,
   };
+}
+
+/**
+ * 构造交互生效判定使用的内部语义指纹。
+ *
+ * 指纹覆盖交互可能改变的模式、房间、课程、门、地面物和玩家可见覆盖层，但只在页面
+ * 内比较，不进入协议结果或 Trace。
+ */
+export function dungeonAgentInteractionFingerprint(
+  snapshot: GameSnapshot,
+  overlay: VisibleOverlayState,
+): string {
+  return JSON.stringify({
+    mode: snapshot.mode,
+    floor: snapshot.floor,
+    room: snapshot.currentRoomId,
+    position: [snapshot.player.x, snapshot.player.y],
+    course: {
+      lesson: snapshot.lessonId,
+      stage: snapshot.lessonStageId,
+      stageIndex: snapshot.lessonStageIndex,
+      completedLessons: snapshot.completedLessons,
+      completedRooms: snapshot.completedRoomIds,
+    },
+    doors: {
+      opened: snapshot.openedGateIds,
+      activeChallenge: snapshot.activeGateChallenge?.id ?? null,
+    },
+    groundItems: snapshot.groundItems.map((item) => [
+      item.id,
+      item.sourceRoomId,
+      item.x,
+      item.y,
+      item.collection,
+      item.rewardId,
+    ]),
+    keyItems: snapshot.keyItems,
+    claimableReward: snapshot.claimableReward?.id ?? null,
+    activeCampfire: snapshot.activeCampfireId,
+    activeLoot: snapshot.activeLootBundleId,
+    prompt: snapshot.interactionPrompt,
+    banner: snapshot.banner,
+    overlay,
+  });
 }
 
 /**
@@ -109,7 +155,7 @@ export function installDungeonAgentBridge(
     judgeByFloor.set(nextSnapshot.floor, judgeSnapshot(nextSnapshot));
   });
 
-  const interactionKey = (): string => [
+  const interactionTargetKey = (): string => [
     snapshot.floor,
     snapshot.player.x,
     snapshot.player.y,
@@ -117,9 +163,14 @@ export function installDungeonAgentBridge(
     snapshot.interactionPrompt,
   ].join(":");
 
+  const interactionFingerprint = (): string => dungeonAgentInteractionFingerprint(
+    snapshot,
+    readDungeonAgentOverlay(options.root),
+  );
+
   const currentView = (): DungeonAgentView => {
     const view = buildDungeonAgentView(snapshot, readDungeonAgentOverlay(options.root));
-    if (!usedInteractions.has(interactionKey())) return view;
+    if (!usedInteractions.has(interactionTargetKey())) return view;
     return {
       ...view,
       actions: view.actions.filter((entry) => entry.id !== "interact"),
@@ -226,23 +277,67 @@ export function installDungeonAgentBridge(
     },
     async use(actionId) {
       const selector = DUNGEON_AGENT_ACTION_SELECTORS[actionId];
-      const beforeKey = actionId === "interact" ? interactionKey() : null;
+      const beforeTargetKey = actionId === "interact" ? interactionTargetKey() : null;
+      const beforeFingerprint = actionId === "interact" ? interactionFingerprint() : null;
       const beforePosition = actionId === "interact"
         ? `${snapshot.floor}:${snapshot.player.x}:${snapshot.player.y}`
         : null;
-      if (!selector || !clickDungeonAgentAction(options.root, selector)) {
+      if (!selector) {
         trace.record("use", `action=${actionId} result=action-not-available`);
         return result(false, "action-not-available");
       }
-      if (beforeKey) {
-        // 交互按点击前语义状态去重；区域门同步传送时再标记目的地，避免重放来回触发。
-        usedInteractions.add(beforeKey);
-        const afterPosition = `${snapshot.floor}:${snapshot.player.x}:${snapshot.player.y}`;
-        if (afterPosition !== beforePosition) usedInteractions.add(interactionKey());
+      if (!await waitDungeonAgentUiReady(options.root)) {
+        trace.record("use", `action=${actionId} result=ui-not-ready`);
+        return result(false, "ui-not-ready");
       }
-      await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+      if (!clickDungeonAgentAction(options.root, selector)) {
+        trace.record("use", `action=${actionId} result=action-not-available`);
+        return result(false, "action-not-available");
+      }
+      if (beforeFingerprint && beforeTargetKey) {
+        const actionApplied = await waitDungeonAgentInteractionApplied(
+          interactionFingerprint,
+          beforeFingerprint,
+        );
+        if (!actionApplied) {
+          trace.record("use", `action=${actionId} result=action-not-applied`);
+          return result(false, "action-not-applied");
+        }
+        // 只在真实语义状态变化后去重；区域门同步传送时再标记目的地。
+        usedInteractions.add(beforeTargetKey);
+        const afterPosition = `${snapshot.floor}:${snapshot.player.x}:${snapshot.player.y}`;
+        if (afterPosition !== beforePosition) usedInteractions.add(interactionTargetKey());
+      } else {
+        await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+      }
       trace.record("use", `action=${actionId} result=accepted`);
       return result(true, `action:${actionId}`);
+    },
+    async inputSql(sql) {
+      const mode = snapshot.mode;
+      if (mode !== "combat" && mode !== "challenge") {
+        trace.record("input-sql", `mode=${mode} result=input-not-available`);
+        return result(false, "input-not-available");
+      }
+      if (
+        typeof sql !== "string"
+        || sql.length > DUNGEON_AGENT_SQL_MAX_LENGTH
+        || sql.includes("\u0000")
+      ) {
+        trace.record("input-sql", `mode=${mode} result=input-invalid`);
+        return result(false, "input-invalid");
+      }
+      if (!await waitDungeonAgentUiReady(options.root)) {
+        trace.record("input-sql", `mode=${mode} result=ui-not-ready`);
+        return result(false, "ui-not-ready");
+      }
+      if (!writeDungeonAgentSql(options.root, mode, sql)) {
+        trace.record("input-sql", `mode=${mode} result=terminal-not-open`);
+        return result(false, "terminal-not-open");
+      }
+      await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+      trace.record("input-sql", `mode=${mode} length=${sql.length} result=input-accepted`);
+      return result(true, "input-accepted");
     },
     async query() {
       const modeBeforeQuery = snapshot.mode;
@@ -251,10 +346,13 @@ export function installDungeonAgentBridge(
         return result(false, "query-not-available");
       }
 
-      const queryResult = executeDungeonAgentQuery({
-        snapshot,
-        session: options.session,
-        sql: options.sql,
+      const queryResult = await executeDungeonAgentQuery({
+        root: options.root,
+        mode: modeBeforeQuery,
+        readFingerprint: () => dungeonAgentInteractionFingerprint(
+          snapshot,
+          readDungeonAgentOverlay(options.root),
+        ),
       });
       await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
       trace.record(

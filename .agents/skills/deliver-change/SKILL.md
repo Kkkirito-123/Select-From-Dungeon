@@ -1,6 +1,6 @@
 ---
 name: "deliver-change"
-description: "Orchestrate an approved substantive repository change from context inspection through bounded implementation, risk-based validation, final Diff review, and repository-guide and README synchronization. Use for complete approved features, refactors, multi-file fixes, dependency or schema changes, batch edits, and other end-to-end implementation work. Do not use for raw requirements, first template bootstrap, one localized implementation slice, read-only diagnosis or review, post-hoc guide sync, or publishing."
+description: "Orchestrate an approved substantive repository change from context inspection through bounded implementation, risk-based validation, final Diff review, and Guide, Architecture, and README synchronization. Use for complete approved features, refactors, multi-file fixes, dependency or schema changes, batch edits, and other end-to-end implementation work. Do not use for raw requirements, first template bootstrap, one localized implementation slice, read-only diagnosis or review, post-hoc documentation sync, or publishing."
 ---
 
 # Deliver Change
@@ -11,10 +11,11 @@ This Skill owns checkpoints and integration evidence; the coding stage follows
 
 ## Workflow
 
-1. Read the root and applicable nested `AGENTS.md`, the approved change contract
-   or specification, Git status, owning implementation, contracts, tests, and
-   relevant documentation. Preserve unrelated work.
-2. Check the contract contains the goal, users or stakeholders, MVP, non-goals,
+1. Read the root and applicable nested `AGENTS.md`, the exact approved
+   `CONTRACT_REF`, its `ARCHITECTURE_REF`, Git status, owning implementation,
+   contracts, tests, and relevant documentation. Preserve unrelated work.
+2. Check Task status is `ACTIVE`, approval is confirmed, positive revisions
+   match, and the contract contains the goal, users or stakeholders, MVP, non-goals,
    expected scope, acceptance criteria, and risks. If approval is missing or a
    material decision is unresolved, stop and use `$define-requirement` or read
    `.agents/skills/define-requirement/SKILL.md`.
@@ -29,7 +30,8 @@ This Skill owns checkpoints and integration evidence; the coding stage follows
 5. For each slice, use `$implement-change` or read
    `.agents/skills/implement-change/SKILL.md`. At the checkpoint, compare the
    slice with the approved contract for drift; do not re-ask about unchanged
-   scope. Integrate the result and preserve its evidence before the next slice.
+   scope. Update the Task recovery checkpoint with the current slice, evidence,
+   unverified behavior, blocker, and one next action before the next slice.
 6. Validate the integrated change in proportion to risk. Reuse valid slice
    evidence and rerun only checks invalidated by integration or required by the
    broader repository gate:
@@ -52,8 +54,9 @@ This Skill owns checkpoints and integration evidence; the coding stage follows
    security, credentials, permissions, compatibility, generated artifacts,
    unrelated edits, and accidental public APIs.
 9. Use `$sync-project-guide` or read
-   `.agents/skills/sync-project-guide/SKILL.md`. Require explicit guide and
-   README update decisions based on durable and user-facing facts.
+   `.agents/skills/sync-project-guide/SKILL.md`. Require explicit Guide,
+   Architecture, and README update decisions based on stable, current, and
+   user-facing facts.
 10. Report `DELIVERED`, `PARTIAL`, or `BLOCKED` truthfully with the objective,
    files, acceptance evidence, validation results, guide decision, discoveries,
    unverified areas, and remaining risk. Do not publish unless the user
@@ -61,10 +64,10 @@ This Skill owns checkpoints and integration evidence; the coding stage follows
 
 ## Task State
 
-Use structured task state only for complex or multi-session work. Prefer an
-existing Issue, PR, specification, or tracker. Each item should contain only an
-identifier, goal, source, scope, dependencies, status, and acceptance evidence;
-do not duplicate the same status in several Markdown files.
+`TASK.md` is the single current repository checkpoint. On completion, map final
+evidence to every acceptance criterion and set `STATUS: COMPLETE`; after that
+evidence is preserved in the delivery report, PR, or chosen tracker, restore
+Task and its translation to `IDLE`. Do not duplicate current state elsewhere.
 
 ## Boundaries
 
@@ -80,6 +83,6 @@ do not duplicate the same status in several Markdown files.
 ## Completion Evidence
 
 Report the delivery status, requirement-to-evidence trace, files changed, checks
-and fresh results, final review findings, guide and README sync decisions,
+and fresh results, final review findings, Guide, Architecture, and README sync decisions,
 assumptions, unverified areas, remaining risks, and any reusable rule justified
 by repeated evidence.

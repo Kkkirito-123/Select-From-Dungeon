@@ -44,6 +44,47 @@ class ValidatorRegressionTests(unittest.TestCase):
                 VALIDATOR.parse_frontmatter(path, text)
                 self.assertTrue(VALIDATOR.errors)
 
+    def test_task_control_requires_valid_state_and_revision(self) -> None:
+        path = VALIDATOR.ROOT / "TASK.md"
+        valid = "\n".join(
+            [
+                "TASK_ID: example",
+                "STATUS: ACTIVE",
+                "CONTRACT_REF: TASK.md",
+                "CONTRACT_REVISION: 2",
+                "APPROVED_REVISION: 2",
+                "APPROVAL: confirmed",
+                "ARCHITECTURE_REF: ARCHITECTURE.md",
+                "EXTERNAL_REF: none",
+            ]
+        )
+        values = VALIDATOR.parse_task_control(path, valid)
+        self.assertEqual(values["STATUS"], "ACTIVE")
+        self.assertFalse(VALIDATOR.errors)
+
+        self.setUp()
+        invalid = valid.replace("STATUS: ACTIVE", "STATUS: UNKNOWN")
+        VALIDATOR.parse_task_control(path, invalid)
+        self.assertTrue(
+            any("unsupported Task STATUS" in error for error in VALIDATOR.errors)
+        )
+
+        self.setUp()
+        invalid = valid.replace("APPROVED_REVISION: 2", "APPROVED_REVISION: 1")
+        VALIDATOR.parse_task_control(path, invalid)
+        self.assertTrue(any("revisions must match" in error for error in VALIDATOR.errors))
+
+    def test_task_control_rejects_duplicate_fields(self) -> None:
+        path = VALIDATOR.ROOT / "TASK.md"
+        text = "TASK_ID: one\nTASK_ID: two\n"
+        VALIDATOR.parse_task_control(path, text)
+        self.assertTrue(
+            any(
+                "duplicate Task control field TASK_ID" in error
+                for error in VALIDATOR.errors
+            )
+        )
+
     def test_metadata_rejects_wrong_parent_and_non_boolean_policy(self) -> None:
         path = VALIDATOR.ROOT / "probe.yaml"
         wrong_parent = (

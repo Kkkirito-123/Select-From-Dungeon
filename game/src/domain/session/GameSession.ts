@@ -518,6 +518,7 @@ export class GameSession {
   private reviewBattleId: number | null = null;
   private banner = INITIAL_EXPLORATION_BANNER;
   private adminMode = false;
+  private agentPlaytestMode = false;
   private adminPanelOpen = false;
   private adminIdentityMonsterIds = new Set<number>();
   private regionTransferSequence = 0;
@@ -719,6 +720,7 @@ export class GameSession {
       questionBankVersion: this.questionBankVersion,
       mode: this.mode,
       adminMode: this.adminMode,
+      exposeAdminAnswer: this.adminMode && !this.agentPlaytestMode,
       adminPanelOpen: this.adminPanelOpen,
       adminIdentityMonsterIds: this.adminIdentityMonsterIds,
       regionTransfer: this.regionTransfer,
@@ -2040,7 +2042,11 @@ export class GameSession {
    * 和 XP；campaign 先通过纯函数校验，再初始化新楼层，避免跳层或重复进入。
    */
   advanceFloor(): boolean {
-    if (this.adminMode || this.mode !== "transition" || this.floorNumber >= 8) return false;
+    if (
+      (this.adminMode && !this.agentPlaytestMode) ||
+      this.mode !== "transition" ||
+      this.floorNumber >= 8
+    ) return false;
     const fromFloor = this.floorNumber;
     const transition = advanceCampaignProgress(this.campaign);
     const nextFloor = transition.to;
@@ -2916,16 +2922,21 @@ export class GameSession {
     const keyId = `floor-${this.floorNumber}-key`;
     if (!this.keyItems.includes(keyId)) this.keyItems.push(keyId);
     this.completedRoomIds.add(this.currentRoomId);
-    if (this.adminMode) {
+    return this.completeFloorKeyCollection(false);
+  }
+
+  private completeFloorKeyCollection(openedBattleChest: boolean): string {
+    const prefix = openedBattleChest ? "打开战利品宝箱，" : "";
+    if (this.adminMode && !this.agentPlaytestMode) {
       this.mode = "explore";
-      return `管理员预览已击败第 ${this.floorNumber} 层层主；不会推进或写入正式 Run。`;
+      return `${prefix}管理员预览已击败第 ${this.floorNumber} 层层主；不会推进或写入正式 Run。`;
     }
     if (this.floorNumber < 8) {
       this.mode = "transition";
-      return `第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，正在自动进入第 ${this.floorNumber + 1} 层。`;
+      return `${prefix}第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，1.5 秒后自动进入第 ${this.floorNumber + 1} 层。`;
     }
     this.completeCampaignVictory();
-    return "获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。";
+    return `${prefix}获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。`;
   }
 
   private completeCampaignVictory(): void {
@@ -3072,6 +3083,21 @@ export class GameSession {
       ok: true,
       kind: "none",
       message: "管理员视图已开启：全图、怪物与区域交通均可见；预览操作不会写入正式存档。",
+    };
+  }
+
+  /**
+   * 为本机 Dungeon Maintainer 试玩开启管理员辅助和真实楼层推进。
+   * 该标志只存在于当前 Session 实例，不进入 Snapshot、SavedRun 或 Profile。
+   */
+  enableAgentPlaytestMode(): InteractionResolution {
+    this.agentPlaytestMode = true;
+    this.adminMode = true;
+    this.emit();
+    return {
+      ok: true,
+      kind: "none",
+      message: "Agent 试玩已开启：管理员辅助可用，楼层仍按真实流程推进。",
     };
   }
 
@@ -3514,13 +3540,7 @@ export class GameSession {
       item.id.startsWith("lesson-drop:") ||
       item.id.startsWith("room-reward:");
     if (item.rewardId === "floor-key") {
-      if (this.floorNumber < 8) {
-        this.mode = "transition";
-        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}第 ${this.floorNumber} 层钥匙已接入传送门。无需按键，1.5 秒后自动进入第 ${this.floorNumber + 1} 层。`;
-      } else {
-        this.completeCampaignVictory();
-        this.banner = `${openedBattleChest ? "打开战利品宝箱，" : ""}获得第八层钥匙。魔王数据王座已平定，八层 SQL 图鉴均已永久更新。`;
-      }
+      this.banner = this.completeFloorKeyCollection(openedBattleChest);
     } else if (
       item.weapon ||
       this.player.weapon.id !== previousWeapon.id ||

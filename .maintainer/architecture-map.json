@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "projectRoot": "game",
+  "layers": [
+    { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
+    { "id": "application", "root": "game/src/application", "responsibility": "启动、用例编排、运行时配置和页面生命周期" },
+    { "id": "content", "root": "game/src/content", "responsibility": "课程、世界、剧情、背包和 SQL 的作者静态内容" },
+    { "id": "domain", "root": "game/src/domain", "responsibility": "不依赖界面的游戏规则、状态和领域计算" },
+    { "id": "infrastructure", "root": "game/src/infrastructure", "responsibility": "浏览器、SQLite、存储、音频和外部服务适配" },
+    { "id": "presentation", "root": "game/src/presentation", "responsibility": "DOM 与 Phaser 展示、输入转发和视觉反馈" },
+    { "id": "devtools", "root": "game/src/devtools", "responsibility": "仅开发态的外部维护和测试桥" }
+  ],
+  "areas": [
+    {
+      "id": "contracts.agent",
+      "parentId": "contracts",
+      "root": "game/src/contracts/agent",
+      "responsibility": "可选游戏 Agent 请求、回复和投影契约",
+      "notResponsibleFor": ["Agent 网络调用", "游戏状态修改"],
+      "signals": ["agent 契约", "请求 schema", "回复 schema", "投影字段"],
+      "neighbors": ["application.agent", "infrastructure.agent"]
+    },
+    {
+      "id": "contracts.game",
+      "parentId": "contracts",
+      "root": "game/src/contracts/game",
+      "responsibility": "跨层游戏快照、结果和公开数据形状",
+      "notResponsibleFor": ["战斗计算", "界面渲染"],
+      "signals": ["快照字段", "游戏契约", "结果类型", "公开状态"],
+      "neighbors": ["domain.session", "application.runtime"]
+    },
+    {
+      "id": "contracts.storage",
+      "parentId": "contracts",
+      "root": "game/src/contracts/storage",
+      "responsibility": "存档读写端口和持久化数据契约",
+      "notResponsibleFor": ["IndexedDB 实现", "迁移执行"],
+      "signals": ["存储契约", "存档接口", "持久化端口"],
+      "neighbors": ["infrastructure.storage", "domain.session"]
+    },
+    {
+      "id": "application.agent",
+      "parentId": "application",
+      "root": "game/src/application/agent",
+      "responsibility": "游戏内 Agent 场景投影、缓存和生命周期编排",
+      "notResponsibleFor": ["模型网络协议", "领域状态写入"],
+      "signals": ["篝火 agent", "抄写员", "agent runtime", "agent 缓存"],
+      "neighbors": ["contracts.agent", "infrastructure.agent", "application.triggers"]
+    },
+    {
+      "id": "application.config",
+      "parentId": "application",
+      "root": "game/src/application/config",
+      "responsibility": "运行时调节参数和固定产品配置",
+      "notResponsibleFor": ["作者课程内容", "环境变量读取"],
+      "signals": ["配置值", "概率配置", "运行参数", "阈值"],
+      "neighbors": ["application.runtime", "content.world"]
+    },
+    {
+      "id": "application.runtime",
+      "parentId": "application",
+      "root": "game/src/application/runtime",
+      "responsibility": "页面运行时服务装配、资源加载和用例协调",
+      "notResponsibleFor": ["领域规则", "DOM 细节"],
+      "signals": ["启动失败", "资源加载", "运行时", "初始化"],
+      "neighbors": ["domain.session", "infrastructure.storage", "presentation.dom"]
+    },
+    {
+      "id": "application.triggers",
+      "parentId": "application",
+      "root": "game/src/application/triggers",
+      "responsibility": "把游戏快照变化转换为语义触发事件",
+      "notResponsibleFor": ["事件展示", "领域判定"],
+      "signals": ["触发器", "事件没有触发", "重复事件", "快照变化"],
+      "neighbors": ["domain.session", "application.agent", "presentation.dom"]
+    },
+    {
+      "id": "content.curriculum",
+      "parentId": "content",
+      "root": "game/src/content/curriculum",
+      "responsibility": "课程、题目、提示、关卡 SQL 和 Campaign 作者数据",
+      "notResponsibleFor": ["SQL 执行", "结果判定算法"],
+      "signals": ["题目错误", "答案 sql", "提示错误", "课程", "lesson", "关卡题目"],
+      "neighbors": ["domain.learning", "infrastructure.sql", "content.sql"]
+    },
+    {
+      "id": "content.inventory",
+      "parentId": "content",
+      "root": "game/src/content/inventory",
+      "responsibility": "装备、恢复品、容量和掉落候选目录",
+      "notResponsibleFor": ["掉落计算", "背包状态变更"],
+      "signals": ["装备配置", "物品配置", "掉落池", "恢复品"],
+      "neighbors": ["domain.inventory", "content.world"]
+    },
+    {
+      "id": "content.narrative",
+      "parentId": "content",
+      "root": "game/src/content/narrative",
+      "responsibility": "剧情、证据、角色文案和叙事顺序",
+      "notResponsibleFor": ["剧情渲染", "触发条件计算"],
+      "signals": ["剧情", "文案", "失名录", "故事", "叙事"],
+      "neighbors": ["application.triggers", "presentation.dom", "content.world"]
+    },
+    {
+      "id": "content.sql",
+      "parentId": "content",
+      "root": "game/src/content/sql",
+      "responsibility": "权威 SQL Schema、表字段和静态数据定义",
+      "notResponsibleFor": ["SQL 执行", "课程判定"],
+      "signals": ["schema", "字段", "表名", "sql 数据", "列类型"],
+      "neighbors": ["infrastructure.sql", "domain.learning", "content.curriculum"]
+    },
+    {
+      "id": "content.world",
+      "parentId": "content",
+      "root": "game/src/content/world",
+      "responsibility": "楼层、生态、迷宫意图、怪物配置和世界作者内容",
+      "notResponsibleFor": ["路径计算", "世界渲染"],
+      "signals": ["楼层配置", "迷宫配置", "怪物配置", "生态", "世界内容"],
+      "neighbors": ["domain.exploration", "domain.progression", "presentation.phaser"]
+    },
+    {
+      "id": "domain.combat",
+      "parentId": "domain",
+      "root": "game/src/domain/combat",
+      "responsibility": "战斗回合、伤害、生命、阶段和胜负规则",
+      "notResponsibleFor": ["战斗画面", "怪物作者配置", "SQL 引擎"],
+      "signals": ["boss", "生命", "hp", "伤害", "战斗", "无法死亡", "胜利结算"],
+      "neighbors": ["domain.session", "domain.learning", "content.curriculum"]
+    },
+    {
+      "id": "domain.exploration",
+      "parentId": "domain",
+      "root": "game/src/domain/exploration",
+      "responsibility": "移动、迷宫、区域、门、遭遇、导航和世界位置规则",
+      "notResponsibleFor": ["Phaser 绘制", "楼层作者数据"],
+      "signals": ["移动", "门", "传送门", "迷宫", "路径", "区域首领", "遭遇", "卡住"],
+      "neighbors": ["domain.session", "content.world", "presentation.phaser"]
+    },
+    {
+      "id": "domain.inventory",
+      "parentId": "domain",
+      "root": "game/src/domain/inventory",
+      "responsibility": "背包、装备、战利品和掉落确定性规则",
+      "notResponsibleFor": ["物品作者目录", "背包界面"],
+      "signals": ["背包", "装备", "掉落", "战利品", "物品丢失", "奖励缺失"],
+      "neighbors": ["domain.session", "content.inventory", "presentation.dom"]
+    },
+    {
+      "id": "domain.learning",
+      "parentId": "domain",
+      "root": "game/src/domain/learning",
+      "responsibility": "SQL 特征、课程锁定、结果语义和学习记录规则",
+      "notResponsibleFor": ["SQLite 执行", "课程作者正文"],
+      "signals": ["查询通过", "判题", "课程完成", "sql 特征", "学习记录", "阶段没有推进"],
+      "neighbors": ["content.curriculum", "infrastructure.sql", "domain.combat"]
+    },
+    {
+      "id": "domain.progression",
+      "parentId": "domain",
+      "root": "game/src/domain/progression",
+      "responsibility": "Campaign、楼层推进、等级、经验和跨层规则",
+      "notResponsibleFor": ["楼层画面", "课程作者内容"],
+      "signals": ["楼层推进", "换层", "经验", "xp", "campaign", "通关"],
+      "neighbors": ["domain.session", "domain.exploration", "content.world"]
+    },
+    {
+      "id": "domain.session",
+      "parentId": "domain",
+      "root": "game/src/domain/session",
+      "responsibility": "GameSession 门面、跨领域状态协调和快照形成",
+      "notResponsibleFor": ["DOM 渲染", "浏览器存储实现"],
+      "signals": ["game session", "状态没有更新", "刷新后", "状态泄漏", "重复提交", "快照"],
+      "neighbors": ["domain.combat", "domain.exploration", "domain.learning", "domain.progression", "infrastructure.storage"]
+    },
+    {
+      "id": "domain.shared",
+      "parentId": "domain",
+      "root": "game/src/domain/shared",
+      "responsibility": "领域共享值对象、基础类型和无副作用公共规则",
+      "notResponsibleFor": ["业务流程编排", "跨层基础设施"],
+      "signals": ["共享类型", "基础类型", "值对象", "类型不一致"],
+      "neighbors": ["contracts.game", "domain.session"]
+    },
+    {
+      "id": "infrastructure.agent",
+      "parentId": "infrastructure",
+      "root": "game/src/infrastructure/agent",
+      "responsibility": "可选 Agent HTTP、超时、Hash 和响应校验适配",
+      "notResponsibleFor": ["场景选择", "游戏状态修改"],
+      "signals": ["agent 请求失败", "agent 超时", "gateway", "响应校验"],
+      "neighbors": ["contracts.agent", "application.agent"]
+    },
+    {
+      "id": "infrastructure.audio",
+      "parentId": "infrastructure",
+      "root": "game/src/infrastructure/audio",
+      "responsibility": "Web Audio 音乐和音效运行适配",
+      "notResponsibleFor": ["游戏规则", "视觉反馈"],
+      "signals": ["音乐", "音效", "audio", "静音"],
+      "neighbors": ["presentation.phaser", "application.runtime"]
+    },
+    {
+      "id": "infrastructure.feedback",
+      "parentId": "infrastructure",
+      "root": "game/src/infrastructure/feedback",
+      "responsibility": "运行反馈和设备能力适配",
+      "notResponsibleFor": ["领域事件判定", "页面布局"],
+      "signals": ["反馈", "震动", "设备能力"],
+      "neighbors": ["application.triggers", "presentation.dom"]
+    },
+    {
+      "id": "infrastructure.sql",
+      "parentId": "infrastructure",
+      "root": "game/src/infrastructure/sql",
+      "responsibility": "浏览器 SQLite 执行、沙箱和查询计划适配",
+      "notResponsibleFor": ["课程答案", "学习阶段规则"],
+      "signals": ["sqlite", "查询执行", "事务", "沙箱", "query plan", "执行计划"],
+      "neighbors": ["domain.learning", "content.sql", "content.curriculum"]
+    },
+    {
+      "id": "infrastructure.storage",
+      "parentId": "infrastructure",
+      "root": "game/src/infrastructure/storage",
+      "responsibility": "IndexedDB、存档编解码、迁移和持久化实现",
+      "notResponsibleFor": ["游戏进度规则", "存储端口定义"],
+      "signals": ["存档", "刷新丢失", "indexeddb", "迁移", "持久化", "reload"],
+      "neighbors": ["contracts.storage", "domain.session", "application.runtime"]
+    },
+    {
+      "id": "presentation.dom",
+      "parentId": "presentation",
+      "root": "game/src/presentation/dom",
+      "responsibility": "HUD、面板、终端、背包和 DOM 交互展示",
+      "notResponsibleFor": ["游戏规则", "存档访问"],
+      "signals": ["界面", "按钮", "面板", "终端", "hud", "显示错误", "点击"],
+      "neighbors": ["domain.session", "domain.learning", "application.runtime"]
+    },
+    {
+      "id": "presentation.phaser",
+      "parentId": "presentation",
+      "root": "game/src/presentation/phaser",
+      "responsibility": "Phaser 场景、世界对象、角色、特效和空间交互展示",
+      "notResponsibleFor": ["领域移动规则", "世界作者数据"],
+      "signals": ["phaser", "场景", "地图显示", "角色显示", "世界对象", "碰撞画面"],
+      "neighbors": ["domain.exploration", "content.world", "application.runtime"]
+    },
+    {
+      "id": "devtools.dungeon-agent",
+      "parentId": "devtools",
+      "root": "game/src/devtools/dungeon-agent",
+      "responsibility": "仅开发态维护器协议、玩家投影、语义动作和有限 Trace",
+      "notResponsibleFor": ["生产游戏规则", "管理员答案暴露"],
+      "signals": ["维护器工具", "bridge", "协议", "look", "go", "use", "工具卡住"],
+      "neighbors": ["contracts.game", "domain.session", "presentation.phaser"]
+    }
+  ]
+}

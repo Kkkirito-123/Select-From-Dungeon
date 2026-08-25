@@ -42,10 +42,54 @@ export interface DungeonAgentAction {
   label: string;
 }
 
+/** 当前 SQL 终端向玩家展示的查询状态。 */
+export type DungeonAgentQueryStatusKind =
+  | "neutral"
+  | "success"
+  | "warning"
+  | "error";
+
+/** 当前战斗题面中实际渲染给玩家的结构化说明。 */
+export interface DungeonAgentTaskView {
+  tier: string;
+  situation: string;
+  goal: string;
+  outputs: readonly string[];
+  fields: readonly {
+    expression: string;
+    meaning: string;
+  }[];
+  relations: readonly string[];
+  constraints: readonly string[];
+  success: string;
+}
+
+/** 当前已打开 SQL 终端的玩家可见内容。 */
+export interface DungeonAgentTerminalView {
+  kind: "combat" | "challenge";
+  title: string;
+  objective: string;
+  inputSql: string;
+  status: {
+    kind: DungeonAgentQueryStatusKind;
+    text: string;
+  };
+  lessonId: string | null;
+  stageId: string | null;
+  stageIndex: number | null;
+  task: DungeonAgentTaskView | null;
+  schema: readonly string[];
+  locks: readonly string[];
+  hints: readonly string[];
+  result: string;
+  plan: readonly string[];
+}
+
 /**
  * 允许进入维护模型上下文的玩家视图。
  *
- * 完整地图、SQL、管理员答案、身份档案、背包、正式存档和隐藏裁判结果均不属于该类型。
+ * 只有当前已打开终端 textarea 中玩家已经看见的 SQL 可以进入 `terminal.inputSql`。
+ * 完整地图、隐藏答案、管理员答案字段、身份档案、背包、正式存档和隐藏裁判结果均不属于该类型。
  */
 export interface DungeonAgentView {
   floor: number;
@@ -74,6 +118,7 @@ export interface DungeonAgentView {
     title: string;
     body: string;
   } | null;
+  terminal: DungeonAgentTerminalView | null;
   prompt: string;
   banner: string;
 }
@@ -89,7 +134,7 @@ export interface DungeonAgentResult {
 /**
  * 仅供确定性验证层读取的隐藏裁判摘要。
  *
- * `look/go/use/query` 不得返回此结构，维护模型也没有直接调用 judge 的工具。
+ * `look/go/use/inputSql/query` 不得返回此结构，维护模型也没有直接调用 judge 的工具。
  */
 export interface DungeonAgentJudge {
   floor: number;
@@ -112,7 +157,8 @@ export interface DungeonAgentEvent {
 /**
  * `window.__DUNGEON_PLAYTEST__` 暴露的固定协议 v2。
  *
- * 所有方法均不接受 JavaScript、CSS 选择器、鼠标坐标或 SQL 正文。
+ * 所有方法均不接受 JavaScript、CSS 选择器或鼠标坐标；inputSql 只向当前固定玩家
+ * textarea 写入文本，query 仍不接受 SQL 参数。
  */
 export interface DungeonPlaytestBridge {
   readonly version: 2;
@@ -124,6 +170,7 @@ export interface DungeonPlaytestBridge {
     maxSteps: number,
   ): Promise<DungeonAgentResult>;
   use(actionId: string): Promise<DungeonAgentResult>;
+  inputSql(sql: string): Promise<DungeonAgentResult>;
   query(): Promise<DungeonAgentResult>;
   judge(floor: number): DungeonAgentJudge;
   events(afterSequence: number): readonly DungeonAgentEvent[];
