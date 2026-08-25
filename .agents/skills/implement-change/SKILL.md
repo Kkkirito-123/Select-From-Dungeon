@@ -17,8 +17,9 @@ change behavior or scope, stop and return to `$define-requirement`; do not guess
 ## Workflow
 
 1. Read the root and closest `AGENTS.md`, Git status, the owning implementation,
-   contracts, tests, and relevant documentation. Identify unrelated local work
-   that must remain untouched.
+   contracts, tests, and relevant documentation. For delegated L1/L2 work,
+   also read the exact active Task and its Architecture reference. Identify
+   unrelated local work that must remain untouched.
 2. Establish the behavioral baseline before editing:
    - reproduce the bug or run the closest existing test when practical
    - for new behavior, state the observable before-and-after condition
@@ -52,7 +53,8 @@ change behavior or scope, stop and return to `$define-requirement`; do not guess
    discoveries, and unverified areas to the calling workflow. When this Skill
    was invoked directly, also apply the root guide-sync rule: use
    `$sync-project-guide` if durable or user-facing facts may have changed, or
-   record `GUIDE_NO_UPDATE` and `README_NO_UPDATE` with reasons.
+   record `GUIDE_NO_UPDATE`, `ARCHITECTURE_NO_UPDATE`, and `README_NO_UPDATE`
+   with reasons.
 
 ## Boundaries
 
@@ -69,5 +71,5 @@ change behavior or scope, stop and return to `$define-requirement`; do not guess
 
 Report the objective implemented, baseline, files changed, focused checks and
 fresh results, assumptions, deviations from the expected scope, unverified
-behavior, remaining risk, and—when invoked directly—the guide and README sync
-decisions.
+behavior, remaining risk, and—when invoked directly—the Guide, Architecture,
+and README sync decisions.

@@ -27,7 +27,7 @@ small change.
    - **L1 — change contract:** a normal feature, refactor, multi-file fix,
      routine patch or minor dependency update, behavior-neutral lockfile
      maintenance, or other substantive change that needs one explicit approval
-     before delivery. Keep the contract in the conversation by default; all
+     before delivery. Keep the contract in root `TASK.md` by default; all
      dependency work still receives risk-based validation.
    - **L2 — durable specification:** cross-service or multi-session work, public
      API or schema changes, adding or removing a production dependency, a major
@@ -49,16 +49,18 @@ small change.
    - assumptions, open decisions, and validation approach
 5. Decide the artifact:
    - L0: no requirement artifact
-   - L1: conversation contract unless the repository already has an approved
-     source of truth that must be updated
-   - L2: propose the existing Issue, specification, design, or tracker to update;
-     if none exists, propose a path and contents, then wait for approval before
-     creating it
-6. Present `READY_FOR_APPROVAL` when the contract is complete, or `NEEDS_INPUT`
+   - L1: root `TASK.md`, unless the handoff names an exact approved
+     `CONTRACT_REF`
+   - L2: root `TASK.md` plus an exact existing Issue, specification, design, or
+     tracker in `EXTERNAL_REF` when long-lived ownership is needed
+6. Write the complete proposed contract and incremented revision to `TASK.md`
+   and its retained translation with `APPROVAL: pending`. Present
+   `READY_FOR_APPROVAL` when the contract is complete, or `NEEDS_INPUT`
    with only the blocking decisions. Do not start implementation until required
    approval is explicit.
-7. After approval, persist an L2 specification only when that artifact was part
-   of the approved scope. If the user asked only for requirements or a PRD,
+7. After approval, set `APPROVAL: confirmed`, make `APPROVED_REVISION` equal to
+   `CONTRACT_REVISION`, and set `STATUS: ACTIVE`. Persist an L2 specification
+   only when that artifact was part of the approved scope. If the user asked only for requirements or a PRD,
    report the artifact and stop. Otherwise route the approved objective without
    widening it:
    - first template bootstrap -> `$bootstrap-repository`

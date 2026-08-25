@@ -1,60 +1,66 @@
-# AI 编码 Agent 仓库指南
+# AI 编码 Agent 稳定仓库规则
 
-本文件是根级英文权威 `AGENTS.md` 的同步中文译文。先阅读根指南，再阅读目标目录最近的
-`AGENTS.md`：`game/AGENTS.md` 负责浏览器游戏规则，`agent/AGENTS.md` 负责可选 Python 服务。
+本文件是稳定的仓库级权威。`ARCHITECTURE.md` 保存已验证的当前仓库事实，`TASK.md` 保存当前
+L1/L2 工作契约与恢复检查点。本文件是英文权威 `AGENTS.md` 的同步中文译文。
+
+## 权威与阅读顺序
+
+- 先阅读本指南，再阅读最近的嵌套 `AGENTS.md`。`game/AGENTS.md` 负责浏览器游戏规则，
+  `agent/AGENTS.md` 负责可选 Python 服务。更近的指南可以细化本地规则，但不得削弱根级安全、
+  权限、证据或发布边界。
+- 源码和可执行测试是当前行为证据，已批准 Task 是预期行为证据；两者实质漂移时必须报告。
+- 稳定权限、路由和停止条件属于本文件；当前目录、职责、执行流、命令、配置、数据、协议和运行
+  事实属于 Architecture；当前目标、范围、验收、批准和检查点属于 Task。
+- L0 检查可在读取相关规则和源码后停止。L1/L2 工作必须读取 `TASK.md` 给出的准确
+  `CONTRACT_REF` 与 `ARCHITECTURE_REF`，不得扫描或猜测另一份契约。
+- 上下文压缩、会话恢复或连续性不确定后，重新阅读本指南、准确 Task、准确 Architecture 引用和
+  Git 状态。来源缺失或 revision、范围、批准不一致时停止。
 
 ## 工作契约
 
-- 默认使用中文回复，除非用户要求其他语言；统一使用 UTF-8。
-- 编辑前检查 Git 状态、最近指南、所属源码、测试、契约和相关文档。
-- 保留用户无关改动与忽略的本地配置，不得输出、提交或重写凭证。
-- 功能、重构、依赖变化、删除、Schema 变化和发布都需要明确授权与相称验证。
-- 选择最小完整改动，不建立重复的兼容路径、抽象、注释或文档权威。
-- 只声明实际执行的检查；测试、CI、安全检查或冲突处理不通过时停止，不得强制合并。
+- 默认使用中文回复，除非用户要求其他语言。使用 UTF-8；源码标识符、API 与测试遵循代码库语言。
+- 每次只服务一个明确目标。编辑前检查 Git 状态、最近指南、所属源码、测试、契约和相关文档。
+- 保护用户无关改动和被忽略的本地配置；不得输出、提交、重写或暴露凭证与敏感本地内容。
+- 新功能、重构、删除、依赖或 Schema 变化、批量修改、全局配置及其他高影响工作，需要已批准的
+  目标、用户、MVP、非目标、范围、验收、验证和风险边界；实质变化会使该批准失效。
+- 选择最小完整改动，不建立推测性功能、抽象、兼容路径、依赖或重复权威。
+- 歧义会改变用户可见行为、公开契约、成本、安全或范围时，列出选择并请求决定；否则采用最小、
+  可逆的假设并说明。
+- 区分权限、实现、环境、验证路径和工具失败；同一种实质失败最多尝试三次。
+- 只声明实际执行的检查，并区分静态、单元、Mock、构建、集成、Provider、浏览器、设备和端到端证据。
+- 只读检查和本地验证不代表获得破坏性或外部写入权限。Commit、Push、PR、Merge、Release、部署
+  及相关发布操作都需要单独明确授权。
 
-## 仓库结构
+## 通过 Skills 路由工作
 
-```text
-game/                  独立 TypeScript/Vite 浏览器游戏
-agent/                 独立 Python 篝火/抄写员/Main 服务
-scripts/               仓库规则校验器及其回归测试
-.github/workflows/     跨工程验证和游戏 Pages 部署
-.agents/skills/        需求、实现、交付与指南同步流程
-.maintainer/project.json  外部 Dungeon Maintainer 的固定项目标识
-```
-
-两个工程不共享源码导入或依赖树。游戏只能通过严格 HTTP 契约调用 Agent，而且未启动 Agent 时仍
-必须可玩。Agent 不得读取游戏存档、地图、背包、身份、完整快照或浏览器中的 Provider 密钥。
-法律文件保留在仓库根，游戏构建时复制到 `game/dist/`。
-外部 Dungeon Maintainer 只能通过固定 `.maintainer/project.json` 标识识别本仓库。浏览器开发桥由
-`game/src/devtools/` 持有，只能在本机 Vite 开发页加 `?playtest=agent` 时启用，生产产物不得包含该桥。
-
-## 标准命令
-
-```bash
-python3 scripts/test_validate_rules.py
-python3 scripts/validate-rules.py
-python3 -m unittest discover -s agent/tests
-pnpm --dir game install --frozen-lockfile
-pnpm --dir game test
-pnpm --dir game architecture:check
-pnpm --dir game build
-```
-
-`game/node_modules/`、`game/dist/`、Python 虚拟环境和缓存都是生成内容，不属于源码，不得提交。
-
-## Skill 与交付
-
-适用时按仓库 Skill 路由工作：
+可复用流程位于 `.agents/skills/`。只有名称和描述匹配当前任务后，才读取选中的英文 `SKILL.md`。
 
 ```text
 未批准或有歧义的修改 -> $define-requirement -> 用户确认
-已批准的仓库级改动   -> $deliver-change
-边界明确的实现切片   -> $implement-change
-指南同步             -> $sync-project-guide
 首次模板初始化       -> $bootstrap-repository
-已审查结果 + 明确发布授权 -> $publish-change
+已批准的实质交付     -> $deliver-change
+边界明确的实现切片   -> $implement-change
+指南 / 架构 / README -> $sync-project-guide
+明确发布授权         -> $publish-change
 ```
 
-不能原生发现 Skill 的客户端读取 `.agents/skills/<skill-name>/SKILL.md`。更近的指南可以补充模块
-约束，但不得削弱根级安全、验证和发布规则。
+不能原生发现 Skill 的客户端读取 `.agents/skills/<skill-name>/SKILL.md`。任务完成不自动授予发布权限。
+
+## Task 与 Architecture 协议
+
+- 没有活跃的已批准 L1/L2 工作时，`TASK.md` 保持 `IDLE`。`ACTIVE` 和 `COMPLETE` 要求明确批准，
+  且契约 revision 与批准 revision 为相同正数。范围或安全发生实质变化后，必须获得新 revision
+  批准才能继续实现。
+- Task 检查点只保留当前有界切片、映射到验收编号的证据、未验证行为、阻塞原因和一个下一动作；
+  它不是变更日志或原始日志仓库。
+- 只有子树确实拥有不同的目录、职责、执行流、命令、数据、协议、兼容、安全、生成代码归属或
+  运行事实时，才增加或更新嵌套 Architecture。
+- 已验证的持久事实漂移通过 `$sync-project-guide` 处理。安装与用户行为写入 README，历史证据写入
+  Issue、PR、报告或选定跟踪器。
+
+## 证据与停止条件
+
+- 编辑前定义可观察的成功标准。先运行聚焦检查，再运行适当的更广质量门。
+- 检查每一处改动和完整 Diff，包括行为、安全、兼容、生成产物、过期文档与范围漂移。
+- 当批准不再匹配范围、安全边界将被削弱、必要证据无法在权限内取得，或合并冲突无法在不覆盖
+  用户工作的前提下解决时停止。

@@ -105,6 +105,18 @@ SQLite `EXPLAIN QUERY PLAN`；第八层通过确定性事故数据讲解并发�
 管理员模式用于检查八层全图、三个区域、怪物、首领和交通节点。预览快照不会写入正式 Run。
 它是内容 QA 工具，不提供课程掌握、XP 或奖励捷径。
 
+### Dungeon Maintainer 开发桥边界
+
+维护器只在本地开发试玩页加载协议 v2 开发桥，要求同时满足 Vite 开发模式、本机地址
+（127.0.0.1、localhost 或 [::1]）以及 playtest=agent 查询参数。
+
+桥提供受限的 checkpoint、look、go、use、query、judge、events 能力，维护器只能调用语义动作，
+不能传入 SQL、选择器、鼠标轨迹或任意 JavaScript。检查点只使用临时 sessionStorage，恢复后
+立即消费；正式 Run、IndexedDB、localStorage 存档和用户 Chrome Profile 不会被维护器读取。
+
+统一 Chromium Shell 会把本游戏嵌入右侧 iframe。生产构建必须移除开发桥全局，发布前在 game/dist
+执行固定字符串搜索，预期不再包含 __DUNGEON_PLAYTEST__。
+
 ## 9. 当前发布边界
 
 自动化测试和生产构建已覆盖核心规则。完整整局、真实音频设备和逐字文案仍需按

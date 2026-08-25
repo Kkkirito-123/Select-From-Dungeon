@@ -1,25 +1,33 @@
 /**
- * Dungeon Agent 的桥内预选查询执行。
+ * Dungeon Agent 的玩家终端查询执行边界。
  *
- * 本模块封装开发态复现所需的固定答案与正式游戏查询规则：combat 使用当前 Session 的
- * 受限 admin 预选答案，challenge 使用开发模块内固定密文答案；两者仍必须通过身份策略、
- * SQLite 执行和 Session 判定。它不接受模型传入的 SQL，不返回 SQL/答案正文，不写存储，
- * 也不直接操作 DOM。
- *
- * `accepted` 表示真实游戏是否接受查询，而不是函数是否顺利返回。重放层必须把 rejected
- * 视为失败证据，避免把桥内异常或错误答案误判为修复通过。
+ * 本模块只点击当前已打开终端的真实执行按钮，并等待 AppShell 完成既有 SQL 策略、
+ * SQLite、判题、战斗表现和 DOM 反馈链路。它不接收 SQL 参数，不读取 GameSnapshot 中的
+ * 管理员答案或参考答案，也不直接调用底层 SQL 引擎或会话判题接口；当前 textarea 是唯一输入，
+ * 文本写入由 actions.ts 的固定 inputSql 边界负责。
+ * 查询失败会转换为稳定事件，SQL 正文不会进入 Trace 或日志。
  */
 
-import type { GameSnapshot } from "../../contracts/game/snapshots";
-import type { FloorNumber } from "../../domain/progression/runGraph";
-import type { GameSession } from "../../domain/session/GameSession";
-import type { SqlEngine } from "../../infrastructure/sql/SqlEngine";
+import {
+  clickDungeonAgentAction,
+  DUNGEON_AGENT_ACTION_SELECTORS,
+  isDungeonAgentVisible,
+  readDungeonAgentOverlay,
+  readDungeonAgentQueryStatus,
+  sleepDungeonAgent,
+  waitDungeonAgentInteractionApplied,
+  waitDungeonAgentUiReady,
+} from "./actions";
 
 /** 查询结果的稳定事件标签。 */
 export type DungeonAgentQueryEvent =
   | "query-accepted"
   | "query-rejected"
-  | "answer-not-ready";
+  | "answer-not-ready"
+  | "query-not-available"
+  | "terminal-not-open"
+  | "ui-not-ready"
+  | "query-not-applied";
 
 /** 查询执行后只向桥层返回低敏结果。 */
 export interface DungeonAgentQueryResult {
@@ -27,121 +35,73 @@ export interface DungeonAgentQueryResult {
   event: DungeonAgentQueryEvent;
 }
 
-/** 查询执行所需的当前隔离游戏依赖。 */
+/** 当前页面查询执行所需的可见 UI 依赖。 */
 export interface DungeonAgentQueryContext {
-  snapshot: GameSnapshot;
-  session: GameSession;
-  sql: SqlEngine;
+  root: HTMLElement;
+  mode: "combat" | "challenge";
+  readFingerprint(): string;
 }
 
-const DUNGEON_AGENT_GATE_ANSWERS: Readonly<Record<FloorNumber, string>> = {
-  1: `SELECT m.id, COUNT(s.id) AS echo_count, SUM(s.charge) AS total_charge
-      FROM monsters m JOIN monster_signals s ON s.monster_id = m.id
-      WHERE s.channel = 'echo' GROUP BY m.id
-      HAVING COUNT(s.id) >= 3 AND SUM(s.charge) >= 24
-      ORDER BY total_charge DESC, m.id ASC`,
-  2: `SELECT r.id, r.name AS room_name, COUNT(DISTINCT m.id) AS monster_count,
-        COALESCE(SUM(g.power), 0) AS total_power
-      FROM rooms r LEFT JOIN monsters m ON m.room_id = r.id
-      LEFT JOIN monster_gear g ON g.monster_id = m.id
-      WHERE r.floor = 2 GROUP BY r.id, r.name
-      HAVING COALESCE(SUM(g.power), 0) >= 10
-      ORDER BY total_power DESC, r.id ASC LIMIT 2`,
-  3: `SELECT m.id, r.name AS room_name, g.power
-      FROM monsters m JOIN rooms r ON m.room_id = r.id
-      JOIN monster_gear g ON m.id = g.monster_id
-      WHERE r.floor = 3 AND g.power >= 20
-      ORDER BY g.power DESC, m.id ASC LIMIT 2`,
-  4: `WITH strong AS (
-        SELECT monster_id, MAX(power) AS max_power FROM monster_gear
-        GROUP BY monster_id HAVING MAX(power) >= 20
-      ) SELECT m.id, s.max_power FROM monsters m
-      JOIN strong s ON m.id = s.monster_id
-      WHERE m.room_id BETWEEN 51 AND 60
-      ORDER BY s.max_power DESC, m.id ASC LIMIT 3`,
-  5: `WITH ranked AS (
-        SELECT r.sector, m.id, g.power,
-          ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id ASC) AS rn
-        FROM monsters m JOIN rooms r ON m.room_id = r.id
-        JOIN monster_gear g ON g.monster_id = m.id WHERE r.floor = 5
-      ) SELECT sector, id, power, rn FROM ranked WHERE rn = 1
-      ORDER BY power DESC, sector ASC LIMIT 3`,
-  6: `WITH ranked AS (
-        SELECT m.id, g.power,
-          ROW_NUMBER() OVER (PARTITION BY r.sector ORDER BY g.power DESC, m.id ASC) AS rn
-        FROM monsters m JOIN rooms r ON m.room_id = r.id
-        JOIN monster_gear g ON g.monster_id = m.id WHERE r.floor = 6
-      ) SELECT id, power FROM ranked WHERE rn = 1
-      ORDER BY power DESC, id ASC LIMIT 3`,
-  7: `WITH ranked AS (
-        SELECT realm, code, score,
-          ROW_NUMBER() OVER (PARTITION BY realm ORDER BY score DESC, id ASC) AS rn
-        FROM index_records
-      ) SELECT realm, code, score FROM ranked WHERE rn = 1
-      ORDER BY score DESC LIMIT 3`,
-  8: `WITH ranked AS (
-        SELECT region, node, lag_ms,
-          ROW_NUMBER() OVER (PARTITION BY region ORDER BY lag_ms ASC, node ASC) AS rn
-        FROM replica_status WHERE role = 'replica' AND healthy = 1
-      ) SELECT region, node, lag_ms FROM ranked WHERE rn = 1 ORDER BY lag_ms ASC`,
-};
+const UI_POLL_INTERVAL_MS = 24;
+const COMBAT_TERMINAL_SELECTOR = "#combat-terminal";
+const CHALLENGE_TERMINAL_SELECTOR = "#gate-terminal";
+const COMBAT_EXECUTE_SELECTOR = "#execute-query";
+const CHALLENGE_EXECUTE_SELECTOR = "#execute-gate-query";
 
 /**
- * 执行当前 combat/challenge 的开发态预选查询。
+ * 提交当前玩家终端中的 SQL。
  *
- * @param context 当前快照、Session 和 SQL 引擎；三者必须属于同一临时页面实例。
- * @returns 低敏 accepted/event 结果；查询正文永不返回。
- * @throws 不主动抛出游戏规则错误，规则拒绝会转换为 `query-rejected`。
+ * @param context 当前游戏根节点、终端模式和页面内语义指纹读取器。
+ * @returns AppShell 最终可见状态对应的 accepted/event；不会返回或记录 SQL 正文。
  */
-export function executeDungeonAgentQuery(
+export async function executeDungeonAgentQuery(
   context: DungeonAgentQueryContext,
-): DungeonAgentQueryResult {
-  const { snapshot, session, sql } = context;
-  let accepted = false;
-
-  if (snapshot.mode === "combat") {
-    const assistedSql = snapshot.adminAnswerSql;
-    if (!assistedSql) return { accepted: false, event: "answer-not-ready" };
-    try {
-      const policy = session.validateCombatQuery(assistedSql);
-      if (!policy.ok) throw new Error("identity-policy");
-      const queryResult = sql.execute(
-        assistedSql,
-        snapshot.floor,
-        snapshot.lessonId,
-      );
-      const resolution = session.resolveQuery(queryResult);
-      if (resolution.hpUpdates.length > 0) {
-        sql.updateMonsterHp(resolution.hpUpdates);
-      }
-      accepted = resolution.accepted;
-    } catch {
-      const resolution = session.registerQueryError(
-        "桥内预选查询执行失败。",
-        assistedSql,
-      );
-      accepted = resolution.accepted;
+): Promise<DungeonAgentQueryResult> {
+  const terminalSelector = context.mode === "combat"
+    ? COMBAT_TERMINAL_SELECTOR
+    : CHALLENGE_TERMINAL_SELECTOR;
+  if (
+    context.mode === "combat"
+    && !isDungeonAgentVisible(context.root, terminalSelector)
+  ) {
+    if (!clickDungeonAgentAction(
+      context.root,
+      DUNGEON_AGENT_ACTION_SELECTORS.terminal,
+    )) {
+      return { accepted: false, event: "query-not-available" };
     }
-  } else if (snapshot.mode === "challenge") {
-    // 密文答案只存在于开发态动态模块，并仍经过正式只读策略、SQLite 与机关判定。
-    const assistedSql = DUNGEON_AGENT_GATE_ANSWERS[snapshot.floor];
-    if (!assistedSql) return { accepted: false, event: "answer-not-ready" };
-    try {
-      const policy = session.validateGateChallengeQuery(assistedSql);
-      if (!policy.ok) throw new Error("identity-policy");
-      const queryResult = sql.executeSelect(assistedSql);
-      const resolution = session.resolveGateChallenge(queryResult);
-      accepted = resolution.accepted;
-    } catch {
-      const resolution = session.registerGateChallengeError(
-        "桥内预选查询执行失败。",
-      );
-      accepted = resolution.accepted;
-    }
+    await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
   }
 
+  const terminal = readDungeonAgentOverlay(context.root).terminal;
+  if (!terminal || terminal.kind !== context.mode) {
+    return { accepted: false, event: "terminal-not-open" };
+  }
+  const beforeFingerprint = context.readFingerprint();
+  const executeSelector = context.mode === "combat"
+    ? COMBAT_EXECUTE_SELECTOR
+    : CHALLENGE_EXECUTE_SELECTOR;
+  if (!clickDungeonAgentAction(context.root, executeSelector)) {
+    return { accepted: false, event: "query-not-available" };
+  }
+  await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+  if (!await waitDungeonAgentUiReady(context.root)) {
+    return { accepted: false, event: "ui-not-ready" };
+  }
+  await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+  if (!await waitDungeonAgentInteractionApplied(
+    context.readFingerprint,
+    beforeFingerprint,
+  )) {
+    return { accepted: false, event: "query-not-applied" };
+  }
+
+  const status = readDungeonAgentQueryStatus(context.root, context.mode);
+  const accepted = status.kind === "success";
   return {
     accepted,
-    event: accepted ? "query-accepted" : "query-rejected",
+    event: terminal.inputSql.trim()
+      ? accepted ? "query-accepted" : "query-rejected"
+      : "answer-not-ready",
   };
 }

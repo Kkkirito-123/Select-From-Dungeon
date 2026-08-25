@@ -17,15 +17,19 @@ SCRIPT_PATH = Path(__file__).absolute()
 ROOT = SCRIPT_PATH.parents[1].resolve()
 PORTABLE_ROOT_FILES = (
     "AGENTS.md",
+    "ARCHITECTURE.md",
     "CLAUDE.md",
     "LICENSE",
     "ATTRIBUTIONS.md",
+    "TASK.md",
     ".gitignore",
 )
 TEMPLATE_ROOT_FILES = (
     "AGENTS.zh-CN.md",
+    "ARCHITECTURE.zh-CN.md",
     "README.md",
     "README.zh-CN.md",
+    "TASK.zh-CN.md",
 )
 TEMPLATE_AUTOMATION_FILES = (".github/workflows/validate.yml",)
 REQUIRED_SKILLS = {
@@ -111,7 +115,16 @@ MAX_RESOURCE_BYTES = 10 * 1024 * 1024
 RULE_PATHSPECS = (
     "AGENTS.md",
     ":(glob)**/AGENTS.md",
+    ":(glob)**/AGENTS.zh-CN.md",
+    "ARCHITECTURE.md",
+    ":(glob)**/ARCHITECTURE.md",
+    "ARCHITECTURE.zh-CN.md",
+    ":(glob)**/ARCHITECTURE.zh-CN.md",
     "AGENTS.zh-CN.md",
+    "TASK.md",
+    ":(glob)**/TASK.md",
+    "TASK.zh-CN.md",
+    ":(glob)**/TASK.zh-CN.md",
     "CLAUDE.md",
     "README.md",
     "README.zh-CN.md",
@@ -261,6 +274,141 @@ def parse_frontmatter(path: Path, text: str) -> dict[str, str]:
             continue
         values[key] = value
     return values
+
+
+TASK_CONTROL_FIELDS = (
+    "TASK_ID",
+    "STATUS",
+    "CONTRACT_REF",
+    "CONTRACT_REVISION",
+    "APPROVED_REVISION",
+    "APPROVAL",
+    "ARCHITECTURE_REF",
+    "EXTERNAL_REF",
+)
+TASK_STATUSES = {"IDLE", "ACTIVE", "BLOCKED", "COMPLETE"}
+TASK_APPROVALS = {"not-required", "pending", "confirmed"}
+
+
+def parse_task_control(path: Path, text: str) -> dict[str, str]:
+    """Parse the fixed, intentionally small Task control block."""
+    values: dict[str, str] = {}
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        match = re.fullmatch(r"([A-Z][A-Z0-9_]*)[:][ \t]*(.*)", line)
+        if not match or match.group(1) not in TASK_CONTROL_FIELDS:
+            continue
+        key, value = match.groups()
+        if key in values:
+            fail(f"{relative(path)}:{line_number}: duplicate Task control field {key}")
+            continue
+        value = value.strip()
+        if not value:
+            fail(f"{relative(path)}:{line_number}: empty Task control field {key}")
+            continue
+        values[key] = value
+
+    missing = [key for key in TASK_CONTROL_FIELDS if key not in values]
+    if missing:
+        fail(f"{relative(path)}: missing Task control fields: {', '.join(missing)}")
+        return values
+
+    if values["STATUS"] not in TASK_STATUSES:
+        fail(f"{relative(path)}: unsupported Task STATUS")
+    if values["APPROVAL"] not in TASK_APPROVALS:
+        fail(f"{relative(path)}: unsupported Task APPROVAL")
+
+    revisions: dict[str, int] = {}
+    for key in ("CONTRACT_REVISION", "APPROVED_REVISION"):
+        if not re.fullmatch(r"0|[1-9][0-9]*", values[key]):
+            fail(f"{relative(path)}: {key} must be a non-negative integer")
+        else:
+            revisions[key] = int(values[key])
+
+    status = values["STATUS"]
+    if status == "IDLE":
+        if (
+            revisions.get("CONTRACT_REVISION") != 0
+            or revisions.get("APPROVED_REVISION") != 0
+        ):
+            fail(f"{relative(path)}: IDLE Task must use revision 0")
+        if values["APPROVAL"] != "not-required":
+            fail(f"{relative(path)}: IDLE Task must use not-required approval")
+    elif status in {"ACTIVE", "COMPLETE"}:
+        if revisions.get("CONTRACT_REVISION", -1) < 1:
+            fail(f"{relative(path)}: {status} Task must use a positive revision")
+        if revisions.get("CONTRACT_REVISION") != revisions.get("APPROVED_REVISION"):
+            fail(f"{relative(path)}: {status} Task revisions must match")
+        if values["APPROVAL"] != "confirmed":
+            fail(f"{relative(path)}: {status} Task must use confirmed approval")
+    elif status == "BLOCKED" and revisions.get("CONTRACT_REVISION", -1) < 1:
+        fail(f"{relative(path)}: BLOCKED Task must use a positive revision")
+
+    return values
+
+
+def validate_task_reference(task_path: Path, field: str, value: str) -> None:
+    target = value.replace("\\", "/")
+    if URI_SCHEME_RE.match(target) or WINDOWS_DRIVE_RE.match(target):
+        fail(f"{relative(task_path)}: {field} must be an in-repository path")
+        return
+    resolved = (task_path.parent / target).resolve()
+    try:
+        resolved.relative_to(ROOT)
+    except ValueError:
+        fail(f"{relative(task_path)}: {field} escapes the repository")
+        return
+    if uses_symlink_component(resolved):
+        fail(f"{relative(task_path)}: {field} points through a symlink")
+    elif not resolved.is_file():
+        fail(f"{relative(task_path)}: {field} points to a missing file")
+
+
+def validate_task_documents(template_mode: bool) -> None:
+    previous_error_count = len(errors)
+    task_path = ROOT / "TASK.md"
+    architecture_path = ROOT / "ARCHITECTURE.md"
+    if not task_path.is_file() or not architecture_path.is_file():
+        return
+
+    task_text = read_text(task_path)
+    task = parse_task_control(task_path, task_text)
+    for heading in ("## Contract", "## Recovery Checkpoint"):
+        if heading not in task_text:
+            fail(f"{relative(task_path)}: missing required section {heading}")
+    if "## State Rules" in task_text:
+        fail(f"{relative(task_path)}: state rules must remain in the fixed Task sections")
+    if task:
+        validate_task_reference(task_path, "CONTRACT_REF", task.get("CONTRACT_REF", ""))
+        validate_task_reference(
+            task_path, "ARCHITECTURE_REF", task.get("ARCHITECTURE_REF", "")
+        )
+
+    architecture_text = read_text(architecture_path)
+    if re.search(r"(?m)^(?:STATUS|CONTRACT_REVISION|APPROVAL):", architecture_text):
+        fail(f"{relative(architecture_path)}: architecture must not contain Task state fields")
+
+    translated = ROOT / "TASK.zh-CN.md"
+    translated_path = translated if translated.is_file() else None
+    if template_mode and translated_path is None:
+        fail("missing required file: TASK.zh-CN.md")
+    if translated_path is not None:
+        translated_text = read_text(translated_path)
+        translated_task = parse_task_control(translated_path, translated_text)
+        for heading in ("## 契约", "## 恢复检查点"):
+            if heading not in translated_text:
+                fail(f"{relative(translated_path)}: missing required section {heading}")
+        if "## 状态规则" in translated_text:
+            fail(
+                f"{relative(translated_path)}: state rules must remain in the fixed Task sections"
+            )
+        for key in TASK_CONTROL_FIELDS:
+            if task.get(key) != translated_task.get(key):
+                fail(f"Task control field {key} differs between English and Chinese files")
+
+    translated_architecture = ROOT / "ARCHITECTURE.zh-CN.md"
+    if template_mode and not translated_architecture.is_file():
+        fail("missing required file: ARCHITECTURE.zh-CN.md")
+    pass_if_clean("Task control and Architecture boundaries", previous_error_count)
 
 
 def parse_openai_metadata(path: Path, text: str) -> dict[str, dict[str, object]]:
@@ -665,8 +813,8 @@ def collect_rule_surface_files(root_files: list[Path]) -> list[Path]:
     return sorted(files)
 
 
-def collect_module_guides() -> list[Path]:
-    """Find publishable nested AGENTS.md files without traversing ignored trees."""
+def collect_module_rule_documents() -> list[Path]:
+    """Find nested Guide, Architecture, and Task files without ignored trees."""
     previous_error_count = len(errors)
     try:
         result = subprocess.run(
@@ -678,6 +826,11 @@ def collect_module_guides() -> list[Path]:
                 "-z",
                 "--",
                 ":(glob)**/AGENTS.md",
+                ":(glob)**/AGENTS.zh-CN.md",
+                ":(glob)**/ARCHITECTURE.md",
+                ":(glob)**/ARCHITECTURE.zh-CN.md",
+                ":(glob)**/TASK.md",
+                ":(glob)**/TASK.zh-CN.md",
             ],
             cwd=ROOT,
             capture_output=True,
@@ -686,28 +839,31 @@ def collect_module_guides() -> list[Path]:
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         fail(
-            "cannot discover nested repository guides "
+            "cannot discover nested repository rule documents "
             f"({exc.__class__.__name__}; details suppressed)"
         )
         return []
     if result.returncode:
         fail(
-            "nested-guide discovery failed with exit code "
+            "nested rule-document discovery failed with exit code "
             f"{result.returncode}; command output suppressed"
         )
         return []
 
-    guides: list[Path] = []
+    documents: list[Path] = []
     for item in result.stdout.split(b"\0"):
         if not item:
             continue
         path = ROOT / item.decode("utf-8", errors="surrogateescape")
         if uses_symlink_component(path):
-            fail(f"{relative(path)}: repository guide must not use a symlink")
+            fail(f"{relative(path)}: repository rule document must not use a symlink")
         elif path.is_file():
-            guides.append(path)
-    pass_if_clean("tracked and untracked repository-guide discovery", previous_error_count)
-    return sorted(set(guides))
+            documents.append(path)
+    pass_if_clean(
+        "tracked and untracked repository rule-document discovery",
+        previous_error_count,
+    )
+    return sorted(set(documents))
 
 
 def validate_text_whitespace(surface_files: list[Path]) -> None:
@@ -870,12 +1026,15 @@ def parse_args() -> argparse.Namespace:
 
 def main(template_mode: bool = False) -> int:
     root_files = validate_root_files(template_mode)
+    validate_task_documents(template_mode)
     validate_license_and_attributions(template_mode)
     skill_markdown, discovered = validate_skills()
     validate_routing(discovered, template_mode)
     validate_claude_import()
 
-    surface_files = collect_rule_surface_files(root_files + collect_module_guides())
+    surface_files = collect_rule_surface_files(
+        root_files + collect_module_rule_documents()
+    )
     markdown_files = [path for path in surface_files if path.suffix.lower() == ".md"]
     validate_local_links(markdown_files)
     validate_text_whitespace(surface_files)
