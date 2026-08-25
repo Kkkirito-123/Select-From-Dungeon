@@ -228,8 +228,14 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 
 ## 游戏工程地图
 
-机器可读的区域路由权威是 `../.maintainer/architecture-map.json`。它只登记稳定职责目录，
-不登记文件；已有区域内部的普通修改不需要更新地图。
+机器可读路由权威是 `../.maintainer/architecture-map.json`。schema v2 登记稳定 layer/area 边界和
+选定的目录级 partition；它是路由数据，不是代码或文件索引。已登记 partition 内普通文件和内部目录
+变化无需更新地图。`domain/session` 等扁平高密度区域有意保留 area 级路由，由 Inspect 的符号窗口
+继续缩小读取范围。
+
+首批 partition 覆盖 `content/world/floorExperience`、DOM 的 `focus` / `panels` / `renderers`，
+以及 Phaser 的 `actors` / `effects` / `interaction` / `world`。其中 `signals` 用于选择小搜索根，
+`neighbors` 只声明允许的扩展关系，不表示运行时依赖。
 
 ```text
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约

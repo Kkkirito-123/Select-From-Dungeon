@@ -9,6 +9,21 @@ function plainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function exactKeys(value, expected) {
+  return Object.keys(value).sort().join("\n") === [...expected].sort().join("\n");
+}
+
+function validBoundedLines(values, maximum, maximumLength) {
+  return Array.isArray(values)
+    && values.length <= maximum
+    && values.every((value) => (
+      typeof value === "string"
+      && value.length > 0
+      && value.length <= maximumLength
+      && !/[\r\n]/u.test(value)
+    ));
+}
+
 function safeRelativeDirectory(value, label) {
   if (
     typeof value !== "string"
@@ -26,12 +41,14 @@ async function validateArchitectureMap() {
   const parsed = JSON.parse(await readFile(mapPath, "utf8"));
   if (
     !plainObject(parsed)
-    || parsed.schemaVersion !== 1
+    || !exactKeys(parsed, ["schemaVersion", "projectRoot", "layers", "areas", "partitions"])
+    || parsed.schemaVersion !== 2
     || parsed.projectRoot !== "game"
     || !Array.isArray(parsed.layers)
     || !Array.isArray(parsed.areas)
+    || !Array.isArray(parsed.partitions)
   ) {
-    throw new Error("architecture-map.json 不是受支持的 schema v1");
+    throw new Error("architecture-map.json 不是受支持的 schema v2");
   }
 
   const layerIds = new Set();
@@ -39,6 +56,7 @@ async function validateArchitectureMap() {
   for (const layer of parsed.layers) {
     if (
       !plainObject(layer)
+      || !exactKeys(layer, ["id", "root", "responsibility"])
       || typeof layer.id !== "string"
       || !/^[a-z][a-z0-9-]*$/u.test(layer.id)
       || layerIds.has(layer.id)
@@ -61,6 +79,15 @@ async function validateArchitectureMap() {
   for (const area of parsed.areas) {
     if (
       !plainObject(area)
+      || !exactKeys(area, [
+        "id",
+        "parentId",
+        "root",
+        "responsibility",
+        "notResponsibleFor",
+        "signals",
+        "neighbors",
+      ])
       || typeof area.id !== "string"
       || !/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/u.test(area.id)
       || areaIds.has(area.id)
@@ -69,28 +96,11 @@ async function validateArchitectureMap() {
       || area.responsibility.length === 0
       || area.responsibility.length > 120
       || /[\r\n]/u.test(area.responsibility)
-      || !Array.isArray(area.notResponsibleFor)
-      || !Array.isArray(area.signals)
-      || !Array.isArray(area.neighbors)
+      || !validBoundedLines(area.notResponsibleFor, 8, 80)
+      || !validBoundedLines(area.signals, 12, 40)
+      || !validBoundedLines(area.neighbors, 8, 80)
     ) {
       throw new Error("architecture-map.json 包含非法或重复 area");
-    }
-    for (const [label, values, maximum, maximumLength] of [
-      ["notResponsibleFor", area.notResponsibleFor, 8, 80],
-      ["signals", area.signals, 12, 40],
-      ["neighbors", area.neighbors, 8, 80],
-    ]) {
-      if (
-        values.length > maximum
-        || values.some((value) => (
-          typeof value !== "string"
-          || value.length === 0
-          || value.length > maximumLength
-          || /[\r\n]/u.test(value)
-        ))
-      ) {
-        throw new Error(`area ${area.id}.${label} 超出有限契约`);
-      }
     }
     const relativeRoot = safeRelativeDirectory(area.root, `area ${area.id}.root`);
     const parentRoot = layerRoots.get(area.parentId);
@@ -106,6 +116,67 @@ async function validateArchitectureMap() {
   for (const area of parsed.areas) {
     if (area.neighbors.some((neighbor) => neighbor === area.id || !areaIds.has(neighbor))) {
       throw new Error(`area ${area.id} 包含无效相邻区域`);
+    }
+  }
+
+  const partitionIds = new Set();
+  const partitionRoots = new Set();
+  for (const partition of parsed.partitions) {
+    if (
+      !plainObject(partition)
+      || !exactKeys(partition, [
+        "id",
+        "parentId",
+        "root",
+        "responsibility",
+        "notResponsibleFor",
+        "signals",
+        "neighbors",
+      ])
+      || typeof partition.id !== "string"
+      || !/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/u.test(partition.id)
+      || partitionIds.has(partition.id)
+      || !areaIds.has(partition.parentId)
+      || typeof partition.responsibility !== "string"
+      || partition.responsibility.length === 0
+      || partition.responsibility.length > 120
+      || /[\r\n]/u.test(partition.responsibility)
+      || !validBoundedLines(partition.notResponsibleFor, 8, 80)
+      || !validBoundedLines(partition.signals, 12, 40)
+      || !validBoundedLines(partition.neighbors, 8, 80)
+    ) {
+      throw new Error("architecture-map.json 包含非法或重复 partition");
+    }
+    const relativeRoot = safeRelativeDirectory(
+      partition.root,
+      `partition ${partition.id}.root`,
+    );
+    const parentRoot = [...areaRoots.entries()].find(([, id]) => id === partition.parentId)?.[0];
+    const relativeToParent = parentRoot
+      ? path.posix.relative(parentRoot, relativeRoot)
+      : "";
+    if (
+      !parentRoot
+      || !relativeToParent
+      || relativeToParent === ".."
+      || relativeToParent.startsWith("../")
+      || partitionRoots.has(relativeRoot)
+    ) {
+      throw new Error(`partition ${partition.id} root 必须唯一且位于所属 area 内`);
+    }
+    const information = await stat(path.join(repositoryRoot, relativeRoot));
+    if (!information.isDirectory()) throw new Error(`partition ${partition.id} root 不是目录`);
+    partitionIds.add(partition.id);
+    partitionRoots.add(relativeRoot);
+  }
+
+  for (const partition of parsed.partitions) {
+    if (
+      partition.neighbors.some((neighbor) => (
+        neighbor === partition.id || !partitionIds.has(neighbor)
+      ))
+    ) {
+      throw new Error(`partition ${partition.id} 包含无效相邻分区`);
     }
   }
 
