@@ -362,4 +362,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 21, floor: 2, biome: "lake", role: "area-boss", randomEncounter: false, stages: [LAKE_BOSS_SCAN, LAKE_BOSS_SORT] },
   { monsterId: 22, floor: 2, biome: "swamp", role: "area-boss", randomEncounter: false, stages: [FROG_BOSS_LEFT, FROG_BOSS_DISTINCT] },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

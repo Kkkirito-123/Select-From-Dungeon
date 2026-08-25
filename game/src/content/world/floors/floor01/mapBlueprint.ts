@@ -22,4 +22,3 @@ slots: [
   mapSlot("floor-1-rest", 40, 24, 7, 10),
 ],
 } as const satisfies FloorMapBlueprint;
-

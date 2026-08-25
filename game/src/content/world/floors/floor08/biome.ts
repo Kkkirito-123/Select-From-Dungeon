@@ -142,4 +142,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 88, floor: 8, biome: "data-throne", role: "normal", randomEncounter: true, stages: [PRACTICE_GOLEM] },
   { monsterId: 89, floor: 8, biome: "void-court", role: "area-boss", randomEncounter: false, stages: [THRONE_BOSS_SCAN, THRONE_BOSS_CORE] },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

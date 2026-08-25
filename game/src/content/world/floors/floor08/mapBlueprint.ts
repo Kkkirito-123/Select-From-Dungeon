@@ -22,4 +22,3 @@ slots: [
   mapSlot("floor-8-event", 16, 12),
 ],
 } as const satisfies FloorMapBlueprint;
-

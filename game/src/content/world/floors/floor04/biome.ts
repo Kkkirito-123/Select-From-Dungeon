@@ -221,4 +221,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 43, floor: 4, biome: "storm-core", role: "normal", randomEncounter: true, stages: [PRACTICE_SPARK] },
   { monsterId: 44, floor: 4, biome: "frost-vault", role: "area-boss", randomEncounter: false, stages: [FORGE_BOSS_SCAN, FORGE_BOSS_CORE] },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

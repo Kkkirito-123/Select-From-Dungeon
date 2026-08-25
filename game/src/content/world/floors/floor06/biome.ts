@@ -205,4 +205,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 65, floor: 6, biome: "crystal-cavern", role: "normal", randomEncounter: true, stages: [PRACTICE_CRYSTAL_DRAKE] },
   { monsterId: 66, floor: 6, biome: "crystal-cavern", role: "area-boss", randomEncounter: false, stages: [DRAGON_BOSS_SCAN, DRAGON_BOSS_CORE] },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

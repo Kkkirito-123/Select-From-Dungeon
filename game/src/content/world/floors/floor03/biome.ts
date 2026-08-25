@@ -221,4 +221,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 32, floor: 3, biome: "spirit-crypt", role: "normal", randomEncounter: true, stages: [PRACTICE_WRAITH] },
   { monsterId: 33, floor: 3, biome: "grave-mire", role: "area-boss", randomEncounter: false, stages: [GRAVE_BOSS_SCAN, GRAVE_BOSS_CORE] },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

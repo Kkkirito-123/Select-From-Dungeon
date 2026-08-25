@@ -142,4 +142,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 8, floor: 1, biome: "ember-cellar", role: "normal", randomEncounter: true, stages: [PRACTICE_NULL] },
   { monsterId: 9, floor: 1, biome: "drainage", role: "mini-elite", randomEncounter: false, stages: PRACTICE_MIMIC },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

@@ -205,4 +205,3 @@ export const FLOOR_BIOME_ENCOUNTERS = [
   { monsterId: 54, floor: 5, biome: "black-citadel", role: "normal", randomEncounter: true, stages: [PRACTICE_TROLL] },
   { monsterId: 55, floor: 5, biome: "barracks", role: "area-boss", randomEncounter: false, stages: [IRON_BOSS_SCAN, IRON_BOSS_CORE] },
 ] as const satisfies readonly BiomeEncounterDefinition[];
-

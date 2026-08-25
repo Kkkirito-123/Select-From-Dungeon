@@ -22,4 +22,3 @@ slots: [
   mapSlot("floor-2-boss", 39, 24, 8, 8),
 ],
 } as const satisfies FloorMapBlueprint;
-
