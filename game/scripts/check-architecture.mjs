@@ -1,6 +1,12 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import {
+  extractModuleSpecifiers,
+  isFloorAggregatorPath,
+  resolveModuleSpecifier,
+  targetFloorNumber,
+} from "./architecture-imports.mjs";
 
 const root = process.cwd();
 const repositoryRoot = path.resolve(root, "..");
@@ -320,8 +326,7 @@ try {
 for (const rule of rules) {
   for (const file of await sourceFiles(rule.directory)) {
     const text = await readFile(path.join(root, file), "utf8");
-    const imports = [...text.matchAll(/from\s+["']([^"']+)["']/g)];
-    for (const [, specifier] of imports) {
+    for (const specifier of extractModuleSpecifiers(text)) {
       if (!rule.forbidden.some((segment) => specifier.includes(segment))) continue;
       violations.push(`${file}: ${specifier}（${rule.message}）`);
     }
@@ -337,15 +342,35 @@ for (const file of await sourceFiles("src")) {
     || /\/content\/world\/floorExperience\/index\.ts$/u.test(normalizedFile)
   );
   const text = await readFile(path.join(root, file), "utf8");
-  const imports = [...text.matchAll(/from\s+["']([^"']+)["']/g)];
-  for (const [, specifier] of imports) {
-    const targetFloor = /(?:^|\/)floor(0[1-8])(?:\/|$)/u.exec(specifier)?.[1] ?? null;
+  for (const specifier of extractModuleSpecifiers(text)) {
+    const resolvedTarget = resolveModuleSpecifier(normalizedFile, specifier);
+    const targetFloor = targetFloorNumber(resolvedTarget)
+      ?? /(?:^|\/)floor(0[1-8])(?:\/|$)/u.exec(specifier)?.[1]
+      ?? null;
     if (!targetFloor) continue;
-    if (sourceFloor && sourceFloor === targetFloor) continue;
+    if (sourceFloor && sourceFloor === targetFloor) {
+      if (isFloorAggregatorPath(resolvedTarget)) {
+        violations.push(
+          `${file}: ${specifier}（楼层子单元不得反向依赖 registry/index/聚合器；共同逻辑必须由 shared 提供）`,
+        );
+      }
+      continue;
+    }
     if (!sourceFloor && isFloorRegistry) continue;
     violations.push(
       `${file}: ${specifier}（楼层子单元不得引用兄弟楼层；共同逻辑必须上提 shared，由 registry 装配）`,
     );
+  }
+
+  if (sourceFloor) {
+    for (const specifier of extractModuleSpecifiers(text)) {
+      const resolvedTarget = resolveModuleSpecifier(normalizedFile, specifier);
+      if (isFloorAggregatorPath(resolvedTarget)) {
+        violations.push(
+          `${file}: ${specifier}（楼层子单元不得反向依赖 registry/index/聚合器；共同逻辑必须由 shared 提供）`,
+        );
+      }
+    }
   }
 }
 
