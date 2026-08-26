@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "transaction-sandbox-state-leak",
+  "category": "advanced-sql-endgame",
+  "prompt": "第六层每回合 SQL 应该只在一次性副本执行，但前一回合插入的 claw 记录会污染下一回合结果。请修复沙箱生命周期，确保每次提交从永久基线复制。",
+  "evidenceSummary": "先 INSERT 再 UPDATE，第二次回合仍能观察到第一回合新增记录。",
+  "startFloor": 6,
+  "startPreset": "f6-admin-entry",
+  "timeoutMs": 600000
+}

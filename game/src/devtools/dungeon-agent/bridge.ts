@@ -1,5 +1,5 @@
 /**
- * SQL Dungeon 专用的开发态协议 v2 浏览器桥装配器。
+ * SQL Dungeon 专用的开发态协议 v3 浏览器桥装配器。
  *
  * 本文件只把协议方法组合到当前临时 GameSession：它维护快照订阅、一次性检查点、有限
  * Trace、隐藏 judge 缓存和 `window.__DUNGEON_PLAYTEST__` 的安装/清理。DOM 动作、玩家投影、
@@ -83,6 +83,11 @@ function judgeSnapshot(snapshot: GameSnapshot): DungeonAgentJudge {
     migrationSteps: migration.completedStepIds.length,
     migrationComplete: migration.complete,
     advanced: false,
+    stageIndex: snapshot.lessonStageIndex,
+    claimableReward: snapshot.claimableReward?.id ?? null,
+    bossHp: boss?.hp ?? null,
+    victories: snapshot.profile.victories,
+    guidanceDistance: snapshot.navigationGuidance.distance,
   };
 }
 
@@ -131,7 +136,7 @@ export function dungeonAgentInteractionFingerprint(
 }
 
 /**
- * 安装绑定当前临时 GameSession 的协议 v2 桥。
+ * 安装绑定当前临时 GameSession 的协议 v3 桥。
  *
  * @param options 已挂载的游戏根节点、Session、SQL 引擎和经三重入口校验的启动参数。
  * @returns 清理函数；调用后取消订阅并仅移除本次安装的全局桥。
@@ -189,8 +194,14 @@ export function installDungeonAgentBridge(
   });
 
   const bridge: DungeonPlaytestBridge = {
-    version: 2,
+    version: 3,
     checkpointRestored: options.checkpointRestored,
+    prepare(presetId) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(presetId)) return false;
+      const prepared = options.session.adminApplyPreset(presetId).ok;
+      if (prepared) usedInteractions.clear();
+      return prepared;
+    },
     checkpoint() {
       const saved = Boolean(
         options.checkpointStorage

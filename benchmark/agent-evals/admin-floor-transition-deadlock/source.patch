@@ -1,0 +1,12 @@
+diff --git a/game/src/domain/session/progression/floorCompletion.ts b/game/src/domain/session/progression/floorCompletion.ts
+--- a/game/src/domain/session/progression/floorCompletion.ts
++++ b/game/src/domain/session/progression/floorCompletion.ts
+@@ -14,7 +14,7 @@ export function isReadOnlyAdminPreview(
+   adminMode: boolean,
+   agentPlaytestMode: boolean,
+ ): boolean {
+-  return adminMode && !agentPlaytestMode;
++  return adminMode;
+ }
+ 
+ export interface CampaignVictoryInput {

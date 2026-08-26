@@ -164,7 +164,7 @@ Agent 数据库或输出 Store。
 内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
 
-`src/devtools/dungeon-agent/` 负责外部维护器协议 v2，并且始终只在开发态使用：`protocol.ts` 负责
+`src/devtools/dungeon-agent/` 负责外部维护器协议 v3，维护器保留 v2 兼容适配，并且始终只在开发态使用：`protocol.ts` 负责
 协议类型与临时存储，`actions.ts` 负责固定 DOM 动作和可见覆盖层，`projection.ts` 负责玩家可见投影，
 `navigation.ts` 负责页面内部目标/frontier BFS 与停止原因，`query.ts` 负责浏览器内部固定查询执行，
 `trace.ts` 负责有限语义环形 Trace，`bridge.ts` 只负责协议生命周期装配。`src/application/main.ts` 只能
@@ -228,19 +228,23 @@ F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤�
 
 ## 游戏工程地图
 
-机器可读路由权威是 `../.maintainer/architecture-map.json`。schema v3 在稳定 layer/area/partition 之外
-登记八个跨层 `floorScopes`；它是路由数据，不是代码或文件索引。普通文件变化无需更新地图。
+机器可读路由权威是游戏拥有的 `../.maintainer/architecture-map.json`。schema v4 在稳定
+layer/area/partition 与八个 `floorScopes` 之上增加跨层 `features`、有限运行契约和稳定边界签名。
+feature/floor root 只登记稳定目录，不登记文件或 Glob。普通文件和内部子目录变化无需更新地图；
+稳定 root、职责或 route 变化才递增边界 revision 并更新签名。
 
-正常 Inspect 依次搜索当前楼层、直接相邻楼层、父级共享 partition；area/仓库只作失败开放回退。
-每个楼层 scope 可包含同编号的内容与表现目录，但楼层子单元不得引用兄弟楼层。共同算法和服务必须
-上提到父级 shared partition，由唯一 registry 装配后单向提供给子单元。`neighbors` 仅允许前后一层，
-不表示运行时依赖。`GameSession` 继续是唯一状态提交者，楼层模块不得各自持有第二份可变会话状态。
+正常 Inspect 先按功能路由，并把楼层作为可选上下文；依次扩展 feature 的 primary、adjacent、shared、
+fallback root，最后才失败开放到 area/仓库。维护器会把旧 schema v1-v3 规范化；核心地图非法时回退
+普通安全搜索。每个楼层 scope 可包含同编号的内容目录，但楼层子单元不得引用兄弟楼层。共同算法和
+服务必须上提到父级服务 partition，由唯一 registry 装配后单向提供给子单元。`neighbors` 不表示运行时
+依赖。`GameSession` 继续是唯一状态提交者，战斗命中等聚焦规则下沉到子服务，楼层模块不得持有第二份
+可变会话状态。
 
 ```text
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
 src/application/        启动、运行时配置与页面生命周期
-src/content/            课程、世界、剧情、背包与 SQL 静态内容
-src/domain/             Session 门面/辅助模块、战斗、探索、学习、成长、背包与共享规则
+src/content/            课程、世界、剧情、背包与 SQL 静态内容；楼层作者数据位于 */floors/floorNN
+src/domain/             Session 门面/聚焦服务、战斗、探索、学习、成长、背包与共享规则
 src/infrastructure/     音频、反馈、SQLite、存档编解码/迁移与浏览器适配器
 src/presentation/       Phaser 场景、DOM 应用视图与职责明确的渲染器
 src/devtools/           仅开发态外部维护器桥；生产入口不得导入

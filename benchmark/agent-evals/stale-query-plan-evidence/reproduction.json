@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "stale-query-plan-evidence",
+  "steps": [
+    { "op": "go", "target": "objective", "maxSteps": 64 },
+    { "op": "use", "actionId": "terminal" },
+    { "op": "input-sql", "inputRef": "indexed-query" },
+    { "op": "query" }
+  ]
+}

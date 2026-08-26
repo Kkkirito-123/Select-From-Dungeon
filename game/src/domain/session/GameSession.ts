@@ -166,6 +166,16 @@ import { interactionFailure, travelFailure } from "./sessionInteraction";
 import { inventoryFailure } from "./sessionInventory";
 import { emptyTurn } from "./sessionCombat";
 import {
+  advanceCombatSuccessStep,
+  resolveCombatHit,
+} from "./combat/resolveCombatHit";
+import { livingRequiredBoss } from "./progression/regionAccess";
+import {
+  isReadOnlyAdminPreview,
+  resolveCampaignVictory,
+} from "./progression/floorCompletion";
+import { resolveLessonCompletion } from "./learning/lessonCompletion";
+import {
   applyExperienceSettlement,
   experienceForRank,
   levelForXp,
@@ -563,7 +573,7 @@ export class GameSession {
       questionBankVersion: this.questionBankVersion,
       mode: this.mode,
       adminMode: this.adminMode,
-      exposeAdminAnswer: this.adminMode && !this.agentPlaytestMode,
+      exposeAdminAnswer: isReadOnlyAdminPreview(this.adminMode, this.agentPlaytestMode),
       adminPanelOpen: this.adminPanelOpen,
       adminIdentityMonsterIds: this.adminIdentityMonsterIds,
       regionTransfer: this.regionTransfer,
@@ -1679,13 +1689,16 @@ export class GameSession {
       const target = this.monsters.find((entry) => entry.id === this.combat?.targetId);
       const mimicAccepted = target?.id === FLOOR_ONE_MIMIC_MONSTER_ID && evaluation.accepted;
       if (target && target.hp > 0 && (evaluation.attackTargetIds.includes(target.id) || mimicAccepted)) {
-        const nextSuccessStep = this.combat.successStep + 1;
-        const minimumHp = nextSuccessStep < combatStages.length ? 1 : 0;
-        const rawDamage = Math.max(1, this.player.weapon.damage - target.armor);
-        const damage = nextSuccessStep >= combatStages.length
-          ? target.hp
-          : Math.min(rawDamage, Math.max(1, target.hp - minimumHp));
-        target.hp = Math.max(minimumHp, target.hp - damage);
+        const nextSuccessStep = advanceCombatSuccessStep(this.combat.successStep);
+        const hit = resolveCombatHit({
+          currentHp: target.hp,
+          weaponDamage: this.player.weapon.damage,
+          armor: target.armor,
+          nextSuccessStep,
+          totalStages: combatStages.length,
+        });
+        const damage = hit.damage;
+        target.hp = hit.remainingHp;
         hpUpdates.push({ id: target.id, hp: target.hp });
         events.push({ type: "player-hit", targetId: target.id, amount: damage });
         this.combat.successStep = nextSuccessStep;
@@ -1886,7 +1899,7 @@ export class GameSession {
    */
   advanceFloor(): boolean {
     if (
-      (this.adminMode && !this.agentPlaytestMode) ||
+      isReadOnlyAdminPreview(this.adminMode, this.agentPlaytestMode) ||
       this.mode !== "transition" ||
       this.floorNumber >= 8
     ) return false;
@@ -2096,9 +2109,7 @@ export class GameSession {
     ));
     const guardian = rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined
       ? null
-      : this.monsters.find((monster) => (
-          monster.id === rearPortal.requiredBossId && monster.hp > 0
-        )) ?? null;
+      : livingRequiredBoss(this.monsters, rearPortal.requiredBossId);
     const middleRegion = rearPortal
       ? this.biomePlan.regions.find((region) => region.id === rearPortal.fromRegionId)
       : null;
@@ -2130,9 +2141,9 @@ export class GameSession {
     if (rearPortal?.requiredBossId === null || rearPortal?.requiredBossId === undefined) {
       return null;
     }
-    return this.monsters.some((monster) => (
-      monster.id === rearPortal.requiredBossId && monster.hp > 0
-    )) ? rearPortal.toRegionId : null;
+    return livingRequiredBoss(this.monsters, rearPortal.requiredBossId)
+      ? rearPortal.toRegionId
+      : null;
   }
 
   private guidanceRoute(target: Position): Position[] {
@@ -2770,7 +2781,7 @@ export class GameSession {
 
   private completeFloorKeyCollection(openedBattleChest: boolean): string {
     const prefix = openedBattleChest ? "打开战利品宝箱，" : "";
-    if (this.adminMode && !this.agentPlaytestMode) {
+    if (isReadOnlyAdminPreview(this.adminMode, this.agentPlaytestMode)) {
       this.mode = "explore";
       return `${prefix}管理员预览已击败第 ${this.floorNumber} 层层主；不会推进或写入正式 Run。`;
     }
@@ -2783,21 +2794,16 @@ export class GameSession {
   }
 
   private completeCampaignVictory(): void {
-    const completion = advanceCampaignProgress(this.campaign);
-    if (
-      !completion.ok ||
-      !completion.completed ||
-      completion.from !== 8 ||
-      completion.to !== 8
-    ) {
-      throw new Error("第八层终局无法提交：Campaign 状态与当前楼层不一致。");
-    }
-    this.campaign = completion.progress;
+    const completion = resolveCampaignVictory({
+      campaign: this.campaign,
+      victories: this.profile.victories,
+      bestRunQueries: this.profile.bestRunQueries,
+      queryCount: this.queryCount,
+    });
+    this.campaign = completion.campaign;
     this.mode = "victory";
-    this.profile.victories += 1;
-    this.profile.bestRunQueries = this.profile.bestRunQueries === null
-      ? this.queryCount
-      : Math.min(this.profile.bestRunQueries, this.queryCount);
+    this.profile.victories = completion.victories;
+    this.profile.bestRunQueries = completion.bestRunQueries;
   }
 
   private completeAmbush(
@@ -2894,11 +2900,18 @@ export class GameSession {
     _events: CombatEvent[],
     experienceMessage: string,
   ): void {
-    this.completedLessons.add(lesson.id);
-    this.completedRoomIds.add(this.currentRoomId);
-    if (!this.profile.masteredLessons.includes(lesson.id)) {
-      this.profile.masteredLessons.push(lesson.id);
-    }
+    const completion = resolveLessonCompletion({
+      lessonId: lesson.id,
+      roomId: this.currentRoomId,
+      completedLessons: this.completedLessons,
+      completedRoomIds: this.completedRoomIds,
+      masteredLessons: this.profile.masteredLessons,
+      monsters: this.monsters,
+    });
+    this.completedLessons = completion.completedLessons;
+    this.completedRoomIds = completion.completedRoomIds;
+    this.profile.masteredLessons = completion.masteredLessons;
+    this.monsters = completion.monsters;
     this.combat = null;
     this.selectedMonsterId = null;
     this.mode = "explore";
@@ -3077,22 +3090,25 @@ export class GameSession {
     this.regionTransfer = null;
     this.hintLevel = 0;
 
-    const progressedRoomIds = new Set<string>([
+    const completedRoomIds = new Set<string>([
       this.graph.entryId,
-      focusLandmark.anchor.roomNodeId,
+      ...(preset.keepFocusRoomIncomplete ? [] : [focusLandmark.anchor.roomNodeId]),
       ...this.graph.nodes
         .filter((room) => room.lessonId && completedLessons.has(room.lessonId))
         .map((room) => room.id),
     ]);
-    this.visitedRoomIds = new Set(progressedRoomIds);
-    this.completedRoomIds = new Set(progressedRoomIds);
+    this.visitedRoomIds = new Set([
+      ...completedRoomIds,
+      focusLandmark.anchor.roomNodeId,
+    ]);
+    this.completedRoomIds = new Set(completedRoomIds);
     this.groundItems = initialGroundItems(
       this.graph,
       this.mazeFloor,
       this.campfires,
       this.guidedMap,
     ).filter(
-      (item) => isFloorOneChestItem(item) || !progressedRoomIds.has(item.sourceRoomId),
+      (item) => isFloorOneChestItem(item) || !completedRoomIds.has(item.sourceRoomId),
     );
     this.lootBundles = [];
     this.ensureOpenedHiddenAreaRewards();
@@ -4012,9 +4028,7 @@ export class GameSession {
   ): string | null {
     const guardianId = biomeGuardianIdForStep(this.biomePlan, from, to);
     if (guardianId === null) return null;
-    const guardian = this.monsters.find(
-      (monster) => monster.id === guardianId && monster.hp > 0,
-    );
+    const guardian = livingRequiredBoss(this.monsters, guardianId);
     if (!guardian) return null;
     const transit = floorTransitPresentation(
       floorMapBlueprint(this.floorNumber).routeTransit,
@@ -4185,9 +4199,7 @@ export class GameSession {
       ));
       const boss = regionPortal.portal.requiredBossId === null
         ? null
-        : this.monsters.find(
-            (monster) => monster.id === regionPortal.portal.requiredBossId && monster.hp > 0,
-          );
+        : livingRequiredBoss(this.monsters, regionPortal.portal.requiredBossId);
       return boss && regionPortal.side === "entry"
         ? `E  ${transit.label}未开放 · 先击败 ${monsterIdLabel(boss.id)}`
         : `E  ${transit.action}${transit.label} · 前往${targetRegion?.name ?? "相邻区域"}`;

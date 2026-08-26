@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "terminal-action-bug",
+  "steps": [
+    {
+      "op": "go",
+      "target": "objective",
+      "maxSteps": 64
+    },
+    {
+      "op": "use",
+      "actionId": "terminal"
+    }
+  ]
+}

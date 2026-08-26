@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "terminal-action-bug",
+  "secretInputs": {},
+  "beforeOracle": "terminal-action-unavailable",
+  "afterOracle": "terminal-action-available",
+  "requiredChecks": [
+    "game-test",
+    "game-architecture",
+    "game-build"
+  ],
+  "forbiddenPaths": [
+    ".env",
+    ".env.local",
+    ".git"
+  ]
+}

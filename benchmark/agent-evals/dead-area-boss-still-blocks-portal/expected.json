@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "dead-area-boss-still-blocks-portal",
+  "secretInputs": {},
+  "beforeOracle": "guidance-route-missing",
+  "afterOracle": "guidance-route-available",
+  "requiredChecks": ["game-test", "game-architecture", "game-build"],
+  "forbiddenPaths": [".env", ".env.local", ".git"]
+}

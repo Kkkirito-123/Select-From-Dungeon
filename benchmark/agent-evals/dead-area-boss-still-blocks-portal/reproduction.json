@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "dead-area-boss-still-blocks-portal",
+  "steps": [
+    { "op": "wait", "milliseconds": 10 }
+  ]
+}

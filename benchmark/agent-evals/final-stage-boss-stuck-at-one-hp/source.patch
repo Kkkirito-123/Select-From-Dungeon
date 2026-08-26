@@ -1,0 +1,12 @@
+diff --git a/game/src/domain/session/combat/resolveCombatHit.ts b/game/src/domain/session/combat/resolveCombatHit.ts
+--- a/game/src/domain/session/combat/resolveCombatHit.ts
++++ b/game/src/domain/session/combat/resolveCombatHit.ts
+@@ -24,7 +24,7 @@ export interface CombatHitResolution {
+  * @returns 不修改输入的生命结算结果。
+  */
+ export function resolveCombatHit(input: CombatHitInput): CombatHitResolution {
+-  const minimumHp = input.nextSuccessStep < input.totalStages ? 1 : 0;
++  const minimumHp = 1;
+   const rawDamage = Math.max(1, input.weaponDamage - input.armor);
+   const damage = input.nextSuccessStep >= input.totalStages
+     ? input.currentHp

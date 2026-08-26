@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "stale-query-plan-evidence",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "1a4c3a26827eb87cdc7eb501d9b9d0c5475656f4ad219473e65668e73627b18a",
+  "dirtyPaths": ["game/src/infrastructure/sql/SqlEngine.ts"]
+}

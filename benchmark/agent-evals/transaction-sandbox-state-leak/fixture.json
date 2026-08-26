@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "transaction-sandbox-state-leak",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "f759d90d26a0e4e437ea5c03f127d10500dbb26a70e2b20a1b897d81c0ac8f1a",
+  "dirtyPaths": ["game/src/infrastructure/sql/SqlEngine.ts"]
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "boss-hp-reset-after-death",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "fe1d4ae3bce857ea11c8784dffc8c20068ba6aeab931bbda8dc6ec887129634b",
+  "dirtyPaths": ["game/src/domain/session/learning/lessonCompletion.ts"]
+}

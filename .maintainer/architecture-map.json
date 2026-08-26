@@ -1,6 +1,9 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
+  "contractId": "dungeon.game.architecture",
+  "contractVersion": 1,
   "projectRoot": "game",
+  "boundaryRevision": 1,
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
     { "id": "application", "root": "game/src/application", "responsibility": "启动、用例编排、运行时配置和页面生命周期" },
@@ -293,6 +296,33 @@
       "neighbors": ["content.world.floor-experience", "presentation.phaser.world"]
     },
     {
+      "id": "domain.session.combat",
+      "parentId": "domain.session",
+      "root": "game/src/domain/session/combat",
+      "responsibility": "GameSession 战斗命中、阶段与生命结算的纯服务",
+      "notResponsibleFor": ["Session 状态提交", "SQL 执行", "战斗画面"],
+      "signals": ["生命下限", "最终阶段", "combat hit", "remaining hp"],
+      "neighbors": []
+    },
+    {
+      "id": "domain.session.learning",
+      "parentId": "domain.session",
+      "root": "game/src/domain/session/learning",
+      "responsibility": "GameSession 课程完成、学习事实与奖励前置状态的纯服务",
+      "notResponsibleFor": ["SQL 判题", "Session 状态提交", "课程作者正文"],
+      "signals": ["课程完成", "奖励缺失", "mastered lesson", "lesson completion"],
+      "neighbors": ["domain.session.combat", "domain.session.progression"]
+    },
+    {
+      "id": "domain.session.progression",
+      "parentId": "domain.session",
+      "root": "game/src/domain/session/progression",
+      "responsibility": "GameSession 楼层门禁、管理员预览和终局提交的纯服务",
+      "notResponsibleFor": ["地图绘制", "Session 状态提交", "存储实现"],
+      "signals": ["区域首领门禁", "管理员换层", "最终胜利", "重复提交"],
+      "neighbors": ["domain.session.combat", "domain.session.learning"]
+    },
+    {
       "id": "presentation.dom.focus",
       "parentId": "presentation.dom",
       "root": "game/src/presentation/dom/focus",
@@ -360,74 +390,320 @@
     {
       "id": "floor.01",
       "floor": 1,
-      "roots": ["game/src/content/world/floors/floor01"],
+      "roots": [
+        "game/src/content/world/floors/floor01",
+        "game/src/content/world/floorExperience/floors/floor01",
+        "game/src/content/curriculum/floors/floor01"
+      ],
       "responsibility": "第一层 SQL 入门世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第一层", "floor 1", "select from", "where clause", "is null", "档案水轮"],
       "neighbors": ["floor.02"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.02",
       "floor": 2,
-      "roots": ["game/src/content/world/floors/floor02"],
+      "roots": [
+        "game/src/content/world/floors/floor02",
+        "game/src/content/world/floorExperience/floors/floor02",
+        "game/src/content/curriculum/floors/floor02"
+      ],
       "responsibility": "第二层 JOIN 世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第二层", "floor 2", "order by", "distinct", "inner join", "沉水村落"],
       "neighbors": ["floor.01", "floor.03"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.03",
       "floor": 3,
-      "roots": ["game/src/content/world/floors/floor03"],
+      "roots": [
+        "game/src/content/world/floors/floor03",
+        "game/src/content/world/floorExperience/floors/floor03",
+        "game/src/content/curriculum/floors/floor03"
+      ],
       "responsibility": "第三层关系链世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第三层", "floor 3", "self join", "union all", "relation chain", "骨桥"],
       "neighbors": ["floor.02", "floor.04"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.04",
       "floor": 4,
-      "roots": ["game/src/content/world/floors/floor04"],
+      "roots": [
+        "game/src/content/world/floors/floor04",
+        "game/src/content/world/floorExperience/floors/floor04",
+        "game/src/content/curriculum/floors/floor04"
+      ],
       "responsibility": "第四层聚合世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第四层", "floor 4", "group by", "having", "aggregate query", "熔炉"],
       "neighbors": ["floor.03", "floor.05"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.05",
       "floor": 5,
-      "roots": ["game/src/content/world/floors/floor05"],
+      "roots": [
+        "game/src/content/world/floors/floor05",
+        "game/src/content/world/floorExperience/floors/floor05",
+        "game/src/content/curriculum/floors/floor05"
+      ],
       "responsibility": "第五层窗口函数世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第五层", "floor 5", "window over", "row number", "dense rank", "巡逻"],
       "neighbors": ["floor.04", "floor.06"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.06",
       "floor": 6,
-      "roots": ["game/src/content/world/floors/floor06"],
+      "roots": [
+        "game/src/content/world/floors/floor06",
+        "game/src/content/world/floorExperience/floors/floor06",
+        "game/src/content/curriculum/floors/floor06"
+      ],
       "responsibility": "第六层写事务世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第六层", "floor 6", "insert into", "update where", "delete where", "transaction rollback"],
       "neighbors": ["floor.05", "floor.07"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.07",
       "floor": 7,
-      "roots": ["game/src/content/world/floors/floor07"],
+      "roots": [
+        "game/src/content/world/floors/floor07",
+        "game/src/content/world/floorExperience/floors/floor07",
+        "game/src/content/curriculum/floors/floor07"
+      ],
       "responsibility": "第七层索引世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第七层", "floor 7", "btree", "composite index", "covering index", "执行计划"],
       "neighbors": ["floor.06", "floor.08"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     },
     {
       "id": "floor.08",
       "floor": 8,
-      "roots": ["game/src/content/world/floors/floor08"],
+      "roots": [
+        "game/src/content/world/floors/floor08",
+        "game/src/content/world/floorExperience/floors/floor08",
+        "game/src/content/curriculum/floors/floor08"
+      ],
       "responsibility": "第八层综合迁移世界内容与楼层专属地标、生态和地图作者数据",
       "signals": ["第八层", "floor 8", "MVCC", "deadlock", "isolation level", "replication lag", "sharding", "零行礼拜堂", "终局迁移"],
       "neighbors": ["floor.07"],
-      "sharedPartitions": ["content.world.floors-shared"]
+      "sharedPartitions": ["content.world.floors-shared"],
+      "contentRefs": ["content.curriculum", "content.world", "content.world.floor-experience"],
+      "serviceRefs": ["domain.session", "domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "featureRefs": ["feature.floor-content", "feature.world-navigation", "feature.combat-resolution", "feature.lesson-evaluation"]
     }
-  ]
+  ],
+  "features": [
+    {
+      "id": "feature.floor-content",
+      "roots": ["content.curriculum", "content.world.floor-experience", "content.world", "domain.progression", "presentation.phaser.world"],
+      "responsibility": "逐层课程、世界体验、地标与楼层作者内容的组合和定位",
+      "notResponsibleFor": ["跨层状态提交", "SQL 执行"],
+      "signals": ["楼层内容", "楼层配置", "地标配置", "楼层体验", "作者内容", "floor content"],
+      "negativeSignals": ["刷新后丢失", "事务泄漏"],
+      "neighbors": ["domain.progression", "domain.exploration", "presentation.phaser.world"],
+      "route": {
+        "primary": ["content.curriculum", "content.world.floor-experience"],
+        "adjacent": ["content.world"],
+        "shared": ["domain.progression"],
+        "fallback": ["presentation.phaser.world"]
+      },
+      "contentRefs": ["content.curriculum", "content.world"],
+      "serviceProviders": ["domain.progression", "domain.exploration"]
+    },
+    {
+      "id": "feature.combat-resolution",
+      "roots": ["domain.session.combat", "domain.session", "domain.combat", "domain.learning", "infrastructure.sql", "content.curriculum"],
+      "responsibility": "战斗 SQL 阶段、伤害、生命下限、死亡与胜负状态提交",
+      "notResponsibleFor": ["战斗画面", "怪物美术"],
+      "signals": ["最终阶段生命下限", "永远剩余 1 HP", "boss hp", "无法结算", "区域层主", "战斗阶段", "boss 无法死亡", "生命下限"],
+      "negativeSignals": ["只修改战斗画面", "血条样式"],
+      "neighbors": ["domain.learning", "infrastructure.sql", "content.curriculum"],
+      "route": {
+        "primary": ["domain.session.combat", "domain.session"],
+        "adjacent": ["domain.combat", "domain.learning", "infrastructure.sql"],
+        "shared": ["content.curriculum"],
+        "fallback": []
+      },
+      "contentRefs": ["content.curriculum"],
+      "serviceProviders": ["domain.session", "domain.combat", "domain.learning"]
+    },
+    {
+      "id": "feature.lesson-evaluation",
+      "roots": ["domain.session.combat", "domain.session.learning", "domain.learning", "domain.session", "infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
+      "responsibility": "题目提示、SQL 判定、正确查询推进与学习记录",
+      "notResponsibleFor": ["SQLite 沙箱事务", "终端视觉样式"],
+      "signals": ["正确查询没有推进", "答案提示被拒绝", "判题失败", "课程没有完成", "accepted query", "hint rejected", "学习阶段"],
+      "negativeSignals": ["事务状态泄漏", "执行计划过期"],
+      "neighbors": ["infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
+      "route": {
+        "primary": ["domain.session.combat", "domain.session.learning"],
+        "adjacent": ["domain.learning", "domain.session", "infrastructure.sql"],
+        "shared": ["content.curriculum"],
+        "fallback": ["presentation.dom.panels"]
+      },
+      "contentRefs": ["content.curriculum"],
+      "serviceProviders": ["domain.session.combat", "domain.session.learning", "domain.learning", "domain.session"]
+    },
+    {
+      "id": "feature.reward-gating",
+      "roots": ["domain.session.learning", "domain.session.progression", "domain.session", "domain.progression", "domain.inventory", "content.inventory", "content.world", "presentation.dom.panels"],
+      "responsibility": "课程奖励、宝箱、钥匙、区域首领与传送门门禁",
+      "notResponsibleFor": ["背包视觉布局", "地图绘制"],
+      "signals": ["奖励缺失", "宝箱没有出现", "课程完成奖励", "区域首领已死仍阻挡", "传送门仍锁定", "reward missing", "portal blocked"],
+      "negativeSignals": ["随机掉落概率"],
+      "neighbors": ["domain.inventory", "content.inventory", "content.world"],
+      "route": {
+        "primary": ["domain.session.learning", "domain.session.progression"],
+        "adjacent": ["domain.session", "domain.progression", "domain.inventory"],
+        "shared": ["content.inventory", "content.world"],
+        "fallback": ["presentation.dom.panels"]
+      },
+      "contentRefs": ["content.inventory", "content.world"],
+      "serviceProviders": ["domain.session.learning", "domain.session.progression", "domain.session", "domain.progression", "domain.inventory"]
+    },
+    {
+      "id": "feature.transition-persistence",
+      "roots": ["domain.session.progression", "domain.session", "domain.progression", "infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom"],
+      "responsibility": "换层状态、自动传送、保存、刷新恢复和重复提交边界",
+      "notResponsibleFor": ["楼层作者正文", "IndexedDB UI"],
+      "signals": ["切换后丢失", "刷新后回到上一层", "transition lost", "重复最终胜利", "重复提交胜利", "自动传送失败", "reload", "持久化"],
+      "negativeSignals": ["地图地标配置"],
+      "neighbors": ["infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom"],
+      "route": {
+        "primary": ["domain.session.progression", "domain.session"],
+        "adjacent": ["domain.progression", "infrastructure.storage"],
+        "shared": ["contracts.storage"],
+        "fallback": ["application.runtime", "presentation.dom"]
+      },
+      "contentRefs": [],
+      "serviceProviders": ["domain.session.progression", "domain.session", "domain.progression", "contracts.storage"]
+    },
+    {
+      "id": "feature.sql-execution-plan",
+      "roots": ["infrastructure.sql", "domain.learning", "content.sql", "content.curriculum", "domain.session"],
+      "responsibility": "SQLite 沙箱事务、查询执行与执行计划证据",
+      "notResponsibleFor": ["课程文案", "终端按钮事件"],
+      "signals": ["事务沙箱状态泄漏", "transaction sandbox", "执行计划过期", "stale query plan", "query plan", "rollback", "sqlite"],
+      "negativeSignals": ["终端动作不可用"],
+      "neighbors": ["domain.learning", "content.sql", "content.curriculum"],
+      "route": {
+        "primary": ["infrastructure.sql", "domain.learning"],
+        "adjacent": ["content.sql"],
+        "shared": ["content.curriculum"],
+        "fallback": ["domain.session"]
+      },
+      "contentRefs": ["content.sql", "content.curriculum"],
+      "serviceProviders": ["infrastructure.sql", "domain.learning"]
+    },
+    {
+      "id": "feature.terminal-action",
+      "roots": ["devtools.dungeon-agent", "domain.session", "presentation.dom.panels", "contracts.game"],
+      "responsibility": "开发态终端进入、可见 SQL 动作和维护器语义桥",
+      "notResponsibleFor": ["隐藏答案", "生产控制入口"],
+      "signals": ["终端动作不可用", "terminal action", "点击后不可用", "动作不可用", "维护器工具", "bridge", "SQL 终端"],
+      "negativeSignals": ["事务沙箱", "执行计划"],
+      "neighbors": ["domain.session", "presentation.dom.panels", "contracts.game"],
+      "route": {
+        "primary": ["devtools.dungeon-agent"],
+        "adjacent": ["domain.session", "presentation.dom.panels"],
+        "shared": ["contracts.game"],
+        "fallback": []
+      },
+      "contentRefs": [],
+      "serviceProviders": ["domain.session", "contracts.game"]
+    },
+    {
+      "id": "feature.admin-playtest",
+      "roots": ["domain.session.progression", "devtools.dungeon-agent", "domain.session", "application.runtime", "contracts.game", "presentation.dom"],
+      "responsibility": "管理员/Benchmark 预设、楼层装载与开发态恢复流程",
+      "notResponsibleFor": ["生产作弊入口", "任意脚本执行"],
+      "signals": ["管理员换层", "admin floor", "admin preset", "管理员模式", "测试预设", "admin transition"],
+      "negativeSignals": ["普通玩家换层"],
+      "neighbors": ["application.runtime", "contracts.game", "presentation.dom"],
+      "route": {
+        "primary": ["domain.session.progression", "devtools.dungeon-agent"],
+        "adjacent": ["domain.session", "application.runtime"],
+        "shared": ["contracts.game"],
+        "fallback": ["presentation.dom"]
+      },
+      "contentRefs": [],
+      "serviceProviders": ["domain.session.progression", "domain.session", "application.runtime", "contracts.game"]
+    },
+    {
+      "id": "feature.world-navigation",
+      "roots": ["domain.exploration", "domain.session", "content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
+      "responsibility": "世界移动、区域边界、路径、地标交互与空间表现",
+      "notResponsibleFor": ["课程判题", "存档迁移"],
+      "signals": ["地图卡住", "区域边界", "无法移动", "路径错误", "地标无法交互", "world navigation", "portal path"],
+      "negativeSignals": ["刷新后丢失"],
+      "neighbors": ["content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
+      "route": {
+        "primary": ["domain.exploration", "domain.session"],
+        "adjacent": ["content.world"],
+        "shared": ["presentation.phaser.world", "presentation.phaser.interaction"],
+        "fallback": []
+      },
+      "contentRefs": ["content.world"],
+      "serviceProviders": ["domain.exploration", "domain.session"]
+    },
+    {
+      "id": "feature.rendering",
+      "roots": ["presentation.phaser.world", "presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.renderers", "presentation.dom.panels", "presentation.styles", "presentation.dom", "presentation.phaser"],
+      "responsibility": "Phaser 世界/角色/效果与 DOM 面板的只读快照表现",
+      "notResponsibleFor": ["领域状态修改", "存储写入"],
+      "signals": ["显示错误", "界面不更新", "phaser 渲染", "hud", "面板显示", "角色显示", "视觉效果"],
+      "negativeSignals": ["状态没有更新", "刷新后丢失"],
+      "neighbors": ["presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.panels"],
+      "route": {
+        "primary": ["presentation.phaser.world", "presentation.dom.renderers"],
+        "adjacent": ["presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.panels"],
+        "shared": ["presentation.styles"],
+        "fallback": ["presentation.dom", "presentation.phaser"]
+      },
+      "contentRefs": [],
+      "serviceProviders": ["presentation.dom", "presentation.phaser"]
+    }
+  ],
+  "runtime": {
+    "sourceRoot": "game",
+    "bridgeProtocol": 3,
+    "adapterVersion": 1,
+    "supportedCapabilities": ["catalog", "describe", "materialize"]
+  },
+  "maintenancePolicy": {
+    "ordinaryFile": "no-update",
+    "internalDirectory": "no-update",
+    "rootMoveOrRename": "update",
+    "areaPartitionChange": "update",
+    "responsibilityOrRouteChange": "update",
+    "invalidCore": "fallback"
+  },
+  "boundary": {
+    "algorithm": "direct-child-v1",
+    "signature": "af85378587abdc2565571d38fed06e190d3d18e75f525a885d3fd4a4a069694a"
+  }
 }

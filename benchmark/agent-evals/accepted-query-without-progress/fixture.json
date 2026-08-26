@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "accepted-query-without-progress",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "a17c4068899a2341ae3b16a9489b09cff53163efb602102b0c44c80bb4968966",
+  "dirtyPaths": ["game/src/domain/session/combat/resolveCombatHit.ts"]
+}

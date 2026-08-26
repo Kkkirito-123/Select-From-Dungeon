@@ -1,0 +1,13 @@
+diff --git a/game/src/domain/session/learning/lessonCompletion.ts b/game/src/domain/session/learning/lessonCompletion.ts
+--- a/game/src/domain/session/learning/lessonCompletion.ts
++++ b/game/src/domain/session/learning/lessonCompletion.ts
+@@ -27,7 +27,7 @@ export function resolveLessonCompletion(
+   input: LessonCompletionInput,
+ ): LessonCompletionResolution {
+   const completedLessons = new Set(input.completedLessons);
+-  completedLessons.add(input.lessonId);
++  completedLessons.delete(input.lessonId);
+   const completedRoomIds = new Set(input.completedRoomIds);
+   completedRoomIds.add(input.roomId);
+   return {
+       this.profile.masteredLessons.push(lesson.id);

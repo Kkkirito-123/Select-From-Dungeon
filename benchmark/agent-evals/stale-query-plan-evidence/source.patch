@@ -1,0 +1,9 @@
+diff --git a/game/src/infrastructure/sql/SqlEngine.ts b/game/src/infrastructure/sql/SqlEngine.ts
+--- a/game/src/infrastructure/sql/SqlEngine.ts
++++ b/game/src/infrastructure/sql/SqlEngine.ts
+@@ -47,4 +47,4 @@ export class SqlEngine {
+     const planResult = this.database.exec(`EXPLAIN QUERY PLAN ${validation.sql}`)[0];
+     const plan = planResult
+-      ? planResult.values.map((row) => String(row[row.length - 1] ?? ""))
++      ? ["SCAN stale-query-plan"]
+       : [];

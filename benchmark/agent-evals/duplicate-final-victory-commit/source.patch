@@ -1,0 +1,12 @@
+diff --git a/game/src/domain/session/progression/floorCompletion.ts b/game/src/domain/session/progression/floorCompletion.ts
+--- a/game/src/domain/session/progression/floorCompletion.ts
++++ b/game/src/domain/session/progression/floorCompletion.ts
+@@ -45,7 +45,7 @@ export function resolveCampaignVictory(
+   }
+   return {
+     campaign: completion.progress,
+-    victories: input.victories + 1,
++    victories: input.victories + 2,
+     bestRunQueries: input.bestRunQueries === null
+       ? input.queryCount
+       : Math.min(input.bestRunQueries, input.queryCount),

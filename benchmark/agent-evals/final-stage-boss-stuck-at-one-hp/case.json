@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "final-stage-boss-stuck-at-one-hp",
+  "category": "combat-sql-state",
+  "prompt": "区域层主的两阶段 SQL 都正确，最终阶段也显示命中，但 Boss 永远剩余 1 HP，无法结算。请定位最终阶段生命下限计算并修复。",
+  "evidenceSummary": "最终正确查询后仍处于 combat，层主隐藏裁判显示 HP=1。",
+  "startFloor": 1,
+  "startPreset": "f1-admin-boss",
+  "timeoutMs": 600000
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "lesson-complete-reward-missing",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "5169a4821d657c6f3a336a502d276de8a5921140f43edaf56144dfcca66815c8",
+  "dirtyPaths": ["game/src/domain/session/learning/lessonCompletion.ts"]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "duplicate-final-victory-commit",
+  "secretInputs": {
+    "snapshot": "SELECT value FROM tx_versions WHERE row_id = 2 AND created_tx <= 12 AND (expired_tx IS NULL OR expired_tx > 12);",
+    "deadlock": "SELECT waiter_tx, resource FROM lock_waits WHERE blocker_tx = 'T2' ORDER BY waiter_tx;",
+    "anomaly": "SELECT prevented_by FROM isolation_cases WHERE phenomenon = 'phantom_read';",
+    "route": "SELECT node, lag_ms FROM replica_status WHERE role = 'replica' AND healthy = 0 ORDER BY lag_ms DESC;",
+    "security": "SELECT method FROM security_cases WHERE parameterized = 1 AND least_privilege = 1 AND allowed = 1 ORDER BY id;"
+  },
+  "beforeOracle": "victory-count-duplicated",
+  "afterOracle": "victory-count-once",
+  "requiredChecks": ["game-test", "game-architecture", "game-build"],
+  "forbiddenPaths": [".env", ".env.local", ".git"]
+}

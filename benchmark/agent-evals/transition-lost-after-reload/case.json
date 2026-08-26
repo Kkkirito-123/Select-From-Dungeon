@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "transition-lost-after-reload",
+  "category": "transition-death-persistence",
+  "prompt": "层主钥匙已经接入传送门，但传送动画结束后没有触发下一层加载，刷新也只会回到原层。请修复传送调度与领域推进之间的生命周期断点。",
+  "evidenceSummary": "transition 进入后等待超过动画时长仍未 advanced。",
+  "startFloor": 1,
+  "startPreset": "f1-admin-boss",
+  "timeoutMs": 600000
+}

@@ -1,7 +1,7 @@
 /**
  * Dungeon Maintainer 与浏览器游戏之间的开发态协议和临时存储边界。
  *
- * 本文件负责三件事：校验 `DEV + 本机地址 + ?playtest=agent` 启动条件、声明协议 v2
+ * 本文件负责三件事：校验 `DEV + 本机地址 + ?playtest=agent` 启动条件、声明协议 v3
  * 的有限数据结构，以及创建不会接触正式 IndexedDB/localStorage 的页面内存存储。
  * 它不安装全局桥、不执行移动或 SQL，也不启动维护器进程。
  *
@@ -145,6 +145,11 @@ export interface DungeonAgentJudge {
   migrationSteps: number;
   migrationComplete: boolean;
   advanced: boolean;
+  stageIndex: number;
+  claimableReward: string | null;
+  bossHp: number | null;
+  victories: number;
+  guidanceDistance: number | null;
 }
 
 /** 页面内环形 Trace 对外提供的低敏语义事件。 */
@@ -155,14 +160,16 @@ export interface DungeonAgentEvent {
 }
 
 /**
- * `window.__DUNGEON_PLAYTEST__` 暴露的固定协议 v2。
+ * `window.__DUNGEON_PLAYTEST__` 暴露的固定协议 v3。
  *
  * 所有方法均不接受 JavaScript、CSS 选择器或鼠标坐标；inputSql 只向当前固定玩家
  * textarea 写入文本，query 仍不接受 SQL 参数。
  */
 export interface DungeonPlaytestBridge {
-  readonly version: 2;
+  readonly version: 3;
   readonly checkpointRestored: boolean;
+  /** 仅供游戏拥有的 Benchmark Adapter 建立确定性起点。 */
+  prepare(presetId: string): boolean;
   checkpoint(): boolean;
   look(): DungeonAgentView;
   go(

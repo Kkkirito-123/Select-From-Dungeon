@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "stale-query-plan-evidence",
+  "secretInputs": {
+    "indexed-query": "SELECT code, score FROM index_records WHERE id = 3;"
+  },
+  "beforeOracle": "stale-query-plan",
+  "afterOracle": "query-plan-current",
+  "requiredChecks": ["game-test", "game-architecture", "game-build"],
+  "forbiddenPaths": [".env", ".env.local", ".git"]
+}
