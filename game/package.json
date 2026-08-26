@@ -8,6 +8,7 @@
   },
   "packageManager": "pnpm@11.9.0",
   "scripts": {
+    "benchmark:adapter": "node ../scripts/benchmark-adapter.mjs",
     "question-bank:build": "node scripts/build-question-bank.mjs",
     "architecture:check": "node scripts/check-architecture.mjs",
     "dev": "vite --host 0.0.0.0",

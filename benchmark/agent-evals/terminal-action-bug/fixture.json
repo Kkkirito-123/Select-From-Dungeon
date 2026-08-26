@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "id": "terminal-action-bug",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "55b4ba7fb13e6dd5f18f27543fd14811eb5c11493cdd03563d1e9c05c4b50b13",
+  "dirtyPaths": [
+    "game/src/devtools/dungeon-agent/actions.ts"
+  ]
+}

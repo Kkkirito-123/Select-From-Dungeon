@@ -1,0 +1,12 @@
+diff --git a/game/src/domain/session/combat/resolveCombatHit.ts b/game/src/domain/session/combat/resolveCombatHit.ts
+--- a/game/src/domain/session/combat/resolveCombatHit.ts
++++ b/game/src/domain/session/combat/resolveCombatHit.ts
+@@ -23,7 +23,7 @@ export interface CombatHitResolution {
+ 
+ /** 接受一次正确阶段后返回唯一合法的下一成功阶段。 */
+ export function advanceCombatSuccessStep(currentSuccessStep: number): number {
+-  return currentSuccessStep + 1;
++  return currentSuccessStep;
+ }
+ 
+ /**

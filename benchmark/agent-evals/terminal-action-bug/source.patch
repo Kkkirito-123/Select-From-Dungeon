@@ -1,0 +1,12 @@
+diff --git a/game/src/devtools/dungeon-agent/actions.ts b/game/src/devtools/dungeon-agent/actions.ts
+--- a/game/src/devtools/dungeon-agent/actions.ts
++++ b/game/src/devtools/dungeon-agent/actions.ts
+@@ -17,7 +17,7 @@ export const DUNGEON_AGENT_ACTION_SELECTORS: Readonly<Record<string, string>> = {
+   continue: "#close-inspection",
+   "close-review": "#close-review",
+   interact: "#interact",
+-  terminal: "#open-sql",
++  terminal: "#open-sql-broken",
+   rest: "#rest-at-campfire",
+   leave: "#leave-campfire",
+   "take-all": "#take-all-loot",

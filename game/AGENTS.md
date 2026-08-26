@@ -44,11 +44,12 @@ silently choosing one source.
   content, and infrastructure must not import application, presentation, or
   devtools implementations. Pure runtime constants are supplied one-way by
   `contracts/config`. Extend `scripts/check-architecture.mjs` for new boundaries.
-- `.maintainer/architecture-map.json` is the machine routing authority for
-  stable areas, responsibility partitions, and the eight `floorScopes`; it is
-  not a code index. A floor child must not import a sibling floor. Shared logic
-  moves to a parent shared partition and one registry composes the children.
-  Ordinary file changes do not update the map; stable boundary/root changes do.
+- `.maintainer/architecture-map.json` is the game-owned machine routing authority
+  for stable areas, responsibility partitions, cross-layer features, and the
+  eight `floorScopes`; it is not a code index. A floor child must not import a
+  sibling floor. Shared logic moves to a parent service partition and one registry
+  composes the children. Ordinary files and internal folders do not update the
+  map; stable roots, responsibilities, or routes do.
 - `GameSession` and focused domain modules own game rules. DOM and Phaser code
   render snapshots and forward explicit intent; they must not become a second
   rule engine or storage owner.

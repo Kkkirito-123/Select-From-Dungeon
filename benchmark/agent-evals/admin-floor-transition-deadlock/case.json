@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "admin-floor-transition-deadlock",
+  "category": "transition-death-persistence",
+  "prompt": "Agent 试玩使用管理员辅助时，层主已击败且钥匙已结算，但页面不会进入自动传送，玩家仍留在原层。请修复管理员试玩与真实楼层推进的条件冲突。",
+  "evidenceSummary": "层主隐藏裁判已死亡，等待后仍在原层 explore，advanced=false。",
+  "startFloor": 1,
+  "startPreset": "f1-admin-boss",
+  "timeoutMs": 600000
+}

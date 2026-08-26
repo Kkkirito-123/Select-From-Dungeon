@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "duplicate-final-victory-commit",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "c7f48c3ca8ccb536cf94fab7bbfe5b4fa4b96aed02a160c2fdba93ebd81e9d19",
+  "dirtyPaths": ["game/src/domain/session/progression/floorCompletion.ts"]
+}

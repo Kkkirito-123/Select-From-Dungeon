@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "transaction-sandbox-state-leak",
+  "secretInputs": {
+    "insert-row": "INSERT INTO repair_queue(id, item, quantity, status) VALUES (6, 'claw', 2, 'ready');",
+    "update-row": "UPDATE repair_queue SET status = 'fixed' WHERE id = 2;"
+  },
+  "beforeOracle": "sandbox-state-leaked",
+  "afterOracle": "sandbox-isolated",
+  "requiredChecks": ["game-test", "game-architecture", "game-build"],
+  "forbiddenPaths": [".env", ".env.local", ".git"]
+}

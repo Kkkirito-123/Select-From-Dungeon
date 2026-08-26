@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "duplicate-final-victory-commit",
+  "steps": [
+    { "op": "go", "target": "objective", "maxSteps": 64 },
+    { "op": "use", "actionId": "terminal" },
+    { "op": "input-sql", "inputRef": "snapshot" },
+    { "op": "query" },
+    { "op": "input-sql", "inputRef": "deadlock" },
+    { "op": "query" },
+    { "op": "input-sql", "inputRef": "anomaly" },
+    { "op": "query" },
+    { "op": "input-sql", "inputRef": "route" },
+    { "op": "query" },
+    { "op": "input-sql", "inputRef": "security" },
+    { "op": "query" },
+    { "op": "go", "target": "objective", "maxSteps": 64 },
+    { "op": "use", "actionId": "interact" }
+  ]
+}

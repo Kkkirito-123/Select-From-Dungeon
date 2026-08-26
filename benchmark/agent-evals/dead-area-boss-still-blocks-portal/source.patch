@@ -1,0 +1,11 @@
+diff --git a/game/src/domain/session/progression/regionAccess.ts b/game/src/domain/session/progression/regionAccess.ts
+--- a/game/src/domain/session/progression/regionAccess.ts
++++ b/game/src/domain/session/progression/regionAccess.ts
+@@ -12,6 +12,6 @@ export function livingRequiredBoss(
+   requiredBossId: number,
+ ): Monster | null {
+   return monsters.find((monster) => (
+-    monster.id === requiredBossId && monster.hp > 0
++    monster.id === requiredBossId && monster.hp >= 0
+   )) ?? null;
+ }

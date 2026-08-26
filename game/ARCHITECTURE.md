@@ -258,7 +258,8 @@ encounter rates, navigation thresholds, and storage limits.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
 
-`src/devtools/dungeon-agent/` owns the external maintainer protocol v2 and remains development-only.
+`src/devtools/dungeon-agent/` owns external maintainer protocol v3, with the maintainer retaining a
+v2 compatibility adapter, and remains development-only.
 `protocol.ts` owns types and temporary storage, `actions.ts` owns fixed DOM actions and visible
 overlays, `projection.ts` owns the player-visible view, `navigation.ts` owns internal target/frontier
 BFS and stop reasons, `query.ts` owns browser-only fixed query execution, `trace.ts` owns the bounded
@@ -365,22 +366,28 @@ evaluation.
 
 ## Game Project Map
 
-The machine-readable routing authority is `../.maintainer/architecture-map.json`.
-Schema v3 records stable layer/area/partition boundaries and eight cross-layer
-`floorScopes`; it remains routing data rather than a code or file index. Ordinary
-file changes do not update the map.
+The machine-readable routing authority is the game-owned
+`../.maintainer/architecture-map.json`. Schema v4 adds cross-layer `features`, a
+bounded runtime contract, and a stable-boundary signature to the existing
+layer/area/partition and eight `floorScopes`. Feature and floor roots name stable
+directories, never individual files or globs. Ordinary files and internal folders
+do not update the map; stable roots, responsibilities, or routes increment the
+boundary revision and signature.
 
-Normal inspection searches the current floor, its direct neighbors, then parent
-shared partitions; area and repository search are failure-open fallbacks. Floor
-children must not import sibling floors. Common algorithms and services move to a
-parent shared partition and a single registry composes them one-way. `GameSession`
-remains the only mutable session-state committer.
+Normal inspection routes by capability first and keeps an optional floor as
+context. It expands through the feature's primary, adjacent, shared, and fallback
+roots before the safe area/repository fallback. Legacy schema v1-v3 maps are
+normalized by the maintainer, while an invalid core fails open to ordinary safe
+search. Floor children must not import sibling floors. Common algorithms and
+services move to a parent service partition and a single registry composes them
+one-way. `GameSession` remains the only mutable session-state committer; focused
+rules such as combat hit resolution live in child services.
 
 ```text
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
 src/application/        Startup, runtime configuration, and page lifecycle
-src/content/            Static curriculum, world, narrative, inventory, and SQL content
-src/domain/             Session facade/helpers, combat, exploration, learning, progression, inventory, and shared rules
+src/content/            Static curriculum, world, narrative, inventory, and SQL content; floor author data under */floors/floorNN
+src/domain/             Session facade/focused services, combat, exploration, learning, progression, inventory, and shared rules
 src/infrastructure/     Audio, feedback, SQLite, storage codecs/migrations, and browser adapters
 src/presentation/       Phaser scenes, DOM application views, and focused renderers
 src/devtools/           Development-only external maintainer bridge; no production import path

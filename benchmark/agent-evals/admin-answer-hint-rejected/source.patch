@@ -1,0 +1,12 @@
+diff --git a/game/src/domain/learning/lessonResultEvaluator.ts b/game/src/domain/learning/lessonResultEvaluator.ts
+--- a/game/src/domain/learning/lessonResultEvaluator.ts
++++ b/game/src/domain/learning/lessonResultEvaluator.ts
+@@ -300,7 +300,7 @@ function matchesAuthoredStageResult(
+         projectsOnlyColumn(normalizedSql, "weakness") &&
+         /\bfrom\s+monsters\b/i.test(normalizedSql) &&
+         columnEqualsNumber(whereClause, "id", 1) &&
+-        hasSingleValue(result, "weakness", "slash")
++        hasSingleValue(result, "weakness", "focus")
+       );
+     case "where-target":
+       return (

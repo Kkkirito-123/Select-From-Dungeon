@@ -4,6 +4,17 @@ import {
   movementModeIsBlocked,
 } from "../src/domain/session/sessionExploration";
 import { applyExperienceSettlement } from "../src/domain/session/sessionProgression";
+import {
+  advanceCombatSuccessStep,
+  resolveCombatHit,
+} from "../src/domain/session/combat/resolveCombatHit";
+import { livingRequiredBoss } from "../src/domain/session/progression/regionAccess";
+import {
+  isReadOnlyAdminPreview,
+  resolveCampaignVictory,
+} from "../src/domain/session/progression/floorCompletion";
+import { resolveLessonCompletion } from "../src/domain/session/learning/lessonCompletion";
+import { createCampaignProgress } from "../src/domain/progression/campaign";
 
 describe("GameSession 内部职责边界", () => {
   it("移动门面使用稳定的失败结果", () => {
@@ -26,5 +37,73 @@ describe("GameSession 内部职责边界", () => {
     );
     expect(settlement).toMatchObject({ gained: 10, previousLevel: 1, currentLevel: 2 });
     expect(player).toEqual({ hp: 2, maxHp: 3, level: 2, xp: 10 });
+  });
+
+  it("战斗生命服务只在非最终阶段保留 1 HP", () => {
+    expect(advanceCombatSuccessStep(0)).toBe(1);
+    expect(advanceCombatSuccessStep(4)).toBe(5);
+    expect(resolveCombatHit({
+      currentHp: 6,
+      weaponDamage: 20,
+      armor: 0,
+      nextSuccessStep: 1,
+      totalStages: 2,
+    })).toEqual({ minimumHp: 1, damage: 5, remainingHp: 1 });
+    expect(resolveCombatHit({
+      currentHp: 1,
+      weaponDamage: 20,
+      armor: 0,
+      nextSuccessStep: 2,
+      totalStages: 2,
+    })).toEqual({ minimumHp: 0, damage: 1, remainingHp: 0 });
+  });
+
+  it("死亡的区域首领不再阻挡通道", () => {
+    const dead = { id: 9, hp: 0 } as never;
+    const living = { id: 10, hp: 1 } as never;
+    expect(livingRequiredBoss([dead, living], 9)).toBeNull();
+    expect(livingRequiredBoss([dead, living], 10)).toBe(living);
+  });
+
+  it("管理员预览与 Agent 试玩保持单向边界", () => {
+    expect(isReadOnlyAdminPreview(true, false)).toBe(true);
+    expect(isReadOnlyAdminPreview(true, true)).toBe(false);
+    expect(isReadOnlyAdminPreview(false, false)).toBe(false);
+  });
+
+  it("终局提交只增加一次胜利并保留最佳查询数", () => {
+    const result = resolveCampaignVictory({
+      campaign: createCampaignProgress("session-boundary", 8),
+      victories: 2,
+      bestRunQueries: 20,
+      queryCount: 15,
+    });
+    expect(result.campaign.status).toBe("completed");
+    expect(result.victories).toBe(3);
+    expect(result.bestRunQueries).toBe(15);
+    expect(() => resolveCampaignVictory({
+      campaign: result.campaign,
+      victories: result.victories,
+      bestRunQueries: result.bestRunQueries,
+      queryCount: 15,
+    })).toThrow(/终局无法提交/u);
+  });
+
+  it("课程完成只登记学习事实，不重置怪物生命", () => {
+    const monster = { id: 5, hp: 1, maxHp: 24 } as never;
+    const monsters = [monster];
+    const result = resolveLessonCompletion({
+      lessonId: "having",
+      roomId: "lesson:having",
+      completedLessons: new Set(),
+      completedRoomIds: new Set(),
+      masteredLessons: [],
+      monsters,
+    });
+    expect(result.completedLessons.has("having")).toBe(true);
+    expect(result.completedRoomIds.has("lesson:having")).toBe(true);
+    expect(result.masteredLessons).toEqual(["having"]);
+    expect(result.monsters).toEqual([monster]);
+    expect(result.monsters).not.toBe(monsters);
   });
 });

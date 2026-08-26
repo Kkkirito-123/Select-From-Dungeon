@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "dead-area-boss-still-blocks-portal",
+  "category": "reward-map-gating",
+  "prompt": "区域首领已经被击败且 HP 为 0，但通往后区的主线路径仍把它当作存活阻挡，自动导航无法进入下一课程。请修复死亡状态与区域门禁判断不一致的问题。",
+  "evidenceSummary": "预设中区域首领已死亡，go(objective) 仍停留 explore，无法进入后区课程战斗。",
+  "startFloor": 2,
+  "startPreset": "f2-admin-frog-court",
+  "timeoutMs": 600000
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "stale-query-plan-evidence",
+  "category": "advanced-sql-endgame",
+  "prompt": "第七层主键点查的 SQL 与结果都正确，但终端执行计划仍显示 SCAN，导致本回合被拒绝。请修复 EXPLAIN QUERY PLAN 证据与真实查询结果不同步的问题。",
+  "evidenceSummary": "主键点查被错误的 SCAN 计划证据拒绝；正确实现应显示本回合真实 SEARCH 计划。",
+  "startFloor": 7,
+  "startPreset": "f7-admin-entry",
+  "timeoutMs": 600000
+}

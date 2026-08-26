@@ -4,14 +4,14 @@
  * 各楼层文件只声明地标、NPC、隐藏区域和剧情触发器；本入口负责按楼层
  * 暴露统一查询边界，不负责推进剧情或修改玩家状态。
  */
-import { FLOOR_ONE_EXPERIENCE } from "./floor01";
-import { FLOOR_TWO_EXPERIENCE } from "./floor02";
-import { FLOOR_THREE_EXPERIENCE } from "./floor03";
-import { FLOOR_FOUR_EXPERIENCE } from "./floor04";
-import { FLOOR_FIVE_EXPERIENCE } from "./floor05";
-import { FLOOR_SIX_EXPERIENCE } from "./floor06";
-import { FLOOR_SEVEN_EXPERIENCE } from "./floor07";
-import { FLOOR_EIGHT_EXPERIENCE } from "./floor08";
+import { FLOOR_ONE_EXPERIENCE } from "./floors/floor01";
+import { FLOOR_TWO_EXPERIENCE } from "./floors/floor02";
+import { FLOOR_THREE_EXPERIENCE } from "./floors/floor03";
+import { FLOOR_FOUR_EXPERIENCE } from "./floors/floor04";
+import { FLOOR_FIVE_EXPERIENCE } from "./floors/floor05";
+import { FLOOR_SIX_EXPERIENCE } from "./floors/floor06";
+import { FLOOR_SEVEN_EXPERIENCE } from "./floors/floor07";
+import { FLOOR_EIGHT_EXPERIENCE } from "./floors/floor08";
 import type { FloorExperienceDefinition } from "./types";
 
 export * from "./types";

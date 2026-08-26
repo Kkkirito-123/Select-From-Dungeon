@@ -14,6 +14,44 @@ import {
 import { readDungeonAgentOverlay } from "../src/devtools/dungeon-agent/actions";
 
 describe("Dungeon Agent 玩家投影", () => {
+  it("Benchmark 起点只接受游戏登记的管理员预设并返回隐藏裁判摘要", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-prepare");
+    session.enableAgentPlaytestMode();
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {},
+    });
+    let removeBridge: (() => void) | null = null;
+    try {
+      removeBridge = installDungeonAgentBridge({
+        root: { querySelector: () => null } as unknown as HTMLElement,
+        session,
+        launch: { mode: "agent", floor: 1 },
+        checkpointStorage: null,
+        checkpointRestored: false,
+      });
+      expect(window.__DUNGEON_PLAYTEST__?.prepare("../escape")).toBe(false);
+      expect(window.__DUNGEON_PLAYTEST__?.prepare("f1-admin-boss")).toBe(true);
+      expect(window.__DUNGEON_PLAYTEST__?.judge(1)).toMatchObject({
+        floor: 1,
+        lessons: 4,
+        stageIndex: 0,
+        victories: 0,
+      });
+      expect(session.snapshot().completedRoomIds).not.toContain(session.snapshot().currentRoomId);
+      expect(session.snapshot().claimableReward).toBeNull();
+      expect(session.snapshot().groundItems).toContainEqual(expect.objectContaining({
+        sourceRoomId: session.snapshot().currentRoomId,
+        rewardId: "floor-key",
+      }));
+    } finally {
+      removeBridge?.();
+      if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
   it("交互指纹覆盖模式、房间、课程、门、地面物与可见覆盖层", () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-fingerprint");
     const snapshot = session.snapshot();
@@ -497,7 +535,7 @@ describe("Dungeon Agent 桥接边界", () => {
       "utf8",
     );
 
-    expect(protocolSource).toContain("readonly version: 2");
+    expect(protocolSource).toContain("readonly version: 3");
     expect(protocolSource).toContain("inputSql(sql: string): Promise<DungeonAgentResult>");
     expect(protocolSource).toContain("query(): Promise<DungeonAgentResult>");
     expect(protocolSource).toContain("events(afterSequence: number)");

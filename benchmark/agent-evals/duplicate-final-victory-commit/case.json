@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "duplicate-final-victory-commit",
+  "category": "advanced-sql-endgame",
+  "prompt": "第八层最终五阶段查询全部通过后，页面进入胜利态，但本地胜场计数一次结算增加两次。请修复最终胜利提交的幂等性。",
+  "evidenceSummary": "最终模式是 victory，但隐藏裁判 victories=2；一次 Run 只能增加一个胜场。",
+  "startFloor": 8,
+  "startPreset": "f8-admin-boss",
+  "timeoutMs": 600000
+}

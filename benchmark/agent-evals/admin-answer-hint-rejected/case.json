@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "admin-answer-hint-rejected",
+  "category": "terminal-answer-consistency",
+  "prompt": "管理员模式自动填入的 SQL 与最终提示一致，但提交后仍被判错。请定位答案、执行结果与判题规则之间的不一致并修复。",
+  "evidenceSummary": "第一层首题的完整提示 SQL 可以执行，却被结果判定器拒绝。",
+  "startFloor": 1,
+  "startPreset": null,
+  "timeoutMs": 600000
+}

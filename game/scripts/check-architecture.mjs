@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -49,20 +50,79 @@ async function validateArchitectureMap() {
     !plainObject(parsed)
     || !exactKeys(parsed, [
       "schemaVersion",
+      "contractId",
+      "contractVersion",
       "projectRoot",
+      "boundaryRevision",
       "layers",
       "areas",
       "partitions",
       "floorScopes",
+      "features",
+      "runtime",
+      "maintenancePolicy",
+      "boundary",
     ])
-    || parsed.schemaVersion !== 3
+    || parsed.schemaVersion !== 4
+    || parsed.contractId !== "dungeon.game.architecture"
+    || parsed.contractVersion !== 1
     || parsed.projectRoot !== "game"
+    || !Number.isInteger(parsed.boundaryRevision)
+    || parsed.boundaryRevision < 1
     || !Array.isArray(parsed.layers)
     || !Array.isArray(parsed.areas)
     || !Array.isArray(parsed.partitions)
     || !Array.isArray(parsed.floorScopes)
+    || !Array.isArray(parsed.features)
   ) {
-    throw new Error("architecture-map.json 不是受支持的 schema v3");
+    throw new Error("architecture-map.json 不是受支持的 schema v4");
+  }
+
+  if (
+    !plainObject(parsed.runtime)
+    || !exactKeys(parsed.runtime, [
+      "sourceRoot",
+      "bridgeProtocol",
+      "adapterVersion",
+      "supportedCapabilities",
+    ])
+    || parsed.runtime.sourceRoot !== parsed.projectRoot
+    || parsed.runtime.bridgeProtocol !== 3
+    || parsed.runtime.adapterVersion !== 1
+    || !validBoundedLines(parsed.runtime.supportedCapabilities, 16, 60)
+    || !["catalog", "describe", "materialize"].every((capability) => (
+      parsed.runtime.supportedCapabilities.includes(capability)
+    ))
+  ) {
+    throw new Error("architecture-map.json runtime 契约非法");
+  }
+  if (
+    !plainObject(parsed.maintenancePolicy)
+    || !exactKeys(parsed.maintenancePolicy, [
+      "ordinaryFile",
+      "internalDirectory",
+      "rootMoveOrRename",
+      "areaPartitionChange",
+      "responsibilityOrRouteChange",
+      "invalidCore",
+    ])
+    || parsed.maintenancePolicy.ordinaryFile !== "no-update"
+    || parsed.maintenancePolicy.internalDirectory !== "no-update"
+    || parsed.maintenancePolicy.rootMoveOrRename !== "update"
+    || parsed.maintenancePolicy.areaPartitionChange !== "update"
+    || parsed.maintenancePolicy.responsibilityOrRouteChange !== "update"
+    || parsed.maintenancePolicy.invalidCore !== "fallback"
+  ) {
+    throw new Error("architecture-map.json maintenancePolicy 非法");
+  }
+  if (
+    !plainObject(parsed.boundary)
+    || !exactKeys(parsed.boundary, ["algorithm", "signature"])
+    || parsed.boundary.algorithm !== "direct-child-v1"
+    || typeof parsed.boundary.signature !== "string"
+    || !/^[a-f0-9]{64}$/u.test(parsed.boundary.signature)
+  ) {
+    throw new Error("architecture-map.json boundary 非法");
   }
 
   const layerIds = new Set();
@@ -198,6 +258,9 @@ async function validateArchitectureMap() {
         "signals",
         "neighbors",
         "sharedPartitions",
+        "contentRefs",
+        "serviceRefs",
+        "featureRefs",
       ])
       || typeof floorScope.id !== "string"
       || !/^floor\.(?:0[1-8])$/u.test(floorScope.id)
@@ -216,6 +279,9 @@ async function validateArchitectureMap() {
       || !validBoundedLines(floorScope.signals, 12, 40)
       || !validBoundedLines(floorScope.neighbors, 2, 80)
       || !validBoundedLines(floorScope.sharedPartitions, 8, 80)
+      || !validBoundedLines(floorScope.contentRefs, 12, 100)
+      || !validBoundedLines(floorScope.serviceRefs, 12, 100)
+      || !validBoundedLines(floorScope.featureRefs, 12, 100)
     ) {
       throw new Error("architecture-map.json 包含非法或重复 floor scope");
     }
@@ -225,12 +291,16 @@ async function validateArchitectureMap() {
         `floor scope ${floorScope.id}.roots`,
       );
       const expectedSuffix = `/floors/floor${String(floorScope.floor).padStart(2, "0")}`;
+      const owningArea = [...areaRoots.entries()].find(([areaRoot]) => (
+        relativeRoot.startsWith(`${areaRoot}/`)
+      ));
       if (
         !relativeRoot.startsWith(`${parsed.projectRoot}/`)
         || !relativeRoot.endsWith(expectedSuffix)
+        || !owningArea
         || floorRoots.has(relativeRoot)
       ) {
-        throw new Error(`floor scope ${floorScope.id} root 必须唯一并对应同编号稳定楼层目录`);
+        throw new Error(`floor scope ${floorScope.id} root 必须唯一、位于已登记 area 并对应同编号稳定楼层目录`);
       }
       const information = await stat(path.join(repositoryRoot, relativeRoot));
       if (!information.isDirectory()) {
@@ -243,6 +313,70 @@ async function validateArchitectureMap() {
   }
   if (floorScopeIds.size !== 8) {
     throw new Error("architecture-map.json 必须登记完整八层 floor scope");
+  }
+
+  const stableAreaReferences = new Set([...areaIds, ...partitionIds]);
+  const stableReferences = new Set([...stableAreaReferences, ...floorScopeIds]);
+  const featureIds = new Set();
+  for (const feature of parsed.features) {
+    if (
+      !plainObject(feature)
+      || !exactKeys(feature, [
+        "id",
+        "roots",
+        "responsibility",
+        "notResponsibleFor",
+        "signals",
+        "negativeSignals",
+        "neighbors",
+        "route",
+        "contentRefs",
+        "serviceProviders",
+      ])
+      || typeof feature.id !== "string"
+      || !/^feature\.[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/u.test(feature.id)
+      || featureIds.has(feature.id)
+      || typeof feature.responsibility !== "string"
+      || feature.responsibility.length === 0
+      || feature.responsibility.length > 160
+      || /[\r\n]/u.test(feature.responsibility)
+      || !validBoundedLines(feature.roots, 12, 100)
+      || feature.roots.length === 0
+      || !validBoundedLines(feature.notResponsibleFor, 8, 80)
+      || !validBoundedLines(feature.signals, 16, 60)
+      || feature.signals.length === 0
+      || !validBoundedLines(feature.negativeSignals, 8, 60)
+      || !validBoundedLines(feature.neighbors, 8, 100)
+      || !validBoundedLines(feature.contentRefs, 8, 100)
+      || !validBoundedLines(feature.serviceProviders, 8, 100)
+      || !plainObject(feature.route)
+      || !exactKeys(feature.route, ["primary", "adjacent", "shared", "fallback"])
+      || !validBoundedLines(feature.route.primary, 8, 100)
+      || feature.route.primary.length === 0
+      || !validBoundedLines(feature.route.adjacent, 8, 100)
+      || !validBoundedLines(feature.route.shared, 8, 100)
+      || !validBoundedLines(feature.route.fallback, 8, 100)
+    ) {
+      throw new Error("architecture-map.json 包含非法或重复 feature");
+    }
+    const routeReferences = [
+      ...feature.route.primary,
+      ...feature.route.adjacent,
+      ...feature.route.shared,
+      ...feature.route.fallback,
+    ];
+    if (
+      new Set(feature.roots).size !== feature.roots.length
+      || feature.roots.some((reference) => !stableReferences.has(reference))
+      || new Set(routeReferences).size !== routeReferences.length
+      || routeReferences.some((reference) => !feature.roots.includes(reference))
+      || feature.neighbors.some((reference) => !stableReferences.has(reference))
+      || feature.contentRefs.some((reference) => !stableAreaReferences.has(reference))
+      || feature.serviceProviders.some((reference) => !stableAreaReferences.has(reference))
+    ) {
+      throw new Error(`feature ${feature.id} 包含未知、重复或越界稳定引用`);
+    }
+    featureIds.add(feature.id);
   }
   for (const floorScope of parsed.floorScopes) {
     const expectedNeighbors = [floorScope.floor - 1, floorScope.floor + 1]
@@ -261,6 +395,25 @@ async function validateArchitectureMap() {
     ) {
       throw new Error(`floor scope ${floorScope.id} 必须引用有效父级共享 partition`);
     }
+    if (
+      floorScope.contentRefs.some((reference) => !stableAreaReferences.has(reference))
+      || floorScope.serviceRefs.some((reference) => !stableAreaReferences.has(reference))
+      || floorScope.featureRefs.some((reference) => !featureIds.has(reference))
+    ) {
+      throw new Error(`floor scope ${floorScope.id} 包含未知内容、服务或功能引用`);
+    }
+    for (const sharedPartitionId of floorScope.sharedPartitions) {
+      const sharedRoot = parsed.partitions.find((partition) => (
+        partition.id === sharedPartitionId
+      ))?.root;
+      if (sharedRoot && floorScope.roots.some((floorRoot) => (
+        floorRoot === sharedRoot
+        || floorRoot.startsWith(`${sharedRoot}/`)
+        || sharedRoot.startsWith(`${floorRoot}/`)
+      ))) {
+        throw new Error(`floor scope ${floorScope.id} 与 shared partition 目录不能重叠`);
+      }
+    }
   }
 
   for (const partition of parsed.partitions) {
@@ -273,8 +426,11 @@ async function validateArchitectureMap() {
     }
   }
 
+  const directChildren = [];
   for (const [layerId, layerRoot] of layerRoots) {
     const entries = await readdir(path.join(repositoryRoot, layerRoot), { withFileTypes: true });
+    const childNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+    directChildren.push({ layerId, children: childNames });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const childRoot = `${layerRoot}/${entry.name}`;
@@ -282,6 +438,54 @@ async function validateArchitectureMap() {
         throw new Error(`layer ${layerId} 出现未登记职责区域：${childRoot}`);
       }
     }
+  }
+
+  // 签名只覆盖稳定边界、职责和路由。普通文件以及 area/partition 内部子目录不参与，
+  // 因而频繁实现修改不要求维护地图；稳定 root 或职责变化则必须显式递增 revision。
+  const boundaryPayload = {
+    layers: parsed.layers.map(({ id, root, responsibility }) => ({ id, root, responsibility })),
+    areas: parsed.areas.map(({ id, parentId, root, responsibility }) => ({
+      id,
+      parentId,
+      root,
+      responsibility,
+    })),
+    partitions: parsed.partitions.map(({ id, parentId, root, responsibility }) => ({
+      id,
+      parentId,
+      root,
+      responsibility,
+    })),
+    floorScopes: parsed.floorScopes.map((floorScope) => ({
+      id: floorScope.id,
+      roots: floorScope.roots,
+      responsibility: floorScope.responsibility,
+      neighbors: floorScope.neighbors,
+      sharedPartitions: floorScope.sharedPartitions,
+      contentRefs: floorScope.contentRefs,
+      serviceRefs: floorScope.serviceRefs,
+      featureRefs: floorScope.featureRefs,
+    })),
+    features: parsed.features.map((feature) => ({
+      id: feature.id,
+      roots: feature.roots,
+      responsibility: feature.responsibility,
+      route: feature.route,
+      contentRefs: feature.contentRefs,
+      serviceProviders: feature.serviceProviders,
+    })),
+    runtime: parsed.runtime,
+    directChildren,
+  };
+  const actualSignature = createHash("sha256")
+    .update(JSON.stringify(boundaryPayload))
+    .digest("hex");
+  if (process.argv.includes("--print-boundary")) {
+    console.log(actualSignature);
+  } else if (actualSignature !== parsed.boundary.signature) {
+    throw new Error(
+      `architecture-map.json 边界签名不匹配；稳定边界变化时更新为 ${actualSignature}`,
+    );
   }
 }
 
@@ -338,7 +542,10 @@ for (const file of await sourceFiles("src")) {
   const sourceFloor = /\/floors\/floor(0[1-8])\//u.exec(normalizedFile)?.[1] ?? null;
   const isFloorRegistry = (
     /\/floors\/(?:index|registry|landmarkRegistry)\.ts$/u.test(normalizedFile)
+    || /\/content\/curriculum\/mvpLevel\.ts$/u.test(normalizedFile)
+    || /\/content\/curriculum\/floor[2-8]Level\.ts$/u.test(normalizedFile)
     || /\/content\/world\/(?:biomeContent|floorMapBlueprints)\.ts$/u.test(normalizedFile)
+    || /\/content\/world\/floorExperience\/floor0[1-8]\.ts$/u.test(normalizedFile)
     || /\/content\/world\/floorExperience\/index\.ts$/u.test(normalizedFile)
   );
   const text = await readFile(path.join(root, file), "utf8");
@@ -365,6 +572,11 @@ for (const file of await sourceFiles("src")) {
   if (sourceFloor) {
     for (const specifier of extractModuleSpecifiers(text)) {
       const resolvedTarget = resolveModuleSpecifier(normalizedFile, specifier);
+      const isAllowedParentService = (
+        /\/content\/curriculum\/floors\/floor0[1-8]\//u.test(normalizedFile)
+        && /\/content\/world\/biomeContent$/u.test(resolvedTarget)
+      );
+      if (isAllowedParentService) continue;
       if (isFloorAggregatorPath(resolvedTarget)) {
         violations.push(
           `${file}: ${specifier}（楼层子单元不得反向依赖 registry/index/聚合器；共同逻辑必须由 shared 提供）`,
@@ -372,6 +584,7 @@ for (const file of await sourceFiles("src")) {
       }
     }
   }
+
 }
 
 if (violations.length > 0) {

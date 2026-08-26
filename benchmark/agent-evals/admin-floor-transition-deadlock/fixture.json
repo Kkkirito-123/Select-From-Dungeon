@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "id": "admin-floor-transition-deadlock",
+  "base": "game-repair-v1",
+  "sourcePatch": "source.patch",
+  "patchSha256": "11d519f23f8898d480d49959bec5ad1c5f4f6bd43e0e0bcd6f3853d3b1f6241d",
+  "dirtyPaths": ["game/src/domain/session/progression/floorCompletion.ts"]
+}

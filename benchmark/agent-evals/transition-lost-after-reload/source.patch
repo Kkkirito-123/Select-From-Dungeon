@@ -1,0 +1,8 @@
+diff --git a/game/src/presentation/dom/AppShell.ts b/game/src/presentation/dom/AppShell.ts
+--- a/game/src/presentation/dom/AppShell.ts
++++ b/game/src/presentation/dom/AppShell.ts
+@@ -2437,3 +2437,3 @@ export class AppShell {
+       : 1_500;
+-    this.floorTransitionCoordinator.sync(shouldScheduleAdvance, delay);
++    this.floorTransitionCoordinator.sync(false, delay);
+  }

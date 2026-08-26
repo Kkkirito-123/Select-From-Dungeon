@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "transition-lost-after-reload",
+  "secretInputs": {
+    "boss-stage-one": "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 2;",
+    "boss-stage-two": "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 3;"
+  },
+  "beforeOracle": "transition-stuck",
+  "afterOracle": "floor-advanced",
+  "requiredChecks": ["game-test", "game-architecture", "game-build"],
+  "forbiddenPaths": [".env", ".env.local", ".git"]
+}

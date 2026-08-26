@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "accepted-query-without-progress",
+  "steps": [
+    { "op": "go", "target": "objective", "maxSteps": 64 },
+    { "op": "use", "actionId": "terminal" },
+    { "op": "input-sql", "inputRef": "first-stage" },
+    { "op": "query" }
+  ]
+}

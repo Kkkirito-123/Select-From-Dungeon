@@ -141,6 +141,8 @@ export interface FloorAdminPreset {
   openedGateIds: readonly string[];
   collectedKeyItems: readonly string[];
   focusLandmarkId: string;
+  /** Boss 战前等预设需要保留聚焦房间的未领取奖励。 */
+  keepFocusRoomIncomplete?: boolean;
 }
 
 export interface FloorExperienceDefinition {
