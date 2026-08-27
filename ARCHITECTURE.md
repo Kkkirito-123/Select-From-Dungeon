@@ -50,11 +50,19 @@ game TriggerBus
 ## Maintainer Boundary
 
 The external Dungeon Maintainer recognizes this repository only through the
-fixed `.maintainer/project.json` marker. Its browser bridge is owned by
-`game/src/devtools/`, runs only on a local Vite development page with
-`?playtest=agent`, uses a temporary in-memory playtest store, and must be absent
-from production output. Its exact tool and projection contract is documented
-in `game/ARCHITECTURE.md`.
+fixed `.maintainer/project.json` marker. The game-owned
+`scripts/benchmark-adapter.mjs` is the only Benchmark source interface: Adapter
+v2 exposes the stable ordered `full` suite of 7 public cases and a
+`sourceFingerprint` bound to the current Git commit/worktree, Adapter, and
+architecture map. Public catalog/description results omit hidden reproduction
+and Oracle data; runner-only description may read them, while materialized
+repair repositories contain neither the Benchmark tree nor the Adapter.
+
+The browser bridge is owned by `game/src/devtools/`, runs only on a local Vite
+development page with `?playtest=agent`, uses a temporary in-memory playtest
+store, and must be absent from production output. Its exact Adapter, tool,
+projection, and hidden-judge contracts are documented in
+`game/ARCHITECTURE.md`.
 
 ## Canonical Validation Commands
 

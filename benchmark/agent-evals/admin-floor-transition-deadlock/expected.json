@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "fixtureId": "admin-floor-transition-deadlock",
+  "expectedRouteFeatures": ["feature.transition-persistence"],
   "secretInputs": {
     "boss-stage-one": "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 2;",
     "boss-stage-two": "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 3;"

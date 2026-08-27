@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "fixtureId": "accepted-query-without-progress",
+  "expectedRouteFeatures": ["feature.lesson-evaluation"],
   "secretInputs": {
     "first-stage": "SELECT weakness FROM monsters WHERE id = 1;"
   },

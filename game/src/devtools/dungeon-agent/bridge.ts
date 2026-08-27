@@ -37,8 +37,6 @@ import {
 } from "./actions";
 import {
   dungeonAgentMoveStopReason,
-  findDungeonAgentFrontier,
-  findDungeonAgentObjective,
   planDungeonAgentNavigation,
   type DungeonAgentMoveStopReason,
 } from "./navigation";
@@ -391,12 +389,3 @@ export function installDungeonAgentBridge(
     }
   };
 }
-
-// 兼容现有测试和开发工具的入口导出；实际职责归属见上方专用模块。
-export {
-  buildDungeonAgentView,
-  dungeonAgentMoveStopReason,
-  findDungeonAgentFrontier,
-  findDungeonAgentObjective,
-};
-export type { DungeonAgentMoveStopReason } from "./navigation";

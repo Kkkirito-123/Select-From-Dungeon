@@ -23,13 +23,22 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const executeFile = promisify(execFile);
-const ADAPTER_VERSION = 1;
-const SCHEMA_VERSION = 1;
+const ADAPTER_VERSION = 2;
+const SCHEMA_VERSION = 2;
 const FIXED_GIT_NAME = "Dungeon Benchmark";
 const FIXED_GIT_EMAIL = "benchmark@localhost.invalid";
 const FIXED_GIT_DATE = "2000-01-01T00:00:00Z";
 const ADAPTER_PATH = "scripts/benchmark-adapter.mjs";
 const CASE_ROOT_PATH = "benchmark/agent-evals";
+const FULL_SUITE_CASE_IDS = [
+  "terminal-action-bug",
+  "accepted-query-without-progress",
+  "final-stage-boss-stuck-at-one-hp",
+  "admin-floor-transition-deadlock",
+  "transition-lost-after-reload",
+  "stale-query-plan-evidence",
+  "duplicate-final-victory-commit",
+];
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const caseRoot = join(sourceRoot, CASE_ROOT_PATH);
 
@@ -94,6 +103,37 @@ async function currentSourceFiles() {
   return [...new Set(output.split("\0").filter(Boolean).map((path) => normalizePath(path)))]
     .filter((path) => !excludedFromTarget(path))
     .sort();
+}
+
+/**
+ * 计算当前游戏源码、Adapter 和架构地图的组合指纹。
+ *
+ * 指纹散列当前 HEAD、工作树状态与差异，并显式散列 Adapter 和架构地图；它只用于
+ * 让维护器的预检证书和 checkpoint 在合同变化后失效，不返回任何差异或隐藏数据正文。
+ */
+async function sourceFingerprint() {
+  const hash = createHash("sha256");
+  // HEAD 覆盖已提交源码；diff/status 覆盖工作树修改；只额外读取两个稳定合同文件，
+  // 避免每个 describe 子进程重复扫描整个游戏源码树。
+  hash.update(await git(["rev-parse", "HEAD"]));
+  hash.update(await git(["status", "--porcelain=v1", "--untracked-files=all"]));
+  hash.update(await git(["diff", "--binary", "HEAD", "--"]));
+  const untracked = (await git(["ls-files", "-z", "--others", "--exclude-standard"]))
+    .split("\0")
+    .filter(Boolean)
+    .map((projectPath) => normalizePath(projectPath))
+    .sort();
+  for (const projectPath of untracked) {
+    const information = await lstat(join(sourceRoot, projectPath));
+    hash.update("\0untracked:" + projectPath + "\0");
+    if (information.isFile()) hash.update(await readFile(join(sourceRoot, projectPath)));
+    else hash.update(`${information.mode}:${information.size}`);
+  }
+  for (const projectPath of [ADAPTER_PATH, ".maintainer/architecture-map.json"]) {
+    hash.update("\\0" + projectPath + "\\0");
+    hash.update(await readFile(join(sourceRoot, projectPath)));
+  }
+  return hash.digest("hex");
 }
 
 async function copyCurrentSource(destination) {
@@ -261,25 +301,37 @@ async function readCase(id) {
 }
 
 async function catalog() {
-  const ids = (await readdir(caseRoot, { withFileTypes: true }))
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
   const cases = [];
-  for (const id of ids) {
+  for (const id of FULL_SUITE_CASE_IDS) {
     const value = await readCase(id);
     cases.push(value.publicCase);
   }
-  return { schemaVersion: SCHEMA_VERSION, adapterVersion: ADAPTER_VERSION, cases };
+  const actualIds = (await readdir(caseRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  if (actualIds.join("\\n") !== [...FULL_SUITE_CASE_IDS].sort().join("\\n")) {
+    fail("游戏 Benchmark 案例集合与 Adapter full 套件不一致");
+  }
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    adapterVersion: ADAPTER_VERSION,
+    suite: "full",
+    cases,
+    sourceFingerprint: await sourceFingerprint(),
+  };
 }
 
 async function describe(id, audience) {
   const value = await readCase(id);
+  const fingerprint = await sourceFingerprint();
   if (audience === "public") {
     return {
       schemaVersion: SCHEMA_VERSION,
       adapterVersion: ADAPTER_VERSION,
       case: value.publicCase,
+      suite: "full",
+      sourceFingerprint: fingerprint,
     };
   }
   if (audience !== "runner") fail("audience 只允许 public 或 runner");
@@ -289,6 +341,8 @@ async function describe(id, audience) {
     case: value.publicCase,
     reproduction: value.reproduction,
     expected: value.expected,
+    suite: "full",
+    sourceFingerprint: fingerprint,
   };
 }
 
@@ -304,6 +358,7 @@ async function materialize(id, destinationValue, variant) {
   const patchSha256 = createHash("sha256").update(canonicalPatch).digest("hex");
   if (value.manifest.patchSha256 !== patchSha256) fail("source.patch Hash 与 manifest 不一致");
   const expectedDirtyPaths = [...value.manifest.dirtyPaths].map((path) => normalizePath(path)).sort();
+  const fingerprint = await sourceFingerprint();
 
   let created = false;
   try {
@@ -338,6 +393,7 @@ async function materialize(id, destinationValue, variant) {
       destination,
       baseCommit,
       dirtyPaths: variant === "broken" ? expectedDirtyPaths : [],
+      sourceFingerprint: fingerprint,
     };
   } catch (error) {
     if (created) await rm(destination, { recursive: true, force: true, maxRetries: 3 }).catch(() => undefined);

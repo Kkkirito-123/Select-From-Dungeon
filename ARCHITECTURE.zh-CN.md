@@ -41,9 +41,15 @@ game TriggerBus
 
 ## 维护器边界
 
-外部 Dungeon Maintainer 只能通过固定 `.maintainer/project.json` 标识识别本仓库。浏览器桥由
-`game/src/devtools/` 持有，只在本机 Vite 开发页加 `?playtest=agent` 时运行，使用临时内存试玩
-存储，生产产物不得包含该桥。准确工具和投影契约记录在 `game/ARCHITECTURE.md`。
+外部 Dungeon Maintainer 只能通过固定 `.maintainer/project.json` 标识识别本仓库。游戏拥有的
+`scripts/benchmark-adapter.mjs` 是唯一 Benchmark 来源接口：Adapter v2 暴露固定顺序的 7 题
+`full` 套件公开信息，以及绑定当前 Git 提交/工作树、Adapter 和架构地图的 `sourceFingerprint`。
+公开 catalog/describe 不包含隐藏复现与 Oracle；只有 runner describe 可以读取这些数据，物化后的
+修复仓库既不包含 Benchmark 目录，也不包含 Adapter。
+
+浏览器桥由 `game/src/devtools/` 持有，只在本机 Vite 开发页加 `?playtest=agent` 时运行，使用临时
+内存试玩存储，生产产物不得包含该桥。准确的 Adapter、工具、投影与隐藏 Judge 契约记录在
+`game/ARCHITECTURE.md`。
 
 ## 标准验证命令
 

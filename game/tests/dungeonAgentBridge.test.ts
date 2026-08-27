@@ -4,14 +4,16 @@ import { GameSession } from "../src/domain/session/GameSession";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
 import { createEmptyProfile } from "../src/infrastructure/storage/localProgress";
 import {
-  buildDungeonAgentView,
   dungeonAgentInteractionFingerprint,
-  dungeonAgentMoveStopReason,
-  findDungeonAgentFrontier,
-  findDungeonAgentObjective,
   installDungeonAgentBridge,
 } from "../src/devtools/dungeon-agent/bridge";
 import { readDungeonAgentOverlay } from "../src/devtools/dungeon-agent/actions";
+import {
+  dungeonAgentMoveStopReason,
+  findDungeonAgentFrontier,
+  findDungeonAgentObjective,
+} from "../src/devtools/dungeon-agent/navigation";
+import { buildDungeonAgentView } from "../src/devtools/dungeon-agent/projection";
 
 describe("Dungeon Agent 玩家投影", () => {
   it("Benchmark 起点只接受游戏登记的管理员预设并返回隐藏裁判摘要", () => {

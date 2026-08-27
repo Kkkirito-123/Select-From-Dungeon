@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -27,15 +27,26 @@ afterEach(async () => {
 });
 
 describe("game-owned Benchmark Adapter", () => {
-  it("只通过版本化 catalog 暴露 12 个公开案例", async () => {
+  it("只通过版本化 catalog 暴露有序的 7 个公开案例", async () => {
     const result = await runAdapter(["catalog"]);
-    expect(result.schemaVersion).toBe(1);
-    expect(result.adapterVersion).toBe(1);
+    expect(result.schemaVersion).toBe(2);
+    expect(result.adapterVersion).toBe(2);
+    expect(result.suite).toBe("full");
+    expect(result.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/u);
     const cases = result.cases as Array<Record<string, unknown>>;
-    expect(cases).toHaveLength(12);
-    expect(cases.map((entry) => entry.fixtureId)).toContain("terminal-action-bug");
+    expect(cases).toHaveLength(7);
+    expect(cases.map((entry) => entry.fixtureId)).toEqual([
+      "terminal-action-bug",
+      "accepted-query-without-progress",
+      "final-stage-boss-stuck-at-one-hp",
+      "admin-floor-transition-deadlock",
+      "transition-lost-after-reload",
+      "stale-query-plan-evidence",
+      "duplicate-final-victory-commit",
+    ]);
     expect(JSON.stringify(result)).not.toContain("secretInputs");
     expect(JSON.stringify(result)).not.toContain("beforeOracle");
+    expect(JSON.stringify(result)).not.toContain("expectedRouteFeatures");
   });
 
   it("仅向 runner 返回复现和隐藏判卷数据", async () => {
@@ -43,6 +54,7 @@ describe("game-owned Benchmark Adapter", () => {
       "describe", "--fixture", "terminal-action-bug", "--audience", "public",
     ]);
     expect(publicResult).toHaveProperty("case.fixtureId", "terminal-action-bug");
+    expect(publicResult).toHaveProperty("suite", "full");
     expect(publicResult).not.toHaveProperty("reproduction");
     expect(publicResult).not.toHaveProperty("expected");
 
@@ -51,6 +63,29 @@ describe("game-owned Benchmark Adapter", () => {
     ]);
     expect(runnerResult).toHaveProperty("reproduction.fixtureId", "terminal-action-bug");
     expect(runnerResult).toHaveProperty("expected.fixtureId", "terminal-action-bug");
+    expect(runnerResult).toHaveProperty("expected.schemaVersion", 3);
+    expect(runnerResult).toHaveProperty(
+      "expected.expectedRouteFeatures",
+      ["feature.terminal-action"],
+    );
+    expect(runnerResult).toHaveProperty("suite", "full");
+    expect(runnerResult.sourceFingerprint).toBe(publicResult.sourceFingerprint);
+  });
+
+  it("工作树中未跟踪文件的内容变化会使 sourceFingerprint 失效", async () => {
+    const probe = join(repositoryRoot, `benchmark-fingerprint-probe-${process.pid}.txt`);
+    try {
+      const baseline = await runAdapter(["catalog"]);
+      await writeFile(probe, "first", "utf8");
+      const first = await runAdapter(["catalog"]);
+      await writeFile(probe, "second", "utf8");
+      const second = await runAdapter(["catalog"]);
+
+      expect(first.sourceFingerprint).not.toBe(baseline.sourceFingerprint);
+      expect(second.sourceFingerprint).not.toBe(first.sourceFingerprint);
+    } finally {
+      await rm(probe, { force: true });
+    }
   });
 
   it("全部公开案例都能通过 runner manifest 与补丁 Hash 校验", async () => {
@@ -63,8 +98,11 @@ describe("game-owned Benchmark Adapter", () => {
       expect(result).toHaveProperty("case.fixtureId", entry.fixtureId);
       expect(result).toHaveProperty("reproduction.fixtureId", entry.fixtureId);
       expect(result).toHaveProperty("expected.fixtureId", entry.fixtureId);
+      expect(result).toHaveProperty("expected.schemaVersion", 3);
+      expect((result.expected as { expectedRouteFeatures: unknown[] }).expectedRouteFeatures.length)
+        .toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it("从当前游戏物化单提交 Bug 仓库且不复制隐藏案例", async () => {
     const parent = await mkdtemp(join(tmpdir(), "game-benchmark-adapter-test-"));
@@ -77,6 +115,9 @@ describe("game-owned Benchmark Adapter", () => {
       "--variant", "broken",
     ]);
     expect(result.fixtureId).toBe("accepted-query-without-progress");
+    expect(result.schemaVersion).toBe(2);
+    expect(result.adapterVersion).toBe(2);
+    expect(result.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/u);
     expect(result.dirtyPaths).toEqual(["game/src/domain/session/combat/resolveCombatHit.ts"]);
     await expect(readFile(join(destination, "benchmark", "agent-evals", "accepted-query-without-progress", "expected.json")))
       .rejects.toMatchObject({ code: "ENOENT" });
