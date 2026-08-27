@@ -4,7 +4,6 @@
  * 负责校验 manifest、复用 IndexedDB 缓存、下载并解析 SQLite 题库；失败
  * 时返回 null 交给上层降级。它不修改 Run，也不参与 SQL 判题。
  */
-import initSqlJs from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import {
   QuestionBankCatalog,
@@ -19,6 +18,7 @@ import {
 import type { AuthoredLessonStageId, QueryFeature } from "../../domain/shared/types";
 import type { FloorNumber, RunLessonId } from "../../domain/progression/runGraph";
 import { QuestionBankCache, type CachedQuestionBank } from "../../infrastructure/storage/questionBankCache";
+import { initSqlRuntime } from "../../infrastructure/sql/initSqlRuntime";
 
 interface QuestionBankManifest {
   bankVersion: string;
@@ -137,7 +137,7 @@ async function catalogFromBytes(
 ): Promise<QuestionBankCatalog | null> {
   try {
     if (cached.schemaVersion !== QUESTION_BANK_CONFIG.schemaVersion) return null;
-    const SQL = await initSqlJs({ locateFile: () => wasmLocation });
+    const SQL = await initSqlRuntime(wasmLocation);
     const database = new SQL.Database(new Uint8Array(cached.bytes));
     try {
       const result = database.exec(`

@@ -26,6 +26,7 @@ const CRITICAL_DOM_IDS = [
   "open-admin",
   "audio-toggle",
   "audio-volume",
+  "github-link",
   "reset-game",
   "agent-panel",
   "main-status",
@@ -61,6 +62,11 @@ describe("AppShell 静态 DOM 契约", () => {
     expect(markup).not.toContain("main-situation");
     expect(markup).not.toContain("agent-scribe-title");
     expect(markup).toContain('id="admin-next-floor"');
+    expect(markup).toContain('href="https://github.com/Kkkirito-123/Select-From-Dungeon"');
+    expect(markup).toContain('aria-label="在 GitHub 查看 SELECT FROM DUNGEON 项目"');
+    expect(markup).toContain('class="github-link__brand">GitHub</strong>');
+    expect(markup).toContain('class="github-link__text">查看项目</span>');
+    expect(markup).toContain('class="github-link__prompt">喜欢就点个 <em>Star</em> ⭐~</span>');
     expect(markup).not.toContain("admin-floor-list");
     expect(markup).not.toContain("admin-region-list");
     expect(markup).not.toContain("admin-preset-list");

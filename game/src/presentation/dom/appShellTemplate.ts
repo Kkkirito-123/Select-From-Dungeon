@@ -34,6 +34,10 @@ export function appShellTemplate({
             <button id="open-review" type="button" class="review-toggle">▤ 答题复盘</button>
             <button id="audio-toggle" type="button" class="audio-toggle" aria-pressed="false">♪ 声音开启</button>
             <label class="volume-control"><span>音量</span><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.55"></label>
+            <a id="github-link" class="github-link" href="https://github.com/Kkkirito-123/Select-From-Dungeon" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 SELECT FROM DUNGEON 项目">
+              <svg class="github-link__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.18-3.37-1.18-.46-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 7.8c.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.33 4.69-4.56 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" /></svg>
+              <span class="github-link__label"><strong class="github-link__brand">GitHub</strong><span class="github-link__text">查看项目</span><span class="github-link__prompt">喜欢就点个 <em>Star</em> ⭐~</span></span>
+            </a>
           </div>
         </header>
 

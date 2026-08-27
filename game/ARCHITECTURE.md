@@ -200,7 +200,7 @@ index.html -> src/application/main.ts
   -> EncounterDirector (deterministic step meter, safe windows, ambush choice)
   -> MonsterRoaming (deterministic slow patrol decisions)
   -> LootDirector (seeded independent candidates and same-battle deduplication)
-  -> SqlEngine (in-memory SQLite WASM, seed data, SELECT/WITH execution, HP sync)
+  -> SqlEngine (in-memory SQLite runtime: WASM first, asm.js fallback, seed data, SELECT/WITH execution, HP sync)
   -> lessonEvaluator (query features, lesson locks, result semantics)
   -> NarrativeContent/NarrativeDomain (beats, evidence, ascents, MIGRATE)
   -> ActorVisuals/PixelActorFactory (shared world/battle actor recipes)
@@ -449,7 +449,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   current value of a player-visible textarea while its
   terminal is open; closed terminals and `snapshot.adminAnswerSql` remain outside the projection.
   Production builds must not contain an accessible `window.__DUNGEON_PLAYTEST__`.
-- SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.
+- SQL execution remains entirely in the browser through `sql.js`. The runtime
+  prefers SQLite WASM and falls back to the bundled asm.js build when the host
+  blocks WebAssembly code generation, so static hosting and restricted embedded
+  browsers use the same game path.
   Campfire review uses only current-floor local snapshot records, and the Scribe
   uses authored content plus a bounded scene projection. If explicitly configured,
   the optional Agent endpoint receives one changed child projection and
@@ -635,9 +638,11 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - The renderer targets 30 FPS. Page-hidden lifecycle handling flushes progress,
   sleeps the Phaser loop, stops scheduled audio, and resumes safely when visible.
   Unchanged heavy HUD lists are reused instead of rebuilt on every snapshot.
-- The production build keeps Phaser, `sql.js`, and SQLite WASM in separate
-  cacheable assets. `sqlite-runtime` must remain outside the application entry;
-  the WASM file remains an external fetched asset and is not inlined.
+- The production build keeps Phaser, `sql.js`, and the SQLite runtime in
+  separate cacheable assets. `sqlite-runtime` must remain outside the
+  application entry; the WASM file remains an external fetched asset and is
+  not inlined. The bundled asm.js fallback is used only when WASM initialization
+  is rejected by the host environment.
 - The repository-root `.github/workflows/deploy-pages.yml` is opt-in through
   `PAGES_ENABLED=true` and must validate both projects and `game/dist` before
   deployment. If private-repository Pages is rejected by the provider/plan,

@@ -121,7 +121,7 @@ index.html -> src/application/main.ts
   -> EncounterDirector（确定性步数计量、安全期与伏击选择）
   -> MonsterRoaming（确定性的缓慢巡逻决策）
   -> LootDirector（种子化独立恢复品候选与同场去重）
-  -> SqlEngine（内存 SQLite WASM、初始数据、SELECT/WITH 执行和 HP 同步）
+  -> SqlEngine（内存 SQLite 运行时：优先 WASM，失败回退 asm.js、初始数据、SELECT/WITH 执行和 HP 同步）
   -> lessonEvaluator（查询特征、关卡知识锁与结果语义判定）
   -> NarrativeContent/NarrativeDomain（叙事拍、证据、上升路线与 MIGRATE）
   -> ActorVisuals/PixelActorFactory（地图/战斗同源角色配方）
@@ -294,7 +294,9 @@ pnpm build
   进入 `look`、动作结果或模型上下文。SQL 的唯一例外是当前玩家可见终端保持打开时，其 textarea 的当前值；
   已关闭终端与 `snapshot.adminAnswerSql` 始终在投影之外。生产构建不得暴露
   `window.__DUNGEON_PLAYTEST__`。
-- SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，抄写员使用作者内容
+- SQL 仍完全通过浏览器内的 `sql.js` 执行。运行时优先使用 SQLite WASM；当宿主禁止 WebAssembly
+  代码生成时，回退到随包提供的 asm.js 构建，因此静态托管和受限嵌入式浏览器使用同一条游戏路径。
+  篝火复盘只读取当前层本地快照，抄写员使用作者内容
   和受限场景投影。明确配置后，唯一 `POST /v1/agent/run` 接收变化方投影和同层子结果。游戏没有 Agent 存档，未配置服务时完全使用本地文案。
 - Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。主 Agent 只看到已经校验的子 Agent 展示文本；
   子请求仍遵守篝火最多八条 SQL 投影和抄写员受限场景证据边界。请求不包含参考 SQL、完整
@@ -401,8 +403,9 @@ pnpm build
   改变游戏状态。
 - 渲染目标为 30 FPS。页面隐藏时先刷新存档，再暂停 Phaser 循环与音频调度；页面恢复后安全
   唤醒。未变化的重型 HUD 列表会复用，不在每个快照上重复创建 DOM。
-- 生产构建将 Phaser、`sql.js` 与 SQLite WASM 保持为独立可缓存资源；`sqlite-runtime` 不得重新
-  合入应用入口，WASM 继续作为外部文件获取，不允许内联。
+- 生产构建将 Phaser、`sql.js` 与 SQLite 运行时保持为独立可缓存资源；`sqlite-runtime` 不得重新
+  合入应用入口，WASM 继续作为外部文件获取，不允许内联。只有当宿主拒绝初始化 WASM 时，才使用
+  随包提供的 asm.js 回退。
 - 仓库根 `.github/workflows/deploy-pages.yml` 只在 `PAGES_ENABLED=true` 时验证两个工程并部署 `game/dist`。
   如果私有仓库套餐拒绝 Pages，保持仓库私有和变量 false/未设置，记录 `provider-blocked`；无新授权不购买、公开或换托管商。
   当前拆包保持为 MVP 2.0 基线，包体/运行时优化延后到独立 MVP 2.1。

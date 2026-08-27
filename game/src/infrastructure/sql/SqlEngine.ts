@@ -1,5 +1,5 @@
-import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
+import { type Database, type SqlJsStatic } from "sql.js";
 import { SQL_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import { SQL_SCHEMA_DDL } from "../../content/sql/sqlSchema";
 import { detectQueryFeatures } from "../../domain/learning/queryFeatureDetector";
@@ -19,6 +19,7 @@ import {
   MONSTER_GEAR_FIXTURES,
   MONSTER_SIGNAL_FIXTURES,
 } from "../../content/sql/sqlFixtures";
+import { initSqlRuntime } from "./initSqlRuntime";
 
 const MAX_RESULT_ROWS = SQL_RUNTIME_CONFIG.maxResultRows;
 
@@ -32,7 +33,7 @@ export class SqlEngine {
     monsters: Monster[],
     wasmLocation = wasmUrl,
   ): Promise<SqlEngine> {
-    const SQL = await initSqlJs({ locateFile: () => wasmLocation });
+    const SQL = await initSqlRuntime(wasmLocation);
     const engine = new SqlEngine(SQL, new SQL.Database());
     engine.seed(monsters);
     return engine;

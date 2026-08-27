@@ -204,6 +204,76 @@ h1 span {
   white-space: nowrap;
 }
 
+.github-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-column: 2 / -1;
+  min-height: 60px;
+  padding: 10px 16px;
+  border-left: 3px solid var(--query);
+  color: var(--gold-light);
+  background: linear-gradient(90deg, #1c222b, #13161c 72%);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.github-link:hover,
+.github-link:focus-visible {
+  color: var(--gold-light);
+}
+
+.github-link__icon {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+  flex: 0 0 auto;
+}
+
+.github-link__label {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 14px;
+  line-height: 1;
+}
+
+.run-console .github-link__brand {
+  color: var(--gold-light);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.run-console .github-link__text {
+  color: var(--paper);
+  font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.run-console .github-link__prompt {
+  color: var(--query);
+  font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.run-console .github-link__prompt em {
+  color: var(--gold-light);
+  font-family: "Times New Roman", Times, serif;
+  font-size: 15px;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
 .volume-control {
   display: grid;
   align-content: center;

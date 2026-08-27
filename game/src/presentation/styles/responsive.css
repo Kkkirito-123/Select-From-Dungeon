@@ -413,7 +413,13 @@
   .monster-codex-toggle,
   .narrative-toggle,
   .review-toggle,
-  .admin-toggle { padding-inline: 5px !important; }
+  .admin-toggle,
+  .github-link { padding-inline: 5px !important; }
+  .run-console .github-link {
+    grid-column: 1 / -1;
+    min-height: 52px;
+    padding-block: 8px;
+  }
   .target-card { width: 57%; }
   .touch-controls { grid-template-columns: 1fr 62px 62px 62px; }
   .onboarding-card__actions { grid-template-columns: 1fr; }

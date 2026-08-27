@@ -1,0 +1,755 @@
+/*
+ * Visual polish layer.
+ * Keep the existing game/map structure intact; this layer only tunes
+ * typography, contrast, spacing, and interaction states.
+ */
+:root {
+  --font-ui: "Times New Roman", "Microsoft YaHei", "微软雅黑", serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --abyss: #07090e;
+  --basalt: #171b24;
+  --basalt-raised: #222837;
+  --iron: #3d4555;
+  --iron-light: #788296;
+  --plum: #503a63;
+  --plum-light: #a379b8;
+  --gold: #e1b65c;
+  --gold-light: #f6d995;
+  --query: #75d8c5;
+  --query-deep: #347d73;
+  --ember: #d45e55;
+  --paper: #f1e8d2;
+  --muted: #b2b7c3;
+  --line: #464e5d;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+button,
+input,
+textarea,
+select,
+option {
+  font-family: var(--font-ui);
+}
+
+code,
+pre,
+kbd,
+#sql-editor,
+#gate-sql-editor,
+.agent-work__log {
+  font-family: var(--font-mono) !important;
+}
+
+body h1,
+body h2,
+body h3,
+body h4,
+body h5,
+body h6,
+body p,
+body span,
+body strong,
+body small,
+body label,
+body button,
+body a,
+body summary,
+body li,
+body dt,
+body dd,
+body blockquote,
+body figcaption,
+body em {
+  font-family: var(--font-ui) !important;
+}
+
+.eyebrow,
+.mission-kicker,
+.hud-label,
+.terminal-prompt,
+.target-card__kicker,
+.run-console span,
+.volume-control span,
+.card-heading,
+.terminal-schema-reference summary,
+.agent-panel,
+.boot-screen,
+.fatal-error {
+  font-family: var(--font-ui) !important;
+}
+
+.page-frame {
+  padding-top: 24px;
+}
+
+.masthead {
+  gap: 30px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom-color: rgba(117, 216, 197, 0.3);
+}
+
+.eyebrow,
+.mission-kicker,
+.hud-label,
+.terminal-prompt,
+.target-card__kicker,
+.run-console span,
+.volume-control span {
+  color: var(--query);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+h1 {
+  font-family: var(--font-ui) !important;
+  font-size: clamp(38px, 5vw, 68px);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-shadow: 4px 4px 0 #2d2036, 0 0 26px rgba(225, 182, 92, 0.12);
+}
+
+h1 span {
+  font-family: var(--font-ui) !important;
+  color: var(--gold);
+}
+
+.title-sub {
+  margin-top: 9px;
+  color: #9ca3b2;
+  font-family: var(--font-ui) !important;
+  font-size: 11px;
+  letter-spacing: 0.19em;
+}
+
+.run-console {
+  border-color: #4c5565;
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.42), 0 0 24px rgba(117, 216, 197, 0.05);
+}
+
+.run-console > div,
+.run-console > button,
+.volume-control {
+  min-height: 54px;
+  padding: 9px 12px;
+}
+
+.run-console strong {
+  color: var(--gold-light);
+  font-family: var(--font-ui) !important;
+  font-size: 13px;
+}
+
+.audio-toggle,
+.monster-codex-toggle,
+.narrative-toggle,
+.review-toggle,
+.admin-toggle {
+  color: var(--paper);
+  font-family: var(--font-ui) !important;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.github-link {
+  min-height: 68px;
+  border-left-width: 4px;
+  padding: 11px 17px;
+  background: linear-gradient(100deg, #202b32 0%, #151a23 68%, #12161d 100%);
+  box-shadow: inset 0 1px 0 rgba(117, 216, 197, 0.1);
+}
+
+.github-link__icon {
+  width: 32px;
+  height: 32px;
+}
+
+.run-console .github-link__brand {
+  font-family: var(--font-ui) !important;
+  font-size: 19px;
+}
+
+.run-console .github-link__text {
+  font-family: var(--font-ui) !important;
+  font-size: 16px;
+}
+
+.run-console .github-link__prompt {
+  font-family: var(--font-ui) !important;
+  font-size: 15px;
+}
+
+.run-console .github-link__prompt em {
+  font-family: var(--font-ui) !important;
+  font-size: 17px;
+}
+
+.game-layout {
+  gap: 15px;
+}
+
+.agent-panel {
+  color: #cbe8de;
+}
+
+.agent-card,
+.dungeon-panel,
+.onboarding-card,
+.mission-card,
+.castle-map-card,
+.mastery-card,
+.schema-codex-card,
+.control-card {
+  border-color: #465061;
+  box-shadow: 9px 9px 0 rgba(0, 0, 0, 0.46), 0 0 0 1px rgba(117, 216, 197, 0.035);
+}
+
+.agent-card__heading {
+  min-height: 50px;
+  padding: 12px 14px;
+  color: var(--paper);
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+}
+
+.agent-card__heading > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-card__heading strong {
+  color: var(--gold-light);
+  font-size: 12px;
+}
+
+.main-plan {
+  padding: 25px 17px 27px;
+}
+
+.main-plan > span {
+  font-size: 13px;
+}
+
+.main-plan p {
+  margin-top: 20px;
+  padding-top: 20px;
+  color: #c2fff0;
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+.main-plan p::before {
+  margin-bottom: 11px;
+  font-size: 11px;
+}
+
+.agent-work__flow {
+  gap: 5px;
+  padding: 9px 11px;
+}
+
+.agent-work__row {
+  min-height: 31px;
+  gap: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-work__index {
+  font-size: 10px;
+}
+
+.agent-work__state {
+  font-size: 11px;
+}
+
+.agent-work__activity {
+  gap: 5px;
+  padding: 10px 14px;
+}
+
+.agent-work__activity > span {
+  font-size: 11px;
+}
+
+.agent-work__activity p {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.agent-work__usage {
+  gap: 5px;
+  padding: 10px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.agent-work__log {
+  padding: 9px 14px 12px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.hud-strip {
+  min-height: 68px;
+  gap: 11px;
+  padding: 11px 14px;
+  background: linear-gradient(180deg, #1a1f2a, #151921);
+}
+
+.hud-strip strong {
+  font-family: var(--font-ui) !important;
+  font-size: 13px;
+}
+
+.target-card {
+  border-color: #8a7650;
+  padding: 12px 13px;
+  background: rgba(9, 11, 16, 0.96);
+}
+
+.target-card strong {
+  font-family: var(--font-ui) !important;
+  font-size: clamp(14px, 1.4vw, 18px);
+}
+
+.target-card__meta,
+#target-hp-value,
+.target-card__intent,
+.target-card__intent b {
+  font-family: var(--font-ui) !important;
+  font-size: 10px;
+}
+
+.retreat-action {
+  font-family: var(--font-ui) !important;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.pickup-card p,
+.narrative-beat-card p,
+.combat-result-card p,
+.combat-result-card small,
+.campfire-menu p,
+.scribe-recap p,
+.campfire-recap p,
+.inventory-item p,
+.loot-item p,
+.loadout-menu__note {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.pickup-card strong,
+.narrative-beat-card > strong,
+.combat-result-card > strong,
+.campfire-menu h2,
+.loadout-menu__header h2,
+.inventory-item > strong,
+.loot-item strong {
+  font-family: var(--font-ui) !important;
+}
+
+.pickup-card > span,
+.narrative-beat-card > span,
+.narrative-beat-card > small,
+.combat-result-card > span,
+.campfire-menu > span,
+.loadout-menu__header span,
+.equipped-summary span,
+.equipped-summary small,
+.loot-item > div:first-child span {
+  font-family: var(--font-ui) !important;
+  font-size: 11px;
+}
+
+.campfire-menu__actions button,
+.campfire-menu__leave,
+.inventory-item__actions button,
+.loot-menu__take-all,
+.floor-portal__actions button {
+  font-family: var(--font-ui) !important;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.interaction-prompt {
+  border-color: #6b7485;
+  padding: 7px 11px;
+  font-family: var(--font-ui) !important;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.onboarding-card,
+.mission-card,
+.schema-codex-card,
+.control-card {
+  padding: 17px;
+}
+
+.onboarding-card__topline > span,
+.mission-card .story-thread span,
+.mission-card .banner,
+.map-legend,
+.mastery-list span,
+.relic-list span,
+.reset-action {
+  font-family: var(--font-ui) !important;
+  font-size: 11px;
+}
+
+.onboarding-card h2,
+.mission-card h2 {
+  font-family: var(--font-ui) !important;
+  font-size: 23px;
+}
+
+.onboarding-card p,
+.mission-card p,
+.control-card p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.mission-card .story-thread {
+  gap: 5px;
+  padding: 10px 11px;
+}
+
+.mission-card .story-thread strong {
+  font-family: var(--font-ui) !important;
+  font-size: 16px;
+}
+
+.mission-card .story-thread p {
+  font-size: 12px;
+}
+
+.onboarding-card__actions button,
+.guide-replay,
+.reset-action {
+  font-size: 12px;
+}
+
+.map-legend {
+  gap: 7px 13px;
+  color: #9ca4b3;
+}
+
+.schema-codex-intro,
+.schema-codex-note,
+.schema-table-panel > p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.schema-table-tabs {
+  gap: 7px;
+  margin: 13px 0;
+}
+
+.schema-table-tabs button {
+  min-height: 48px;
+  padding: 8px 7px;
+  font-family: var(--font-ui) !important;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.schema-table-panel {
+  padding: 12px;
+}
+
+.schema-table-heading {
+  font-family: var(--font-ui) !important;
+}
+
+.schema-table-heading strong {
+  font-size: 15px;
+}
+
+.schema-table-heading span {
+  font-size: 12px;
+}
+
+.schema-column-row {
+  gap: 5px 9px;
+  padding-top: 8px;
+}
+
+.schema-column-type,
+.schema-column-badges i,
+.schema-relation-trace strong {
+  font-family: var(--font-ui) !important;
+}
+
+.schema-column-row > code {
+  font-size: 12px;
+}
+
+.schema-column-type {
+  font-size: 11px;
+}
+
+.schema-column-badges i {
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
+.schema-column-row > small {
+  font-family: var(--font-ui) !important;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.schema-relation-trace {
+  gap: 7px;
+  padding: 10px;
+}
+
+.schema-relation-trace strong {
+  font-size: 11px;
+}
+
+.page-footer {
+  color: #8f97a7;
+  font-family: var(--font-ui) !important;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.feedback-toast {
+  padding: 12px 15px;
+  font-family: var(--font-ui) !important;
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 7px 7px 0 rgba(0, 0, 0, 0.56), 0 0 20px rgba(117, 216, 197, 0.08);
+}
+
+.terminal-brief > p,
+.task-brief__section > p,
+.task-brief__fallback,
+.table-wrap.result-shape p,
+.answer-review__empty,
+.answer-review-entry__feedback,
+.answer-review-entry__objective,
+.answer-review-entry__label,
+.admin-menu__header p,
+.admin-menu__warning {
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.card-heading,
+.task-brief__tier,
+.task-brief__section > strong,
+.lock-list span,
+.schema-task-note,
+.schema-task-table strong,
+.schema-task-table i,
+.sql-assist-rail,
+.admin-summary,
+.admin-next-floor,
+.answer-review-entry__heading {
+  font-family: var(--font-ui) !important;
+}
+
+.card-heading {
+  font-size: 14px;
+}
+
+.card-heading span:last-child {
+  font-size: 12px;
+}
+
+.task-brief__section > strong {
+  font-size: 11px;
+}
+
+.task-brief__section--fields > p,
+.task-brief__section--relation > p {
+  font-family: var(--font-mono) !important;
+  font-size: 12px;
+}
+
+.lock-list span,
+.schema-task-note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.schema-task-table strong {
+  font-size: 13px;
+}
+
+.schema-task-table i {
+  font-size: 11px;
+}
+
+.sql-assist-rail {
+  font-size: 11px;
+}
+
+.terminal-schema-reference summary {
+  font-size: 13px;
+}
+
+.terminal-schema-reference summary span {
+  font-size: 11px;
+}
+
+.primary-action,
+.quiet-action,
+.icon-action,
+.terminal-grid button,
+.answer-review button,
+.admin-menu button {
+  font-family: var(--font-ui) !important;
+}
+
+button:not(:disabled):hover,
+button:not(:disabled):focus-visible,
+a:hover,
+a:focus-visible,
+summary:hover {
+  filter: brightness(1.12);
+}
+
+button:active:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+@media (max-width: 780px) {
+  .page-frame {
+    padding-top: 14px;
+  }
+
+  .masthead {
+    margin-bottom: 13px;
+  }
+
+  .eyebrow,
+  .mission-kicker,
+  .hud-label,
+  .terminal-prompt,
+  .target-card__kicker,
+  .run-console span,
+  .volume-control span {
+    font-size: 10px;
+  }
+
+  h1 {
+    font-size: clamp(34px, 12vw, 50px);
+  }
+
+  .run-console > div,
+  .run-console > button {
+    min-height: 48px;
+  }
+
+  .audio-toggle,
+  .monster-codex-toggle,
+  .narrative-toggle,
+  .review-toggle,
+  .admin-toggle {
+    font-size: 12px;
+  }
+
+  .github-link {
+    min-height: 62px;
+    padding: 9px 12px;
+  }
+
+  .github-link__icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .run-console .github-link__brand {
+    font-size: 17px;
+  }
+
+  .run-console .github-link__text {
+    font-size: 14px;
+  }
+
+  .run-console .github-link__prompt {
+    font-size: 13px;
+  }
+
+  .onboarding-card,
+  .mission-card,
+  .schema-codex-card,
+  .control-card {
+    padding: 14px;
+  }
+
+  .onboarding-card h2,
+  .mission-card h2 {
+    font-size: 21px;
+  }
+
+  .onboarding-card p,
+  .mission-card p,
+  .control-card p,
+  .schema-codex-intro,
+  .schema-codex-note,
+  .schema-table-panel > p {
+    font-size: 13px;
+  }
+
+  .hud-strip {
+    min-height: 58px;
+    padding: 9px 10px;
+  }
+
+  .hud-strip strong {
+    font-size: 12px;
+  }
+
+  .target-card strong {
+    font-size: 14px;
+  }
+
+  .schema-table-tabs button {
+    min-height: 46px;
+    font-size: 11px;
+  }
+
+  .schema-column-row > code {
+    font-size: 12px;
+  }
+
+  .interaction-prompt {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):hover,
+  button:not(:disabled):focus-visible,
+  a:hover,
+  a:focus-visible {
+    filter: none;
+  }
+}
