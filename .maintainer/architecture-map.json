@@ -3,7 +3,7 @@
   "contractId": "dungeon.game.architecture",
   "contractVersion": 1,
   "projectRoot": "game",
-  "boundaryRevision": 1,
+  "boundaryRevision": 2,
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
     { "id": "application", "root": "game/src/application", "responsibility": "启动、用例编排、运行时配置和页面生命周期" },
@@ -556,7 +556,7 @@
       "roots": ["domain.session.combat", "domain.session.learning", "domain.learning", "domain.session", "infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
       "responsibility": "题目提示、SQL 判定、正确查询推进与学习记录",
       "notResponsibleFor": ["SQLite 沙箱事务", "终端视觉样式"],
-      "signals": ["正确查询没有推进", "答案提示被拒绝", "判题失败", "课程没有完成", "accepted query", "hint rejected", "学习阶段"],
+      "signals": ["正确查询没有推进", "答案提示被拒绝", "判题失败", "课程没有完成", "accepted query", "hint rejected", "学习阶段", "查询已通过", "阶段状态"],
       "negativeSignals": ["事务状态泄漏", "执行计划过期"],
       "neighbors": ["infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
       "route": {
@@ -590,7 +590,7 @@
       "roots": ["domain.session.progression", "domain.session", "domain.progression", "infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom"],
       "responsibility": "换层状态、自动传送、保存、刷新恢复和重复提交边界",
       "notResponsibleFor": ["楼层作者正文", "IndexedDB UI"],
-      "signals": ["切换后丢失", "刷新后回到上一层", "transition lost", "重复最终胜利", "重复提交胜利", "自动传送失败", "reload", "持久化"],
+      "signals": ["切换后丢失", "刷新后回到上一层", "transition lost", "重复最终胜利", "重复提交胜利", "自动传送失败", "reload", "持久化", "管理员辅助", "自动传送", "原层", "传送动画结束", "下一层加载", "胜场计数一次结算增加两次", "幂等性"],
       "negativeSignals": ["地图地标配置"],
       "neighbors": ["infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom"],
       "route": {
@@ -607,7 +607,7 @@
       "roots": ["infrastructure.sql", "domain.learning", "content.sql", "content.curriculum", "domain.session"],
       "responsibility": "SQLite 沙箱事务、查询执行与执行计划证据",
       "notResponsibleFor": ["课程文案", "终端按钮事件"],
-      "signals": ["事务沙箱状态泄漏", "transaction sandbox", "执行计划过期", "stale query plan", "query plan", "rollback", "sqlite"],
+      "signals": ["事务沙箱状态泄漏", "transaction sandbox", "执行计划过期", "stale query plan", "query plan", "rollback", "sqlite", "执行计划仍显示 SCAN", "真实查询结果不同步"],
       "negativeSignals": ["终端动作不可用"],
       "neighbors": ["domain.learning", "content.sql", "content.curriculum"],
       "route": {
@@ -691,7 +691,7 @@
   "runtime": {
     "sourceRoot": "game",
     "bridgeProtocol": 3,
-    "adapterVersion": 1,
+    "adapterVersion": 2,
     "supportedCapabilities": ["catalog", "describe", "materialize"]
   },
   "maintenancePolicy": {
@@ -704,6 +704,6 @@
   },
   "boundary": {
     "algorithm": "direct-child-v1",
-    "signature": "af85378587abdc2565571d38fed06e190d3d18e75f525a885d3fd4a4a069694a"
+    "signature": "d7d5897b79887ac82f30fad3780f85e32a6fbd6ad971e26b65a48845700fb6f5"
   }
 }

@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "fixtureId": "terminal-action-bug",
+  "expectedRouteFeatures": ["feature.terminal-action"],
   "secretInputs": {},
   "beforeOracle": "terminal-action-unavailable",
   "afterOracle": "terminal-action-available",

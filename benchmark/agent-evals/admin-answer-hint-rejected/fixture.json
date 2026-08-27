@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 2,
-  "id": "admin-answer-hint-rejected",
-  "base": "game-repair-v1",
-  "sourcePatch": "source.patch",
-  "patchSha256": "cf7b80bde1c62b4b15a49f1421555936903e32ad8986c99aedaf81cf328759ed",
-  "dirtyPaths": ["game/src/domain/learning/lessonResultEvaluator.ts"]
-}

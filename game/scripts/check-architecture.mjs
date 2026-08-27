@@ -43,6 +43,70 @@ function safeRelativeDirectory(value, label) {
   return value.replaceAll("\\", "/").replace(/\/$/u, "");
 }
 
+/** 计算架构 feature 对公开题干的确定性信号分数。 */
+function featureSignalScore(feature, prompt) {
+  const normalized = String(prompt).toLocaleLowerCase("zh-CN").replace(/\s+/gu, " ").trim();
+  if (feature.negativeSignals.some((signal) => normalized.includes(signal.toLocaleLowerCase("zh-CN")))) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return feature.signals.reduce((score, signal) => (
+    normalized.includes(signal.toLocaleLowerCase("zh-CN"))
+      ? score + signal.length
+      : score
+  ), 0);
+}
+
+/** 校验游戏拥有的隐藏 Benchmark 路由合同，不输出隐藏字段。 */
+async function validateBenchmarkRouteContract(parsed) {
+  const benchmarkRoot = path.join(repositoryRoot, "benchmark", "agent-evals");
+  let directoryEntries;
+  try {
+    directoryEntries = await readdir(benchmarkRoot, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  const entries = directoryEntries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const features = new Map(parsed.features.map((feature) => [feature.id, feature]));
+  for (const fixtureId of entries) {
+    const caseValue = JSON.parse(await readFile(
+      path.join(benchmarkRoot, fixtureId, "case.json"),
+      "utf8",
+    ));
+    const expected = JSON.parse(await readFile(
+      path.join(benchmarkRoot, fixtureId, "expected.json"),
+      "utf8",
+    ));
+    if (
+      !plainObject(caseValue)
+      || caseValue.fixtureId !== fixtureId
+      || !plainObject(expected)
+      || expected.fixtureId !== fixtureId
+      || expected.schemaVersion !== 3
+      || !Array.isArray(expected.expectedRouteFeatures)
+      || expected.expectedRouteFeatures.length === 0
+    ) {
+      throw new Error(`Benchmark ${fixtureId} 必须使用 expected schema v3 路由合同`);
+    }
+    const expectedFeatures = expected.expectedRouteFeatures.map((featureId) => features.get(featureId));
+    if (expectedFeatures.some((feature) => !feature)) {
+      throw new Error(`Benchmark ${fixtureId} 声明了未知 expectedRouteFeatures`);
+    }
+    const ranked = parsed.features
+      .map((feature) => ({ feature, score: featureSignalScore(feature, caseValue.prompt) }))
+      .sort((left, right) => right.score - left.score);
+    const bestScore = ranked[0]?.score ?? 0;
+    if (bestScore <= 0 || expectedFeatures.some((feature) => (
+      featureSignalScore(feature, caseValue.prompt) !== bestScore
+    ))) {
+      throw new Error(`Benchmark ${fixtureId} 的公开题干未稳定命中声明 feature`);
+    }
+  }
+}
+
 async function validateArchitectureMap() {
   const mapPath = path.join(repositoryRoot, ".maintainer", "architecture-map.json");
   const parsed = JSON.parse(await readFile(mapPath, "utf8"));
@@ -88,7 +152,7 @@ async function validateArchitectureMap() {
     ])
     || parsed.runtime.sourceRoot !== parsed.projectRoot
     || parsed.runtime.bridgeProtocol !== 3
-    || parsed.runtime.adapterVersion !== 1
+    || parsed.runtime.adapterVersion !== 2
     || !validBoundedLines(parsed.runtime.supportedCapabilities, 16, 60)
     || !["catalog", "describe", "materialize"].every((capability) => (
       parsed.runtime.supportedCapabilities.includes(capability)
@@ -425,6 +489,8 @@ async function validateArchitectureMap() {
       throw new Error(`partition ${partition.id} 包含无效相邻分区`);
     }
   }
+
+  await validateBenchmarkRouteContract(parsed);
 
   const directChildren = [];
   for (const [layerId, layerRoot] of layerRoots) {

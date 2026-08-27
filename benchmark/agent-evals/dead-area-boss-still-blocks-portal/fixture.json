@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 2,
-  "id": "dead-area-boss-still-blocks-portal",
-  "base": "game-repair-v1",
-  "sourcePatch": "source.patch",
-  "patchSha256": "102ca52adea87ed99b9bd322df16441ea98bbaeaa770034ec20661f2099a2806",
-  "dirtyPaths": ["game/src/domain/session/progression/regionAccess.ts"]
-}

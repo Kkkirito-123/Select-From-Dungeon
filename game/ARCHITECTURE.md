@@ -258,8 +258,8 @@ encounter rates, navigation thresholds, and storage limits.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
 
-`src/devtools/dungeon-agent/` owns external maintainer protocol v3, with the maintainer retaining a
-v2 compatibility adapter, and remains development-only.
+`src/devtools/dungeon-agent/` owns the sole external maintainer protocol v3 and remains
+development-only. The maintainer rejects every other bridge protocol.
 `protocol.ts` owns types and temporary storage, `actions.ts` owns fixed DOM actions and visible
 overlays, `projection.ts` owns the player-visible view, `navigation.ts` owns internal target/frontier
 BFS and stop reasons, `query.ts` owns browser-only fixed query execution, `trace.ts` owns the bounded
@@ -376,12 +376,30 @@ boundary revision and signature.
 
 Normal inspection routes by capability first and keeps an optional floor as
 context. It expands through the feature's primary, adjacent, shared, and fallback
-roots before the safe area/repository fallback. Legacy schema v1-v3 maps are
-normalized by the maintainer, while an invalid core fails open to ordinary safe
-search. Floor children must not import sibling floors. Common algorithms and
+roots before the safe area/repository fallback. The maintainer accepts only the
+complete current schema v4 map; every other or invalid map falls back to ordinary
+safe search. Floor children must not import sibling floors. Common algorithms and
 services move to a parent service partition and a single registry composes them
 one-way. `GameSession` remains the only mutable session-state committer; focused
 rules such as combat hit resolution live in child services.
+
+### Game-owned Benchmark contract
+
+`../scripts/benchmark-adapter.mjs` is Adapter v2 and the only external source of
+production Benchmark cases. `catalog` returns schema/Adapter version 2, the
+stable ordered `full` suite of 7 public cases, and a SHA-256
+`sourceFingerprint`. The fingerprint covers the current Git commit and
+worktree state plus the Adapter and architecture map; it is an invalidation key,
+not a source or hidden-data projection. Public `describe` returns only the
+public case. Runner `describe` additionally returns the hidden reproduction and
+expected contract. `materialize` creates a one-commit isolated repair repository
+without `benchmark/`, the Adapter, or the source task files.
+
+Each hidden `../benchmark/agent-evals/*/expected.json` uses schema v3 and
+declares one or more `expectedRouteFeatures`. The architecture check requires
+the public prompt to have a positive best match for every declared feature, so
+case routing changes together with the game-owned map rather than a maintainer
+file index. The hidden browser Judge returns only bounded verification fields.
 
 ```text
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
@@ -424,9 +442,11 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   hostname, and `?playtest=agent` all match. It uses a page-memory DataStore and a temporary
   Chromium `sessionStorage` checkpoint that is deleted immediately after restore. The bridge
   exposes only `checkpoint/look/go/use/inputSql/query/judge/events`; `inputSql` writes only the
-  current fixed player textarea, while `query` has no SQL parameter. Node and the model never receive
-  hidden answers, unrevealed hints, complete maps, saves, inventory, identity, or hidden judge
-  details. The only SQL exception is the current value of a player-visible textarea while its
+  current fixed player textarea, while `query` has no SQL parameter. Model-facing projections never
+  receive hidden answers, unrevealed hints, complete maps, saves, inventory, identity, or hidden
+  Judge details. The fixed Benchmark runner alone may read the bounded `judge` summary described
+  above; it is not added to `look`, action results, or model context. The only SQL exception is the
+  current value of a player-visible textarea while its
   terminal is open; closed terminals and `snapshot.adminAnswerSql` remain outside the projection.
   Production builds must not contain an accessible `window.__DUNGEON_PLAYTEST__`.
 - SQL execution remains entirely in the browser through `sql.js`/SQLite WASM.

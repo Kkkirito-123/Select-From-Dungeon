@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "fixtureId": "stale-query-plan-evidence",
+  "expectedRouteFeatures": ["feature.sql-execution-plan"],
   "secretInputs": {
     "indexed-query": "SELECT code, score FROM index_records WHERE id = 3;"
   },

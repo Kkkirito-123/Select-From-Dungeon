@@ -164,7 +164,7 @@ Agent 数据库或输出 Store。
 内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
 
-`src/devtools/dungeon-agent/` 负责外部维护器协议 v3，维护器保留 v2 兼容适配，并且始终只在开发态使用：`protocol.ts` 负责
+`src/devtools/dungeon-agent/` 只负责唯一的外部维护器协议 v3，维护器拒绝其它桥协议，并且始终只在开发态使用：`protocol.ts` 负责
 协议类型与临时存储，`actions.ts` 负责固定 DOM 动作和可见覆盖层，`projection.ts` 负责玩家可见投影，
 `navigation.ts` 负责页面内部目标/frontier BFS 与停止原因，`query.ts` 负责浏览器内部固定查询执行，
 `trace.ts` 负责有限语义环形 Trace，`bridge.ts` 只负责协议生命周期装配。`src/application/main.ts` 只能
@@ -234,11 +234,24 @@ feature/floor root 只登记稳定目录，不登记文件或 Glob。普通文�
 稳定 root、职责或 route 变化才递增边界 revision 并更新签名。
 
 正常 Inspect 先按功能路由，并把楼层作为可选上下文；依次扩展 feature 的 primary、adjacent、shared、
-fallback root，最后才失败开放到 area/仓库。维护器会把旧 schema v1-v3 规范化；核心地图非法时回退
-普通安全搜索。每个楼层 scope 可包含同编号的内容目录，但楼层子单元不得引用兄弟楼层。共同算法和
+fallback root，最后才失败开放到 area/仓库。维护器只接受完整的当前 schema v4；其它或非法地图直接
+回退普通安全搜索。每个楼层 scope 可包含同编号的内容目录，但楼层子单元不得引用兄弟楼层。共同算法和
 服务必须上提到父级服务 partition，由唯一 registry 装配后单向提供给子单元。`neighbors` 不表示运行时
 依赖。`GameSession` 继续是唯一状态提交者，战斗命中等聚焦规则下沉到子服务，楼层模块不得持有第二份
 可变会话状态。
+
+### 游戏拥有的 Benchmark 合同
+
+`../scripts/benchmark-adapter.mjs` 是 Adapter v2，也是生产 Benchmark 案例唯一的外部来源。
+`catalog` 返回 schema/Adapter v2、固定顺序的 7 题 `full` 套件公开信息，以及 SHA-256
+`sourceFingerprint`。该指纹覆盖当前 Git 提交和工作树状态，并显式覆盖 Adapter 与架构地图；它只用于
+失效旧结果，不是源码或隐藏数据投影。公开 `describe` 只返回公开案例；runner `describe` 才额外返回
+隐藏复现和 expected 合同。`materialize` 创建只有一个提交的隔离修复仓库，且不复制 `benchmark/`、
+Adapter 或来源任务文件。
+
+每个隐藏的 `../benchmark/agent-evals/*/expected.json` 使用 schema v3，并声明至少一个
+`expectedRouteFeatures`。架构检查要求公开题干对每个声明 feature 都取得正的最高匹配分，使案例路由随
+游戏拥有的地图一起演进，而不是依赖维护器文件索引。隐藏浏览器 Judge 只返回受限验证字段。
 
 ```text
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
@@ -276,8 +289,9 @@ pnpm build
 - Dungeon Maintainer 桥只有在 `import.meta.env.DEV`、本机主机名和 `?playtest=agent` 同时匹配时安装。
   它使用页面内存 DataStore 和临时 Chromium `sessionStorage` 检查点，恢复后立即删除。桥只暴露
   `checkpoint/look/go/use/inputSql/query/judge/events`；`inputSql` 只写当前固定玩家 textarea，
-  `query` 不接收 SQL 参数；Node 和模型不得收到隐藏答案、未揭示提示、完整地图、存档、背包、
-  身份或隐藏裁判详情。SQL 的唯一例外是当前玩家可见终端保持打开时，其 textarea 的当前值；
+  `query` 不接收 SQL 参数；面向模型的投影不得包含隐藏答案、未揭示提示、完整地图、存档、背包、
+  身份或隐藏 Judge 详情。只有固定 Benchmark runner 可以读取上文所述的受限 `judge` 摘要，该摘要不会
+  进入 `look`、动作结果或模型上下文。SQL 的唯一例外是当前玩家可见终端保持打开时，其 textarea 的当前值；
   已关闭终端与 `snapshot.adminAnswerSql` 始终在投影之外。生产构建不得暴露
   `window.__DUNGEON_PLAYTEST__`。
 - SQL 仍完全通过浏览器内的 `sql.js`/SQLite WASM 执行。篝火复盘只读取当前层本地快照，抄写员使用作者内容
