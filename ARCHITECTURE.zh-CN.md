@@ -8,6 +8,7 @@
 ```text
 game/                    独立 TypeScript/Vite 浏览器游戏
 agent/                   独立 Python 篝火/抄写员/Main 服务
+presence/                独立、无第三方依赖的 Node.js SSE 在线状态服务
 scripts/                 仓库规则校验器及回归测试
 .github/workflows/       跨工程验证和游戏 Pages 部署
 .agents/skills/          需求、实现、交付与同步流程
@@ -16,8 +17,9 @@ LICENSE                  仓库许可证
 ATTRIBUTIONS.md          外部来源与第三方归属登记
 ```
 
-根目录负责仓库治理和分发入口，产品代码分别归属 `game/` 与 `agent/`。游戏详细事实位于
-`game/ARCHITECTURE.md`；Python 服务在确有独立当前事实地图需求前，继续由 `agent/AGENTS.md` 管理。
+根目录负责仓库治理和分发入口，运行时代码分别归属 `game/`、`agent/` 与 `presence/`。游戏详细
+事实位于 `game/ARCHITECTURE.md`；两个较小服务在确有独立当前事实地图需求前，由根规则和各自
+README 管理。
 
 ## 运行与依赖边界
 
@@ -28,15 +30,22 @@ game TriggerBus
   -> POST /v1/agent/run
   -> agent/src/dungeon_agents
       -> Campfire 或 Scribe -> Main
+
+game PresenceClient
+  -> 同源 GET /game/api/presence
+  -> Nginx 代理 -> presence/server.mjs GET /presence
+  -> 内存 SSE 连接数 -> PresencePanel
 ```
 
-- 两个工程不共享源码导入或依赖树。`game/` 不导入 Python 包；`agent/` 不导入游戏 TypeScript、
-  存档或资源。
+- 三个工程不共享源码导入或依赖树。`game/` 不导入 Python 包；`agent/` 不导入游戏 TypeScript、
+  存档或资源；`presence/` 只使用 Node.js 内置模块。
 - Agent 是可选增强层；服务缺失或不可用时，游戏使用确定性本地文案。
 - 游戏规则、SQL 执行、存档、地图、战斗和 UI 只属于 `game/`；篝火合成、抄写员陪伴、Main 引导、
   Provider 调用和无正文遥测只属于 `agent/`。
 - 跨工程变化必须同时更新 HTTP 契约两端并验证两个工程。静态游戏发布只上传 `game/dist/`；Agent
   独立部署，不进入浏览器构建。
+- 在线状态是可选展示增强。每条 SSE 连接计为一个浏览器标签页；服务不保存身份、游戏数据、历史
+  或持久状态，默认监听 `127.0.0.1:8788`，并且只支持单进程实例。服务不可用时游戏仍可游玩。
 - 法律文件保留在仓库根，游戏构建时复制到 `game/dist/`。
 
 ## 维护器边界
@@ -57,6 +66,7 @@ game TriggerBus
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 python3 -m unittest discover -s agent/tests
+npm test --prefix presence
 pnpm --dir game install --frozen-lockfile
 pnpm --dir game test
 pnpm --dir game architecture:check

@@ -272,6 +272,67 @@ describe("localProgress", () => {
     expect(isSavedRun(invalidTierState)).toBe(false);
   });
 
+  it("v2 题库绑定迁移到 v1 时只重置活动题目状态并保留世界与答题历史", () => {
+    const storage = new MemoryStorage();
+    const session = new GameSession(null, null, "question-bank-migration");
+    session.enableAgentPlaytestMode();
+    expect(session.adminApplyPreset("f1-admin-dormitory")).toMatchObject({ ok: true });
+    const mimic = session.snapshot().groundItems.find((item) => item.id === "chest:f1:mimic");
+    expect(mimic).toBeDefined();
+    expect(session.setPlayerPosition(mimic!.x, mimic!.y)).toBe(true);
+    expect(session.interact()).toMatchObject({ ok: true, kind: "combat" });
+    expect(session.registerQueryError("迁移前记录")).toMatchObject({ accepted: false });
+    const oldRun = structuredClone(session.toSavedRun());
+    oldRun.questionBankVersion = "question-bank-v2";
+    oldRun.practiceDrawCursor = 17;
+    oldRun.practiceDrawCycle = 3;
+    oldRun.practiceDrawStates = {
+      L1: { cursor: 17, cycle: 3 },
+      L2: { cursor: 8, cycle: 2 },
+      L3: { cursor: 4, cycle: 1 },
+    };
+    oldRun.activePracticeMonsterId = oldRun.combat!.targetId;
+    oldRun.activePracticeQuestionIds = ["question-bank-v2:f1:current:t01:v1"];
+    oldRun.queryCount = 1;
+    oldRun.battleSequence = 1;
+    oldRun.answerHistory = [{
+      id: 1,
+      battleId: 1,
+      floor: 1,
+      monsterId: 1,
+      monsterName: "史莱姆",
+      lessonId: "select",
+      stageId: "select-name",
+      stageObjective: "查询史莱姆名字",
+      round: 1,
+      sql: "SELECT id FROM monsters WHERE id = 1;",
+      answerSql: "SELECT id FROM monsters WHERE id = 1;",
+      result: "correct",
+      hintLevel: 0,
+      outcome: "victory",
+      feedback: "结果正确",
+    }];
+    storage.setItem(RUN_SAVE_KEY, JSON.stringify(oldRun));
+
+    const loaded = loadRun(storage);
+    expect(loaded).not.toBeNull();
+    expect(loaded?.questionBankVersion).toBe("question-bank-v1");
+    expect(loaded?.practiceDrawCursor).toBe(0);
+    expect(loaded?.practiceDrawCycle).toBe(0);
+    expect(loaded?.practiceDrawStates).toEqual({
+      L1: { cursor: 0, cycle: 0 },
+      L2: { cursor: 0, cycle: 0 },
+      L3: { cursor: 0, cycle: 0 },
+    });
+    expect(loaded?.activePracticeMonsterId).toBeNull();
+    expect(loaded?.activePracticeQuestionIds).toEqual([]);
+    expect(loaded?.mazeFloor).toEqual(oldRun.mazeFloor);
+    expect(loaded?.worldActors).toEqual(oldRun.worldActors);
+    expect(loaded?.answerHistory).toEqual(oldRun.answerHistory);
+    expect(loadRun(storage)).toEqual(loaded);
+    expect(storage.getItem(RUN_SAVE_KEY)).toBe(JSON.stringify(oldRun));
+  });
+
   it("v12 继续读取已经保存的 96×72 generator-v6 Run", () => {
     const storage = new MemoryStorage();
     const legacyLarge = asLargeV6Run(freshRun("saved-large-v6"));

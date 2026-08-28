@@ -29,6 +29,8 @@
   元素升炉、黑铁外城、龙脊上城、残照王苑和黑金高堂。
 - 顶栏现在显示当前楼层槽位 `/ 08`。可校验的 Campaign 骨架已经定义八个稳定楼层身份、课程先修、
   题阶、遭遇角色、主题和内容池；`v0.10` 已经可以完整游玩八层，`v0.11` 已完成低消耗收口。
+- 可选在线状态服务可用时，左下角以小绿点和数字显示已连接的游戏标签页数；服务离线时显示不可用
+  状态，不用虚假的 `0` 冒充真实人数。
 - 击败第一至七层魔王并拾取钥匙后，会显示金色
   `FLOOR NN CLEARED / CONGRATULATIONS!!` 约 1.5 秒并自动进入下一层，不需要再次寻路、
   按 `E` 或选择菜单。等级、XP、装备、背包、遗物和查询数跨层保留。
@@ -224,6 +226,10 @@ pnpm dev
 打开 Vite 输出的地址，通常是 `http://localhost:5173/`。不要通过 `file://` 直接打开
 `index.html`，SQLite WASM 必须通过 HTTP 加载。
 
+如需在本地启用在线人数，从仓库根目录另开终端执行 `npm start --prefix presence`。Vite 会自动
+代理相对地址 `api/presence`；生产环境 Nginx 与 systemd 配置见
+[`../presence/README.zh-CN.md`](../presence/README.zh-CN.md)。
+
 需要按生产方式本地验收时，构建并通过 HTTP 预览 `dist/`：
 
 ```bash
@@ -345,11 +351,12 @@ generator v5 `48×36` 与 generator v4 `64×48` 地图只为旧 Run 兼容继续
 已触发陷阱复用 `openedGateIds`；直接穿过开放房间边界不增加独立存档字段。Run v12 记录题库版本、
 确定性牌组、随机练习首次奖励和导航计数。
 
-只读 `public/data/question-bank-v2.sqlite` 由课程源生成，共 960 题：每层 L1 64 道、L2 40 道、
+只读 `public/data/question-bank-v1.sqlite` 由课程源生成，共 960 题：每层 L1 64 道、L2 40 道、
 L3 16 道；第二至八层 L1 包含 40 道本层题与 24 道复习题，L2/L3 都是本层题。固定课程怪和
 层主继续使用作者题；每层 15 个题族各有 8 道基于真实数据参数、可执行且保存精确结果证据的变体，
 普通怪、小精英、区域首领分别抽 1 道 L1、2 道 L2、3 道 L3。加载前通过 Manifest 校验版本、字节数、总数与 SHA-256；新题库
-版本只在新 Run 生效。
+版本只在新 Run 生效。生成器按 `monstersForFloor(floor)` 为每层建立 SQL fixture，并校验怪物关系引用闭包；绑定 v2 的 v12 Run
+会在内存中迁移为 v1，重置活动练习绑定与牌组游标，同时保留世界状态和答题历史。
 
 第一至五层及第七、八层终端每次只接受一条只读 `SELECT` 或 `WITH`，最多显示 50 行结果；第六层允许在
 一次性 `repair_queue` 中执行 1–8 条受控语句。DDL、`PRAGMA`、`ATTACH`、永久课程表和无条件
@@ -390,6 +397,7 @@ pnpm build
 python3 ../scripts/test_validate_rules.py
 python3 ../scripts/validate-rules.py
 python3 -m unittest discover -s ../agent/tests
+npm test --prefix ../presence
 ```
 
 `pnpm build` 会先执行 TypeScript 检查，再把静态网站输出到 `dist/`，并把根目录权威
@@ -397,7 +405,7 @@ python3 -m unittest discover -s ../agent/tests
 提供 WASM MIME 类型的静态托管即可。
 
 GitHub Pages 默认不部署：仓库根 `.github/workflows/deploy-pages.yml` 只在仓库变量
-`PAGES_ENABLED=true` 时执行，上传 `game/dist` 前必须通过两个工程的测试、规则和生产构建，并保持 Vite
+`PAGES_ENABLED=true` 时执行，上传 `game/dist` 前必须通过三个工程的测试、规则和生产构建，并保持 Vite
 `base: "./"`。当前仓库保持私有；如果 Provider/套餐不允许 workflow-backed Pages，发布状态记为
 `provider-blocked`，变量保持 false 或未设置，没有单独授权不改公开、不换托管商。
 

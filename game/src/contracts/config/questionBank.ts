@@ -4,7 +4,7 @@ export const QUESTION_BANK_TIERS = ["L1", "L2", "L3"] as const;
 export type PracticeQuestionTier = typeof QUESTION_BANK_TIERS[number];
 
 export const QUESTION_BANK_CONFIG = {
-  version: "question-bank-v2",
+  version: "question-bank-v1",
   schemaVersion: 2,
   firstFloor: 1,
   floorCount: 8,
@@ -21,7 +21,7 @@ export const QUESTION_BANK_CONFIG = {
   questionsPerFloor: 120,
   totalQuestions: 960,
   manifestUrl: "data/question-bank-manifest.json",
-  databaseUrl: "data/question-bank-v2.sqlite",
+  databaseUrl: "data/question-bank-v1.sqlite",
   drawInspectionMultiplier: 4,
   drawCountInspectionMultiplier: 8,
   generationDomainValueLimit: 24,

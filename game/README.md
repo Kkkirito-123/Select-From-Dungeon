@@ -33,6 +33,9 @@ complete SQLite query, and turn the correct result into an animated attack.
   scaffold defines all eight ordered floor identities, curriculum prerequisites,
   exercise tiers, encounter roles, themes, and content pools. All eight floors
   are executable in v0.10 and hardened for low-cost play in v0.11.
+- A compact lower-left status shows a green dot and the number of connected
+  game tabs when the optional live presence service is available. It shows an
+  unavailable state instead of a fabricated zero when that service is offline.
 - Collecting a Boss key on floors one through seven shows a gold
   `FLOOR NN CLEARED / CONGRATULATIONS!!` transition for approximately 1.5
   seconds and automatically enters the next floor—no extra pathfinding, `E`
@@ -320,6 +323,11 @@ pnpm dev
 Open the URL printed by Vite, normally `http://localhost:5173/`. Do not open
 `index.html` through `file://`; the SQLite WASM file must be fetched over HTTP.
 
+To enable the live count locally, start the dependency-free service from the
+repository root in another terminal with `npm start --prefix presence`. Vite
+proxies the relative `api/presence` request automatically. Production Nginx and
+systemd examples are in [`../presence/README.md`](../presence/README.md).
+
 For a production-equivalent local check, build and serve `dist/` over HTTP:
 
 ```bash
@@ -476,7 +484,7 @@ maze. Triggered traps reuse `openedGateIds`; directly crossing open room
 boundaries adds no save field. Run v12 pins the question-bank version, deterministic
 deck state, repeat-practice reward state, and navigation guidance counters.
 
-The generated, read-only `public/data/question-bank-v2.sqlite` contains 960
+The generated, read-only `public/data/question-bank-v1.sqlite` contains 960
 questions: each floor has 64 L1, 40 L2, and 16 L3 questions. On floors two
 through eight, L1 contains 40 current-floor and 24 review questions; L2/L3 are
 current-floor questions. Each floor uses 15 families
@@ -484,7 +492,10 @@ of eight executable variants built from real fixture values, with exact result
 and ordering evidence stored for grading. Fixed curriculum monsters and floor
 Bosses keep authored stages; normal, mini-elite, and area-Boss practice battles
 draw one L1, two L2, and three L3 questions. Its manifest verifies version, size, count, and
-SHA-256 before use. A new bank version only applies to a new Run.
+SHA-256 before use. Generation uses a per-floor SQL fixture from
+`monstersForFloor(floor)` and validates monster relationship closure. v2-bound
+v12 Runs reset active practice bindings and draw cursors when migrated to v1,
+while preserving world state and answer history. A new bank version only applies to a new Run.
 
 On floors one through five and seven through eight, the terminal accepts one
 read-only `SELECT` or `WITH` statement and displays at most 50 rows. Floor six
@@ -539,6 +550,7 @@ pnpm build
 python3 ../scripts/test_validate_rules.py
 python3 ../scripts/validate-rules.py
 python3 -m unittest discover -s ../agent/tests
+npm test --prefix ../presence
 ```
 
 `pnpm build` type-checks the project and writes the static site to `dist/`.
@@ -547,7 +559,7 @@ into `dist/`; do not maintain separate hand-written copies. Deploy that director
 to a static host that serves WASM with the correct MIME type.
 
 GitHub Pages is deliberately opt-in. `.github/workflows/deploy-pages.yml` runs
-only when the repository variable `PAGES_ENABLED=true`; it validates both
+only when the repository variable `PAGES_ENABLED=true`; it validates all three
 projects and the production build before publishing `game/dist`, and keeps Vite
 `base: "./"`. The current repository remains private. If its provider/plan does
 not allow a workflow-backed Pages site, publication is recorded as

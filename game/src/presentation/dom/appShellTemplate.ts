@@ -482,6 +482,12 @@ export function appShellTemplate({
           <span>奖励：课程宝箱固定 · 随机恢复品低概率</span>
         </footer>
 
+        <aside id="online-presence" class="online-presence" data-state="connecting" role="status" aria-live="polite" aria-atomic="true" aria-label="正在连接在线人数服务">
+          <span class="online-presence__dot" aria-hidden="true"></span>
+          <output id="online-presence-count" class="online-presence__count">—</output>
+          <span id="online-presence-label" class="sr-only">正在连接在线人数服务</span>
+        </aside>
+
         <div id="feedback-toast" class="feedback-toast" role="status" aria-live="polite" aria-atomic="true"></div>
       </div>
   `;

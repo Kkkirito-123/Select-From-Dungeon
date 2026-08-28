@@ -178,6 +178,7 @@ index.html -> src/application/main.ts
   -> DEV-only DungeonAgentBridge (localhost + ?playtest=agent, memory-only store)
   -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
+  -> PresenceClient -> same-origin SSE -> ../presence/server.mjs -> PresencePanel
   -> CampfireReview (current-floor deterministic SQL recap)
   -> TriggerBus -> AgentRuntime/XState (parallel Campfire, Scribe, Main lifecycle and memory caches)
   -> AgentGateway -> optional ../agent/src/dungeon_agents -> changed PydanticAI role -> Main guidance -> AgentPanel
@@ -254,7 +255,9 @@ OpenTelemetry spans, and the three HTTP routes. It has no Agent database or
 output store.
 
 `src/application/config/` owns Chinese-commented runtime tuning values such as map size,
-encounter rates, navigation thresholds, and storage limits.
+encounter rates, navigation thresholds, storage limits, and the same-origin
+presence endpoint. `PresenceClient` validates SSE counts and owns reconnecting
+browser state; `PresencePanel` renders only the supplied state.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
 
@@ -301,7 +304,7 @@ audit. A complete SQL answer appears only in hint four.
 and event handlers must not duplicate that markup or silently query a second
 selector for the same persistent node.
 `src/presentation/dom/panels/` owns terminal, inventory, campfire, review, narrative,
-and Schema interactions; `src/presentation/dom/renderers/` owns HUD, minimap, and
+Schema, and presence presentation; `src/presentation/dom/renderers/` owns HUD, minimap, and
 combat presentation. Panels receive snapshots and explicit callbacks, never storage,
 external services, or Phaser instances.
 `src/presentation/phaser/world/` owns terrain, fog, world-object visibility, and
@@ -406,7 +409,7 @@ src/contracts/          Cross-layer read-only game, persistence, result, Agent, 
 src/application/        Startup, runtime configuration, and page lifecycle
 src/content/            Static curriculum, world, narrative, inventory, and SQL content; floor author data under */floors/floorNN
 src/domain/             Session facade/focused services, combat, exploration, learning, progression, inventory, and shared rules
-src/infrastructure/     Audio, feedback, SQLite, storage codecs/migrations, and browser adapters
+src/infrastructure/     Audio, feedback, SQLite, storage codecs/migrations, presence, and browser adapters
 src/presentation/       Phaser scenes, DOM application views, and focused renderers
 src/devtools/           Development-only external maintainer bridge; no production import path
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
@@ -418,7 +421,8 @@ dist/               Generated static build; ignored and never hand-edited
 ```
 
 Repository governance, the optional Python service, and cross-project CI live
-one level above this project.
+one level above this project. The optional Node.js presence service also lives
+there and never enters `game/dist`.
 
 ## Canonical Commands
 
@@ -435,6 +439,11 @@ pnpm build
 `pnpm build` runs TypeScript checking before the Vite production build. The
 static output is `dist/`; serve it through HTTP rather than opening files through
 `file://` because the WASM asset must be fetched normally.
+
+The presence client defaults to relative `api/presence`, so `/game/` deployments
+request `/game/api/presence`. Vite proxies `/api/presence` to the local service;
+production Nginx must proxy the deployed path with buffering disabled. A missing
+service changes only the indicator to unavailable and cannot block startup.
 
 ## Runtime and Safety Boundaries
 
@@ -459,6 +468,10 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   already validated same-floor child display text through `POST /v1/agent/run`.
   The game remains playable without
   any service and keeps no Agent output in browser storage.
+- The lower-left online indicator counts active browser-tab SSE connections, not
+  unique people. It sends no player identifier or gameplay data. The Node.js
+  service keeps only an in-memory connection set, binds to localhost by default,
+  and requires shared state before it can be replicated.
 - Agent requests contain a request ID, evidence hash, current floor, and only
   the scene-specific bounded evidence. Campfire requests contain aggregate counts
   and at most eight submitted SQL projections; Scribe requests contain only the
@@ -495,7 +508,7 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
 - SQLite `EXPLAIN QUERY PLAN` drives the floor-seven/eight query-load teaching
   signal. It is SQLite evidence, not a MySQL execution plan. MySQL/InnoDB concepts must
   be clearly labeled simulations or use a separately isolated real backend.
-- `public/data/question-bank-v2.sqlite` is generated from authored TypeScript
+- `public/data/question-bank-v1.sqlite` is generated from authored TypeScript
   stages and is never hand-edited. Its manifest pins the version, byte length,
   SHA-256, and 960-question count. Every floor has 64 L1, 40 L2, and 16 L3
   questions. On floors two through eight, L1 contains 40 current-floor plus 24
@@ -506,6 +519,11 @@ static output is `dist/`; serve it through HTTP rather than opening files throug
   must say so explicitly. Fixed curriculum monsters and floor Bosses keep their
   authored stages; normal, mini-elite, and area-Boss practice encounters draw
   one L1, two L2, and three L3 questions respectively.
+  The generator creates a separate SQL fixture per floor from
+  `monstersForFloor(floor)` and rejects monster relationship references outside
+  that floor's closure. A v2-bound v12 Run is migrated in memory to v1 with
+  active practice bindings and draw cursors reset while world state and answer
+  history remain unchanged.
   New Runs pin the active bank version and draw deterministic no-repeat decks.
   IndexedDB stores at most 5,000 full attempts plus permanent question/lesson
   aggregates; export and explicit clearing never include an API Key.

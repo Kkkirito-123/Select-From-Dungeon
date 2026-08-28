@@ -9,6 +9,7 @@ import type Phaser from "phaser";
 import { ArcadeAudio } from "../infrastructure/audio/ArcadeAudio";
 import {
   AGENT_RUNTIME_CONFIG,
+  PRESENCE_RUNTIME_CONFIG,
   WORLD_RUNTIME_CONFIG,
 } from "./config/runtimeConfig";
 import { GameSession } from "../domain/session/GameSession";
@@ -25,6 +26,7 @@ import { AppShell } from "../presentation/dom/AppShell";
 import { OnboardingController } from "../presentation/dom/OnboardingController";
 import { AgentGateway } from "../infrastructure/agent/AgentGateway";
 import { AgentRuntime } from "./agent/AgentRuntime";
+import { PresenceClient } from "../infrastructure/presence/PresenceClient";
 import { TriggerBus } from "./triggers/bus";
 import type {
   DungeonAgentLaunch,
@@ -124,6 +126,7 @@ async function bootstrap(): Promise<void> {
     ...AGENT_RUNTIME_CONFIG,
     endpoint: dungeonAgentLaunch ? null : AGENT_RUNTIME_CONFIG.endpoint,
   }));
+  const presenceClient = new PresenceClient(PRESENCE_RUNTIME_CONFIG.endpoint);
   const triggerBus = new TriggerBus();
   const unsubscribeAgentEvents = triggerBus.subscribe((event) => agentRuntime.handle(event));
   const disconnectTriggers = triggerBus.connect(session);
@@ -142,6 +145,7 @@ async function bootstrap(): Promise<void> {
     },
     savedRun ? "restored" : "new",
     agentRuntime,
+    presenceClient,
   );
   try {
     // 先启动学习账本和 DOM，再创建 Phaser 场景，确保 UI 订阅不会错过首个快照。
@@ -158,6 +162,7 @@ async function bootstrap(): Promise<void> {
         launch: dungeonAgentLaunch,
         checkpointStorage,
         checkpointRestored: dungeonAgentStore?.checkpointState === "restored",
+        resetSql: (monsters) => sql.reset([...monsters]),
       });
     }
     root.dataset.runtimeState = "active";

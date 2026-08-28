@@ -9,7 +9,8 @@ import {
 } from "../src/content/curriculum/questionBank";
 import { QUESTION_BANK_CONFIG } from "../src/application/config/questionBankConfig";
 import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
-import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
+import { LESSONS } from "../src/content/curriculum/mvpLevel";
+import { monstersForFloor } from "../src/domain/session/lifecycle/sessionWorld";
 import { evaluateStage } from "../src/domain/learning/lessonEvaluator";
 import { lessonsForFloor } from "../src/domain/progression/runGraph";
 import { loadBundledQuestionBank } from "../src/application/runtime/questionBankLoader";
@@ -20,15 +21,15 @@ async function fixtureFetcher(input: RequestInfo | URL): Promise<Response> {
   if (url.endsWith("question-bank-manifest.json")) {
     return new Response(await readFile(resolve("public/data/question-bank-manifest.json")));
   }
-  if (url.endsWith("question-bank-v2.sqlite")) {
-    return new Response(await readFile(resolve("public/data/question-bank-v2.sqlite")));
+  if (url.endsWith("question-bank-v1.sqlite")) {
+    return new Response(await readFile(resolve("public/data/question-bank-v1.sqlite")));
   }
   return new Response(null, { status: 404 });
 }
 
 const wasmLocation = resolve("node_modules/sql.js/dist/sql-wasm.wasm");
 
-describe("question bank v2", () => {
+describe("question bank v1", () => {
   it("loads one verified read-only catalog with 120 questions per floor", async () => {
     const catalog = await loadBundledQuestionBank(
       "/",
@@ -46,7 +47,7 @@ describe("question bank v2", () => {
       expect(new Set(questions.map((question) => question.questionId)).size)
         .toBe(QUESTION_BANK_CONFIG.questionsPerFloor);
       expect(questions.every((question) => (
-        /^question-bank-v2:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(question.questionId)
+        /^question-bank-v1:f[1-8]:(?:current|review):t\d{2}:v[1-8]$/u.test(question.questionId)
       ))).toBe(true);
       if (floor === QUESTION_BANK_CONFIG.firstFloor) {
         expect(questions.every((question) => question.scope === "current")).toBe(true);
@@ -85,7 +86,7 @@ describe("question bank v2", () => {
 
   it("stores tier as an explicit constrained SQLite column", async () => {
     const SQL = await initSqlJs({ locateFile: () => wasmLocation });
-    const bytes = await readFile(resolve("public/data/question-bank-v2.sqlite"));
+    const bytes = await readFile(resolve("public/data/question-bank-v1.sqlite"));
     const database = new SQL.Database(bytes);
     try {
       const columns = database.exec("PRAGMA table_info(questions)")[0]?.values ?? [];
@@ -223,7 +224,10 @@ describe("question bank v2", () => {
       undefined,
       wasmLocation,
     );
-    const engine = await SqlEngine.create([...INITIAL_MONSTERS], wasmLocation);
+    const firstFloor = QUESTION_BANK_CONFIG.firstFloor;
+    const firstFloorMonsters = monstersForFloor(firstFloor as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+    const engine = await SqlEngine.create(firstFloorMonsters, wasmLocation);
+    let engineFloor: number = firstFloor;
     const stages = new Map([
       ...LESSONS.flatMap((lesson) => lesson.stages.map((stage) => [stage.id, stage] as const)),
       ...BIOME_ENCOUNTERS.flatMap((encounter) => (
@@ -232,14 +236,53 @@ describe("question bank v2", () => {
     ]);
     expect(catalog).not.toBeNull();
     for (const question of catalog?.questions ?? []) {
+      if (question.floor !== engineFloor) {
+        engine.reset(monstersForFloor(question.floor));
+        engineFloor = question.floor;
+      }
       if (!stages.has(question.baseStageId)) {
         throw new Error(`${question.questionId} 缺少基础判题阶段`);
       }
       const result = engine.execute(question.answerSql, question.floor, question.lessonId);
+      expect(result.columns, `${question.questionId} 列不一致`).toEqual(question.expectedColumns);
+      expect(
+        result.rows.map((row) => question.expectedColumns.map((column) => row[column] ?? null)),
+        `${question.questionId} 期望行不一致`,
+      ).toEqual(question.expectedRows);
       expect(
         evaluateStage(practiceStageForQuestion(question, 1), result).accepted,
         `${question.questionId} 未通过 ${question.baseStageId}`,
       ).toBe(true);
     }
+  });
+
+  it("截图题的楼层边界回归：F2 变体不再绑定 F1 的 monster_id", async () => {
+    const catalog = await loadBundledQuestionBank(
+      "/",
+      fixtureFetcher as typeof fetch,
+      null,
+      undefined,
+      wasmLocation,
+    );
+    const question = catalog?.question("question-bank-v1:f2:current:t03:v5");
+    expect(question).not.toBeNull();
+    expect(question?.answerSql).not.toContain("monster_id = 5");
+    const engine = await SqlEngine.create(monstersForFloor(2), wasmLocation);
+    const result = engine.execute(question!.answerSql, 2, question!.lessonId);
+    expect(result.rows).toEqual(
+      question!.expectedRows.map((row) => ({
+        [question!.expectedColumns[0]]: row[0],
+      })),
+    );
+    expect(result.rows.length).toBeGreaterThan(0);
+
+    const floorOneEngine = await SqlEngine.create(monstersForFloor(1), wasmLocation);
+    expect(floorOneEngine.executeSelect(
+      "SELECT DISTINCT channel FROM monster_signals WHERE monster_id = 5 LIMIT 5",
+    ).rows).toEqual([
+      { channel: "echo" },
+      { channel: "noise" },
+      { channel: "ward" },
+    ]);
   });
 });

@@ -100,9 +100,12 @@ function excludedFromTarget(path) {
 
 async function currentSourceFiles() {
   const output = await git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
-  return [...new Set(output.split("\0").filter(Boolean).map((path) => normalizePath(path)))]
-    .filter((path) => !excludedFromTarget(path))
-    .sort();
+  const candidates = [...new Set(output.split("\0").filter(Boolean).map((path) => normalizePath(path)))]
+    .filter((path) => !excludedFromTarget(path));
+  const existing = await Promise.all(candidates.map(async (path) => (
+    await pathExists(join(sourceRoot, path)) ? path : null
+  )));
+  return existing.filter((path) => path !== null).sort();
 }
 
 /**

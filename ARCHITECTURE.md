@@ -9,6 +9,7 @@ This file records verified current repository facts. Stable rules live in
 ```text
 game/                    Independent TypeScript/Vite browser game
 agent/                   Independent Python Campfire/Scribe/Main service
+presence/                Independent dependency-free Node.js SSE presence service
 scripts/                 Repository-rule validator and regression tests
 .github/workflows/       Cross-project validation and game Pages deployment
 .agents/skills/          Requirement, implementation, delivery, and sync workflows
@@ -17,10 +18,10 @@ LICENSE                  Repository license
 ATTRIBUTIONS.md          External-source and third-party attribution register
 ```
 
-The root owns repository governance and distribution entry points. Product
-code belongs to `game/` and `agent/`. Detailed game facts live in
-`game/ARCHITECTURE.md`; Python-service facts are governed by `agent/AGENTS.md`
-until that subtree needs its own current-facts map.
+The root owns repository governance and distribution entry points. Runtime
+code belongs to `game/`, `agent/`, and `presence/`. Detailed game facts live in
+`game/ARCHITECTURE.md`; the smaller services remain governed by the root and
+their local README files until either subtree needs its own current-facts map.
 
 ## Runtime and Dependency Boundaries
 
@@ -31,11 +32,16 @@ game TriggerBus
   -> POST /v1/agent/run
   -> agent/src/dungeon_agents
       -> Campfire or Scribe -> Main
+
+game PresenceClient
+  -> same-origin GET /game/api/presence
+  -> Nginx proxy -> presence/server.mjs GET /presence
+  -> in-memory SSE connection count -> PresencePanel
 ```
 
 - The projects share no source imports or dependency tree. `game/` does not
   import Python packages; `agent/` does not import game TypeScript, saves, or
-  assets.
+  assets; `presence/` uses only Node.js built-ins.
 - The Agent is an optional enhancement. The game uses deterministic local copy
   when the service is absent or unavailable.
 - Game rules, SQL execution, saves, maps, combat, and UI belong to `game/`.
@@ -44,6 +50,10 @@ game TriggerBus
 - Cross-project changes update both sides of the HTTP contract and validate both
   projects. Static game publication uploads only `game/dist/`; the Agent is
   deployed separately and never enters the browser bundle.
+- Presence is an optional display enhancement. Each open SSE connection counts
+  one browser tab; the service stores no identifiers, gameplay data, history,
+  or persistent state, binds to `127.0.0.1:8788` by default, and supports one
+  process instance. The game remains playable when it is unavailable.
 - Legal files stay at repository root and are copied into `game/dist/` by the
   game build.
 
@@ -70,6 +80,7 @@ projection, and hidden-judge contracts are documented in
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 python3 -m unittest discover -s agent/tests
+npm test --prefix presence
 pnpm --dir game install --frozen-lockfile
 pnpm --dir game test
 pnpm --dir game architecture:check

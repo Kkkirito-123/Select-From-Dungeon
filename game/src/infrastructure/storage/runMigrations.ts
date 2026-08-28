@@ -42,6 +42,26 @@ export interface RunMigrators {
 
 export type RunVersion = 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
+const LEGACY_QUESTION_BANK_VERSION = "question-bank-v2";
+
+/** 将仍绑定 v2 题库的当前格式 Run 迁移到 v1，不触碰世界状态或答题历史。 */
+export function migrateQuestionBankBinding(run: SavedRun): SavedRun {
+  if (run.questionBankVersion !== LEGACY_QUESTION_BANK_VERSION) return run;
+  return {
+    ...run,
+    questionBankVersion: QUESTION_BANK_VERSION,
+    practiceDrawCursor: 0,
+    practiceDrawCycle: 0,
+    practiceDrawStates: {
+      L1: { cursor: 0, cycle: 0 },
+      L2: { cursor: 0, cycle: 0 },
+      L3: { cursor: 0, cycle: 0 },
+    },
+    activePracticeMonsterId: null,
+    activePracticeQuestionIds: [],
+  };
+}
+
 /**
  * 迁移只依赖最终格式校验器，不直接依赖 localProgress 的存储入口。
  * 这样旧字段转换可以独立测试，同时仍然由入口决定何时读取和写入。
