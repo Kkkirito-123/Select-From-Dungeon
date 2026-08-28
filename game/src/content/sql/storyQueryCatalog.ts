@@ -1,3 +1,4 @@
+/** 剧情档案使用的只读 SQL 查询目录；它们不参与战斗判题。 */
 export type StoryQueryId =
   | "f1-current-resident"
   | "f1-restore-contradiction"
@@ -174,6 +175,7 @@ export const STORY_QUERY_CATALOG: readonly StoryQueryDefinition[] = [
 ] as const;
 
 export function storyQuery(id: StoryQueryId): StoryQueryDefinition {
+  // 统一从目录取定义，调用方不需要复制 SQL、期望列和用途说明。
   const definition = STORY_QUERY_CATALOG.find((entry) => entry.id === id);
   if (!definition) throw new Error(`未知剧情查询：${id}`);
   return definition;

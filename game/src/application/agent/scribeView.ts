@@ -7,10 +7,12 @@ import type {
   ScribePrompt,
 } from "../../contracts/agent/scribe";
 
+/** 将当前快照压缩成抄写员可接收的最小证据投影；不会携带完整存档或参考答案。 */
 const MAX_COLUMNS = 16;
 const MAX_CONCEPTS = 12;
 
 function latestAttempt(snapshot: GameSnapshot): AnswerAttemptRecord | null {
+  // 只看当前楼层记录，并按 id 排序确保“最近一次”与写入顺序一致。
   return snapshot.floorReview
     .filter((attempt) => attempt.floor === snapshot.floor)
     .slice()
@@ -19,6 +21,7 @@ function latestAttempt(snapshot: GameSnapshot): AnswerAttemptRecord | null {
 }
 
 function submittedColumns(sql: string): string[] {
+  // 轻量解析 SELECT 投影，去掉别名后只保留有限字段，避免把整段 SQL 发送给 Agent。
   const selectStart = sql.search(/\bselect\b/iu);
   const fromStart = sql.search(/\bfrom\b/iu);
   if (selectStart < 0 || fromStart <= selectStart) return [];
@@ -47,6 +50,7 @@ function submittedColumns(sql: string): string[] {
 }
 
 function columnKey(value: string): string {
+  // 规范化 a.id、id AS value 等写法，便于比较“要求字段”和“实际提交字段”。
   return value
     .replace(/\s+as\s+[a-z_]\w*$/iu, "")
     .replace(/^.*\.\s*/u, "")
@@ -55,6 +59,7 @@ function columnKey(value: string): string {
 }
 
 function unique(values: readonly string[], maximum = MAX_COLUMNS): string[] {
+  // 保留首次出现顺序并限制数量，既稳定又避免恶意输入撑大请求。
   const seen = new Set<string>();
   return values.filter((value) => {
     const key = columnKey(value);
@@ -68,6 +73,7 @@ export function learningEvidenceFor(
   snapshot: GameSnapshot,
   taskSnapshot: GameSnapshot = snapshot,
 ): ScribeLearningEvidence | null {
+  // 将最近答题转换成缺失/多余字段与待复习概念，Agent 只接收这些摘要。
   const attempt = latestAttempt(snapshot);
   if (!attempt) return null;
   const requiredColumns = unique(taskSnapshot.taskBrief?.outputColumns ?? []);
@@ -99,6 +105,7 @@ export function interactionPrompt(
   scribeId: string,
   authoredMessage: string,
 ): ScribePrompt {
+  // 调查场景携带作者原文和可选学习证据，不带导航/死亡信息。
   return {
     floor: snapshot.floor,
     scene: "interaction",
@@ -112,6 +119,7 @@ export function interactionPrompt(
 }
 
 function deathCause(previous: GameSnapshot): ScribeDeathCause {
+  // 根据死亡前模式分类，供本地文案和远程提示选择不同语气。
   if (previous.mode === "combat") return "combat";
   if (previous.mode === "challenge") return "cipher";
   if (previous.mode === "explore") return "hazard";
@@ -119,6 +127,7 @@ function deathCause(previous: GameSnapshot): ScribeDeathCause {
 }
 
 export function deathPrompt(snapshot: GameSnapshot, previous: GameSnapshot): ScribePrompt {
+  // 死亡复盘引用上一快照判断原因，当前快照提供最终答题与楼层信息。
   const attempt = latestAttempt(snapshot);
   return {
     floor: snapshot.floor,
@@ -137,6 +146,7 @@ export function deathPrompt(snapshot: GameSnapshot, previous: GameSnapshot): Scr
 }
 
 export function navigationPrompt(snapshot: GameSnapshot): ScribePrompt | null {
+  // 导航等级为 0 或目标信息不完整时不触发 Agent，避免生成无方向的空提示。
   const value = snapshot.navigationGuidance;
   if (
     value.level === 0 || !value.objectiveRoomId || !value.objectiveTitle ||
@@ -161,6 +171,7 @@ export function navigationPrompt(snapshot: GameSnapshot): ScribePrompt | null {
 }
 
 export function localScribeContent(prompt: ScribePrompt): ScribeAgentContent {
+  // 本地回退按“字段 -> 概念 -> 结果 -> 下一步”优先级组装最多三条事实。
   const facts: string[] = [];
   let message = prompt.authoredMessage;
   let nextAction = "先确认当前目标，再继续手动探索。";

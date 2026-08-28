@@ -1,3 +1,4 @@
+/** 剧情 SQL 使用的附加记录类型；它与战斗 monsters 表分离，避免混淆两套语义。 */
 export interface IdentitySourceFixture {
   id: number;
   residentId: number;
@@ -10,6 +11,7 @@ export interface IdentitySourceFixture {
 }
 
 export const WORLD_STORY_SCHEMA_DDL = `
+  -- residents 表保存恢复中的主体记录；room_id 可为空表示尚未定位。
   CREATE TABLE residents (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -19,6 +21,7 @@ export const WORLD_STORY_SCHEMA_DDL = `
     FOREIGN KEY (room_id) REFERENCES rooms(id)
   );
 
+  -- identity_sources 保存来自不同区域的证据页；content_key 用于稳定去重。
   CREATE TABLE identity_sources (
     id INTEGER PRIMARY KEY,
     resident_id INTEGER,
@@ -111,10 +114,12 @@ export const IDENTITY_SOURCE_FIXTURES: readonly IdentitySourceFixture[] = [
 ] as const;
 
 function quote(value: string): string {
+  // SQL 字符串中的单引号必须成对转义；fixture 内容不能直接拼入 DML。
   return `'${value.replaceAll("'", "''")}'`;
 }
 
 export function worldStorySeedDml(): string {
+  // 用作者 fixture 生成 INSERT，而不是手写多份剧情数据；修改证据只需改上面的数组。
   const residents = IDENTITY_SOURCE_FIXTURES.map((entry) => (
     `(${entry.residentId}, ${quote(entry.aliasName)}, ${quote(entry.restoreTrace)}, ` +
     `${quote("archived")}, NULL)`

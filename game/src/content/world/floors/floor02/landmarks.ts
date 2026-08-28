@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第二层潮汐群岛地标文案，根据课程完成情况提示下一处航线。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

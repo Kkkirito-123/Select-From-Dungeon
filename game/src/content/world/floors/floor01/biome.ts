@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第一层生态遭遇池：水渠、软泥池和余烬地窖对应基础 SQL 阶段。 */
 export const FLOOR_ONE_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 1,

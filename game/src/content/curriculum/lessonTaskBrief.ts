@@ -10,6 +10,11 @@ import type {
 } from "../../domain/shared/types";
 import { SQL_RELATIONS, SQL_TABLES } from "../sql/sqlSchema";
 
+/**
+ * 把作者题目转换成 UI 可展示的任务简报。
+ * 该模块只分析 SQL 文本和课程 Schema，不执行 SQL；因此它可以在查询前安全地
+ * 生成字段指南、关系提示和分级提示，而不会泄露判题结果。
+ */
 const SQL_ALIAS_STOP_WORDS = new Set([
   "where",
   "inner",
@@ -99,10 +104,12 @@ const FEATURE_TOPIC: Readonly<Partial<Record<QueryFeature, string>>> = {
 };
 
 function normalizeSql(sql: string): string {
+  // 统一空白和结尾分号，让后续正则只处理一种文本形态。
   return sql.replace(/\s+/g, " ").trim().replace(/;$/, "");
 }
 
 function splitTopLevel(value: string): string[] {
+  // 只在括号深度为 0 时按逗号分隔，避免把 COUNT(...)、窗口函数参数拆开。
   const parts: string[] = [];
   let depth = 0;
   let start = 0;
@@ -124,6 +131,7 @@ function isSqlWordCharacter(value: string | undefined): boolean {
 }
 
 function keywordAt(sql: string, index: number, keyword: string): boolean {
+  // 边界判断防止把 "fromage" 误识别成 FROM；调用方已在顶层扫描中处理引号。
   return (
     sql.slice(index, index + keyword.length).toLocaleLowerCase() === keyword &&
     !isSqlWordCharacter(sql[index - 1]) &&
@@ -138,6 +146,7 @@ interface TopLevelToken {
 }
 
 function topLevelTokens(sql: string): TopLevelToken[] {
+  // 这是轻量级词法扫描，不试图完整解析 SQL AST；它只需要识别顶层子句边界。
   const keywords = [
     "group by",
     "order by",
@@ -189,6 +198,7 @@ function topLevelTokens(sql: string): TopLevelToken[] {
 }
 
 function aliasMapFor(sql: string): Map<string, string> {
+  // 记录 table -> table 以及 alias -> table，后续字段/关系提示都通过这张表还原真实表名。
   const aliases = new Map<string, string>();
   for (const match of sql.matchAll(
     /\b(?:from|join|update|into)\s+([a-z_]\w*)(?:\s+(?:as\s+)?([a-z_]\w*))?/gi,
@@ -206,6 +216,7 @@ function tableReferences(
   aliases: ReadonlyMap<string, string>,
   knownTables: ReadonlySet<string>,
 ): string[] {
+  // 只收集 FROM/JOIN/UPDATE/INTO 后的已知表，并去重保持出现顺序。
   const tables: string[] = [];
   for (const match of sql.matchAll(/\b(?:from|join|update|into)\s+([a-z_]\w*)/gi)) {
     const table = aliases.get(match[1].toLocaleLowerCase()) ?? match[1].toLocaleLowerCase();
@@ -220,6 +231,7 @@ function primaryTableFor(
   knownTables: ReadonlySet<string>,
   fallback: string | null,
 ): string | null {
+  // 优先取最外层 FROM；子查询中的 FROM 不应覆盖任务的主表。
   const outerFrom = topLevelTokens(sql).find((token) => token.keyword === "from");
   const outerTable = outerFrom
     ? sql.slice(outerFrom.end).match(/^\s*([a-z_]\w*)/i)?.[1].toLocaleLowerCase()
@@ -231,6 +243,7 @@ function primaryTableFor(
 }
 
 function selectOutputs(sql: string): string[] {
+  // 提取 SELECT 与 FROM 之间的投影；DML 没有投影时返回面向玩家的动作描述。
   const tokens = topLevelTokens(sql);
   const select = tokens.find((token) => token.keyword === "select");
   const from = select
@@ -245,6 +258,7 @@ function selectOutputs(sql: string): string[] {
 }
 
 function clauseValues(sql: string): string[] {
+  // 把顶层 WHERE/GROUP BY/HAVING/ORDER BY/LIMIT 原文保留下来，作为约束提示。
   const clauses: string[] = [];
   const tokens = topLevelTokens(sql);
   const labels = new Map<TopLevelToken["keyword"], string>([
@@ -307,6 +321,7 @@ const SPECIAL_COLUMN_MEANINGS: Readonly<Record<string, string>> = {
 };
 
 function schemaColumns(schema: readonly string[]): Map<string, Set<string>> {
+  // 先加载权威 SQL_TABLES，再合并题目附加 Schema，支持剧情表等扩展字段。
   const tables = new Map<string, Set<string>>();
   SQL_TABLES.forEach((table) => {
     tables.set(table.name, new Set(table.columns.map((column) => column.name)));
@@ -325,6 +340,7 @@ function schemaColumns(schema: readonly string[]): Map<string, Set<string>> {
 }
 
 function relationValues(sql: string, aliases: ReadonlyMap<string, string>): string[] {
+  // 将 ON 条件转成“原表达式 + 关系含义”，让玩家同时看到写法和连接目的。
   return [...sql.matchAll(
     /\bon\s+([\s\S]*?)(?=\b(?:inner|left|right|full|cross)?\s*join\b|\bwhere\b|\bgroup\s+by\b|\bhaving\b|\border\s+by\b|\blimit\b|$)/gi,
   )].map((match) => {
@@ -351,6 +367,7 @@ function fieldGuideFor(
   primaryTable: string | null,
   knownColumns: ReadonlyMap<string, ReadonlySet<string>>,
 ): LessonTaskFieldGuide[] {
+  // 从 SELECT 投影、限定列和表达式中收集最多 7 个字段，避免任务卡被长 SQL 撑爆。
   const expressions = new Set<string>();
   outputs.forEach((output) => {
     for (const match of output.matchAll(/\b([a-z_]\w*)\.([a-z_]\w*)\b/gi)) {
@@ -395,6 +412,7 @@ function fieldGuideFor(
 }
 
 export function topicGroupsForStage(stage: LessonStageDefinition): string[] {
+  // 将底层 feature 集合压缩成人类可读主题，并优先展示更具体的高级语法。
   const topics: string[] = [];
   const features = new Set(stage.requiredFeatures);
   const add = (topic: string | undefined): void => {
@@ -491,6 +509,7 @@ export function topicGroupsForStage(stage: LessonStageDefinition): string[] {
 }
 
 function taskTier(monster: Monster, stageIndex: number): LessonTaskTier {
+  // 怪物等级决定默认题阶；同一只精英/普通怪的后续阶段自动升级为复合练习。
   if (monster.rank === "boss") return "boss";
   if (monster.rank === "elite") return stageIndex === 0 ? "reinforcement" : "composite";
   return stageIndex === 0 ? "foundation" : "reinforcement";
@@ -510,6 +529,7 @@ function progressiveHints(
   constraints: readonly string[],
   focusTopics: readonly string[],
 ): string[] {
+  // 四级提示从目标字段 -> 核心结构 -> 组装约束 -> 完整 SQL 逐步增加信息量。
   const outputHint = outputs.join("、");
   const structure = [
     focusTopics.length > 0 ? `核心语法是 ${focusTopics.join(" + ")}` : "先确定本题的读写动作",
@@ -534,6 +554,7 @@ export function lessonTaskBriefFor(input: {
   monster: Monster;
   stageIndex: number;
 }): LessonTaskBrief {
+  // 该函数只组装展示模型：真正的答案校验仍在 lessonEvaluator/SqlEngine 中完成。
   const sql = normalizeSql(input.stage.answerSql);
   const aliases = aliasMapFor(sql);
   const knownColumns = schemaColumns(input.lesson.schema);

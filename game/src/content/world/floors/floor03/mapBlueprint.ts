@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第三层白霜墓原的宏观房间槽位；关系课程区域由 registry 统一装配。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 3,
 layoutName: "白霜墓原回环",

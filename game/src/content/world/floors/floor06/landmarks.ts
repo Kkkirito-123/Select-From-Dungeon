@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第六层龙脊工坊地标文案，强调写操作只作用于一次性隔离副本。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

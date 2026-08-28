@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第四层元素升炉的宏观房间槽位；三个元素区域共享同一张物理迷宫。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 4,
 layoutName: "三炉垂直升环",

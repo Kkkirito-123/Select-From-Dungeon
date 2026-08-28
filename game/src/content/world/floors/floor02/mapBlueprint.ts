@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第二层潮汐群岛的宏观房间槽位；运行时据此布局海岸、泥沼和渡点。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 2,
 layoutName: "月潮群岛船闸环线",

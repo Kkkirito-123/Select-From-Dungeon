@@ -4,6 +4,7 @@ import {
   type NarrativeEndingStep,
 } from "./narrativeContent";
 
+/** 第八层 MIGRATE 终局的五阶段叙事与前七层历史证据映射。 */
 export const FINAL_MIGRATION_STAGE_IDS = [
   "f8-final-snapshot",
   "f8-final-deadlock",
@@ -118,12 +119,14 @@ export const FINAL_MIGRATION_STAGE_NARRATIVES:
 export function finalMigrationStageNarrative(
   stageId: string,
 ): FinalMigrationStageNarrative | null {
+  // UI 可能传入普通 string；找不到时返回 null，让调用方按非终局文案处理。
   return FINAL_MIGRATION_STAGE_NARRATIVES.find(
     (entry) => entry.stageId === stageId,
   ) ?? null;
 }
 
 export function validateFinalMigrationSequence(): string[] {
+  // 启动/测试时校验阶段顺序、证据存在性和七个迁移步骤是否恰好覆盖一次。
   const errors: string[] = [];
   const evidenceIds = new Set(
     NARRATIVE_FLOORS.flatMap((floor) =>

@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第五层黑铁外城的宏观房间槽位；窗口函数课程沿前中后三段展开。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 5,
 layoutName: "黑铁城墙双环",

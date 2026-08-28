@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第五层生态遭遇池：窗口函数阶段由 stages 数组决定战斗中的题目顺序。 */
 export const FLOOR_FIVE_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 5,

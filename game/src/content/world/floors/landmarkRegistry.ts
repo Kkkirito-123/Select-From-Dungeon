@@ -11,6 +11,7 @@ import type {
   FloorLandmarkMessageResolver,
 } from "./shared/landmarks";
 
+// registry 是唯一的楼层分派点；楼层子模块彼此不直接依赖，便于单独校验每层内容。
 const FLOOR_LANDMARK_RESOLVERS: Readonly<Record<number, FloorLandmarkMessageResolver>> = {
   1: floor01LandmarkMessage,
   2: floor02LandmarkMessage,
@@ -25,6 +26,7 @@ const FLOOR_LANDMARK_RESOLVERS: Readonly<Record<number, FloorLandmarkMessageReso
 export function floorLandmarkMessage(
   input: FloorLandmarkMessageInput,
 ): string | null {
+  // floor 合法性由 FloorNumber 契约保证；这里仅负责把输入交给对应作者模块。
   return FLOOR_LANDMARK_RESOLVERS[input.floor](input);
 }
 

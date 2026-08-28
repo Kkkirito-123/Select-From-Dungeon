@@ -1,6 +1,7 @@
 import type { AgentPhase, AgentRuntimeState } from "../../../application/agent/AgentRuntime";
 import type { AppShellDom } from "../appShellDom";
 
+/** Agent 面板的纯 DOM 渲染器，负责状态文本、流式打字和 Token 摘要。 */
 const STATUS: Record<AgentPhase, string> = {
   idle: "IDLE",
   dirty: "DIRTY",
@@ -31,6 +32,7 @@ export class AgentPanel {
   >) {}
 
   render(state: AgentRuntimeState): void {
+    // running 状态取消旧打字动画；ready/local 状态按 requestKey 去重，避免重复闪烁。
     const phase = state.phases.main;
     this.dom.agentPanel.dataset.state = phase;
     this.dom.mainStatus.textContent = STATUS[phase];
@@ -56,10 +58,12 @@ export class AgentPanel {
   }
 
   destroy(): void {
+    // 页面销毁时停止 requestAnimationFrame，防止回调继续触碰已卸载 DOM。
     this.cancelTyping();
   }
 
   private startTyping(state: AgentRuntimeState): void {
+    // 远程 ready 结果逐字展示；每个 renderId 对应一个版本，旧动画会自动失效。
     this.cancelTyping();
     const id = ++this.renderId;
     const guidance = Array.from(state.guidance);
@@ -81,12 +85,14 @@ export class AgentPanel {
   }
 
   private showAll(state: AgentRuntimeState): void {
+    // 减少动画或本地回退时直接一次性显示完整指引。
     this.cancelTyping();
     this.dom.mainGuidance.textContent = state.guidance;
     this.complete(state);
   }
 
   private complete(state: AgentRuntimeState): void {
+    // 打字结束后恢复真实 phase，并更新 aria-live 节点供辅助技术读取。
     this.frame = null;
     this.dom.agentPanel.dataset.state = state.phases.main;
     this.dom.mainStatus.textContent = STATUS[state.phases.main];
@@ -94,6 +100,7 @@ export class AgentPanel {
   }
 
   private cancelTyping(): void {
+    // 递增 renderId 先使旧闭包失效，再取消浏览器帧请求。
     this.renderId += 1;
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null;
@@ -104,6 +111,7 @@ export class AgentPanel {
   }
 
   private renderWork(state: AgentRuntimeState): void {
+    // 工作台同时展示三角色阶段和当前/页面 Token 汇总，不参与调度决策。
     const running = Object.values(state.phases).includes("running");
     this.dom.agentWorkMode.textContent = running ? "ACTIVE" : state.usage.mode;
     this.setRoleState(this.dom.agentWorkCampfire, state.phases.campfire);

@@ -33,8 +33,12 @@ import type {
 
 function runtimeStorage(): StorageLike {
   try {
+    // localStorage 是正式 Run/Profile 的持久化入口；这里不直接使用 Storage 类型，
+    // 是为了让内存回退对象也能满足同一份最小契约。
     return window.localStorage;
   } catch {
+    // 隐私模式、浏览器策略或存储配额异常时，游戏仍应能够进入试玩。
+    // 这个 Map 只在当前页面有效，刷新后不会留下正式存档。
     const values = new Map<string, string>();
     return {
       getItem: (key) => values.get(key) ?? null,
@@ -56,8 +60,10 @@ function dungeonAgentCheckpointStorage(): StorageLike | null {
 async function bootstrap(): Promise<void> {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("缺少应用根节点。 ");
+  // 先显示启动占位，避免题库、SQLite WASM 和 Phaser 加载期间出现空白页面。
   root.innerHTML = `<div class="boot-screen"><span class="boot-cursor"></span>正在生成魔王城查询计划…</div>`;
 
+  // 维护器桥只在开发构建中动态加载。生产构建不会把这条调试路径暴露给玩家。
   let dungeonAgentLaunch: DungeonAgentLaunch | null = null;
   let dungeonAgentStore: DungeonAgentStore | null = null;
   let checkpointStorage: StorageLike | null = null;
@@ -74,7 +80,8 @@ async function bootstrap(): Promise<void> {
       dungeonAgentStore = protocol.createDungeonAgentStore(checkpointStorage);
     }
   }
-  // 试玩模式绝不能打开正式 IndexedDB，也不能读取用户 localStorage 中的 Run/Profile。
+  // 试玩模式绝不能打开正式 IndexedDB，也不能读取用户 localStorage 中的 Run/Profile；
+  // 因此 DataStore 的选择必须发生在读取 savedRun/profile 之前。
   const data = dungeonAgentStore ?? await BrowserDataStore.open(runtimeStorage());
   const savedRun = data.loadRun();
   const profile = data.loadProfile();
@@ -95,6 +102,7 @@ async function bootstrap(): Promise<void> {
     setupSession.adminLoadFloor(dungeonAgentLaunch.floor);
     initialRun = setupSession.toSavedRun();
   }
+  // 使用已保存 Run 的 seed 重建同一张物理地图；没有存档时才使用固定世界 seed。
   const session = new GameSession(
     initialRun,
     profile,
@@ -102,6 +110,7 @@ async function bootstrap(): Promise<void> {
     questionBank,
   );
   if (dungeonAgentLaunch) session.enableAgentPlaytestMode();
+  // SQL 引擎与 Phaser 彼此独立，可以并行初始化；两者都完成后才挂载可交互界面。
   const [sql, { createGame }] = await Promise.all([
     SqlEngine.create(session.snapshot().monsters),
     import("../presentation/phaser/createGame"),
@@ -135,6 +144,7 @@ async function bootstrap(): Promise<void> {
     agentRuntime,
   );
   try {
+    // 先启动学习账本和 DOM，再创建 Phaser 场景，确保 UI 订阅不会错过首个快照。
     learningRecorder.start();
     app.mount();
     game = createGame(session, audio, feedback);
@@ -166,6 +176,8 @@ async function bootstrap(): Promise<void> {
     ? { flush: () => undefined, destroy: () => undefined }
     : startProgressPersistence(session, data, JSON.stringify(profile));
 
+  // pagehide 覆盖关闭/跳转，visibilitychange 覆盖切后台；两者共同保证短暂移动
+  // 的延迟写入不会在页面被挂起时丢失。
   const pageHideHandler = (): void => persistence.flush();
   const visibilityChangeHandler = (): void => {
     const hidden = document.visibilityState === "hidden";
@@ -181,6 +193,8 @@ async function bootstrap(): Promise<void> {
   document.addEventListener("visibilitychange", visibilityChangeHandler);
 
   const beforeUnloadHandler = (): void => {
+    // 销毁顺序与创建顺序相反：先停止持久化和事件源，再拆 UI/Phaser，避免回调
+    // 在部分对象已释放时继续访问它们。
     persistence.flush();
     persistence.destroy();
     window.removeEventListener("pagehide", pageHideHandler);

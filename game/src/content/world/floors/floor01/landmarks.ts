@@ -1,5 +1,10 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/**
+ * 第一层地标的本地回退文案。
+ * completedLessons 决定“下一步学什么”，而不是决定地图或战斗结果；
+ * 因此文案可以随课程进度变化，规则仍由 GameSession 负责。
+ */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,
@@ -9,6 +14,7 @@ export function floorLandmarkMessage({
   void openedGateIds;
   void monsters;
   let message: string | null = null;
+  // 用 if/else 链保持每个地标只有一个权威文案来源，避免 UI 再复制一份进度判断。
   if (landmarkId === "npc-scribe-f1") {
     message = !completedLessons.has("select")
       ? "抄写员：先去档案水轮。找出 ID #001 的记录，学会用 SELECT 读取字段、用 FROM 指定表。"

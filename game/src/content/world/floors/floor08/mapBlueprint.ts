@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第八层黑金高堂的宏观房间槽位；最终 MIGRATE 叙事在本层收束。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 8,
 layoutName: "黑金七翼王座轴",
