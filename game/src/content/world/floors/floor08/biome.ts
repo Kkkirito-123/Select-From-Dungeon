@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第八层生态遭遇池：事故模型课程最终汇入五阶段 MIGRATE Boss。 */
 export const FLOOR_EIGHT_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 8, id: 85, lessonId: "f8-mvcc", roomId: 98, name: "魔兵",

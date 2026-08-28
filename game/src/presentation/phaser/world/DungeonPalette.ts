@@ -1,6 +1,11 @@
 import type { GameSnapshot } from "../../../contracts/game/snapshots";
 import type { MazeZone } from "../../../domain/exploration/mazeGenerator";
 
+/**
+ * 地图渲染使用的颜色目录。
+ * 颜色属于表现层配置，按楼层/区域选择，不应被领域规则读取；数值采用 Phaser 的
+ * 0xRRGGBB 格式，避免在每个 renderer 中重复解析颜色字符串。
+ */
 export const COLORS = {
   void: 0x08090c,
   wall: 0x252a34,
@@ -251,6 +256,7 @@ export const BIOME_COLORS = {
 } as const;
 
 export function colorsForFloor(floor: GameSnapshot["floor"]) {
+  // 楼层 1 使用基础色板，其余楼层按固定编号切换主题色，不产生随机颜色。
   if (floor === 2) return FLOOR_TWO_COLORS;
   if (floor === 3) return FLOOR_THREE_COLORS;
   if (floor === 4) return FLOOR_FOUR_COLORS;
@@ -262,6 +268,7 @@ export function colorsForFloor(floor: GameSnapshot["floor"]) {
 }
 
 export function zoneColorsForFloor(floor: GameSnapshot["floor"]): Record<MazeZone["type"], number> {
+  // 区域色板与楼层色板分开：前者区分入口/课程/Boss，后者控制整层基调。
   if (floor === 2) return FLOOR_TWO_ZONE_COLORS;
   if (floor === 3) return FLOOR_THREE_ZONE_COLORS;
   if (floor === 4) return FLOOR_FOUR_ZONE_COLORS;

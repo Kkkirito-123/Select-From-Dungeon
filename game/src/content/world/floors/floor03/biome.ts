@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第三层生态遭遇池：JOIN 关系课程和区域主题在这里关联到怪物。 */
 export const FLOOR_THREE_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 3,

@@ -4,6 +4,7 @@ import { monsterIdentityPresentation } from "../../../domain/progression/monster
 import type { GameSnapshot } from "../../../contracts/game/snapshots";
 import type { Monster } from "../../../domain/shared/types";
 
+/** 以 BiomeKind 选择战斗场景配色和背景轮廓的纯 Phaser 绘制模块。 */
 const HUD_COLORS = { query: 0x78c9b8, ember: 0xc75248 } as const;
 
 const BIOME_ARENA: Readonly<Record<BiomeKind, {
@@ -235,10 +236,12 @@ export function createBattleArena(
   snapshot: GameSnapshot,
   target: Monster | undefined,
 ): BattleArenaView {
+    // 目标怪物优先决定生态；没有目标时使用快照当前区域，保证过渡状态也能绘制。
     const biome = target
       ? biomeEncounterFor(target.id)?.biome ?? snapshot.currentBiome
       : snapshot.currentBiome;
     const palette = BIOME_ARENA[biome];
+    // 先铺底色和棋盘，再画生态剪影、平台、HUD，绘制顺序决定遮挡关系。
     scene.cameras.main.setBackgroundColor(palette.void);
     scene.add.rectangle(320, 208, 640, 416, palette.void);
     for (let y = 0; y < 13; y += 1) {
@@ -342,6 +345,7 @@ function drawBiomeSilhouette(
   biome: BiomeKind,
   color: number,
 ): void {
+    // 每种生态只绘制轻量几何轮廓，不加载额外纹理；未知生态使用通用矩形背景。
     if (biome === "lake") {
       [82, 118, 154].forEach((y, index) => {
         scene.add.rectangle(320 + (index % 2 === 0 ? -28 : 34), y, 520, 3, color, 0.22);

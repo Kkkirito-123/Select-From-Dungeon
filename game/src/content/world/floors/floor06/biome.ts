@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第六层生态遭遇池：DML 阶段的 answerSql 只会在临时沙箱中执行。 */
 export const FLOOR_SIX_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 6,

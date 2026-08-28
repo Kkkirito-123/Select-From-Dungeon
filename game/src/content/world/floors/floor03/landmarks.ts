@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第三层墓原地标文案，把 JOIN 关系映射为可观察的骨桥和遗物线索。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

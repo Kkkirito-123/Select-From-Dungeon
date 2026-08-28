@@ -20,10 +20,16 @@ import type { GameSnapshot } from "../../../contracts/game/snapshots";
 import type { ExperienceSettlement } from "../../../contracts/game/results";
 import { parseSchemaLines } from "../sqlAutocomplete";
 
+/**
+ * AppShell 的纯展示策略。
+ * 这些函数把快照转换为标题、可见性、遮罩和摘要，不能修改 GameSession，
+ * 也不应在这里执行 SQL 或读取浏览器存储。
+ */
 export function inspectionDialogCopy(message: string): {
   title: string;
   body: string;
 } {
+  // 带“说话者：正文”的作者文案拆成标题和正文，其余消息使用稳定兜底标题。
   const speaker = message.match(/^([^：]{1,12})：\s*(.+)$/s);
   if (speaker) {
     return { title: speaker[1], body: speaker[2] };
@@ -41,6 +47,7 @@ export function redactSnapshotMonsterIdentity(
   value: string,
   snapshot: Pick<GameSnapshot, "monsters" | "profile">,
 ): string {
+  // 展示层再次脱敏，防止旧快照或远程文案间接露出尚未回收的怪物名字。
   return redactUndiscoveredMonsterIdentityText(
     value,
     snapshot.monsters,
@@ -52,12 +59,14 @@ export function canOpenCombatTerminal(
   mode: GameSnapshot["mode"] | null | undefined,
   busy: boolean,
 ): boolean {
+  // busy 期间禁止重复打开终端，避免两个提交按钮同时驱动同一回合。
   return mode === "combat" && !busy;
 }
 
 export function isInspectionPrimaryKey(
   event: Pick<KeyboardEvent, "code" | "key" | "repeat">,
 ): boolean {
+  // Enter 与 E 都可确认调查，但长按 repeat 必须忽略，避免重复打开对话框。
   if (event.repeat) return false;
   return event.code === "KeyE" || event.key.toLowerCase() === "e" ||
     event.key === "Enter";
@@ -67,6 +76,7 @@ export function inspectionEscapeCanClose(
   recordKind: string | undefined,
   activePresentation: FloorStoryPresentation | null | undefined,
 ): boolean {
+  // MIGRATE 阶段的阻塞叙事不能被 ESC 跳过，普通调查则允许退出。
   return recordKind !== "migration" && activePresentation !== "blocking";
 }
 
@@ -74,12 +84,14 @@ export function shouldDismissTransientCard(
   shownAtMove: number | null,
   currentTotalMoves: number,
 ): boolean {
+  // 移动满三步后自动收起拾取/结算卡，让它不会长期遮挡地图。
   return shownAtMove !== null && currentTotalMoves - shownAtMove >= 3;
 }
 
 export function narrativeMomentUsesRecordOverlay(
   presentation: FloorStoryPresentation,
 ): boolean {
+  // blocking/inspect 需要记录式遮罩；banner 等轻量展示不抢占主交互。
   return presentation === "blocking" || presentation === "inspect";
 }
 
@@ -93,6 +105,7 @@ const NARRATIVE_EVIDENCE_TITLES = new Map(
 export function isFinalMigrationStoryMoment(
   moment: Pick<FloorStoryMoment, "floor" | "sourceId">,
 ): boolean {
+  // 终局来源 ID 是内容契约的一部分，不能仅凭 floor=8 推断。
   return moment.floor === 8 && moment.sourceId === FINAL_MIGRATION_STORY_SOURCE_ID;
 }
 
@@ -100,6 +113,7 @@ export function canPresentFinalMigrationStoryMoment(
   moment: Pick<FloorStoryMoment, "floor" | "sourceId">,
   snapshot: Pick<GameSnapshot, "floor" | "mode">,
 ): boolean {
+  // 只有第八层 victory 状态才允许打开终局迁移叙事，防止提前展示结局。
   if (!isFinalMigrationStoryMoment(moment)) return true;
   return snapshot.floor === 8 && snapshot.mode === "victory";
 }
@@ -116,6 +130,7 @@ export interface FinalMigrationRecordCopy {
 export function finalMigrationRecordCopy(
   markerIds: readonly string[],
 ): FinalMigrationRecordCopy | null {
+  // 将已完成 marker 转成当前待执行步骤；完成全部步骤时返回 null，交给终局页处理。
   const ending = NARRATIVE_ENDINGS[0];
   const progress = finalMigrationProgress(markerIds);
   if (!progress.nextStep) return null;
@@ -152,6 +167,7 @@ export function finalMigrationArgumentCopy(
     combat: { targetId: number } | null;
   },
 ): FinalMigrationArgumentCopy | null {
+  // 只有与最终 Boss 对战的安全阶段才展示档案王论点，普通战斗不复用终局文案。
   const narrative = (
     snapshot.lessonId === "f8-security" &&
     snapshot.combat?.targetId === 84
@@ -176,12 +192,14 @@ export function finalVictoryPortalReady(
     openedGateIds: readonly string[];
   },
 ): boolean {
+  // 第八层还要额外完成 MIGRATE；前七层 victory 只需到达胜利状态即可过渡。
   if (snapshot.mode !== "victory") return false;
   return snapshot.floor !== 8 ||
     finalMigrationProgress(snapshot.openedGateIds).complete;
 }
 
 export function storyMomentRecordBody(moment: FloorStoryMoment): string {
+  // 有 SQL 证据时追加查询、行数和目的；纯对白拍保持原有行顺序。
   if (!moment.query) return moment.lines.join("\n");
   const fields = moment.query.expectedColumns.length > 0
     ? moment.query.expectedColumns.join(" · ")
@@ -202,6 +220,7 @@ export function canPresentQueuedNarrativeMoment(
   combatSettlementVisible: boolean,
   blockingOverlayOpen: boolean,
 ): boolean {
+  // 结算卡、阻塞遮罩或异步动作期间暂缓队列，避免两个弹层争夺焦点。
   if (busy || combatSettlementVisible || blockingOverlayOpen) return false;
   return mode === "explore" || mode === "transition" || mode === "victory";
 }
@@ -219,6 +238,7 @@ export function schemaRenderSignature(
     | "schema"
   > & Partial<Pick<GameSnapshot, "taskBrief">>,
 ): string {
+  // 签名只用于判断是否需要重绘 Schema 面板，不是安全 Hash，也不发送到网络。
   return [
     String(snapshot.focusMonsterId ?? ""),
     snapshot.lessonStageId,
@@ -236,6 +256,7 @@ export function schemaTaskTableRoles(
     "focusMonsterId" | "lessonIntro" | "lessonStageId" | "missionBody" | "schema"
   > & Partial<Pick<GameSnapshot, "taskBrief">>,
 ): ReadonlyMap<string, SchemaTaskRole> {
+  // 优先使用 taskBrief 的作者分析；旧快照缺少它时再从答案 SQL 做轻量回退推断。
   if (snapshot.taskBrief?.primaryTable) {
     const roles = new Map<string, SchemaTaskRole>();
     roles.set(snapshot.taskBrief.primaryTable.toLocaleLowerCase(), "primary");
@@ -343,6 +364,7 @@ export function narrativeProgressForSnapshot(
     | "roomGraph"
   >,
 ): NarrativeRuntimeProgress {
+  // 每次从快照重算叙事条件，确保刷新/恢复后不会遗留 UI 自己维护的错误进度。
   const floor = narrativeFloorFor(snapshot.floor);
   const requiredLessonIds = snapshot.roomGraph.nodes
     .filter((node) => node.required && node.lessonId)
@@ -425,6 +447,7 @@ export function combatSettlementCopy(
   lootDropped: boolean,
   recoveryName?: string,
 ): CombatSettlementCopy {
+  // 结算卡只格式化领域层已经计算好的 XP、等级和掉落信息，不重新判定奖励。
   const nextXp = LEVEL_XP_THRESHOLDS[experience.currentLevel];
   const progress = nextXp === undefined
     ? `LV.${experience.currentLevel} · ${experience.previousXp} → ${experience.currentXp} XP · MAX`

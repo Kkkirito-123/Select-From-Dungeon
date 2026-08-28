@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 
+/** 楼层贴图资源目录与按需加载器；当前只为第一、二层提供外部贴图包。 */
 type ArtFloor = Extract<GameSnapshot["floor"], 1 | 2>;
 
 interface RuntimeTexture {
@@ -127,10 +128,12 @@ export const FLOOR_ART_ASSETS: Readonly<Record<ArtFloor, readonly RuntimeTexture
 };
 
 export function supportsFloorArt(floor: GameSnapshot["floor"]): floor is ArtFloor {
+  // 后续楼层继续使用程序化几何，不应因缺少贴图阻塞场景创建。
   return floor === 1 || floor === 2;
 }
 
 export function floorArtReady(scene: Phaser.Scene, floor: GameSnapshot["floor"]): boolean {
+  // 只有该层所有资源都已注册，调用方才可切换到贴图渲染路径。
   if (!supportsFloorArt(floor)) return false;
   return FLOOR_ART_ASSETS[floor].every((asset) => scene.textures.exists(asset.key));
 }
@@ -139,6 +142,7 @@ export function queueFloorArtAssets(
   scene: Phaser.Scene,
   floor: GameSnapshot["floor"],
 ): boolean {
+  // 只把尚未存在的资源加入 Phaser loader；返回值告诉场景是否需要等待 load 完成。
   if (!supportsFloorArt(floor)) return false;
   let queued = false;
   FLOOR_ART_ASSETS[floor].forEach((asset) => {

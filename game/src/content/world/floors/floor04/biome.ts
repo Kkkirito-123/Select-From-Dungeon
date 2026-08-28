@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第四层生态遭遇池：火/冰/雷怪物共享楼层的子查询课程推进。 */
 export const FLOOR_FOUR_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 4,

@@ -11,6 +11,11 @@ import type { GameSnapshot } from "../../../../contracts/game/snapshots";
 import { createScribeActor } from "../../PixelActorFactory";
 import { WORLD_VISUAL_LANGUAGE } from "../../worldVisualLanguage";
 
+/**
+ * 楼层专属地标的 Phaser 基类。
+ * 子类只负责本层地貌；本类统一管理抄写员、隐藏房、SQL 密文和邻近提示的创建/销毁，
+ * 并把 GameSnapshot 转换为可见性状态。
+ */
 export interface PixelPoint {
   x: number;
   y: number;
@@ -50,6 +55,7 @@ export type FloorWorldState = NonNullable<
 >;
 
 function discoveredRoom(snapshot: GameSnapshot, roomNodeId: string): boolean {
+  // 管理员预览可直接查看全部房间，正式模式必须先访问房间才显示内部地标。
   return snapshot.adminMode || snapshot.visitedRoomIds.includes(roomNodeId);
 }
 
@@ -72,6 +78,7 @@ export abstract class FloorSetpieceModule {
   ) {}
 
   build(snapshot: GameSnapshot): void {
+    // 重建前先销毁旧容器，避免换层后旧楼层的定时器和精灵残留。
     this.destroy();
     if (!hasFloorExperience(snapshot.floor)) return;
     this.root = this.scene.add.container(0, 0).setDepth(12);
@@ -82,6 +89,7 @@ export abstract class FloorSetpieceModule {
   }
 
   sync(snapshot: GameSnapshot): void {
+    // sync 只更新可见性、标签和状态，不重复创建对象；创建工作集中在 build。
     if (!this.root || !hasFloorExperience(snapshot.floor)) return;
     const world = floorWorldStateFromSnapshot(snapshot);
     if (!world) return;
@@ -102,6 +110,7 @@ export abstract class FloorSetpieceModule {
   }
 
   destroy(): void {
+    // 定时器、容器和引用一起清空，保证 Phaser 场景切换后没有悬挂对象。
     this.resetFloorState();
     this.timers.forEach((timer) => timer.remove(false));
     this.timers = [];
@@ -120,6 +129,7 @@ export abstract class FloorSetpieceModule {
   ): void;
   protected resetFloorState(): void {}
   protected anchorPoint(snapshot: GameSnapshot, landmarkId: string): PixelPoint | null {
+    // 作者位置使用 zone 内归一化坐标，运行时在这里换算成 TILE_SIZE 像素坐标。
     if (!hasFloorExperience(snapshot.floor)) return null;
     const landmark = floorExperience(snapshot.floor).landmarks.find(
       (entry) => entry.id === landmarkId,
@@ -146,6 +156,7 @@ export abstract class FloorSetpieceModule {
     frame?: string | number,
     scale = 2,
   ): Phaser.GameObjects.Image {
+    // 所有子类图片都挂到 root，销毁 root 即可一次性回收。
     const image = this.scene.add.image(x, y, key, frame).setScale(scale);
     this.root?.add(image);
     return image;
@@ -157,6 +168,7 @@ export abstract class FloorSetpieceModule {
     color = "#efe0bd",
     offsetY = -34,
   ): Phaser.GameObjects.Text {
+    // 标签默认隐藏，只在玩家靠近时由 syncProximityLabels 打开，减少画面噪声。
     const label = this.scene.add.text(point.x, point.y + offsetY, text, {
       color,
       fontFamily: "monospace",
@@ -172,6 +184,7 @@ export abstract class FloorSetpieceModule {
   }
 
   protected syncProximityLabels(snapshot: GameSnapshot): void {
+    // 每次快照只做距离判断，不重新创建文本对象。
     this.proximityLabels.forEach(({ label, point, radius }) => {
       label.setVisible(this.isPlayerNear(snapshot, point, radius));
     });
@@ -182,6 +195,7 @@ export abstract class FloorSetpieceModule {
     point: PixelPoint | null,
     maxTiles = 3,
   ): boolean {
+    // 地图使用曼哈顿距离，与移动网格规则一致；point 为空表示该地标未解析。
     if (!point) return false;
     const playerX = (snapshot.player.x + 0.5) * TILE_SIZE;
     const playerY = (snapshot.player.y + 0.5) * TILE_SIZE;
@@ -191,6 +205,7 @@ export abstract class FloorSetpieceModule {
   }
 
   protected createUniqueScribe(snapshot: GameSnapshot, npcId: string): void {
+    // 抄写员位置来自楼层作者数据，找不到对应 zone 时直接跳过而不阻塞整层加载。
     if (!hasFloorExperience(snapshot.floor)) return;
     const npc = floorExperience(snapshot.floor).npcPlacements.find(
       (entry) => entry.id === npcId,
@@ -234,6 +249,7 @@ export abstract class FloorSetpieceModule {
     lineColor: number,
     horizontalPlanks: boolean,
   ): Phaser.GameObjects.Container | null {
+    // 隐藏房背景只负责视觉层，是否打开和是否显形由 syncHiddenArea 决定。
     const zone = snapshot.mazeFloor.zones.find((entry) => entry.roomNodeId === roomNodeId);
     if (!zone) return null;
     const centerX = (zone.x + zone.width / 2) * TILE_SIZE;
@@ -273,6 +289,7 @@ export abstract class FloorSetpieceModule {
     darkColor: number,
     lightColor: number,
   ): void {
+    // 同时创建 sealed/opened 两套容器，状态切换时只需 setVisible，不必重建几何。
     if (!hasFloorExperience(snapshot.floor)) return;
     const area = floorExperience(snapshot.floor).hiddenAreas[0];
     if (!area) return;
@@ -312,6 +329,7 @@ export abstract class FloorSetpieceModule {
   }
 
   protected syncHiddenArea(snapshot: GameSnapshot): void {
+    // gate 状态决定入口样式，visitedRoomIds 决定房间内部是否显形，两者是独立条件。
     const view = this.hiddenArea;
     if (!view) return;
     const opened = snapshot.openedGateIds.includes(view.gateId);
@@ -329,6 +347,7 @@ export abstract class FloorSetpieceModule {
     snapshot: GameSnapshot,
     colors: readonly [number, number, number],
   ): void {
+    // 区域颜色按 zone 索引分段映射；Boss 区只提高洗色透明度，不改变碰撞。
     snapshot.mazeFloor.zones.forEach((zone, index) => {
       const centerX = (zone.x + zone.width / 2) * TILE_SIZE;
       const centerY = (zone.y + zone.height / 2) * TILE_SIZE;
@@ -348,6 +367,7 @@ export abstract class FloorSetpieceModule {
   }
 
   protected createSqlSeal(snapshot: GameSnapshot): void {
+    // SQL 密文锚点优先取 Boss gate，缺失时再使用作者地标归一化位置。
     if (!hasFloorExperience(snapshot.floor)) return;
     const sealLandmark = floorExperience(snapshot.floor).landmarks.find(
       (landmark) => landmark.kind === "sql-seal",
@@ -381,6 +401,7 @@ export abstract class FloorSetpieceModule {
     snapshot: GameSnapshot,
     state: "sealed" | "decoded",
   ): void {
+    // decoded 只改变透明度、核心颜色和标签；门是否真正开放仍由 GameSession 决定。
     if (!this.sqlSeal) return;
     const decoded = state === "decoded";
     this.sqlSeal.container.setAlpha(decoded ? 0.82 : 1);

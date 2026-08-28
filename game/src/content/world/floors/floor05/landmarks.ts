@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第五层黑铁外城地标文案，解释窗口函数和轮值顺序的世界反馈。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

@@ -16,6 +16,7 @@ import type {
 import { cloneMonsters } from "../sessionState";
 import { stableStringHash } from "../../progression/runGraph";
 
+/** GameSession 构造/恢复阶段使用的世界对象工厂，不处理玩家输入或规则结算。 */
 export const INITIAL_EXPLORATION_BANNER =
   "迷宫已经生成。沿青色箭头找到 ID #001，触碰它进入 SELECT 战斗。";
 const LEGACY_INSPECTION_BANNER_PREFIXES = [
@@ -25,6 +26,7 @@ const LEGACY_INSPECTION_BANNER_PREFIXES = [
 ] as const;
 
 export function createRunInstanceId(seed: string): string {
+  // UUID 用于区分同一 seed 的不同 Run；旧环境才使用 seed+时间的可追踪回退值。
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
@@ -32,12 +34,14 @@ export function createRunInstanceId(seed: string): string {
 }
 
 export function restoredWorldBanner(banner: string): string {
+  // 旧版本可能把地标长文案存进 banner；恢复时替换为稳定的探索提示。
   return LEGACY_INSPECTION_BANNER_PREFIXES.some((prefix) => banner.startsWith(prefix))
     ? INITIAL_EXPLORATION_BANNER
     : banner;
 }
 
 function rewardItemKind(reward: ClaimableReward): GroundItem["kind"] {
+  // 将内容层奖励分类映射为地图物品类型，避免 UI 直接理解 reward.kind。
   if (reward.kind === "weapon") return "weapon";
   if (reward.kind === "relic") return "relic";
   if (reward.kind === "heal" || reward.kind === "cool") return "heal";
@@ -46,6 +50,7 @@ function rewardItemKind(reward: ClaimableReward): GroundItem["kind"] {
 }
 
 export function monstersForFloor(floor: FloorNumber): Monster[] {
+  // 每次从作者初始表复制，再按楼层战斗矩阵计算反击伤害，绝不复用可变对象。
   return cloneMonsters(INITIAL_MONSTERS.filter((monster) => monster.floor === floor))
     .map((monster) => ({
       ...monster,
@@ -57,6 +62,7 @@ export function restoredMonstersForFloor(
   savedMonsters: readonly Monster[],
   floor: FloorNumber,
 ): Monster[] {
+  // 以当前作者怪物列表为基线，只恢复 hp；这样新增字段仍由当前内容补齐。
   const savedById = new Map(savedMonsters.map((monster) => [monster.id, monster]));
   return monstersForFloor(floor).map((canonical) => {
     const saved = savedById.get(canonical.id);
@@ -72,6 +78,7 @@ export function initialActors(
   monsters: readonly Monster[],
   biomePlan: BiomePlan,
 ): WorldActor[] {
+  // 课程怪物与区域首领都转换为世界 Actor；行为由 Boss/教程/课程类型决定。
   const curriculumActors: WorldActor[] = monsters
     .filter((monster) => monster.encounterType === "curriculum")
     .map((monster) => {
@@ -113,6 +120,7 @@ export function restoredActorsForFloor(
   savedActors: readonly WorldActor[],
   expectedActors: readonly WorldActor[],
 ): WorldActor[] {
+  // 保存的 Actor 只恢复位置等运行状态，home/behavior/radius 以当前作者定义为准。
   const savedByMonster = new Map(savedActors.map((actor) => [actor.monsterId, actor]));
   return expectedActors.map((expected) => {
     const saved = savedByMonster.get(expected.monsterId);
@@ -136,6 +144,7 @@ export function initialGroundItems(
   campfires: readonly Campfire[] = [],
   guidedMap?: GuidedMapPlan,
 ): GroundItem[] {
+  // 房间奖励按图节点生成；重复的唯一武器/遗物降级为热量恢复品，避免同层冲突。
   const items: GroundItem[] = [];
   const uniqueRewardIds = new Set<RoomReward>();
   graph.nodes.forEach((node) => {

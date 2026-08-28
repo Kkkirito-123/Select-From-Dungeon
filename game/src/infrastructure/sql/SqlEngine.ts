@@ -23,6 +23,11 @@ import { initSqlRuntime } from "./initSqlRuntime";
 
 const MAX_RESULT_ROWS = SQL_RUNTIME_CONFIG.maxResultRows;
 
+/**
+ * 浏览器内 SQLite 适配器。
+ * 主数据库保存当前怪物与剧情数据；第六层写操作在 export() 产生的临时副本中执行，
+ * 因而一次题目的 INSERT/UPDATE/DELETE 不会污染下一题或正式存档。
+ */
 export class SqlEngine {
   private constructor(
     private readonly SQL: SqlJsStatic,
@@ -33,6 +38,7 @@ export class SqlEngine {
     monsters: Monster[],
     wasmLocation = wasmUrl,
   ): Promise<SqlEngine> {
+    // WASM/asm.js 初始化由 initSqlRuntime 统一处理，这里只负责创建空库并灌入初始数据。
     const SQL = await initSqlRuntime(wasmLocation);
     const engine = new SqlEngine(SQL, new SQL.Database());
     engine.seed(monsters);
@@ -40,6 +46,7 @@ export class SqlEngine {
   }
 
   executeSelect(input: string): SqlQueryResult {
+    // 先过只读策略，再分别执行 EXPLAIN 和真实查询；UI 永远拿不到未校验的 SQL。
     const validation = validateReadOnlyQuery(input);
     if (!validation.ok) {
       throw new Error(validation.message);
@@ -63,6 +70,7 @@ export class SqlEngine {
       };
     }
 
+    // 只有结果集中名为 id 的列才会被视为攻击目标，避免把任意数值列误当作怪物 ID。
     const idIndex = queryResult.columns.findIndex(
       (column) => column.toLocaleLowerCase() === "id",
     );
@@ -85,6 +93,7 @@ export class SqlEngine {
   }
 
   execute(input: string, floor: FloorNumber, lessonId?: string): SqlQueryResult {
+    // 第六层课程使用 repair_queue 沙箱；其余楼层和非 DML 练习走只读查询路径。
     const usesFloorSixSandbox = floor === 6 && (
       lessonId === undefined || lessonId.startsWith("f6-")
     );
@@ -98,6 +107,7 @@ export class SqlEngine {
     if (!validation.ok) {
       throw new Error(validation.message);
     }
+    // export() 复制当前数据库字节；sandbox.close() 后所有写入都会随副本一起丢弃。
     const sandbox = new this.SQL.Database(this.database.export());
     try {
       sandbox.run(validation.sql);
@@ -127,6 +137,7 @@ export class SqlEngine {
   }
 
   updateMonsterHp(updates: Array<{ id: number; hp: number }>): void {
+    // 战斗结算后只同步怪物 hp；课程数据、信号和装备表不由战斗流程修改。
     const statement = this.database.prepare(
       "UPDATE monsters SET hp = $hp WHERE id = $id",
     );
@@ -144,6 +155,7 @@ export class SqlEngine {
   }
 
   private seed(monsters: Monster[]): void {
+    // 所有教学表在同一段 DDL 中创建，随后按固定 fixture 写入，保证每次启动内容一致。
     this.database.run(`
       ${SQL_SCHEMA_DDL}
 

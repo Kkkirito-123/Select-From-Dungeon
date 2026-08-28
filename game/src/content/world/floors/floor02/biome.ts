@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第二层生态遭遇池：怪物数据负责候选与课程，坐标由运行时地图生成器决定。 */
 export const FLOOR_TWO_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 2,

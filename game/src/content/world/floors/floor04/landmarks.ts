@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第四层元素升炉地标文案；三种元素区域共享同一套进度查询。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

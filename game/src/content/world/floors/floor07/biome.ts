@@ -4,6 +4,7 @@ import {
   type BiomeEncounterDefinition,
 } from "../shared/biome";
 
+/** 第七层生态遭遇池：题目同时记录 EXPLAIN 计划要求和目标索引特征。 */
 export const FLOOR_SEVEN_BIOME_MONSTERS: readonly Monster[] = [
   biomeMonster({
     floor: 7, id: 73, lessonId: "f7-btree", roomId: 87, name: "枝妖",

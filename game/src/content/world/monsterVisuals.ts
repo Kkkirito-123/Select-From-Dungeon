@@ -1,5 +1,9 @@
 import type { Monster, MonsterKind } from "../../domain/shared/types";
 
+/**
+ * 视觉原型是“规则怪物种类 -> 程序化绘制配方”的中间层。
+ * 规则层只保存 kind/species，不直接依赖 Phaser 颜色或几何。
+ */
 export type MonsterVisualArchetype =
   | "slime"
   | "hound"
@@ -41,6 +45,7 @@ export const MONSTER_KIND_VISUALS: Readonly<Record<
   MonsterKind,
   MonsterVisualArchetype
 >> = {
+  // 默认按 MonsterKind 映射；特殊物种在 monsterVisualArchetype 中覆盖。
   "projection-slime": "slime",
   "filter-hound": "hound",
   "null-ghost": "ghost",
@@ -85,6 +90,7 @@ export const MONSTER_KIND_VISUALS: Readonly<Record<
 export function monsterVisualArchetype(
   monster: Pick<Monster, "kind" | "species">,
 ): MonsterVisualArchetype {
+  // species 是内容作者的细粒度标签，例如 frog/treant；它比通用 kind 更适合表达外观变体。
   if (monster.species.includes("frog")) return "frog";
   if (monster.species.includes("treant")) return "treant";
   if (monster.species.includes("storm_beast")) return "storm-beast";

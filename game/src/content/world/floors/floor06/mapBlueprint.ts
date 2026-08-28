@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第六层龙脊工坊的宏观房间槽位；DML 课程使用独立 repair_queue 沙箱。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 6,
 layoutName: "龙脊工坊折线",

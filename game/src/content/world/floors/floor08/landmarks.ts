@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第八层黑金高堂地标文案，为最终事故模型和 MIGRATE 阶段提供上下文。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

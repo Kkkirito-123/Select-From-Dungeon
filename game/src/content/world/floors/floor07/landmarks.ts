@@ -1,5 +1,6 @@
 import type { FloorLandmarkMessageInput } from "../shared/landmarks";
 
+/** 第七层索引园地标文案，把查询计划映射为扫描路径和索引树变化。 */
 export function floorLandmarkMessage({
   landmarkId,
   completedLessons,

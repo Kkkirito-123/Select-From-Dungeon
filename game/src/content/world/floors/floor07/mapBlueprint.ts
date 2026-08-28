@@ -1,6 +1,7 @@
 import type { FloorMapBlueprint } from "../shared/mapBlueprint";
 import { mapSlot } from "../shared/mapBlueprint";
 
+/** 第七层残照索引园的宏观房间槽位；索引课程会读取真实查询计划。 */
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 7,
 layoutName: "残照索引王苑",

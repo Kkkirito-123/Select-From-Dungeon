@@ -10,6 +10,7 @@ import {
   type MonsterVisualArchetype,
 } from "./monsterVisuals";
 
+/** 地图和战斗共用的角色轮廓枚举；渲染器据此选择几何，而不是读取具体 MonsterKind。 */
 export type ActorSilhouette =
   | "blob"
   | "quadruped"
@@ -31,6 +32,7 @@ export type ActorSilhouette =
 export type ActorIdleMotion = "breathe" | "float" | "squash" | "pulse";
 
 export interface MonsterActorProfile {
+  /** 与 monsterVisualArchetype 返回值对应的稳定配方 ID。 */
   id: MonsterVisualArchetype;
   silhouette: ActorSilhouette;
   base: number;
@@ -44,6 +46,7 @@ export interface MonsterActorProfile {
 }
 
 export interface PlayerActorProfile {
+  /** 随楼层推进的角色身份阶段；装备颜色在此基础上再覆盖。 */
   stage: "keyless" | "archivist" | "migrator" | "history-set";
   coat: number;
   coatSecondary: number;
@@ -62,6 +65,7 @@ export const MONSTER_ACTOR_PROFILES: Readonly<Record<
   MonsterVisualArchetype,
   MonsterActorProfile
 >> = {
+  // 颜色使用 0xRRGGBB 数值，交给 Phaser 时无需再次解析 CSS 字符串。
   slime: profile("slime", "blob", 0x4f9a8f, 0x85c8ae, "squash"),
   hound: profile("hound", "quadruped", 0x9b6747, 0xc08b5f, "breathe"),
   ghost: profile("ghost", "spirit", 0x74558f, 0xbda4d1, "float"),
@@ -211,6 +215,7 @@ function wingedProfile(
 }
 
 function mixColor(left: number, right: number, ratio: number): number {
+  // 按 RGB 三个通道分别插值，给角色生成稳定阴影色；ratio=0 保留 left，ratio=1 接近 right。
   const mix = (shift: number) => Math.round(
     ((left >> shift) & 0xff) * (1 - ratio) +
     ((right >> shift) & 0xff) * ratio,
@@ -246,6 +251,7 @@ export function playerActorProfile(
   floor: FloorNumber,
   player: Pick<PlayerState, "weapon" | "armor">,
 ): PlayerActorProfile {
+  // 楼层决定基础身份，特殊“回燃衣”再覆盖外套与披风外观，但不改变玩家规则属性。
   const stage = PLAYER_STAGE_BY_FLOOR[floor];
   const echoRobe = player.armor?.id === "ember-echo-robe";
   return {
@@ -268,6 +274,7 @@ export function playerActorProfile(
 export function monsterActorProfile(
   monster: Pick<Monster, "kind" | "species" | "isBoss">,
 ): MonsterActorProfile {
+  // Boss 统一加冠，物种标签只改变配色/原型，不改变生命或战斗数值。
   const archetype = monsterVisualArchetype(monster);
   const source = MONSTER_ACTOR_PROFILES[archetype];
   let base = source.base;

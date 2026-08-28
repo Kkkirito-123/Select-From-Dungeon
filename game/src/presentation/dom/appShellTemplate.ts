@@ -4,19 +4,23 @@
  * GameSnapshot 更新；模板不包含游戏规则和存档数据。
  */
 export interface AppShellTemplateMetrics {
+  /** 从权威 SQL Schema 统计的表数量，显示在字段图鉴标题中。 */
   schemaTableCount: number;
+  /** 从权威 SQL Schema 统计的字段数量，避免模板手填后与 Schema 漂移。 */
   schemaFieldCount: number;
 }
+
 /**
- * Static DOM contract for AppShell.
+ * AppShell 的静态 DOM 契约。
  *
- * Keep markup, stable IDs and accessibility attributes here. Runtime state,
- * event handlers and rendering remain outside this pure template boundary.
+ * 这里集中维护稳定 ID、ARIA 属性和无状态容器；运行时状态、事件处理和渲染
+ * 位于 AppShell 及各 Panel 中。修改 ID 时必须同步 appShellDom.ts 的选择器。
  */
 export function appShellTemplate({
   schemaTableCount,
   schemaFieldCount,
 }: AppShellTemplateMetrics): string {
+  // 模板只执行字符串插值，不读取 window、不访问存储，也不决定按钮是否可用。
   return `
       <div class="page-frame">
         <header class="masthead">

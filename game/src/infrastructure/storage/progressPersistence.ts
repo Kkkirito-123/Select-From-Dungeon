@@ -18,10 +18,15 @@ import type { ProfileProgress, SavedRun } from "../../domain/shared/types";
 export const PROGRESS_SAVE_DEBOUNCE_MS = STORAGE_RUNTIME_CONFIG.progressSaveDebounceMs;
 
 export interface PersistenceFingerprint {
+  /** 当前会话模式，例如 "explore"、"combat" 或 "campfire"。 */
   mode: string;
+  /** 已执行 SQL 回合数；查询成功/失败都属于需要立即保存的进度。 */
   queryCount: number;
+  /** 地面物品与战利品包的稳定 ID 串，用于检测拾取、丢弃和生成变化。 */
   itemIds: string;
+  /** 装备、护甲耐久和恢复品数量的 JSON 快照。 */
   inventoryState: string;
+  /** 迷宫拓扑签名；换楼层或迁移地图后必须立即写入。 */
   topologyHash: number;
 }
 
@@ -55,6 +60,10 @@ function isProgressStore(value: StorageTarget): value is ProgressStore {
 export function persistenceFingerprint(
   snapshot: GameSnapshot,
 ): PersistenceFingerprint {
+  // 这个指纹不是完整存档，而是“是否需要立即落盘”的廉价判断。
+  // 例如 inventoryState 可能序列化为：
+  // {"weapon":"filter-bow","armor":null,"armorHp":0,
+  //  "equipment":["filter-bow"],"consumables":[["minor-potion",2]]}
   return {
     mode: snapshot.mode,
     queryCount: snapshot.queryCount,
@@ -82,6 +91,7 @@ export function isCriticalPersistenceChange(
   previous: PersistenceFingerprint | null,
   current: PersistenceFingerprint,
 ): boolean {
+  // 首次收到快照必须保存；之后只要关键字段变化，就跳过 debounce 窗口直接写入。
   return previous === null ||
     current.mode !== previous.mode ||
     current.queryCount !== previous.queryCount ||
@@ -112,6 +122,7 @@ export function startProgressPersistence(
     timer = null;
   };
   const persistCurrent = (): void => {
+    // Run 和 Profile 同时从同一时刻读取，避免保存出“局内状态已前进、永久档案未更新”的组合。
     const run = source.toSavedRun();
     const profile = source.toProfile();
     if (isProgressStore(storage)) {
@@ -129,6 +140,7 @@ export function startProgressPersistence(
   const flush = (): void => {
     if (destroyed) return;
     clearPending();
+    // 管理员模式是内存预览，不能覆盖玩家正式存档；离开预览后才恢复正常保存。
     if (adminPreview || source.snapshot().adminMode) return;
     persistCurrent();
   };
@@ -139,6 +151,7 @@ export function startProgressPersistence(
   const unsubscribe = source.subscribe((snapshot) => {
     if (destroyed) return;
     if (snapshot.adminMode) {
+      // 切入管理员预览前，先把尚未执行的正式延迟写入完成，随后冻结持久化。
       const hadPendingFormalSave = timer !== null;
       clearPending();
       if (!adminPreview && hadPendingFormalSave) persistCurrent();
@@ -148,6 +161,7 @@ export function startProgressPersistence(
     const current = persistenceFingerprint(snapshot);
     const critical = isCriticalPersistenceChange(previousFingerprint, current);
     previousFingerprint = current;
+    // 关键变化立即写入；普通移动只保留最后一次快照，减少高频巡逻/移动造成的存储写入。
     if (critical) flush();
     else schedule();
   });
