@@ -3,7 +3,7 @@
   "contractId": "dungeon.game.architecture",
   "contractVersion": 1,
   "projectRoot": "game",
-  "boundaryRevision": 2,
+  "boundaryRevision": 3,
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
     { "id": "application", "root": "game/src/application", "responsibility": "启动、用例编排、运行时配置和页面生命周期" },
@@ -220,6 +220,15 @@
       "notResponsibleFor": ["领域事件判定", "页面布局"],
       "signals": ["反馈", "震动", "设备能力"],
       "neighbors": ["application.triggers", "presentation.dom"]
+    },
+    {
+      "id": "infrastructure.presence",
+      "parentId": "infrastructure",
+      "root": "game/src/infrastructure/presence",
+      "responsibility": "同源 SSE 在线人数连接、消息校验和浏览器重连状态适配",
+      "notResponsibleFor": ["独立玩家身份", "历史访问统计", "游戏状态修改"],
+      "signals": ["在线人数", "presence", "SSE", "连接失败", "人数不更新"],
+      "neighbors": ["application.config", "presentation.dom"]
     },
     {
       "id": "infrastructure.sql",
@@ -686,6 +695,23 @@
       },
       "contentRefs": [],
       "serviceProviders": ["presentation.dom", "presentation.phaser"]
+    },
+    {
+      "id": "feature.live-presence",
+      "roots": ["infrastructure.presence", "application.config", "presentation.dom.panels", "presentation.styles"],
+      "responsibility": "在线标签页连接数的同源 SSE 接入、失败降级和左下角状态展示",
+      "notResponsibleFor": ["独立玩家去重", "历史分析", "游戏领域状态"],
+      "signals": ["在线人数", "绿点", "presence", "SSE", "连接人数", "在线状态不可用"],
+      "negativeSignals": ["怪物生命", "存档迁移"],
+      "neighbors": ["infrastructure.presence", "application.config", "presentation.dom.panels"],
+      "route": {
+        "primary": ["infrastructure.presence"],
+        "adjacent": ["application.config", "presentation.dom.panels"],
+        "shared": ["presentation.styles"],
+        "fallback": []
+      },
+      "contentRefs": [],
+      "serviceProviders": ["infrastructure.presence"]
     }
   ],
   "runtime": {
@@ -704,6 +730,6 @@
   },
   "boundary": {
     "algorithm": "direct-child-v1",
-    "signature": "d7d5897b79887ac82f30fad3780f85e32a6fbd6ad971e26b65a48845700fb6f5"
+    "signature": "d0252ca69958eaf254188c80e21d1dd3452baaa7f532cedb4c050f7a60b066b4"
   }
 }

@@ -84,6 +84,8 @@ import { InventoryPanel } from "./panels/InventoryPanel";
 import type { ScribeAgentContent } from "../../contracts/agent/scribe";
 import type { AgentRuntime, AgentRuntimeState } from "../../application/agent/AgentRuntime";
 import { AgentPanel } from "./panels/AgentPanel";
+import { PresencePanel } from "./panels/PresencePanel";
+import type { PresenceClient } from "../../infrastructure/presence/PresenceClient";
 import { adminAnswerForInput, shouldAutofillAdminAnswer } from "./adminAnswer";
 import {
   canOpenCombatTerminal,
@@ -160,6 +162,7 @@ export class AppShell {
   private inventoryPanel!: InventoryPanel;
   private campfirePanel!: CampfirePanel;
   private agentPanel!: AgentPanel;
+  private presencePanel!: PresencePanel;
   private readonly schemaPanel = new SchemaPanel();
   private terminalPanel!: TerminalPanel;
   private readonly listenerController = new AbortController();
@@ -167,6 +170,7 @@ export class AppShell {
   private unsubscribeFeedback: (() => void) | null = null;
   private unsubscribeOnboarding: (() => void) | null = null;
   private unsubscribeAgent: (() => void) | null = null;
+  private unsubscribePresence: (() => void) | null = null;
   private releaseAudioGesture: (() => void) | null = null;
   private focusBeforeTerminal: HTMLElement | null = null;
   private focusBeforeInspection: HTMLElement | null = null;
@@ -457,6 +461,7 @@ export class AppShell {
     private readonly getBattleScene: () => BattleScene | null,
     initialRunSource: "new" | "restored" = "new",
     private readonly agentRuntime: AgentRuntime | null = null,
+    private readonly presenceClient: PresenceClient,
   ) {
     this.hudRenderer = new HudRenderer(root);
     this.minimapRenderer = new MinimapRenderer(root);
@@ -494,6 +499,10 @@ export class AppShell {
     this.lootMenu = dom.lootMenu;
     this.adminMenu = dom.adminMenu;
     this.agentPanel = new AgentPanel(dom);
+    this.presencePanel = new PresencePanel(dom);
+    this.unsubscribePresence = this.presenceClient.subscribe(
+      (state) => this.presencePanel.render(state),
+    );
     this.answerReview = new ReviewPanel(this.root);
     this.narrativeCodex = new NarrativePanel(this.root, {
       onClose: () => {
@@ -722,6 +731,9 @@ export class AppShell {
     this.unsubscribeOnboarding = null;
     this.unsubscribeAgent?.();
     this.unsubscribeAgent = null;
+    this.unsubscribePresence?.();
+    this.unsubscribePresence = null;
+    this.presenceClient.destroy();
     this.releaseAudioGesture?.();
     this.releaseAudioGesture = null;
     this.listenerController.abort();

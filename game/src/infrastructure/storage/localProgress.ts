@@ -88,6 +88,7 @@ import { decodeRunJson, encodeRun } from "./runCodec";
 import {
   createRunMigrators,
   migrateFirstAvailableRun,
+  migrateQuestionBankBinding,
   type LegacyRunCandidates,
 } from "./runMigrations";
 import type {
@@ -1668,7 +1669,7 @@ export function loadRun(storage: StorageLike): SavedRun | null {
     )
   );
   const value = readRun(RUN_SAVE_KEY);
-  if (isSavedRun(value)) return value;
+  if (isSavedRun(value)) return migrateQuestionBankBinding(value);
   const legacy: LegacyRunCandidates = {
     v11: readRun(LEGACY_RUN_V11_SAVE_KEY),
     v10: readRun(LEGACY_RUN_SAVE_KEY),
@@ -1680,7 +1681,8 @@ export function loadRun(storage: StorageLike): SavedRun | null {
     v4: readRun(ORIGINAL_RUN_SAVE_KEY),
   };
   const migrators = createRunMigrators({ isSavedRunVersion });
-  return migrateFirstAvailableRun(value, legacy, migrators);
+  const migrated = migrateFirstAvailableRun(value, legacy, migrators);
+  return migrated ? migrateQuestionBankBinding(migrated) : null;
 }
 
 /** 从当前键和历史键读取、迁移并验证永久档案。 */

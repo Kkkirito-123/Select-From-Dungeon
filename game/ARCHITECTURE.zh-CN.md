@@ -99,6 +99,7 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 index.html -> src/application/main.ts
   -> 仅开发态 DungeonAgentBridge（localhost + ?playtest=agent，纯内存存储）
   -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
+  -> PresenceClient -> 同源 SSE -> ../presence/server.mjs -> PresencePanel
   -> CampfireReview（当前楼层确定性 SQL 复盘）
   -> TriggerBus -> AgentRuntime/XState（并行篝火、抄写员、Main 生命周期与内存缓存）
   -> AgentGateway -> 可选 ../agent/src/dungeon_agents -> 变化的 PydanticAI 角色 -> Main 引导 -> AgentPanel
@@ -160,8 +161,9 @@ actor 管理篝火、抄写员和 Main 三个并行状态区，并负责脏状�
 契约、PydanticAI 模型入口、子 Agent/Main 流程、不含正文的 OpenTelemetry Span 与一个 HTTP 路由；服务没有
 Agent 数据库或输出 Store。
 
-`src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、存储上限
-内容 ID、文案、SQL 契约与存档版本仍由原有
+`src/application/config/` 统一维护带中文注释的运行时调节参数，例如地图尺寸、遭遇概率、导航阈值、
+存储上限和同源在线状态端点。`PresenceClient` 校验 SSE 人数并维护浏览器重连状态；
+`PresencePanel` 只渲染传入状态。内容 ID、文案、SQL 契约与存档版本仍由原有
 权威模块负责。
 
 `src/devtools/dungeon-agent/` 只负责唯一的外部维护器协议 v3，维护器拒绝其它桥协议，并且始终只在开发态使用：`protocol.ts` 负责
@@ -192,7 +194,7 @@ SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，
 `src/presentation/dom/appShellTemplate.ts` 独占 AppShell 静态页面骨架，`src/presentation/dom/appShellDom.ts` 统一绑定会被
 运行时重复使用的稳定节点；状态渲染和事件处理不得复制整份模板，也不得为同一个持久节点维护
 第二套静默选择器。
-`src/presentation/dom/panels/` 负责终端、背包、篝火、复盘、剧情和 Schema 交互，
+`src/presentation/dom/panels/` 负责终端、背包、篝火、复盘、剧情、Schema 和在线状态展示，
 `src/presentation/dom/renderers/` 负责 HUD、小地图和战斗展示。Panel 只能接收快照与显式回调，
 不得直接访问存档、外部服务或 Phaser。
 `src/presentation/phaser/world/` 负责地形、迷雾、世界对象可见性和拓扑重建判断；`DungeonScene`
@@ -258,7 +260,7 @@ src/contracts/          跨层只读游戏、存档、结果、Agent 与存储�
 src/application/        启动、运行时配置与页面生命周期
 src/content/            课程、世界、剧情、背包与 SQL 静态内容；楼层作者数据位于 */floors/floorNN
 src/domain/             Session 门面/聚焦服务、战斗、探索、学习、成长、背包与共享规则
-src/infrastructure/     音频、反馈、SQLite、存档编解码/迁移与浏览器适配器
+src/infrastructure/     音频、反馈、SQLite、存档编解码/迁移、在线状态与浏览器适配器
 src/presentation/       Phaser 场景、DOM 应用视图与职责明确的渲染器
 src/devtools/           仅开发态外部维护器桥；生产入口不得导入
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
@@ -267,7 +269,8 @@ scripts/            游戏资源、题库和架构脚本
 dist/               生成的静态构建；被忽略且不得手工修改
 ```
 
-仓库治理、可选 Python 服务和跨工程 CI 位于本工程的上一级目录。
+仓库治理、可选 Python 服务、可选 Node.js 在线状态服务和跨工程 CI 位于本工程的上一级目录；
+在线状态服务不会进入 `game/dist`。
 
 ## 标准命令
 
@@ -284,6 +287,10 @@ pnpm build
 `pnpm build` 先运行 TypeScript 检查，再执行 Vite 生产构建。静态产物位于 `dist/`；WASM 资源需要
 正常 HTTP 请求，因此应通过 HTTP 托管，不要直接使用 `file://` 打开。
 
+在线状态客户端默认使用相对地址 `api/presence`，所以部署到 `/game/` 后会请求
+`/game/api/presence`。Vite 将 `/api/presence` 代理到本地服务；生产 Nginx 必须代理部署路径并关闭
+缓冲。服务缺失时只把指示器切换为不可用，不得阻塞游戏启动。
+
 ## 运行与安全边界
 
 - Dungeon Maintainer 桥只有在 `import.meta.env.DEV`、本机主机名和 `?playtest=agent` 同时匹配时安装。
@@ -298,6 +305,8 @@ pnpm build
   代码生成时，回退到随包提供的 asm.js 构建，因此静态托管和受限嵌入式浏览器使用同一条游戏路径。
   篝火复盘只读取当前层本地快照，抄写员使用作者内容
   和受限场景投影。明确配置后，唯一 `POST /v1/agent/run` 接收变化方投影和同层子结果。游戏没有 Agent 存档，未配置服务时完全使用本地文案。
+- 左下角在线人数统计活跃浏览器标签页的 SSE 连接数，不代表独立自然人；它不发送玩家标识或游戏
+  数据。Node.js 服务只保留内存连接集合，默认监听本机地址；扩展为多副本前必须引入共享状态。
 - Agent 请求包含请求 ID、证据 Hash、当前层和场景所需的受限证据。主 Agent 只看到已经校验的子 Agent 展示文本；
   子请求仍遵守篝火最多八条 SQL 投影和抄写员受限场景证据边界。请求不包含参考 SQL、完整
   `GameSnapshot`、身份、移动、地图、背包或游戏指令。响应必须匹配请求 Hash 并通过文本限制，才能替换本地
@@ -319,13 +328,15 @@ pnpm build
   `EXCEPT`；支持表别名限定列，也支持在 `HAVING` 中使用题目要求的 `total` 别名。
 - 第七、八层的查询负载使用 SQLite `EXPLAIN QUERY PLAN`。这是 SQLite 证据，不是 MySQL
   执行计划。MySQL/InnoDB 概念必须明确标记为模拟，或使用另行隔离的真实后端。
-- `public/data/question-bank-v2.sqlite` 由 TypeScript 课程阶段生成，不得手工修改。Manifest 固定
+- `public/data/question-bank-v1.sqlite` 由 TypeScript 课程阶段生成，不得手工修改。Manifest 固定
   版本、字节数、SHA-256 和 960 题总数；每层包含 L1 64 道、L2 40 道、L3 16 道。第二至八层
   L1 包含 40 道本层题与 24 道只读复习题，L2/L3 均为本层题。每层由 15 个确定性题族组成，每族 8 道
   使用真实数据参数且可执行的变体；生成时记录精确结果行、顺序及第七层计划证据作为逐题判定契约，
   空结果题必须在题面明确说明。固定课程怪与层主继续使用作者题；普通怪、小精英、区域首领分别
   抽取 1 道 L1、2 道 L2、3 道 L3。新 Run 固定题库版本并使用确定性不重复牌组。IndexedDB 最多保留 5000 条完整作答，
   题目/课程聚合永久保留；导出与清除内容绝不包含 API Key。
+  生成器按 `monstersForFloor(floor)` 为每层建立独立 SQL fixture，并拒绝超出该层关系闭包的怪物引用。
+  绑定 v2 的 v12 Run 会在内存中迁移为 v1，重置活动练习绑定和牌组游标，同时保留世界状态与答题历史。
 - 浏览器数据统一保存在 IndexedDB `select-from-dungeon-data`：`run_nodes` 与 `floor_nodes` 分开保存
   Run 全局数据和当前楼层；`profile_nodes` 保存 v3 永久档案；`guide_nodes` 保存引导；`attempts`、
   `question_stats`、`lesson_stats` 保存学习记录；`question_banks` 保存经校验的题库字节。有效的

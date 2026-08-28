@@ -2,17 +2,19 @@
 
 [简体中文](README.zh-CN.md) | **English**
 
-This repository contains two independent projects:
+This repository contains three independent projects:
 
 - [`game/`](game/README.md): the browser SQL roguelite, including TypeScript
   source, Vitest tests, assets, product documents, and the Vite build.
 - [`agent/`](agent/README.md): the optional read-only Python Agent service for
   Campfire review, Scribe companionship, and Main guidance.
+- [`presence/`](presence/README.md): the dependency-free Node.js SSE service
+  that counts open game tabs for the lower-left online indicator.
 
-The game remains fully playable without the Agent service. The projects share
-no source imports or dependency directory; their only runtime integration is a
-strict HTTP contract. See [ARCHITECTURE.md](ARCHITECTURE.md) for ownership and
-execution boundaries.
+The game remains fully playable without either optional service. The projects
+share no source imports or dependency directory; runtime integration uses
+strict HTTP/SSE contracts. See [ARCHITECTURE.md](ARCHITECTURE.md) for ownership
+and execution boundaries.
 
 ## Quick start
 
@@ -31,6 +33,12 @@ python3 -m pip install -e agent
 dungeon-agent --host 127.0.0.1 --port 8787
 ```
 
+Run the live presence service in another terminal:
+
+```bash
+npm start --prefix presence
+```
+
 Copy `game/.env.example` to `game/.env.local` to enable the single optional
 `POST /v1/agent/run` integration. Provider keys stay in `agent/.env`.
 
@@ -44,6 +52,7 @@ not project source, is ignored by Git, and can be regenerated from
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 python3 -m unittest discover -s agent/tests
+npm test --prefix presence
 pnpm --dir game test
 pnpm --dir game architecture:check
 pnpm --dir game build

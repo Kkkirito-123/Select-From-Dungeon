@@ -33,11 +33,19 @@ jobs:
         run: python3 -m pip install -e agent
       - name: Test Agent service
         run: python3 -m unittest discover -s agent/tests
+      - name: Test presence service
+        run: npm test --prefix presence
       - name: Install pnpm
         run: npm install --global pnpm@11.9.0
       - name: Install game dependencies
         working-directory: game
         run: pnpm install --frozen-lockfile
+      - name: Generate question bank
+        working-directory: game
+        run: pnpm question-bank:build
+      - name: Verify generated question bank is committed
+        working-directory: game
+        run: git diff --exit-code -- public/data/question-bank-manifest.json public/data/question-bank-v1.sqlite
       - name: Run game unit tests
         working-directory: game
         run: pnpm test

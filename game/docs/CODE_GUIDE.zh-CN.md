@@ -43,11 +43,11 @@ textarea
 
 ```json
 {
-  "bankVersion": "question-bank-v2",
+  "bankVersion": "question-bank-v1",
   "schemaVersion": 2,
-  "url": "data/question-bank-v2.sqlite",
-  "byteLength": 1052672,
-  "sha256": "0fddfa62da166b9a46d7603ccac47d08044379bbd3daf355fc5dfdfc1588ed21",
+  "url": "data/question-bank-v1.sqlite",
+  "byteLength": 1048576,
+  "sha256": "51b5a5e9c4bbff5d65b442fc18eaec0273f313763c35c2e7aeb39209feac5106",
   "questionCount": 960
 }
 ```
@@ -57,6 +57,10 @@ textarea
 - `url`：相对于 Vite `BASE_URL` 的资源路径，不写主机名。
 - `byteLength` 与 `sha256`：下载后分别检查长度和摘要，防止截断或内容替换。
 - `questionCount`：启用题目的数量。加载器会拒绝行数不匹配的数据库。
+
+生成器按 `monstersForFloor(floor)` 为每层建立独立 SQL fixture，并校验
+`monster_signals.monster_id`、`monster_gear.monster_id` 和 `master_id` 的引用闭包；
+绑定旧 v2 的 v12 Run 在加载时迁移到 v1，清空活动练习绑定并重置牌组游标，同时保留世界状态和答题历史。
 
 加载顺序在 `questionBankLoader.ts` 中固定为：
 

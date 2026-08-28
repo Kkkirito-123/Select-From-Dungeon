@@ -25,7 +25,7 @@ interface QuestionBankManifest {
   bankVersion: string;
   /** SQLite questions 表的结构版本，防止新旧字段错配。 */
   schemaVersion: number;
-  /** 相对于 Vite BASE_URL 的数据库路径，例如 data/question-bank-v2.sqlite。 */
+  /** 相对于 Vite BASE_URL 的数据库路径，例如 data/question-bank-v1.sqlite。 */
   url: string;
   /** 下载字节数；和 sha256 一起校验资源是否完整。 */
   byteLength: number;

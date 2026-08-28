@@ -2,15 +2,17 @@
 
 **简体中文** | [English](README.md)
 
-本仓库包含两个相互独立的工程：
+本仓库包含三个相互独立的工程：
 
 - [`game/`](game/README.zh-CN.md)：浏览器 SQL 肉鸽，包含 TypeScript 源码、Vitest
   测试、资源、产品文档和 Vite 构建。
 - [`agent/`](agent/README.md)：可选的只读 Python Agent 服务，包含篝火复盘、抄写员陪伴和
   Main 下一步指引。
+- [`presence/`](presence/README.zh-CN.md)：无第三方依赖的 Node.js SSE 服务，为游戏左下角统计
+  已打开的标签页数量。
 
-不启动 Agent 服务时，游戏仍可完整游玩。两个工程不共享源码导入或依赖目录，运行时只通过严格
-HTTP 契约连接。模块归属和执行边界见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+不启动任一可选服务时，游戏仍可完整游玩。三个工程不共享源码导入或依赖目录，运行时只通过严格
+HTTP/SSE 契约连接。模块归属和执行边界见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 快速开始
 
@@ -29,6 +31,12 @@ python3 -m pip install -e agent
 dungeon-agent --host 127.0.0.1 --port 8787
 ```
 
+在另一个终端启动在线人数服务：
+
+```bash
+npm start --prefix presence
+```
+
 如需启用唯一的 `POST /v1/agent/run` 集成，将 `game/.env.example` 复制为
 `game/.env.local`；模型密钥只放在 `agent/.env`。
 
@@ -41,6 +49,7 @@ dungeon-agent --host 127.0.0.1 --port 8787
 python3 scripts/test_validate_rules.py
 python3 scripts/validate-rules.py
 python3 -m unittest discover -s agent/tests
+npm test --prefix presence
 pnpm --dir game test
 pnpm --dir game architecture:check
 pnpm --dir game build

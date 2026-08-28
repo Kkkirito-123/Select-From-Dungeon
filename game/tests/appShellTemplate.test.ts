@@ -40,6 +40,9 @@ const CRITICAL_DOM_IDS = [
   "agent-work-page",
   "agent-work-log",
   "main-live",
+  "online-presence",
+  "online-presence-count",
+  "online-presence-label",
 ] as const;
 
 describe("AppShell 静态 DOM 契约", () => {
@@ -70,6 +73,8 @@ describe("AppShell 静态 DOM 契约", () => {
     expect(markup).not.toContain("admin-floor-list");
     expect(markup).not.toContain("admin-region-list");
     expect(markup).not.toContain("admin-preset-list");
+    expect(markup).toContain('class="online-presence__dot" aria-hidden="true"');
+    expect(markup).toContain('aria-label="正在连接在线人数服务"');
   });
 
   it("只通过模板参数写入 Schema 统计，不依赖运行时全局状态", () => {

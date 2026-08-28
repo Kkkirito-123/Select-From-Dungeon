@@ -43,6 +43,9 @@ export const APP_SHELL_DOM_SELECTORS = {
   agentWorkPage: "#agent-work-page",
   agentWorkLog: "#agent-work-log",
   mainLive: "#main-live",
+  presenceIndicator: "#online-presence",
+  presenceCount: "#online-presence-count",
+  presenceLabel: "#online-presence-label",
 } as const;
 
 /**
@@ -81,6 +84,9 @@ export interface AppShellDom {
   agentWorkPage: HTMLElement;
   agentWorkLog: HTMLElement;
   mainLive: HTMLElement;
+  presenceIndicator: HTMLElement;
+  presenceCount: HTMLOutputElement;
+  presenceLabel: HTMLElement;
 }
 
 export function bindAppShellDom(root: ParentNode): AppShellDom {
@@ -115,5 +121,8 @@ export function bindAppShellDom(root: ParentNode): AppShellDom {
     agentWorkPage: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkPage),
     agentWorkLog: requireElement(root, APP_SHELL_DOM_SELECTORS.agentWorkLog),
     mainLive: requireElement(root, APP_SHELL_DOM_SELECTORS.mainLive),
+    presenceIndicator: requireElement(root, APP_SHELL_DOM_SELECTORS.presenceIndicator),
+    presenceCount: requireElement(root, APP_SHELL_DOM_SELECTORS.presenceCount),
+    presenceLabel: requireElement(root, APP_SHELL_DOM_SELECTORS.presenceLabel),
   };
 }

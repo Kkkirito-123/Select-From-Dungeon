@@ -14,6 +14,7 @@ import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { StorageLike } from "../../contracts/storage/storageLike";
 import { finalMigrationProgress } from "../../domain/progression/finalMigration";
 import type { GameSession } from "../../domain/session/GameSession";
+import type { Monster } from "../../domain/shared/types";
 import {
   saveDungeonAgentCheckpoint,
   type DungeonAgentJudge,
@@ -54,6 +55,7 @@ export interface DungeonAgentBridgeOptions {
   launch: DungeonAgentLaunch;
   checkpointStorage: StorageLike | null;
   checkpointRestored: boolean;
+  resetSql: (monsters: readonly Monster[]) => void;
 }
 
 /**
@@ -197,7 +199,10 @@ export function installDungeonAgentBridge(
     prepare(presetId) {
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(presetId)) return false;
       const prepared = options.session.adminApplyPreset(presetId).ok;
-      if (prepared) usedInteractions.clear();
+      if (prepared) {
+        options.resetSql(options.session.snapshot().monsters);
+        usedInteractions.clear();
+      }
       return prepared;
     },
     checkpoint() {

@@ -88,6 +88,11 @@ function literalOptions(stage, floor, domains, monstersByFloor, config) {
       values = [1, 2, 3, 4, 5];
     } else if (/\brepair_queue\b/iu.test(sql) && !raw.startsWith("'")) {
       values = [...new Set([...(domains.get("repair_id") ?? []), 6, 7, 8, 9])];
+    } else if (
+      column === "monster_id" &&
+      /\b(?:monsters|monster_signals|monster_gear)\b/iu.test(sql)
+    ) {
+      values = monstersByFloor.get(floor) ?? [];
     } else if (column === "id" && /\bmonsters\b/iu.test(sql)) {
       values = monstersByFloor.get(floor) ?? [];
     } else if (column === "room_id" && /\bmonsters\b/iu.test(sql)) {
@@ -253,9 +258,8 @@ function buildDomains(engine, monsters, floor) {
   };
   Object.entries(tableColumns).forEach(([table, columns]) => {
     columns.forEach((column) => {
-      const result = engine.execute(
+      const result = engine.executeSelect(
         `SELECT DISTINCT ${column} FROM ${table} WHERE ${column} IS NOT NULL ORDER BY ${column};`,
-        floor,
       );
       const values = result.rows.map((row) => row[column]);
       register(column, values);
@@ -280,6 +284,49 @@ function buildDomains(engine, monsters, floor) {
     ...domains.values(),
   ].flat().filter((value) => typeof value === "string"));
   return domains;
+}
+
+function assertMonsterReferenceClosure(
+  floor,
+  monsters,
+  allMonsters,
+  engine,
+  signalFixtures,
+  gearFixtures,
+) {
+  const monsterIds = new Set(monsters.map((monster) => monster.id));
+  const errors = [];
+  monsters.forEach((monster) => {
+    if (monster.masterId !== null && !monsterIds.has(monster.masterId)) {
+      errors.push(`F${floor} monsters.master_id=${monster.masterId} (monster ${monster.id})`);
+    }
+  });
+  const checkFixtureOwners = (table, fixtures) => {
+    fixtures.forEach((fixture) => {
+      const owner = allMonsters.get(fixture.monsterId);
+      if (!owner) {
+        errors.push(`${table}.monster_id=${fixture.monsterId} 无对应怪物`);
+      } else if (owner.floor === floor && !monsterIds.has(fixture.monsterId)) {
+        errors.push(`F${floor} ${table}.monster_id=${fixture.monsterId} 不在楼层 fixture`);
+      }
+    });
+  };
+  checkFixtureOwners("monster_signals", signalFixtures);
+  checkFixtureOwners("monster_gear", gearFixtures);
+  ["monster_signals", "monster_gear"].forEach((table) => {
+    const result = engine.executeSelect(
+      `SELECT DISTINCT monster_id FROM ${table} ORDER BY monster_id;`,
+    );
+    result.rows.forEach((row) => {
+      const monsterId = Number(row.monster_id);
+      if (!monsterIds.has(monsterId)) {
+        errors.push(`F${floor} ${table}.monster_id=${monsterId} 不在 monsters`);
+      }
+    });
+  });
+  if (errors.length > 0) {
+    throw new Error(`F${floor} 怪物关系引用闭包失败：${errors.join("；")}`);
+  }
 }
 
 function insertQuestion(database, question) {
@@ -333,12 +380,16 @@ async function main() {
       { BIOME_ENCOUNTERS },
       { lessonsForFloor },
       { SqlEngine },
+      { monstersForFloor },
+      { MONSTER_GEAR_FIXTURES, MONSTER_SIGNAL_FIXTURES },
       { QUESTION_BANK_CONFIG, QUESTION_BANK_TIERS },
     ] = await Promise.all([
       vite.ssrLoadModule("/src/content/curriculum/mvpLevel.ts"),
       vite.ssrLoadModule("/src/content/world/biomeContent.ts"),
       vite.ssrLoadModule("/src/domain/progression/runGraph.ts"),
       vite.ssrLoadModule("/src/infrastructure/sql/SqlEngine.ts"),
+      vite.ssrLoadModule("/src/domain/session/lifecycle/sessionWorld.ts"),
+      vite.ssrLoadModule("/src/content/sql/sqlFixtures.ts"),
       vite.ssrLoadModule("/src/application/config/questionBankConfig.ts"),
     ]);
     const {
@@ -384,19 +435,18 @@ async function main() {
 
     const SQL = await initSqlJs();
     const database = new SQL.Database();
+    const wasmLocation = resolve(root, "node_modules/sql.js/dist/sql-wasm.wasm");
+    const floorMonsters = new Map();
+    const monstersByFloor = new Map();
+    for (let floor = firstFloor; floor <= lastFloor; floor += 1) {
+      const monsters = monstersForFloor(floor);
+      floorMonsters.set(floor, monsters);
+      monstersByFloor.set(floor, monsters.map((monster) => monster.id));
+    }
     const engine = await SqlEngine.create(
-      [...INITIAL_MONSTERS],
-      resolve(root, "node_modules/sql.js/dist/sql-wasm.wasm"),
+      floorMonsters.get(firstFloor),
+      wasmLocation,
     );
-    const domains = buildDomains(engine, INITIAL_MONSTERS, firstFloor);
-    const monstersByFloor = new Map(Array.from({ length: floorCount }, (_, index) => {
-      const floor = firstFloor + index;
-      return [
-        floor,
-        INITIAL_MONSTERS.filter((monster) => monster.floor === floor)
-          .map((monster) => monster.id),
-      ];
-    }));
     database.run(`
       PRAGMA user_version = ${schemaVersion};
       CREATE TABLE bank_metadata (
@@ -450,6 +500,18 @@ async function main() {
     });
 
     for (let floor = firstFloor; floor <= lastFloor; floor += 1) {
+      const monsters = floorMonsters.get(floor);
+      if (!monsters) throw new Error(`F${floor} 缺少 SQL fixture`);
+      engine.reset(monsters);
+      assertMonsterReferenceClosure(
+        floor,
+        monsters,
+        monsterById,
+        engine,
+        MONSTER_SIGNAL_FIXTURES,
+        MONSTER_GEAR_FIXTURES,
+      );
+      const domains = buildDomains(engine, monsters, floor);
       const floorAuthored = authored.filter((entry) => entry.floor === floor);
       const floorEncounters = encounters.filter((entry) => entry.floor === floor);
       const l1Current = uniqueStages([
@@ -513,7 +575,10 @@ async function main() {
           let result;
           let lastError;
           let emptyFallback;
-          for (let attempt = 0; attempt < generationVariantSearchLimit; attempt += 1) {
+          // 当前楼层参数域较小时，重复尝试不会产生新内容；保留有限轮次避免 WASM
+          // 查询在空结果候选上无限消耗资源，同时仍服从配置的更小上限。
+          const maxAttempts = Math.min(generationVariantSearchLimit, variantsPerFamily * 8);
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
             variant = materialVariant(
               entry.stage,
               floor,

@@ -1,0 +1,21 @@
+[Unit]
+Description=SELECT FROM DUNGEON live presence service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/select-from-dungeon/presence
+ExecStart=/usr/bin/node /srv/select-from-dungeon/presence/server.mjs
+Environment=PRESENCE_HOST=127.0.0.1
+Environment=PRESENCE_PORT=8788
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

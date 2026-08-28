@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../src/domain/session/GameSession";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
@@ -14,6 +15,7 @@ import {
   findDungeonAgentObjective,
 } from "../src/devtools/dungeon-agent/navigation";
 import { buildDungeonAgentView } from "../src/devtools/dungeon-agent/projection";
+import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
 
 describe("Dungeon Agent 玩家投影", () => {
   it("Benchmark 起点只接受游戏登记的管理员预设并返回隐藏裁判摘要", () => {
@@ -32,6 +34,7 @@ describe("Dungeon Agent 玩家投影", () => {
         launch: { mode: "agent", floor: 1 },
         checkpointStorage: null,
         checkpointRestored: false,
+        resetSql: () => undefined,
       });
       expect(window.__DUNGEON_PLAYTEST__?.prepare("../escape")).toBe(false);
       expect(window.__DUNGEON_PLAYTEST__?.prepare("f1-admin-boss")).toBe(true);
@@ -47,6 +50,41 @@ describe("Dungeon Agent 玩家投影", () => {
         sourceRoomId: session.snapshot().currentRoomId,
         rewardId: "floor-key",
       }));
+    } finally {
+      removeBridge?.();
+      if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
+  it("管理员预设后 SQL 引擎读取最新怪物 HP", async () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-sql-reset");
+    session.enableAgentPlaytestMode();
+    const sql = await SqlEngine.create(
+      session.snapshot().monsters,
+      resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
+    );
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {},
+    });
+    let removeBridge: (() => void) | null = null;
+    try {
+      removeBridge = installDungeonAgentBridge({
+        root: { querySelector: () => null } as unknown as HTMLElement,
+        session,
+        launch: { mode: "agent", floor: 1 },
+        checkpointStorage: null,
+        checkpointRestored: false,
+        resetSql: (monsters) => sql.reset([...monsters]),
+      });
+      expect(window.__DUNGEON_PLAYTEST__?.prepare("f1-admin-boss")).toBe(true);
+      const defeated = session.snapshot().monsters.find((monster) => monster.hp === 0);
+      expect(defeated).toBeDefined();
+      expect(sql.executeSelect(
+        `SELECT hp FROM monsters WHERE id = ${defeated!.id}`,
+      ).rows).toEqual([{ hp: 0 }]);
     } finally {
       removeBridge?.();
       if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
@@ -381,6 +419,7 @@ describe("Dungeon Agent 玩家投影", () => {
         launch: { mode: "agent", floor: 1 },
         checkpointStorage: null,
         checkpointRestored: false,
+        resetSql: () => undefined,
       });
 
       const sql = "SELECT id FROM monsters WHERE id = -1";
@@ -484,6 +523,7 @@ describe("Dungeon Agent 玩家投影", () => {
         launch: { mode: "agent", floor: 1 },
         checkpointStorage: null,
         checkpointRestored: false,
+        resetSql: () => undefined,
       });
       await expect(window.__DUNGEON_PLAYTEST__?.use("interact")).resolves.toMatchObject({
         ok: false,

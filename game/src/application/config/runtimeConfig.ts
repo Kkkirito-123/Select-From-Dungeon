@@ -14,3 +14,8 @@ export const AGENT_RUNTIME_CONFIG = {
   endpoint: import.meta.env.VITE_AGENT_URL?.trim() || null,
   timeoutMs: 5_000,
 } as const;
+
+export const PRESENCE_RUNTIME_CONFIG = {
+  /** 相对地址会跟随游戏部署目录；生产环境由同源 Nginx 转发到在线状态服务。 */
+  endpoint: import.meta.env.VITE_PRESENCE_URL?.trim() || "api/presence",
+} as const;
