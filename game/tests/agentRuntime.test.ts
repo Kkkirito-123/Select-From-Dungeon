@@ -4,7 +4,7 @@ import type { AgentGatewayPort, AgentResponse, AgentView } from "../src/contract
 import type { AnswerAttemptRecord } from "../src/contracts/game/results";
 import type { GameSnapshot } from "../src/contracts/game/snapshots";
 import type { FloorNumber } from "../src/domain/progression/runGraph";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { stableJson } from "../src/infrastructure/agent/protocol";
 
 function attempt(id = 1): AnswerAttemptRecord {

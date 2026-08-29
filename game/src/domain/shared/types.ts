@@ -4,7 +4,7 @@
  * 这里描述的是规则层使用的运行状态、只读快照和本地存档格式，不负责
  * 生成地图、执行 SQL、渲染 Phaser 或调用 Agent。GameSession 维护运行时
  * 真相；snapshot() 生成展示与 Agent 读取的只读副本；SavedRun/Profile
- * 是需要保持兼容的持久化格式。修改存档字段前必须同步迁移和校验测试。
+ * 是当前唯一的持久化格式。修改存档字段前必须同步校验测试。
  */
 import type {
   FloorNumber,
@@ -440,7 +440,7 @@ export interface LessonTaskFieldGuide {
 /**
  * Player-facing explanation of one SQL combat stage. This is derived content:
  * it is never persisted in SavedRun/ProfileProgress and therefore does not
- * participate in save-version compatibility.
+ * participate in save validation.
  */
 export interface LessonTaskBrief {
   tier: LessonTaskTier;
@@ -644,18 +644,18 @@ export interface GameSnapshot {
 /**
  * 当前 Run 的本地持久化格式。
  *
- * version 和字段含义是兼容边界；读取旧格式的工作由 storage 层完成，
- * GameSession 只接收已经验证过的 SavedRun。
+ * version 和字段含义定义当前存档边界；GameSession 只接收已经验证过的
+ * SavedRun。
  */
 export interface SavedRun {
   version: 12;
-  generatorVersion: 4 | 5 | 6 | 7;
+  generatorVersion: 7;
   runInstanceId: string;
   questionBankVersion: string;
   practiceDrawCursor: number;
   practiceDrawCycle: number;
-  /** v12 增量字段：三个难度牌组分别保存游标；缺失时按旧 L1 状态恢复。 */
-  practiceDrawStates?: {
+  /** 三个难度牌组分别保存游标和轮次。 */
+  practiceDrawStates: {
     L1: { cursor: number; cycle: number };
     L2: { cursor: number; cycle: number };
     L3: { cursor: number; cycle: number };

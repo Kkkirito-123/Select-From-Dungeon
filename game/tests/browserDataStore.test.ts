@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StorageLike } from "../src/contracts/storage/storageLike";
 import { GUIDE_KEY } from "../src/contracts/storage/keys";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { BrowserDataStore } from "../src/infrastructure/storage/browserDataStore";
 import { createEmptyProfile, PROFILE_SAVE_KEY, RUN_SAVE_KEY } from "../src/infrastructure/storage/localProgress";
 
@@ -22,15 +22,15 @@ class MemoryStorage implements StorageLike {
 }
 
 describe("浏览器数据仓库", () => {
-  it("IndexedDB 不可用时保留旧存储回退", async () => {
-    const old = new MemoryStorage();
+  it("IndexedDB 不可用时保留当前 localStorage 回退", async () => {
+    const local = new MemoryStorage();
     const run = new GameSession(null, null, "data-store-fallback").toSavedRun();
     const profile = createEmptyProfile();
     profile.victories = 2;
-    old.setItem(RUN_SAVE_KEY, JSON.stringify(run));
-    old.setItem(PROFILE_SAVE_KEY, JSON.stringify(profile));
+    local.setItem(RUN_SAVE_KEY, JSON.stringify(run));
+    local.setItem(PROFILE_SAVE_KEY, JSON.stringify(profile));
 
-    const store = await BrowserDataStore.open(old, null);
+    const store = await BrowserDataStore.open(local, null);
     expect(store.loadRun()).toEqual(run);
     expect(store.loadProfile()).toEqual(profile);
 

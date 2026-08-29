@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { NAVIGATION_RUNTIME_CONFIG } from "../src/contracts/config/runtime";
+import { GameSession } from "../src/features/game-session/GameSession";
 import {
   movementFailure,
   movementModeIsBlocked,
 } from "../src/domain/session/sessionExploration";
+import { createCombatState } from "../src/domain/session/sessionCombat";
 import { applyExperienceSettlement } from "../src/domain/session/sessionProgression";
 import {
   advanceCombatSuccessStep,
@@ -14,9 +17,52 @@ import {
   resolveCampaignVictory,
 } from "../src/domain/session/progression/floorCompletion";
 import { resolveLessonCompletion } from "../src/domain/session/learning/lessonCompletion";
+import { advanceNavigationGuidance } from "../src/domain/session/exploration/navigationGuidance";
+import {
+  createAdminFloorPreview,
+  resolveAdminPreset,
+  resolveAdminRegion,
+} from "../src/domain/session/admin/adminPreview";
 import { createCampaignProgress } from "../src/domain/progression/campaign";
 
 describe("GameSession 内部职责边界", () => {
+  it("导航引导只返回下一状态，不修改输入快照", () => {
+    const snapshot = new GameSession(null, null, "guidance-boundary").snapshot();
+    const objective = snapshot.roomGraph.nodes.find((node) => node.lessonId === "select");
+    if (!objective) throw new Error("测试图缺少 SELECT 引导目标");
+    const state = {
+      objectiveId: objective.id,
+      steps: NAVIGATION_RUNTIME_CONFIG.directionHintAt - 1,
+      level: 0 as const,
+    };
+    const result = advanceNavigationGuidance({
+      floor: snapshot.floor,
+      graph: snapshot.roomGraph,
+      mazeFloor: snapshot.mazeFloor,
+      biomePlan: snapshot.biomePlan,
+      monsters: snapshot.monsters,
+      completedLessons: new Set(snapshot.completedLessons),
+      openedGateIds: new Set(snapshot.openedGateIds),
+      player: snapshot.player,
+      currentRoomId: snapshot.currentRoomId,
+    }, state);
+
+    expect(state).toEqual({
+      objectiveId: objective.id,
+      steps: NAVIGATION_RUNTIME_CONFIG.directionHintAt - 1,
+      level: 0,
+    });
+    expect(result).toMatchObject({
+      state: {
+        objectiveId: objective.id,
+        steps: NAVIGATION_RUNTIME_CONFIG.directionHintAt,
+        level: 1,
+      },
+      raised: true,
+      banner: expect.stringContaining("余烬指路"),
+    });
+  });
+
   it("移动门面使用稳定的失败结果", () => {
     expect(movementModeIsBlocked("combat")).toBe(true);
     expect(movementModeIsBlocked("explore")).toBe(false);
@@ -58,6 +104,28 @@ describe("GameSession 内部职责边界", () => {
     })).toEqual({ minimumHp: 0, damage: 1, remainingHp: 0 });
   });
 
+  it("初始战斗状态复制首题锁定条件", () => {
+    const locks = ["where"];
+    const combat = createCombatState(
+      {
+        id: 7,
+        attackName: "撞击",
+        damage: 2,
+        rank: "normal",
+        encounterType: "ambush",
+      } as never,
+      { locks } as never,
+    );
+    locks.push("order-by");
+    expect(combat).toMatchObject({
+      targetId: 7,
+      kind: "ambush",
+      round: 1,
+      successStep: 0,
+      intent: { name: "撞击", locks: ["where"] },
+    });
+  });
+
   it("死亡的区域首领不再阻挡通道", () => {
     const dead = { id: 9, hp: 0 } as never;
     const living = { id: 10, hp: 1 } as never;
@@ -69,6 +137,45 @@ describe("GameSession 内部职责边界", () => {
     expect(isReadOnlyAdminPreview(true, false)).toBe(true);
     expect(isReadOnlyAdminPreview(true, true)).toBe(false);
     expect(isReadOnlyAdminPreview(false, false)).toBe(false);
+  });
+
+  it("管理员预览计算返回显式状态且不修改输入", () => {
+    const snapshot = new GameSession(null, null, "admin-boundary").snapshot();
+    const originalPlayer = { ...snapshot.player, weapon: { ...snapshot.player.weapon } };
+    const preview = createAdminFloorPreview(
+      snapshot.campaign.baseSeed,
+      2,
+      snapshot.player,
+    );
+    if (!preview) throw new Error("测试缺少第二层管理员预览");
+    expect(snapshot.player).toEqual(originalPlayer);
+    expect(preview).toMatchObject({ floor: 2, currentRoomId: preview.graph.entryId });
+
+    const originalHp = preview.monsters.map((monster) => monster.hp);
+    const preset = resolveAdminPreset({
+      floor: preview.floor,
+      presetId: "f2-admin-village",
+      graph: preview.graph,
+      mazeFloor: preview.mazeFloor,
+      campfires: preview.campfires,
+      guidedMap: preview.guidedMap,
+      monsters: preview.monsters,
+      worldActors: preview.worldActors,
+    });
+    expect(preview.monsters.map((monster) => monster.hp)).toEqual(originalHp);
+    expect(preset).toMatchObject({ ok: true, label: "F2 沉水村落" });
+    if (!preset.ok) throw new Error(preset.message);
+
+    const region = resolveAdminRegion({
+      regionId: preview.biomePlan.regions[1].id,
+      biomePlan: preview.biomePlan,
+      mazeFloor: preview.mazeFloor,
+      campfires: preview.campfires,
+      monsters: preset.monsters,
+      worldActors: preview.worldActors,
+      player: preview.player,
+    });
+    expect(region).toMatchObject({ ok: true, toName: preview.biomePlan.regions[1].name });
   });
 
   it("终局提交只增加一次胜利并保留最佳查询数", () => {

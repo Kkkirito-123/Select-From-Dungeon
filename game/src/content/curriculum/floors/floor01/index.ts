@@ -2,13 +2,11 @@
  * 第一层课程、怪物和固定奖励的楼层内容真源。
  *
  * 本模块只提供第一层静态课程数据，不保存玩家进度，不执行 SQL，也不修改
- * GameSession。父级 registry 负责把各层内容单向组合为兼容的全局视图。
+ * GameSession。父级 registry 负责把各层内容单向组合为统一的全局视图。
  */
 import type {
   LessonDefinition,
-  LessonId,
   Monster,
-  Position,
   Weapon,
 } from "../../../../domain/shared/types";
 import {
@@ -381,8 +379,3 @@ export const FLOOR_ONE_LESSONS: readonly LessonDefinition[] = [
     ],
   },
 ] as const;
-
-export const FLOOR_ONE_LOOT_AFTER_LESSON: Partial<Record<LessonId, { weapon: Weapon; position: Position }>> = {
-  select: { weapon: FILTER_BOW, position: { x: 10, y: 5 } },
-  "is-null": { weapon: NULL_LANTERN, position: { x: 10, y: 5 } },
-};

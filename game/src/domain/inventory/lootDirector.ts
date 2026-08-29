@@ -4,7 +4,7 @@
  * 返回的 LootItem 写入运行状态。
  */
 import { CONSUMABLES, type LootCandidate } from "../../content/inventory/inventoryCatalog";
-import { legacyMonsterIdForCurrent } from "../../content/world/monsterIds";
+import { monsterRandomSeedId } from "../../content/world/monsterIds";
 import type { LootItem, Monster } from "../shared/types";
 import { stableStringHash, type FloorNumber } from "../progression/runGraph";
 
@@ -58,7 +58,7 @@ function isKey(item: LootItem): boolean {
  * 正式战斗不传该值，因此怪物阶级不会凭空保证随机掉落。
  */
 export function rollLootItems(input: LootRollInput): LootItem[] {
-  const stableMonsterId = legacyMonsterIdForCurrent(input.monster.id);
+  const stableMonsterId = monsterRandomSeedId(input.monster.id);
   const rolled = input.candidates
     .filter((candidate) => (
       roll(`${input.seed}:loot:${input.floor}:${stableMonsterId}:${candidate.item.itemId}`) <

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
 import { redactUndiscoveredQueryIdentities } from "../src/domain/learning/queryDisclosure";
 import type { LessonId, SqlQueryResult } from "../src/domain/shared/types";

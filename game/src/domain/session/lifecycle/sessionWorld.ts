@@ -5,7 +5,7 @@ import type { BiomePlan } from "../../exploration/biome";
 import { generateFloorOneChestItems } from "../../exploration/floorOneTreasure";
 import type { GuidedMapPlan } from "../../exploration/guidedMap";
 import type { MazeFloor } from "../../exploration/mazeGenerator";
-import { cloneWorldActor, type WorldActor } from "../../exploration/monsterRoaming";
+import type { WorldActor } from "../../exploration/monsterRoaming";
 import type { FloorNumber, RoomGraph, RoomReward } from "../../progression/runGraph";
 import type {
   Campfire,
@@ -19,11 +19,6 @@ import { stableStringHash } from "../../progression/runGraph";
 /** GameSession 构造/恢复阶段使用的世界对象工厂，不处理玩家输入或规则结算。 */
 export const INITIAL_EXPLORATION_BANNER =
   "迷宫已经生成。沿青色箭头找到 ID #001，触碰它进入 SELECT 战斗。";
-const LEGACY_INSPECTION_BANNER_PREFIXES = [
-  "抄写员：",
-  "档案水轮",
-  "无名宿舍",
-] as const;
 
 export function createRunInstanceId(seed: string): string {
   // UUID 用于区分同一 seed 的不同 Run；旧环境才使用 seed+时间的可追踪回退值。
@@ -31,13 +26,6 @@ export function createRunInstanceId(seed: string): string {
     return crypto.randomUUID();
   }
   return `run-${stableStringHash(seed).toString(36)}-${Date.now().toString(36)}`;
-}
-
-export function restoredWorldBanner(banner: string): string {
-  // 旧版本可能把地标长文案存进 banner；恢复时替换为稳定的探索提示。
-  return LEGACY_INSPECTION_BANNER_PREFIXES.some((prefix) => banner.startsWith(prefix))
-    ? INITIAL_EXPLORATION_BANNER
-    : banner;
 }
 
 function rewardItemKind(reward: ClaimableReward): GroundItem["kind"] {
@@ -56,20 +44,6 @@ export function monstersForFloor(floor: FloorNumber): Monster[] {
       ...monster,
       damage: counterDamageForMonster(monster),
     }));
-}
-
-export function restoredMonstersForFloor(
-  savedMonsters: readonly Monster[],
-  floor: FloorNumber,
-): Monster[] {
-  // 以当前作者怪物列表为基线，只恢复 hp；这样新增字段仍由当前内容补齐。
-  const savedById = new Map(savedMonsters.map((monster) => [monster.id, monster]));
-  return monstersForFloor(floor).map((canonical) => {
-    const saved = savedById.get(canonical.id);
-    return saved
-      ? { ...canonical, hp: Math.min(canonical.maxHp, Math.max(0, saved.hp)) }
-      : { ...canonical };
-  });
 }
 
 export function initialActors(
@@ -114,28 +88,6 @@ export function initialActors(
     }];
   });
   return [...curriculumActors, ...areaBossActors];
-}
-
-export function restoredActorsForFloor(
-  savedActors: readonly WorldActor[],
-  expectedActors: readonly WorldActor[],
-): WorldActor[] {
-  // 保存的 Actor 只恢复位置等运行状态，home/behavior/radius 以当前作者定义为准。
-  const savedByMonster = new Map(savedActors.map((actor) => [actor.monsterId, actor]));
-  return expectedActors.map((expected) => {
-    const saved = savedByMonster.get(expected.monsterId);
-    if (!saved) return cloneWorldActor(expected);
-    const shouldRestoreAnchor = expected.behavior === "anchored"
-      && saved.behavior !== "anchored";
-    return cloneWorldActor({
-      ...saved,
-      x: shouldRestoreAnchor ? expected.home.x : saved.x,
-      y: shouldRestoreAnchor ? expected.home.y : saved.y,
-      home: { ...expected.home },
-      behavior: expected.behavior,
-      roamRadius: expected.roamRadius,
-    });
-  });
 }
 
 export function initialGroundItems(

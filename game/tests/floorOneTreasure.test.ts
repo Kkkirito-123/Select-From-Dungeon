@@ -4,7 +4,7 @@ import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
 import { generateMazeFloor, mazeTileAt, mazeZoneAt } from "../src/domain/exploration/mazeGenerator";
 import { floorOneAreaAt } from "../src/domain/exploration/floorOneLabyrinth";
 import { generateRoomGraph } from "../src/domain/progression/runGraph";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
 import type { SqlQueryResult } from "../src/domain/shared/types";
 import {

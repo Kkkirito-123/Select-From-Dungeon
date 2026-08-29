@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMPLETE_SCHEMA_LINES } from "../src/content/sql/sqlSchema";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { migrationStepMarkerIds } from "../src/domain/progression/finalMigration";
 import type { AnswerAttemptRecord, ExperienceSettlement } from "../src/domain/shared/types";
 import { answerReviewSummary } from "../src/presentation/dom/AnswerReviewView";
@@ -23,7 +23,7 @@ import {
   schemaTaskTableRoles,
   shapeOnlyQueryResultCopy,
   shouldDismissTransientCard,
-} from "../src/presentation/dom/AppShell";
+} from "../src/features/app-shell/AppShell";
 import {
   adminAnswerForInput,
   shouldAutofillAdminAnswer,

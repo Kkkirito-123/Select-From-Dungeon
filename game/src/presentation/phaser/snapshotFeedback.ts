@@ -10,6 +10,11 @@ type FeedbackSnapshot = Pick<
   "runSeed" | "groundItems" | "completedLessons" | "availableRoomIds" | "mode"
 > & { mazeFloor: Pick<GameSnapshot["mazeFloor"], "gates"> };
 
+type GuidedPickupSnapshot = Pick<
+  GameSnapshot,
+  "runSeed" | "floor" | "keyItems" | "openedGateIds" | "guidedMap"
+>;
+
 type SnapshotGate = FeedbackSnapshot["mazeFloor"]["gates"][number];
 
 export function newlyOpenedGate(
@@ -33,4 +38,47 @@ export function pickedItemsBetween(
     const victoryOwnsKeyFeedback = item.kind === "key" && next.mode === "victory";
     return removed && !victoryOwnsKeyFeedback;
   });
+}
+
+/**
+ * 把保证钥匙或死路补给的快照变化转换成一次性拾取反馈。
+ * 只比较已发布状态，不修改会话或界面。
+ */
+export function guidedPickupBetween(
+  previous: GuidedPickupSnapshot,
+  next: GuidedPickupSnapshot,
+): GroundItem | null {
+  if (previous.runSeed !== next.runSeed || previous.floor !== next.floor) return null;
+  const shortcut = next.guidedMap.shortcuts.find((entry) => (
+    !previous.keyItems.includes(entry.keyId) &&
+    next.keyItems.includes(entry.keyId)
+  ));
+  if (shortcut) {
+    return {
+      id: shortcut.keyId,
+      sourceRoomId: shortcut.keyRoomNodeId,
+      ...shortcut.keyPosition,
+      name: "捷径钥匙",
+      description: `保证开启${shortcut.name}；不会占用背包，也不依赖随机掉落。`,
+      kind: "key",
+      collection: "interact",
+      rewardId: null,
+    };
+  }
+  const cache = next.guidedMap.deadEndCaches.find((entry) => (
+    !previous.openedGateIds.includes(entry.id) &&
+    next.openedGateIds.includes(entry.id)
+  ));
+  if (!cache) return null;
+  return {
+    id: cache.id,
+    sourceRoomId: cache.sourceRoomId,
+    x: cache.x,
+    y: cache.y,
+    name: "死路补给",
+    description: "空死路已替换为可选收益；打开后本 Run 不会重复刷新。",
+    kind: "event",
+    collection: "interact",
+    rewardId: cache.rewardId,
+  };
 }

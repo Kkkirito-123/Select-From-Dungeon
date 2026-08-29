@@ -1,4 +1,4 @@
-/** 存档数据的兼容克隆。旧浏览器可能没有 structuredClone。 */
+/** 存档数据的深克隆；没有 structuredClone 时使用 JSON 兜底。 */
 export function cloneValue<T>(value: T): T {
   if (typeof globalThis.structuredClone === "function") {
     return globalThis.structuredClone(value);

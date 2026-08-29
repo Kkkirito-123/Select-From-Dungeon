@@ -320,9 +320,9 @@ F1/F2 recordings or any commercial game audio. In particular, no music from
 - Use: evidence for expressing a dungeon as generated room connectivity rather
   than one fixed painted maze.
 - Status: reference only. This repository uses its own deterministic hash,
-  curriculum graph, current 48x36 generator-v5 blueprints, legacy 64x48
-  generator-v4 compatibility, physical-world validation, and prerequisite
-  rules; no tutorial code, map, text, or asset is copied.
+  curriculum graph, current 56x42 generator-v7 blueprints, physical-world
+  validation, and prerequisite rules; historical map formats are ignored and
+  no tutorial code, map, text, or asset is copied.
 
 ## Procedural-generation references / 程序生成参考
 

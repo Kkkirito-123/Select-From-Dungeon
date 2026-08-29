@@ -6,17 +6,11 @@
  */
 import type {
   LessonDefinition,
-  LessonId,
-  LessonStageDefinition,
   Monster,
-  Position,
   Weapon,
 } from "../../../../domain/shared/types";
 import { COMPLETE_SCHEMA_LINES } from "../../../sql/sqlSchema";
-import {
-  BIOME_PRACTICE_STAGES,
-  FLOOR_TWO_BIOME_MONSTERS,
-} from "../../../world/biomeContent";
+import { FLOOR_TWO_BIOME_MONSTERS } from "../../../world/biomeContent";
 
 export const SORT_SABER: Weapon = {
   id: "sort-saber",
@@ -147,13 +141,6 @@ export const FLOOR_TWO_MONSTERS: readonly Monster[] = [
   },
   ...FLOOR_TWO_BIOME_MONSTERS,
 ] as const;
-
-export const FLOOR_TWO_PRACTICE_STAGES: Readonly<Record<number, LessonStageDefinition>> =
-  Object.fromEntries(
-    Object.entries(BIOME_PRACTICE_STAGES)
-      .filter(([id]) => FLOOR_TWO_BIOME_MONSTERS.some((monster) => monster.id === Number(id)))
-      .map(([id, stages]) => [id, stages[0]]),
-  );
 
 const FLOOR_TWO_SCHEMA = [...COMPLETE_SCHEMA_LINES];
 
@@ -327,10 +314,3 @@ export const FLOOR_TWO_LESSONS: readonly LessonDefinition[] = [
     ],
   },
 ] as const;
-
-export const FLOOR_TWO_LOOT_AFTER_LESSON: Partial<
-  Record<LessonId, { weapon: Weapon; position: Position }>
-> = {
-  "order-by": { weapon: SORT_SABER, position: { x: 10, y: 5 } },
-  "inner-join": { weapon: JOIN_CHAIN, position: { x: 10, y: 5 } },
-};

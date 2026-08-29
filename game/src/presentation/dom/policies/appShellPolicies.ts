@@ -6,7 +6,7 @@ import {
 } from "../../../content/narrative/narrativeContent";
 import { finalMigrationStageNarrative } from "../../../content/narrative/finalMigrationSequence";
 import { LESSONS, practiceStagesFor } from "../../../content/curriculum/mvpLevel";
-import { LEVEL_XP_THRESHOLDS } from "../../../domain/session/GameSession";
+import { LEVEL_XP_THRESHOLDS } from "../../../features/game-session/GameSession";
 import { narrativeFloorFor } from "../../../domain/progression/narrative";
 import {
   floorStoryProgress,

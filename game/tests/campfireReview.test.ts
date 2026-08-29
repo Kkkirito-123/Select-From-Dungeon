@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCampfireReview, type CampfireReviewInput } from "../src/domain/learning/campfireReview";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import type { AnswerAttemptRecord } from "../src/domain/shared/types";
 import type { FloorNumber } from "../src/domain/progression/runGraph";
 

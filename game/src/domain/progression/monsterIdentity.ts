@@ -79,7 +79,7 @@ export function monsterIdentityPresentation(
   );
 
   // 世界与战斗界面始终使用稳定 ID。姓名恢复只属于击杀结算和怪物图鉴，
-  // 避免旧存档中的已发现身份重新泄露到遭遇标签、任务横幅或目标面板。
+  // 避免已发现身份泄露到遭遇标签、任务横幅或目标面板。
   return {
     discovered,
     idLabel,

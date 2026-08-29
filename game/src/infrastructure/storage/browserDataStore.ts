@@ -4,18 +4,18 @@ import type { StorageLike } from "../../contracts/storage/storageLike";
 import type { ProfileProgress, SavedRun } from "../../domain/shared/types";
 import {
   createEmptyProfile,
+  isProfileProgress,
   isSavedRun,
-  loadProfile as loadOldProfile,
-  loadRun as loadOldRun,
+  loadProfile as loadLocalProfile,
+  loadRun as loadLocalRun,
   PROFILE_SAVE_KEY,
   RUN_SAVE_KEY,
-  saveProfile as saveOldProfile,
-  saveRun as saveOldRun,
+  saveProfile as saveLocalProfile,
+  saveRun as saveLocalRun,
 } from "./localProgress";
 import {
   DATA_STORES,
   deleteNode,
-  migrateOldData,
   openDataDatabase,
   readNode,
   writeNodes,
@@ -69,7 +69,7 @@ export class BrowserDataStore implements DataStore {
   saveRun(value: SavedRun): void {
     this.run = cloneValue(value);
     if (!this.database) {
-      saveOldRun(this.fallback, value);
+      saveLocalRun(this.fallback, value);
       return;
     }
     const tree = splitRun(value);
@@ -86,7 +86,7 @@ export class BrowserDataStore implements DataStore {
   saveProfile(value: ProfileProgress): void {
     this.profile = cloneValue(value);
     if (!this.database) {
-      saveOldProfile(this.fallback, value);
+      saveLocalProfile(this.fallback, value);
       return;
     }
     const node: ProfileNode = {
@@ -158,7 +158,6 @@ export class BrowserDataStore implements DataStore {
     }
     try {
       this.database = await openDataDatabase(factory);
-      await migrateOldData(factory, this.database);
       const runNode = await readNode<RunNode>(this.database, DATA_STORES.run, CURRENT_KEY);
       const profileNode = await readNode<ProfileNode>(this.database, DATA_STORES.profile, CURRENT_KEY);
       const guideNode = await readNode<GuideNode>(this.database, DATA_STORES.guide, CURRENT_KEY);
@@ -173,14 +172,16 @@ export class BrowserDataStore implements DataStore {
         this.run = joined && isSavedRun(joined) ? joined : null;
       }
       if (!this.run) {
-        const oldRun = loadOldRun(this.fallback);
-        if (oldRun) this.saveRun(oldRun);
+        const localRun = loadLocalRun(this.fallback);
+        if (localRun) this.saveRun(localRun);
       }
 
-      this.profile = profileNode?.schema === TREE_SCHEMA
+      const storedProfile = profileNode?.schema === TREE_SCHEMA &&
+          isProfileProgress(profileNode.data)
         ? cloneValue(profileNode.data)
-        : loadOldProfile(this.fallback);
-      if (!profileNode && this.fallback.getItem(PROFILE_SAVE_KEY)) {
+        : null;
+      this.profile = storedProfile ?? loadLocalProfile(this.fallback);
+      if (!storedProfile && this.fallback.getItem(PROFILE_SAVE_KEY)) {
         this.saveProfile(this.profile);
       }
 
@@ -196,8 +197,8 @@ export class BrowserDataStore implements DataStore {
   }
 
   private loadFallback(): void {
-    this.run = loadOldRun(this.fallback);
-    this.profile = loadOldProfile(this.fallback);
+    this.run = loadLocalRun(this.fallback);
+    this.profile = loadLocalProfile(this.fallback);
     this.guide = this.fallback.getItem(GUIDE_KEY);
   }
 

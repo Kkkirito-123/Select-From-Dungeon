@@ -47,7 +47,7 @@
 后续实现预计涉及：
 
 - `docs/product/narrative/FLOOR_01_SCRIPT.md` 至 `FLOOR_08_SCRIPT.md`；
-- `src/content/world/floorExperience/floor01.ts` 至 `floor08.ts`；
+- `src/content/world/floorExperience/floors/floor01/index.ts` 至 `floor08/index.ts`；
 - `src/content/narrative/narrativeContent.ts`、`src/domain/progression/floorStory.ts`；
 - 剧情主框、失名录、管理员状态与对应测试。
 

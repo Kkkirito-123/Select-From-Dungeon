@@ -6,7 +6,7 @@
  */
 import type { ExperienceSettlement, Monster } from "../shared/types";
 
-/** 经验达到这些阈值时依次进入下一个等级。顺序属于存档兼容规则。 */
+/** 经验达到这些阈值时依次进入下一个等级。顺序属于当前存档规则。 */
 export const LEVEL_XP_THRESHOLDS = [0, 2, 4, 6, 8, 14, 22, 32, 44, 58, 74, 92, 112] as const;
 
 const XP_BY_RANK: Readonly<Record<Monster["rank"], number>> = {

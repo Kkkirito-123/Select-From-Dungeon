@@ -5,7 +5,6 @@ import { mapSlot } from "../shared/mapBlueprint";
 export const FLOOR_MAP_BLUEPRINT = {
 floor: 2,
 layoutName: "月潮群岛船闸环线",
-legacyLayoutNames: ["月潮群岛航线"],
 regionNames: ["潮汐浅滩", "月影湖与沉水村落", "古树沼泽与灯塔岛"],
 routeTransit: "skiff",
 ascentTransit: "north-ferry",

@@ -3,6 +3,6 @@
   "id": "transition-lost-after-reload",
   "base": "game-repair-v1",
   "sourcePatch": "source.patch",
-  "patchSha256": "97eee9b69d1eba3f2ced83c2feb2933360cdb7fcb991e03753ebe920b2be6b5e",
-  "dirtyPaths": ["game/src/presentation/dom/AppShell.ts"]
+  "patchSha256": "f717cc1457bba75c004d01690aba8cfca5fa1e510f684bc23d08f7e9fcef96eb",
+  "dirtyPaths": ["game/src/presentation/dom/panels/TransitionPanel.ts"]
 }

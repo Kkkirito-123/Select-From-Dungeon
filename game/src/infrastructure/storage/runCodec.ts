@@ -1,8 +1,8 @@
 /**
  * Run JSON 编解码边界。
  *
- * 本模块只负责 JSON 的解析和 v12 Run 的序列化，不判断地图、课程或迁移
- * 不变量。结构校验仍由 localProgress 的验证器负责，避免编码层偷偷新增规则。
+ * 本模块只负责 JSON 的解析和 v12 Run 的序列化，不判断地图或课程
+ * 不变量。结构校验由 runValidator 负责，避免编码层偷偷新增规则。
  */
 import type { SavedRun } from "../../contracts/game/persistence";
 

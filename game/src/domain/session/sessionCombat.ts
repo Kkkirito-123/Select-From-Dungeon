@@ -1,10 +1,29 @@
 /**
  * GameSession 战斗命令的纯结果辅助函数。
  *
- * SQL 判题、伤害结算和死亡状态仍由 GameSession 协调；这个模块只负责
- * 构造“不接受本回合”的统一结果，避免表现层猜测缺省字段。
+ * SQL 判题、伤害结算和死亡状态仍由 GameSession 协调；这个模块只构造
+ * 初始战斗状态与“不接受本回合”的统一结果。
  */
-import type { PlayMode, TurnResolution } from "../shared/types";
+import { counterDamageForMonster } from "../combat/combatBalance";
+import type { CombatState, LessonStageDefinition, Monster, PlayMode, TurnResolution } from "../shared/types";
+
+/** 根据怪物和首题构造一份独立的初始战斗状态。 */
+export function createCombatState(
+  monster: Monster,
+  stage: LessonStageDefinition,
+): CombatState {
+  return {
+    targetId: monster.id,
+    kind: monster.encounterType,
+    round: 1,
+    successStep: 0,
+    intent: {
+      name: monster.attackName,
+      damage: counterDamageForMonster(monster),
+      locks: [...stage.locks],
+    },
+  };
+}
 
 /** 创建一个不改变生命值和战斗状态的空回合结果。 */
 export function emptyTurn(

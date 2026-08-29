@@ -247,8 +247,7 @@ export function generateFloorHazards(
   guidedMap: GuidedMapPlan,
   biomePlan: BiomePlan,
 ): FloorHazard[] {
-  // 第一层早于八层共享合同发布，因此保留其精确种子位置，避免已有 v11 Run
-  // 在载入后移动已经触发过的切割机关。
+  // 第一层使用独立的固定位置，保持当前地图和机关的确定性。
   if (floorNumber === 1) {
     return generateFloorOneHazards(floor, campfires, guidedMap);
   }
@@ -275,23 +274,4 @@ export function generateFloorHazards(
     kind: contract.hazardKind,
     ...position,
   }));
-}
-
-export function hasDiscoveredLabyrinthCell(
-  floorNumber: FloorNumber,
-  floor: MazeFloor,
-  campfires: readonly Campfire[],
-  discoveredCells: ReadonlySet<string>,
-): boolean {
-  return [...discoveredCells].some((cell) => {
-    const [x, y] = cell.split(":").map(Number);
-    return Number.isInteger(x) &&
-      Number.isInteger(y) &&
-      floorLabyrinthAreaAt(
-        floorNumber,
-        floor,
-        campfires,
-        { x, y },
-      ) === "labyrinth";
-  });
 }
