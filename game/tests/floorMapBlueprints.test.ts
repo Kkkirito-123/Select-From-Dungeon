@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   FLOOR_MAP_BLUEPRINTS,
+  FLOOR_MAP_REFERENCE_HEIGHT,
+  FLOOR_MAP_REFERENCE_WIDTH,
   FLOOR_TRANSIT_PRESENTATIONS,
-  MVP2_MAZE_HEIGHT,
-  MVP2_MAZE_WIDTH,
-  compatibleFloorLayoutNames,
   floorTransitPresentation,
   regionPortalsEnabledForFloor,
 } from "../src/content/world/floorMapBlueprints";
@@ -43,19 +42,6 @@ describe("FLOOR_MAP_BLUEPRINTS", () => {
     expect(regionPortalsEnabledForFloor(2)).toBe(true);
   });
 
-  it("第一、二层保留已发布 v11 布局名作为只读存档兼容身份", () => {
-    expect(compatibleFloorLayoutNames(1)).toEqual([
-      "双岸失名档案",
-      "地下余烬档案回环",
-      "回燃档案环廊",
-    ]);
-    expect(compatibleFloorLayoutNames(2)).toEqual([
-      "月潮群岛船闸环线",
-      "月潮群岛航线",
-    ]);
-    expect(compatibleFloorLayoutNames(3)).toEqual(["白霜墓原回环"]);
-  });
-
   it("每个蓝图槽位与本层 RoomGraph 一一对应、位于地图内且互不重叠", () => {
     FLOORS.forEach((floorNumber) => {
       const blueprint = FLOOR_MAP_BLUEPRINTS[floorNumber];
@@ -68,9 +54,9 @@ describe("FLOOR_MAP_BLUEPRINTS", () => {
         expect(slot.x, `第 ${floorNumber} 层 ${slot.roomNodeId}`).toBeGreaterThan(0);
         expect(slot.y, `第 ${floorNumber} 层 ${slot.roomNodeId}`).toBeGreaterThan(0);
         expect(slot.x + slot.width, `第 ${floorNumber} 层 ${slot.roomNodeId}`)
-          .toBeLessThan(MVP2_MAZE_WIDTH);
+          .toBeLessThan(FLOOR_MAP_REFERENCE_WIDTH);
         expect(slot.y + slot.height, `第 ${floorNumber} 层 ${slot.roomNodeId}`)
-          .toBeLessThan(MVP2_MAZE_HEIGHT);
+          .toBeLessThan(FLOOR_MAP_REFERENCE_HEIGHT);
         blueprint.slots.slice(index + 1).forEach((other) => {
           const overlaps = !(
             slot.x + slot.width <= other.x ||

@@ -88,56 +88,55 @@ export interface BiomePlan {
 
 interface RegionTemplate {
   kind: BiomeKind;
-  lessonId: RunLessonId;
   feature: BiomeFeatureKind;
 }
 
 const FLOOR_ONE_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "drainage", lessonId: "select", feature: "drain" },
-  { kind: "slime-pool", lessonId: "where", feature: "slime" },
-  { kind: "ember-cellar", lessonId: "having", feature: "ember" },
+  { kind: "drainage", feature: "drain" },
+  { kind: "slime-pool", feature: "slime" },
+  { kind: "ember-cellar", feature: "ember" },
 ];
 
 const FLOOR_TWO_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "lake", lessonId: "distinct", feature: "water" },
-  { kind: "swamp", lessonId: "left-join", feature: "reeds" },
-  { kind: "forest", lessonId: "join-boss", feature: "tree" },
+  { kind: "lake", feature: "water" },
+  { kind: "swamp", feature: "reeds" },
+  { kind: "forest", feature: "tree" },
 ];
 
 const FLOOR_THREE_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "bone-yard", lessonId: "f3-inner", feature: "bones" },
-  { kind: "grave-mire", lessonId: "f3-chain", feature: "grave" },
-  { kind: "spirit-crypt", lessonId: "f3-union", feature: "ghost-flame" },
+  { kind: "bone-yard", feature: "bones" },
+  { kind: "grave-mire", feature: "grave" },
+  { kind: "spirit-crypt", feature: "ghost-flame" },
 ];
 
 const FLOOR_FOUR_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "fire-forge", lessonId: "f4-cte", feature: "lava" },
-  { kind: "frost-vault", lessonId: "f4-in", feature: "ice" },
-  { kind: "storm-core", lessonId: "f4-exists", feature: "crystal" },
+  { kind: "fire-forge", feature: "lava" },
+  { kind: "frost-vault", feature: "ice" },
+  { kind: "storm-core", feature: "crystal" },
 ];
 
 const FLOOR_FIVE_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "iron-yard", lessonId: "f5-over", feature: "iron" },
-  { kind: "barracks", lessonId: "f5-lag-lead", feature: "banner" },
-  { kind: "black-citadel", lessonId: "f5-top-n", feature: "battlement" },
+  { kind: "iron-yard", feature: "iron" },
+  { kind: "barracks", feature: "banner" },
+  { kind: "black-citadel", feature: "battlement" },
 ];
 
 const FLOOR_SIX_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "magma-nest", lessonId: "f6-insert", feature: "egg" },
-  { kind: "crystal-cavern", lessonId: "f6-constraint", feature: "magma" },
-  { kind: "dragon-throne", lessonId: "f6-savepoint", feature: "dragon-bone" },
+  { kind: "magma-nest", feature: "egg" },
+  { kind: "crystal-cavern", feature: "magma" },
+  { kind: "dragon-throne", feature: "dragon-bone" },
 ];
 
 const FLOOR_SEVEN_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "crystal-grove", lessonId: "f7-btree", feature: "crystal-tree" },
-  { kind: "root-maze", lessonId: "f7-composite", feature: "root" },
-  { kind: "index-heart", lessonId: "f7-optimize", feature: "index-rune" },
+  { kind: "crystal-grove", feature: "crystal-tree" },
+  { kind: "root-maze", feature: "root" },
+  { kind: "index-heart", feature: "index-rune" },
 ];
 
 const FLOOR_EIGHT_TEMPLATES: readonly RegionTemplate[] = [
-  { kind: "obsidian-hall", lessonId: "f8-mvcc", feature: "obsidian" },
-  { kind: "void-court", lessonId: "f8-lock", feature: "void-flame" },
-  { kind: "data-throne", lessonId: "f8-security", feature: "gold-throne" },
+  { kind: "obsidian-hall", feature: "obsidian" },
+  { kind: "void-court", feature: "void-flame" },
+  { kind: "data-throne", feature: "gold-throne" },
 ];
 
 const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTemplate[]>> = {
@@ -152,11 +151,10 @@ const TEMPLATES_BY_FLOOR: Readonly<Record<RoomGraph["floor"], readonly RegionTem
 };
 
 /**
- * Generator-v6+ regions follow the authored guardian split instead of a numeric
- * third of the lesson list. The middle anchor is the last lesson before the
- * area guardian; the rear anchor is the first lesson that guardian protects.
+ * 区域按作者定义的守卫分段：中段锚点位于区域首领之前，后段锚点位于
+ * 该首领保护的第一节课程。
  */
-const V6_REGION_LESSONS: Readonly<Record<
+const REGION_LESSONS: Readonly<Record<
   RoomGraph["floor"],
   readonly [RunLessonId, RunLessonId, RunLessonId]
 >> = {
@@ -441,13 +439,11 @@ export function generateBiomePlan(
   guidedMap: GuidedMapPlan,
 ): BiomePlan {
   const templates = TEMPLATES_BY_FLOOR[graph.floor];
-  const regionLessonIds = V6_REGION_LESSONS[graph.floor];
+  const regionLessonIds = REGION_LESSONS[graph.floor];
   const regionNames = floorMapBlueprint(graph.floor).regionNames;
   const seed = `select-from-dungeon:biome:v1:floor-${graph.floor}:${graph.seed}`;
   const regions: BiomeRegion[] = templates.map((template, index) => {
-    const sourceLessonId = floor.generatorVersion >= 6
-      ? regionLessonIds[index]
-      : template.lessonId;
+    const sourceLessonId = regionLessonIds[index];
     const node = graph.nodes.find((entry) => entry.lessonId === sourceLessonId);
     const anchor = node ? floor.anchors[node.id] : floor.zones[index]?.center;
     if (!node || !anchor) {

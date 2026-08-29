@@ -4,13 +4,64 @@
 稳定编辑规则位于 `AGENTS.md`，仓库当前任务位于 `../TASK.md`；本文件是英文权威
 `ARCHITECTURE.md` 的同步中文译文。
 
+## 新人总览
+
+先读这一节。产品版本统一为 **1.0**，代码按八个清晰区域组织；内部格式编号是独立的兼容性标识，
+不代表产品发布版本。
+
+```text
+浏览器
+└─ index.html -> src/application/main.ts
+   ├─ contracts/       跨层类型与协议
+   ├─ application/     启动、配置、生命周期与编排
+   ├─ features/        按工作流组织的门面、协调器与运行时
+   ├─ content/         课程、楼层、剧情、SQL、背包作者内容
+   ├─ domain/          GameSession 与纯游戏规则
+   ├─ infrastructure/  存档、SQLite、音频、在线状态与 Agent IO
+   ├─ presentation/    DOM 面板与 Phaser 场景
+   └─ devtools/        仅开发态的 Dungeon Maintainer 桥
+```
+
+| 区域 | 负责什么 | 不负责什么 |
+| --- | --- | --- |
+| `contracts/` | 跨层类型、存档/结果/Agent/存储协议 | 游戏规则、渲染或外部 IO |
+| `features/` | `GameSession`、终端、剧情、快照、DOM 外壳和运行时功能包 | 作者内容、底层适配器的重复实现 |
+| `content/` | 课程、楼层/世界/剧情、SQL 与背包静态定义 | 可变运行时状态或持久化 |
+| `domain/` | 会话底层服务以及移动、战斗、探索、学习、成长、掉落规则 | DOM、Phaser、网络或浏览器存储 |
+| `application/` | 启动、配置、生命周期与事件/Agent 编排 | 具体玩法判定或渲染 |
+| `infrastructure/` | 存档、SQLite、音频、在线状态、浏览器与 Agent 适配器 | 游戏决策或 UI 标记 |
+| `presentation/` | DOM 面板/渲染器与 Phaser 场景；渲染快照并转发意图 | 存档、SQL 判题、隐藏状态或规则归属 |
+| `devtools/` | 仅开发态的维护器桥和玩家可见投影 | 生产入口、玩家存档、隐藏答案或完整地图 |
+
+`GameSession` 是唯一可变游戏状态提交者。其他区域只能提供作者内容、通过它应用规则、执行外部
+IO，或渲染它产生的快照。
+
+```text
+启动
+index.html -> main.ts -> GameRuntime -> DataStore/GameSession -> AppShell + DungeonScene
+
+玩家动作
+DOM/Phaser 输入 -> GameSession -> Snapshot/Event -> DOM + Phaser + Persistence
+
+SQL 动作
+SQL 终端 -> SqlEngine + lessonEvaluator -> GameSession -> Snapshot/Event
+```
+
+功能包按单向端口连接：`game-session` 是唯一规则状态门面；`terminal`、`narrative` 和
+`snapshot` 只接收显式服务端口；`app-shell` 负责 DOM 生命周期与事件路由；`game-runtime`
+负责构造、页面生命周期和反向销毁。允许的包边由 `scripts/check-architecture.mjs` 校验，
+不得让协调器反向依赖运行时或形成环。
+
+当前内部编号继续使用 **Run 12**、**Profile 3** 和 **generator 7**；它们描述存档/世界格式，
+不是产品版本。
+
 ## 产品与用户
 
 `SQL 魔王城 / SELECT * FROM DUNGEON` 是面向 SQL 初学者和面试准备者的中文浏览器肉鸽。
-MVP 2.0 是八层 Run；新 Run 使用唯一一套确定性 `56×42 / generator v7` 紧凑迷宫，玩家不能
+产品版本 1.0 包含当前八层 Run；新 Run 使用唯一一套确定性 `56×42 / generator v7` 紧凑迷宫，玩家不能
 输入 Seed 或重抽地图。每层将手工房间分散到整张地图，并生成 DFS 迷宫、约 15% 回环、三个区域
 和实体交通地标。
-generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图只作为旧存档兼容路径。玩家必须实际行走探索地图，让不可
+当前 Run 校验器只接受 generator v7 地图，历史地图格式会被忽略。玩家必须实际行走探索地图，让不可
 点击传送的发现式小地图逐步显形；必修怪物被击败前只显示稳定的 `ID #NNN`，最后一击才回收
 直白名字并写入永久怪物图鉴。进入存活必修怪物所在格或通过步数遭遇判定时切换到独立单体战斗，在游戏内写完整只读 SQL。每局以
 两颗心开始，怪物反击按楼层与角色矩阵确定伤害并由护甲优先承受，胜利按怪物等级获得经验并显示明确的
@@ -33,7 +84,7 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 掌握、XP 或战利品。
 本轮还包含 12 格装备背包、一个武器位、一个防具位与三种恢复品堆叠，每种最多 5 个。只有探索
 或篝火状态可按 `B` 管理背包，打开时暂停移动和巡逻。护甲生命优先承受反击，并在篝火休息或
-复活时恢复。`v1.1` 的可选随机池只保留自动使用的恢复品：普通怪 2%、小型精英 5%、
+复活时恢复。产品版本 1.0 的可选随机池只保留自动使用的恢复品：普通怪 2%、小型精英 5%、
 区域首领 10%、层主 0%；不再为精英或 Boss 补足随机掉落。课程奖励、明确宝箱与钥匙保持确定。
 满背包必须显式替换，普通物品丢弃后在当前层可重新拾取，基础/课程/钥匙类保护物品不能丢弃。
 篝火与抄写员是两个独立的游戏对象。实体篝火始终负责休息和复活点，但本层精英被击败前不会解锁学习复盘，
@@ -41,7 +92,7 @@ generator v6 `96×72`、generator v5 `48×36` 与 generator v4 `64×48` 地图�
 作者内容是她的本地回退文案。当前游戏没有玩家提示词；配置 `VITE_AGENT_URL` 后，可选的无状态
 Python 服务通过 `POST /v1/agent/run` 只运行变化的篝火或抄写员角色，再生成 Main 指引。本地结果仍然立即可用。抄写员在调查、死亡复盘和导航指引等级提升时响应，不能修改游戏状态、路线或存档。
 每层五个短叙事拍和两条固定《失名录》证据仍由现有 Run 进度
-解锁；证据明确区分未知、已查为 `NULL` 和实际值。第八层完成 MVP 2.0 唯一结局 `MIGRATE`，
+解锁；证据明确区分未知、已查为 `NULL` 和实际值。第八层完成 1.0 唯一结局 `MIGRATE`，
 不使用账号、服务端游戏数据库或远程游戏日志。
 第一至第八层各有且仅有一个可选实体隐藏房：第一层“封存旧库”在完成 `WHERE / IS NULL` 后
 开放，第二层“沉船记录舱”在完成 `ORDER BY / LIMIT / DISTINCT` 后开放，第三层在前三项关系
@@ -97,8 +148,13 @@ Campaign 框架已经定义并校验全部八层可玩内容的有序课程先�
 
 ```text
 index.html -> src/application/main.ts
+  -> features/game-runtime/GameRuntime（服务装配、生命周期、反向销毁）
+  -> features/game-session/GameSession（唯一规则状态门面）
+  -> features/app-shell/AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
+     -> features/terminal/TerminalCoordinator（SQL 一次提交）
+     -> features/narrative/NarrativeCoordinator（剧情动作与证据确认）
+     -> features/snapshot/SnapshotRenderer（纯快照投影）
   -> 仅开发态 DungeonAgentBridge（localhost + ?playtest=agent，纯内存存储）
-  -> AppShell（DOM HUD、小地图、背包/战利品、SQL 终端与本地复盘）
   -> PresenceClient -> 同源 SSE -> ../presence/server.mjs -> PresencePanel
   -> CampfireReview（当前楼层确定性 SQL 复盘）
   -> TriggerBus -> AgentRuntime/XState（并行篝火、抄写员、Main 生命周期与内存缓存）
@@ -194,14 +250,19 @@ SQLite 已声明的 `FOREIGN KEY` 约束。`lessonEvaluator` 允许等价 SQL，
 `src/presentation/dom/appShellTemplate.ts` 独占 AppShell 静态页面骨架，`src/presentation/dom/appShellDom.ts` 统一绑定会被
 运行时重复使用的稳定节点；状态渲染和事件处理不得复制整份模板，也不得为同一个持久节点维护
 第二套静默选择器。
-`src/presentation/dom/panels/` 负责终端、背包、篝火、复盘、剧情、Schema 和在线状态展示，
+`src/presentation/dom/panels/` 负责终端、背包、篝火、复盘、剧情、Schema 和在线状态展示。
+`RecordPanel` 统一负责剧情、调查、迁移和抄写员记录面板；`TransitionPanel` 负责楼层、区域和
+死亡转场及其短时计时器；`TransientFeedbackPanel` 负责拾取与战斗结算卡；`AdminPanel`
+负责管理员菜单 DOM、焦点和文案，跨运行时的管理员动作仍由 `AppShell` 协调。
 `src/presentation/dom/renderers/` 负责 HUD、小地图和战斗展示。Panel 只能接收快照与显式回调，
 不得直接访问存档、外部服务或 Phaser。
-`src/presentation/phaser/world/` 负责地形、迷雾、世界对象可见性和拓扑重建判断；`DungeonScene`
-仍是 Phaser 生命周期与事件转发门面。
+`src/presentation/phaser/world/` 负责地形、迷雾、世界对象可见性和拓扑重建判断。
+`WorldRuntimeLayer` 组合区域标签、门、捷径、篝火和陷阱；`FloorSetpieceLayer` 是
+`world/setpieces/` 各楼层模块的唯一 registry/门面，共同生命周期与通用地标位于
+`world/shared/FloorSetpieceModule.ts`。`DungeonScene` 仍是 Phaser 生命周期与事件转发门面。
 `src/domain/learning/queryFeatureDetector.ts` 负责 SQL 特征标签，
 `queryIdentityRules.ts` 负责身份字段防火墙，`lessonLocks.ts` 负责课程阶段选择和基础 SQL
-外形限制，`lessonResultEvaluator.ts` 负责固定课程结果语义；`lessonEvaluator.ts` 只保留兼容导出与组合。
+外形限制，`lessonResultEvaluator.ts` 负责固定课程结果语义；`lessonEvaluator.ts` 负责聚合判题规则。
 `src/presentation/dom/sqlAutocomplete.ts` 负责从完整权威 Schema、当前任务语境与
 MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确接受时才能替换当前 Token，不得
 生成完整答案、提交查询或绕过课程判定。
@@ -224,7 +285,7 @@ Floor Labyrinth 与 Floor Map Blueprints。`src/domain/progression/campaign.ts` 
 八层剧情与怪物分布 V2 契约已有运行时与自动化基线；完整真人 Run、文字/音频主观 QA 和最终美术仍是独立证据。
 长期稳定契约为：展示子区必须显式映射到 `front` / `middle` / `rear`；怪物 `1–89`、课程/装备/剧情/证据/
 `MIGRATE` ID 与 Run v12/Profile v3 不得改名；击杀前所有可见怪物文字经身份展示函数，管理员揭示不写 Profile；
-剧情只用 `blocking` / `ambient` / `inspect`，其中环境卡在 3 次成功移动后消失，旧 Run 不重播已看事件；
+剧情只用 `blocking` / `ambient` / `inspect`，其中环境卡在 3 次成功移动后消失，恢复的 Run 不重播已看事件；
 `counterDamageForEncounter` 是战斗反击唯一真源：F1–2 全为 1，F3–4 普通/精英为 1、Boss 为 2，F5–6 普通为 1、其余为 2，
 F7–8 层主为 3、其余为 2，SQL 错误共用该规则且护甲先承伤；剧情工作不改四表 DDL 或稳定存档版本。
 
@@ -239,8 +300,30 @@ feature/floor root 只登记稳定目录，不登记文件或 Glob。普通文�
 fallback root，最后才失败开放到 area/仓库。维护器只接受完整的当前 schema v4；其它或非法地图直接
 回退普通安全搜索。每个楼层 scope 可包含同编号的内容目录，但楼层子单元不得引用兄弟楼层。共同算法和
 服务必须上提到父级服务 partition，由唯一 registry 装配后单向提供给子单元。`neighbors` 不表示运行时
-依赖。`GameSession` 继续是唯一状态提交者，战斗命中等聚焦规则下沉到子服务，楼层模块不得持有第二份
-可变会话状态。
+依赖。`GameSession` 继续是唯一可变会话状态提交者；导航指引位于
+`domain/session/exploration/navigationGuidance.ts`，背包转换由
+`domain/session/inventory/` 功能包编排，战斗抽题、经验、伤害与复盘由
+`domain/session/combat/` 功能包编排。这些模块只接收窄 Context，不持有第二份会话状态。
+
+会话专属的只读模型由 `domain/session/sessionSelectors.ts` 提供，功能门面只把显式 Context
+适配成公开查询。AppShell 的重置路径独立位于 `features/app-shell/workflows/ResetWorkflow.ts`：
+它通过端口编排界面清理、会话重置、SQLite 重置、战斗中止和音频恢复，DOM 所有权仍留在 AppShell。
+
+功能包目录是维护者的第一入口：
+
+| 功能包 | 入口 | 定位问题 |
+| --- | --- | --- |
+| `features/game-session/` | `GameSession.ts` | 游戏状态、公开动作、快照与规则门面 |
+| `features/terminal/` | `TerminalCoordinator.ts` | SQL 提交、SQLite 同步、战斗动画和 busy 清理 |
+| `features/narrative/` | `NarrativeCoordinator.ts` | 剧情动作、音频/世界效果和证据确认 |
+| `features/snapshot/` | `SnapshotRenderer.ts` | 前后快照差异、模式进入和渲染投影 |
+| `features/app-shell/` | `AppShell.ts` | DOM 装配、输入路由和面板生命周期；`rendering/` 负责快照投影，`workflows/` 负责剧情、反馈/转场与重置编排 |
+| `features/game-runtime/` | `GameRuntime.ts` | 启动装配、页面隐藏、失败回收和销毁 |
+
+端口方向固定为“底层服务 -> 功能协调器 -> GameRuntime”；架构检查器会拒绝未经声明的
+功能包边和循环依赖。
+`GameRuntime` 是 Audio、Presence、持久化和维护器桥等外部资源的最终释放者；`AppShell.destroy()`
+只解绑自身的 DOM 订阅、面板和用户手势，避免重复释放异步资源。
 
 ### 游戏拥有的 Benchmark 合同
 
@@ -259,8 +342,9 @@ Adapter 或来源任务文件。
 src/contracts/          跨层只读游戏、存档、结果、Agent 与存储契约
 src/application/        启动、运行时配置与页面生命周期
 src/content/            课程、世界、剧情、背包与 SQL 静态内容；楼层作者数据位于 */floors/floorNN
-src/domain/             Session 门面/聚焦服务、战斗、探索、学习、成长、背包与共享规则
-src/infrastructure/     音频、反馈、SQLite、存档编解码/迁移、在线状态与浏览器适配器
+src/domain/             Session 支撑服务、战斗、探索、学习、成长、背包与共享规则
+src/features/           GameSession、终端、剧情、快照、AppShell 与 GameRuntime 功能包
+src/infrastructure/     音频、反馈、SQLite、存档编解码/校验、在线状态与浏览器适配器
 src/presentation/       Phaser 场景、DOM 应用视图与职责明确的渲染器
 src/devtools/           仅开发态外部维护器桥；生产入口不得导入
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
@@ -336,18 +420,18 @@ pnpm build
   抽取 1 道 L1、2 道 L2、3 道 L3。新 Run 固定题库版本并使用确定性不重复牌组。IndexedDB 最多保留 5000 条完整作答，
   题目/课程聚合永久保留；导出与清除内容绝不包含 API Key。
   生成器按 `monstersForFloor(floor)` 为每层建立独立 SQL fixture，并拒绝超出该层关系闭包的怪物引用。
-  绑定 v2 的 v12 Run 会在内存中迁移为 v1，重置活动练习绑定和牌组游标，同时保留世界状态与答题历史。
+  Run v12 必须绑定当前题库版本和完整抽题状态；历史题库绑定直接拒绝。
+- `src/infrastructure/storage/localProgress.ts` 是 Run/Profile 的 load/save/clear 门面；
+  只读写当前 `run:v12` 与 `profile:v3` Key。`runCodec.ts` 负责 Run JSON 编码，
+  `profileCodec.ts` 负责 Profile 创建、校验与编码。Run 校验按单向责任链组织：
+  `runDataValidators.ts` 校验玩家/战斗/背包值，`runWorldValidator.ts` 校验图、地图和世界结构，
+  `runValidator.ts` 组合 SavedRun 跨字段不变量并暴露版本入口。
 - 浏览器数据统一保存在 IndexedDB `select-from-dungeon-data`：`run_nodes` 与 `floor_nodes` 分开保存
   Run 全局数据和当前楼层；`profile_nodes` 保存 v3 永久档案；`guide_nodes` 保存引导；`attempts`、
-  `question_stats`、`lesson_stats` 保存学习记录；`question_banks` 保存经校验的题库字节。有效的
-  `select-from-dungeon:run:v12` 仍是 Run 格式；有效的 `select-from-dungeon:run:v11` 会在内存中迁移为 v12；有效 `run:v10`、`run:v9`、`run:v8` 会继续经过
-  兼容链补上确定性的八层
-  Campaign 槽位；有效 `run:v7` 再补上空背包/战利品状态与当前已装备物品记录；有效 `run:v6`、
-  `run:v5` 和 `run:v4` 继续经过原有迁移后进入 v12。旧 localStorage Key 以及旧的两个 IndexedDB
-  会作为只读迁移来源保留，不会自动删除；
-  更旧 Run Key 不读取。
-  有效的 `profile:v1` 与 `profile:v2` 会迁移为 v3；缺失的怪物身份记录从空集合开始，原有
-  学习计数保持。
+  `question_stats`、`lesson_stats` 保存学习记录；`question_banks` 保存经校验的题库字节。只加载
+  有效的 `select-from-dungeon:run:v12` 与 `select-from-dungeon:profile:v3`。当前 localStorage
+  值可以导入统一 IndexedDB，也可在 IndexedDB 不可用时作为 fallback。历史 Run/Profile Key 与
+  旧 learning/content IndexedDB 不读取也不删除；不支持数据的恢复路径是开始新 Run。
   `progressPersistence` 会合并非关键移动/巡逻快照，但查询、战利品、背包、模式与拓扑变化
   仍立即落盘；改变结构时必须处理版本或恢复。
 - 迷宫契约不新增独立存档字段。陷阱坐标、安全格掩码与
@@ -371,8 +455,7 @@ pnpm build
   与 `Escape` 不产生代价。
 - 新 Run 使用唯一一套八张手工宏观蓝图生成 `56×42 / generator v7` `MazeFloor`，课程房覆盖地图宽高至少
   70%，采用 DFS 雕刻与约 15% 回环；超出内容连接骨架范围的远端 DFS 分支会重新封墙，不再形成
-  无用途的外围迷宫。generator v6 `96×72`、generator v5 `48×36` 和
-  generator v4 `64×48` 记录继续兼容读取。玩家界面不再提供 Seed 输入或地图重抽。
+  无用途的外围迷宫。其他 generator 版本直接拒绝。玩家界面不再提供 Seed 输入或地图重抽。
   玩家必须实际走过连续世界；发现式小地图不是导航控件。移动进入存活必修怪物所在格，或成功移动触发
   遭遇计量时，会自动进入独立战斗场景；安全期结束后，每个符合条件的成功移动以 2% 基础概率
   判定，连续 30 个符合条件的安静步数后保底遭遇。出生和篝火安全区不累计遭遇风险、不生成
@@ -383,8 +466,8 @@ pnpm build
   失效。第二至八层的抽象区域归属不再阻挡相邻普通步行；绑定的中段区域首领只封锁可见区域交通
   与跨区捷径，课程前置门继续防止越课。第一层仍是无通用区域门的连续地图例外。
 - `GuidedMap` 只能从课程图、已保存 `MazeFloor` 和两个篝火确定性派生，不重复写入存档。主路线
-  每 14 格左右放置信标且最大空档不超过 18 格；走廊剩余死路必须放置一次性补给。generator v6+
-  每层固定三条双向捷径与三把保证钥匙，旧地图仍保留一条；钥匙不占背包。开门前必须持有钥匙并满足对应课程前置；
+  每 14 格左右放置信标且最大空档不超过 18 格；走廊剩余死路必须放置一次性补给。当前每层固定
+  三条双向捷径与三把保证钥匙；钥匙不占背包。开门前必须持有钥匙并满足对应课程前置；
   开门、休息和死亡均不得重抽或重新锁门。
 - 拾取第一至七层钥匙后进入 `transition` 状态；AppShell 显示金色
   `FLOOR NN CLEARED / CONGRATULATIONS!!` 通关反馈，并在约 1.5 秒后自动调用
@@ -392,7 +475,7 @@ pnpm build
   遗物与查询数跨层保留，每层迷宫和课程状态重新生成。
 - 每次胜利都会显示明确的 XP 结算；课程胜利解锁对应房间的确定宝箱，不再凭空制造必掉怪物包。
   伏击只结算可选的种子化即时恢复品，且大多数为空。物品文案展示名称与准确效果；
-  结算卡和获取说明卡在之后完成 3 次成功移动后消失。旧存档中的松散掉落仍可走上去拾取；祭坛、
+  结算卡和获取说明卡在之后完成 3 次成功移动后消失。丢在地面的物品仍可走上去拾取；祭坛、
   秘藏宝箱与篝火同样使用 `E`。课程关键装备仍然确定可得且可达。
 - 背包包含 12 个装备格、一个武器位、一个防具位与三种恢复品堆叠，每种最多 5 个；已装备物品
   不占格。只有探索和篝火可打开背包，打开后暂停移动和巡逻，战斗中不可换装。护甲先于基础生命
@@ -419,7 +502,7 @@ pnpm build
   随包提供的 asm.js 回退。
 - 仓库根 `.github/workflows/deploy-pages.yml` 只在 `PAGES_ENABLED=true` 时验证两个工程并部署 `game/dist`。
   如果私有仓库套餐拒绝 Pages，保持仓库私有和变量 false/未设置，记录 `provider-blocked`；无新授权不购买、公开或换托管商。
-  当前拆包保持为 MVP 2.0 基线，包体/运行时优化延后到独立 MVP 2.1。
+  当前拆包保持为 1.0 基线，包体/运行时优化属于 1.0 之后的独立优化项。
 - 像素角色、地砖、房间装饰、音乐与音效均由项目代码生成。增加第三方图片、字体、音频或复制
   关卡文字前，必须完成许可审查并更新归属。
 - 浏览器运行依赖固定在 `package.json` 与 `pnpm-lock.yaml`。依赖变化仍需审批，并按风险检查许可证、

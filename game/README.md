@@ -10,7 +10,7 @@
 [中文课程蓝图](docs/CURRICULUM.zh-CN.md) |
 [中文地图蓝图](docs/FLOOR_THEMES.zh-CN.md)
 
-**Package: `v2.0.0` · F1/F2 content candidate: `MVP 2.1 RC`** · [Player guide](GUIDE.md) ·
+**Product: `1.0` · Package: `1.0.0`** · [Player guide](GUIDE.md) ·
 [Changelog](CHANGELOG.md) ·
 [Release checklist](docs/RELEASE_CHECKLIST.md)
 
@@ -19,7 +19,7 @@ combat action: physically explore a continuous canonical pixel maze, move into a
 unidentified monster's ID-labelled tile to enter a separate duel, write a
 complete SQLite query, and turn the correct result into an animated attack.
 
-## MVP Features
+## Product 1.0 Features
 
 - Complete an eight-floor Run made from one canonical set of deterministic
   `56x42` generator-v7 labyrinths. Players cannot enter or reroll a map seed;
@@ -32,7 +32,7 @@ complete SQLite query, and turn the correct result into an animated attack.
 - The header now shows the current slot out of eight. A validated campaign
   scaffold defines all eight ordered floor identities, curriculum prerequisites,
   exercise tiers, encounter roles, themes, and content pools. All eight floors
-  are executable in v0.10 and hardened for low-cost play in v0.11.
+  are executable in Product 1.0.
 - A compact lower-left status shows a green dot and the number of connected
   game tabs when the optional live presence service is available. It shows an
   unavailable state instead of a fabricated zero when that service is offline.
@@ -62,7 +62,7 @@ complete SQLite query, and turn the correct result into an animated attack.
   prevent lesson bypass.
 - The fixed internal world identity deterministically rebuilds course-route beacons, two
   middle/rear campfires, the entrance safe anchor, dead-end caches, and three
-  keyed two-way shortcuts for generator-v6+ maps.
+  keyed two-way shortcuts on every current map.
   Visible route interests stay within 18 steps on the main course route. Every
   remaining corridor dead end contains a one-use cache. Shortcut keys consume
   no inventory slot and never depend on random loot. At 40 unsuccessful route
@@ -105,7 +105,8 @@ complete SQLite query, and turn the correct result into an animated attack.
   fields, and real JOIN relationships. Task cards distinguish primary and
   detail tables: monster targets use consecutive `monsters.id` values from
   `1` through `89`, while `monster_id` is only a detail-table relationship
-  field. Sparse IDs in an older Run are migrated losslessly when loaded.
+  field. Historical Run formats and sparse legacy IDs are ignored; only the current v12 Run and v3
+  Profile are loaded, so unsupported data recovers by starting a new Run.
   Aliases such as `m.` narrow the list to that table. Use arrows plus
   `Enter`/`Tab`, click or tap, or open it explicitly with `Ctrl/Command +
   Space`. Accepting a suggestion never executes the query or fills the complete
@@ -212,7 +213,7 @@ complete SQLite query, and turn the correct result into an animated attack.
 - Watch the same low-cost procedural actor recipes in the maze and battle
   arena: four player identity stages, an animated Scribe, and explicit
   silhouettes for every monster family. Reaching the eighth-floor victory
-  resolves the single MVP 2.0 ending, `MIGRATE`, while preserving the history
+  resolves the single Product 1.0 ending, `MIGRATE`, while preserving the history
   and rollback path described in the `失名录`.
 
 ## First-Floor Learning Route
@@ -378,10 +379,10 @@ left on the monster's tile, and press `E` to process its items.
 
 For a first pass through the code, follow this short route:
 
-1. `src/application/main.ts`: startup and dependency assembly.
-2. `src/domain/shared/types.ts` and `src/domain/session/GameSession.ts`: state contracts and the single source of gameplay truth.
-3. `src/infrastructure/storage/localProgress.ts`: save validation, migration dispatch, and restoration.
-   `src/infrastructure/storage/runMigrations.ts` owns the v4-v12 in-memory Run conversion chain.
+1. `src/application/main.ts` and `src/features/game-runtime/GameRuntime.ts`: startup, assembly, and teardown.
+2. `src/domain/shared/types.ts` and `src/features/game-session/GameSession.ts`: state contracts and the single source of gameplay truth.
+3. `src/infrastructure/storage/localProgress.ts`: current `run:v12` / `profile:v3` validation,
+   safe read/write, and restoration.
 4. `src/infrastructure/sql/SqlEngine.ts` and `src/domain/learning/lessonEvaluator.ts`: SQL execution and grading boundaries.
 5. `src/presentation/phaser/` and `src/presentation/dom/`: Phaser and DOM presentation, including local review and authored narrative display.
 
@@ -390,10 +391,11 @@ The top-level source tree is:
 ```text
 src/
 ├─ contracts/        cross-layer read-only game, persistence, result, Campfire/Scribe Agent, and storage contracts
-├─ application/       startup, configuration, and page lifecycle
+├─ application/      startup configuration and page lifecycle
+├─ features/         GameSession, terminal, narrative, snapshot, AppShell, and GameRuntime packages
 ├─ content/           curriculum, world, narrative, inventory, and SQL content
 ├─ domain/            session facade/helpers, combat, exploration, learning, progression, and shared rules
-├─ infrastructure/    audio, feedback, SQLite, storage codecs/migrations, and browser adapters
+├─ infrastructure/    audio, feedback, SQLite, storage codecs/validators, and browser adapters
 └─ presentation/     Phaser scenes, DOM views, and focused renderers
 ```
 
@@ -402,7 +404,7 @@ Within the facades, `src/presentation/dom/panels/` owns focused DOM interactions
 `src/presentation/phaser/world/` owns world rendering decisions. The learning
 boundary keeps SQL feature tags in `queryFeatureDetector.ts`, the sealed-identity
 firewall in `queryIdentityRules.ts`, stage selection in `lessonLocks.ts`, authored
-result semantics in `lessonResultEvaluator.ts`, and compatibility composition in
+result semantics in `lessonResultEvaluator.ts`, and rule composition in
 `lessonEvaluator.ts`.
 
 ```text
@@ -470,8 +472,7 @@ resolved by `GameSession` against the maze.
 
 New Runs use one canonical maze-generator-v7 set of eight `56x42` compact
 labyrinths that spread authored rooms across the full map. Players cannot input
-or reroll a map seed. Generator-v6 `96x72`, generator-v5 `48x36`,
-and generator-v4 `64x48` maps remain loadable only for legacy Run compatibility.
+or reroll a map seed. The current validator rejects other generator versions.
 The generator isolates `topology` and `decor` random streams. `GuidedMap`
 then derives route beacons, dead-end caches, and the keyed shortcut from the
 fixed maze, curriculum graph, and campfires, so decoration density cannot move
@@ -493,9 +494,9 @@ and ordering evidence stored for grading. Fixed curriculum monsters and floor
 Bosses keep authored stages; normal, mini-elite, and area-Boss practice battles
 draw one L1, two L2, and three L3 questions. Its manifest verifies version, size, count, and
 SHA-256 before use. Generation uses a per-floor SQL fixture from
-`monstersForFloor(floor)` and validates monster relationship closure. v2-bound
-v12 Runs reset active practice bindings and draw cursors when migrated to v1,
-while preserving world state and answer history. A new bank version only applies to a new Run.
+`monstersForFloor(floor)` and validates monster relationship closure. A Run must
+bind the current question-bank version and complete practice draw state; historical
+bindings are rejected. A new bank version only applies to a new Run.
 
 On floors one through five and seven through eight, the terminal accepts one
 read-only `SELECT` or `WITH` statement and displays at most 50 rows. Floor six
@@ -521,14 +522,10 @@ Browser data is stored in one IndexedDB database, `select-from-dungeon-data`:
   browser and are never written to Run, Profile, or IndexedDB. The Python service
   has no Agent database or output store.
 
-The old localStorage keys and the old learning/content IndexedDB databases are
-kept as read-only migration sources and are not deleted automatically.
-
-A valid `run:v11` is migrated in memory into v12 without changing the current
-Run. Valid `run:v10` through `run:v4` saves continue through the existing
-migration chain before v12. Legacy keys are not deleted; earlier Run keys remain
-unread. Valid `profile:v1` and `profile:v2` records migrate to v3, preserving
-learning counters while initializing missing identity records as empty.
+Only valid `run:v12` and `profile:v3` values are loaded. Current localStorage
+values may seed the unified IndexedDB or act as its unavailable-browser fallback.
+Historical Run/Profile keys and the old learning/content IndexedDB databases are
+left untouched but never read; unsupported data is recovered by starting a new Run.
 `src/infrastructure/storage/progressPersistence.ts` coalesces non-critical movement and patrol
 snapshots, while query, loot, inventory, mode, and topology changes flush
 immediately.
@@ -566,22 +563,28 @@ not allow a workflow-backed Pages site, publication is recorded as
 `provider-blocked`, the variable stays false or unset, and the repository must
 not be made public or moved to another host without separate authorization.
 
-MVP 2.0 retains the existing Phaser, SQLite WASM, world-rules, and application
-chunk split. Further bundle/startup optimization is deferred to the independent
-MVP 2.1 performance pass; this content release does not change engine,
-dependencies, schema, or save versions for that purpose.
+Product 1.0 retains the existing Phaser, SQLite WASM, world-rules, and application
+chunk split. Further bundle/startup optimization is deferred to a separate
+performance pass; this release does not change engine, dependencies, schema, or
+save versions for that purpose.
 
 ### Current Validation Status
 
 - **Automated coverage:** all eight labyrinth contracts and map blueprints, 47
   required lesson groups, required anchors and Boss boundaries, shortcut keys
   and hidden entrances, safe-zone constraints, real SQLite reference results,
-  and compatible save migrations.
+  and current save round-trip/rejection boundaries.
 - **Browser spot checks:** representative F1, F2, F4, and F8 scenes plus SQL
   combat, cipher gates, campfire and death review, inventory, autocomplete,
   Schema Codex, reload recovery, and floor transitions. Key desktop, narrow,
   touch, and Reduced Motion paths were checked without horizontal overflow or
   console errors.
+- **Benchmark browser Oracles:** all seven fixed repair scenarios matched both
+  the injected failure and the clean-after state (7/7, with zero browser errors).
+- **Maintainer Agent runs:** the latest maintainer branch reached the real
+  Provider boundary, but every model turn was stopped by HTTP 402 (insufficient
+  balance). The evaluator records these as infrastructure `infra_error` with
+  `model-billing-unavailable`; they are not game correctness failures.
 - **Human checks remaining:** one continuous eight-floor playthrough, open
   safe-room crossings and patrol visibility details, a few uncovered dialog
   states, headphone/speaker fatigue review, and a restricted iframe environment.
@@ -611,7 +614,7 @@ has unit coverage, not a completed browser iframe acceptance run.
 
 ## Scope and Attribution
 
-This MVP covers 47 lesson groups across eight floors, ending with real SQLite
+Product 1.0 covers 47 lesson groups across eight floors, ending with real SQLite
 query-plan exercises and deterministic incident analysis for MVCC, locking,
 isolation, modeling, replication, sharding, and SQL security. Distributed-system
 records are teaching fixtures, not claims that SQLite implements those systems.

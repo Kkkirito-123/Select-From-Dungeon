@@ -6,15 +6,69 @@ surfaces. Stable editing rules live in `AGENTS.md`; the active repository task
 lives in `../TASK.md`. `ARCHITECTURE.zh-CN.md` is the synchronized Chinese
 translation.
 
+## At a glance
+
+Read this section first. Product version **1.0** is assembled from eight clear
+areas; internal format numbers are separate compatibility identifiers.
+
+```text
+Browser
+└─ index.html -> src/application/main.ts
+   ├─ contracts/       Shared types and cross-layer protocols
+   ├─ application/     Startup, configuration, lifecycle, orchestration
+   ├─ features/        Workflow facades, coordinators, and runtime assembly
+   ├─ content/         Authored curriculum, floors, story, SQL, inventory
+   ├─ domain/          GameSession and pure gameplay rules
+   ├─ infrastructure/  Persistence, SQLite, audio, presence, Agent IO
+   ├─ presentation/    DOM panels and Phaser scenes
+   └─ devtools/        Development-only Dungeon Maintainer bridge
+```
+
+| Area | Owns | Does not own |
+| --- | --- | --- |
+| `contracts/` | Cross-layer types, save/result/Agent/storage protocols | Gameplay rules, rendering, or I/O |
+| `features/` | `GameSession`, terminal, narrative, snapshot, AppShell, and runtime packages | Duplicate authored content or adapter implementations |
+| `content/` | Authored curriculum, floor/world/story/SQL/inventory definitions | Mutable runtime state or persistence |
+| `domain/` | Session support services and gameplay rules for movement, combat, exploration, learning, progression, and loot | DOM, Phaser, network, or browser storage |
+| `application/` | Startup, configuration, lifecycle, and event/Agent orchestration | Detailed gameplay decisions or rendering |
+| `infrastructure/` | Persistence, SQLite, audio, presence, browser, and Agent adapters | Gameplay decisions or UI markup |
+| `presentation/` | DOM panels/renderers and Phaser scenes; renders snapshots and forwards intent | Saves, SQL judging, hidden state, or rule ownership |
+| `devtools/` | The development-only Dungeon Maintainer bridge and player-visible projections | Production paths, player saves, hidden answers, or full maps |
+
+`GameSession` is the only mutable game-state committer. All other areas either
+describe content, apply rules through it, perform external I/O, or render its
+snapshots.
+
+```text
+Startup
+index.html -> main.ts -> GameRuntime -> DataStore/GameSession -> AppShell + DungeonScene
+
+Player action
+DOM/Phaser input -> GameSession -> Snapshot/Event -> DOM + Phaser + Persistence
+
+SQL action
+SQL terminal -> SqlEngine + lessonEvaluator -> GameSession -> Snapshot/Event
+```
+
+Feature packages use one-way ports: `game-session` is the only mutable rules
+facade; `terminal`, `narrative`, and `snapshot` consume explicit service ports;
+`app-shell` owns DOM lifecycle and input routing; and `game-runtime` owns
+construction, page lifecycle, and reverse teardown. `scripts/check-architecture.mjs`
+rejects undeclared feature edges and cycles.
+
+The current internal identifiers remain **Run 12**, **Profile 3**, and
+**generator 7**. They describe save/world formats, not product releases.
+
 ## Product and Users
 
 `SQL 魔王城 / SELECT * FROM DUNGEON` is a Chinese browser roguelite for SQL
-beginners and interview learners. New Runs use one canonical set of eight
+beginners and interview learners. Product version 1.0 is the current eight-floor
+Run. New Runs use one canonical set of eight
 deterministic `56x42` generator-v7 maps; players cannot enter or reroll a map
 seed. Each floor distributes its authored rooms across the compact map, with a
 DFS labyrinth, about 15% loops, three regions, and physical transit landmarks.
-Generator-v6 `96x72`, generator-v5
-`48x36`, and generator-v4 `64x48` maps remain legacy save compatibility paths. Players reveal the
+Only generator-v7 maps are accepted by the current Run validator; historical
+map formats are ignored. Players reveal the
 non-interactive minimap by physically walking the maze. Curriculum monsters
 show only a stable `ID #NNN` until defeated; the finishing blow recovers the
 plain display name into the permanent Monster Codex. Moving into a living
@@ -53,7 +107,7 @@ The Run also has a 12-slot equipment inventory, one equipped weapon, one
 equipped armor, and three consumable stacks capped at five items each. `B`
 opens inventory management only during exploration or from a campfire and
 pauses movement and patrols. Armor HP absorbs counters before base HP and is
-restored by campfire rest or respawn. In v1.1, optional random loot is limited
+restored by campfire rest or respawn. In product version 1.0, optional random loot is limited
 to an immediately consumed recovery item: 2% for normal monsters, 5% for
 mini-elites, 10% for area Bosses, and 0% for floor Bosses. Random loot has no
 minimum count; course rewards, explicit chests, and keys stay deterministic.
@@ -74,7 +128,7 @@ an immediate deterministic recap from current-floor records; its review button
   changes gameplay state, routes, or saves. Five short narrative
 beats and two fixed Lost Name evidence entries per floor still unlock from
 existing Run progress; the local `失名录` distinguishes unknown, confirmed
-`NULL`, and actual values. The eighth floor resolves the sole MVP 2.0 ending,
+`NULL`, and actual values. The eighth floor resolves the sole 1.0 ending,
 `MIGRATE`; no account, server game database, or remote game log is used.
 Floors one through eight each contain exactly one optional physical hidden room:
 the first-floor sealed archive opens after `WHERE / IS NULL`, and the
@@ -175,8 +229,13 @@ complete SQL or MySQL interview curriculum.
 
 ```text
 index.html -> src/application/main.ts
+  -> features/game-runtime/GameRuntime (service assembly, lifecycle, reverse teardown)
+  -> features/game-session/GameSession (single mutable rules facade)
+  -> features/app-shell/AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
+     -> features/terminal/TerminalCoordinator (one SQL submission)
+     -> features/narrative/NarrativeCoordinator (story actions and evidence confirmation)
+     -> features/snapshot/SnapshotRenderer (pure snapshot projection)
   -> DEV-only DungeonAgentBridge (localhost + ?playtest=agent, memory-only store)
-  -> AppShell (DOM HUD, minimap, inventory/loot, SQL terminal, local review)
   -> AppShellTemplate/AppShellDom (static markup and fail-fast stable selector contract)
   -> PresenceClient -> same-origin SSE -> ../presence/server.mjs -> PresencePanel
   -> CampfireReview (current-floor deterministic SQL recap)
@@ -304,16 +363,24 @@ audit. A complete SQL answer appears only in hint four.
 and event handlers must not duplicate that markup or silently query a second
 selector for the same persistent node.
 `src/presentation/dom/panels/` owns terminal, inventory, campfire, review, narrative,
-Schema, and presence presentation; `src/presentation/dom/renderers/` owns HUD, minimap, and
-combat presentation. Panels receive snapshots and explicit callbacks, never storage,
-external services, or Phaser instances.
+Schema, and presence presentation. `RecordPanel` owns the shared story, inspection,
+migration, and Scribe record surface; `TransitionPanel` owns floor, region, and defeat
+transitions and their short timers; `TransientFeedbackPanel` owns pickup and combat
+settlement cards; `AdminPanel` owns the administrator menu DOM, focus, and copy while
+`AppShell` keeps cross-runtime administrator actions. `src/presentation/dom/renderers/`
+owns HUD, minimap, and combat presentation. Panels receive snapshots and explicit
+callbacks, never storage, external services, or Phaser instances.
 `src/presentation/phaser/world/` owns terrain, fog, world-object visibility, and
-topology rebuild decisions; `DungeonScene` remains the lifecycle and event facade.
+topology rebuild decisions. `WorldRuntimeLayer` composes zone labels, gates, shortcuts,
+campfires, and hazards. `FloorSetpieceLayer` is the single registry/facade for the
+floor-specific modules in `world/setpieces/`; their shared lifecycle and common
+landmarks live in `world/shared/FloorSetpieceModule.ts`. `DungeonScene` remains the
+lifecycle and event facade.
 `src/domain/learning/queryFeatureDetector.ts` owns SQL feature tags,
 `queryIdentityRules.ts` owns the sealed-identity firewall, `lessonLocks.ts` owns
 stage selection and the flat beginner-SQL shape guard, and
 `lessonResultEvaluator.ts` owns authored result semantics. `lessonEvaluator.ts`
-keeps the compatibility exports and composition only.
+composes these current judging rules.
 `src/content/inventory/inventoryCatalog.ts` owns inventory capacities, the current
 weapon/armor/consumable catalog, and biome-based optional candidate probabilities;
 `src/domain/inventory/lootDirector.ts` owns deterministic independent rolls and
@@ -348,7 +415,7 @@ boundaries:
 - Player-facing subregions map explicitly to the only physical navigation
   regions, `front`, `middle`, and `rear`; F2 may expose four display regions.
 - Monster IDs `1–89`, lesson/result, equipment, story/evidence, and `MIGRATE`
-  IDs plus Run v12/Profile v3 are compatibility keys and must not be renamed.
+  IDs plus Run v12/Profile v3 are stable current keys and must not be renamed.
 - Before the finishing blow, every player-visible monster reference goes
   through `monsterIdentityPresentation` or `monsterIntentName`; admin reveal is
   memory-only and never updates the profile.
@@ -383,8 +450,35 @@ roots before the safe area/repository fallback. The maintainer accepts only the
 complete current schema v4 map; every other or invalid map falls back to ordinary
 safe search. Floor children must not import sibling floors. Common algorithms and
 services move to a parent service partition and a single registry composes them
-one-way. `GameSession` remains the only mutable session-state committer; focused
-rules such as combat hit resolution live in child services.
+one-way. `GameSession` remains the only mutable session-state committer. Focused
+navigation guidance lives in `domain/session/exploration/navigationGuidance.ts`;
+inventory transformations are composed by `domain/session/inventory/`; combat
+question drawing, experience, damage, and battle review are composed by
+`domain/session/combat/`. These modules consume narrow contexts and do not own a
+second session state.
+
+The session-specific read model is exposed through `domain/session/sessionSelectors.ts`;
+the feature facade only adapts its explicit context to the public getters. AppShell's
+reset path is a separate `features/app-shell/workflows/ResetWorkflow.ts` workflow:
+it sequences UI cleanup, session reset, SQLite reset, battle cancellation, and audio
+restoration through ports while keeping DOM ownership in AppShell.
+
+The feature package directory is the maintainer's first lookup point:
+
+| Package | Entry point | Locate this kind of issue |
+| --- | --- | --- |
+| `features/game-session/` | `GameSession.ts` | State, public actions, snapshots, and rules facade |
+| `features/terminal/` | `TerminalCoordinator.ts` | SQL submission, SQLite sync, battle animation, and busy cleanup |
+| `features/narrative/` | `NarrativeCoordinator.ts` | Story actions, audio/world effects, and evidence confirmation |
+| `features/snapshot/` | `SnapshotRenderer.ts` | Snapshot deltas, mode entry, and render projection |
+| `features/app-shell/` | `AppShell.ts` | DOM assembly, input routing, and panel lifecycle; `rendering/` owns snapshot projection and `workflows/` owns narrative/feedback-transition/reset orchestration |
+| `features/game-runtime/` | `GameRuntime.ts` | Startup assembly, page visibility, failure recovery, and teardown |
+
+The package direction is fixed as “lower-level service -> feature coordinator ->
+GameRuntime”; the architecture checker rejects undeclared feature edges and cycles.
+`GameRuntime` is the final owner of external resource disposal for Audio, Presence,
+persistence, and the maintainer bridge; `AppShell.destroy()` only unbinds its own
+DOM subscriptions, panels, and user-gesture listeners to avoid duplicate async disposal.
 
 ### Game-owned Benchmark contract
 
@@ -408,8 +502,9 @@ file index. The hidden browser Judge returns only bounded verification fields.
 src/contracts/          Cross-layer read-only game, persistence, result, Agent, and storage contracts
 src/application/        Startup, runtime configuration, and page lifecycle
 src/content/            Static curriculum, world, narrative, inventory, and SQL content; floor author data under */floors/floorNN
-src/domain/             Session facade/focused services, combat, exploration, learning, progression, inventory, and shared rules
-src/infrastructure/     Audio, feedback, SQLite, storage codecs/migrations, presence, and browser adapters
+src/domain/             Session support services, combat, exploration, learning, progression, inventory, and shared rules
+src/features/           GameSession, terminal, narrative, snapshot, AppShell, and GameRuntime packages
+src/infrastructure/     Audio, feedback, SQLite, storage codecs/validators, presence, and browser adapters
 src/presentation/       Phaser scenes, DOM application views, and focused renderers
 src/devtools/           Development-only external maintainer bridge; no production import path
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
@@ -521,30 +616,29 @@ service changes only the indicator to unavailable and cannot block startup.
   one L1, two L2, and three L3 questions respectively.
   The generator creates a separate SQL fixture per floor from
   `monstersForFloor(floor)` and rejects monster relationship references outside
-  that floor's closure. A v2-bound v12 Run is migrated in memory to v1 with
-  active practice bindings and draw cursors reset while world state and answer
-  history remain unchanged.
-  New Runs pin the active bank version and draw deterministic no-repeat decks.
+  that floor's closure. Run v12 must bind the current bank version and complete
+  practice draw state; mismatched historical bindings are rejected. New Runs
+  pin the active bank version and draw deterministic no-repeat decks.
   IndexedDB stores at most 5,000 full attempts plus permanent question/lesson
   aggregates; export and explicit clearing never include an API Key.
+- `src/infrastructure/storage/localProgress.ts` is the Run/Profile
+  load/save/clear facade for the current `run:v12` and `profile:v3` keys.
+  `runCodec.ts` owns Run JSON encoding and `profileCodec.ts` owns Profile
+  creation, validation, and encoding. Run validation flows one-way from
+  `runDataValidators.ts` for player/combat/inventory values through
+  `runWorldValidator.ts` for graph/map/world structures to `runValidator.ts`,
+  which composes SavedRun cross-field invariants and exposes the version entry.
 - Browser data is stored in one IndexedDB database,
   `select-from-dungeon-data`. Its `run_nodes` and `floor_nodes` stores keep
   global Run data separate from the active floor; `profile_nodes` keeps the
   v3 permanent profile; `guide_nodes` keeps onboarding; `attempts`,
   `question_stats`, and `lesson_stats` keep learning evidence; and
-  `question_banks` keeps verified question-bank bytes. A valid
-  `select-from-dungeon:run:v12` still defines the Run format, and a valid
-  `select-from-dungeon:run:v11` is migrated in memory into v12;
-  valid `run:v10` and `run:v9` are then migrated through the existing chain;
-  valid `run:v8` is upgraded with deterministic eight-floor campaign slots, and `run:v7` is then
-  migrated with empty inventory/loot state and acquired equipped gear
-  registered; valid `run:v6`, `run:v5`, and `run:v4` data continue through the
-  existing migrations before v12. Legacy keys remain undeleted; older Run keys remain
-  unread.
-  Valid `select-from-dungeon:profile:v1` and `profile:v2` records migrate into
-  v3; missing identity records start empty while existing learning counters are
-  preserved. The old localStorage keys and the old learning/content IndexedDB
-  databases remain as read-only migration sources and are not deleted.
+  `question_banks` keeps verified question-bank bytes. Only valid
+  `select-from-dungeon:run:v12` and `select-from-dungeon:profile:v3` records are
+  loaded. Current localStorage values may seed the unified IndexedDB or act as
+  its unavailable-browser fallback. Historical Run/Profile keys and the old
+  learning/content IndexedDB databases are neither read nor deleted; starting a
+  new Run is the recovery path for unsupported data.
   `progressPersistence`
   coalesces non-critical movement/patrol snapshots while flushing query, loot,
   inventory, mode, and topology changes immediately; changing a shape requires
@@ -581,9 +675,8 @@ service changes only the indicator to unavailable and cannot block startup.
 - New Runs use one canonical generator-v7 `56x42` `MazeFloor` set that distributes the
   authored rooms across the compact map with DFS carving and about 15% loops;
   remote DFS branches outside the authored-room connection envelope are sealed
-  back into walls instead of forming an unused outer maze.
-  generator-v6 `96x72`, generator-v5 `48x36`, and generator-v4 `64x48` records remain loadable for legacy Run
-  compatibility. There is no player-facing seed input or map reroll. Players must walk through the
+  back into walls instead of forming an unused outer maze. Other generator
+  versions are rejected. There is no player-facing seed input or map reroll. Players must walk through the
   continuous world; the discovery minimap is not a navigation control. Moving
   into the same tile as a living curriculum monster or triggering the
   successful-step encounter meter starts the separate battle scene. After its
@@ -604,9 +697,9 @@ service changes only the indicator to unavailable and cannot block startup.
 - `GuidedMap` is derived deterministically from the curriculum graph, saved
   `MazeFloor`, and two campfires rather than duplicated in save data. Route
   beacons appear about every 14 steps with no gap above 18, and every remaining
-  corridor dead end contains a one-use supply. Generator-v6 floors have three
-  two-way shortcuts and three guaranteed keys that consume no inventory slot;
-  legacy floors retain one. Opening requires both the key and the shortcut's course
+  corridor dead end contains a one-use supply. Every current floor has three
+  two-way shortcuts and three guaranteed keys that consume no inventory slot.
+  Opening requires both the key and the shortcut's course
   prerequisites; opening, rest, and death never reroll or relock it.
 - Collecting a key on floors one through seven enters `transition` mode.
   AppShell displays the gold `FLOOR NN CLEARED / CONGRATULATIONS!!` feedback and calls
@@ -619,7 +712,7 @@ service changes only the indicator to unavailable and cannot block startup.
   drop. Ambush results contain only optional seeded immediate recovery and are
   usually empty. Acquisition copy names every
   item and its exact effect. Settlement and acquisition cards dismiss after
-  three later successful movement steps. Legacy loose drops remain
+  three later successful movement steps. Loose dropped items remain
   touch-collectable, while altars, treasure rooms, and campfires also use `E`.
   Critical curriculum gear remains deterministic and reachable.
 - The inventory has 12 equipment slots, one weapon slot, one armor slot, and
@@ -666,7 +759,7 @@ service changes only the indicator to unavailable and cannot block startup.
   deployment. If private-repository Pages is rejected by the provider/plan,
   keep the repository private and the variable false/unset, record
   `provider-blocked`, and do not buy, publish, or switch hosts without authority.
-  Bundle/runtime optimization remains a separate MVP 2.1 change.
+  Bundle/runtime optimization remains a separate post-1.0 change.
 - Characters and UI effects remain generated from project code. The first two
   floor slices may also load the audited CC0 tile/prop packs declared in their
   runtime manifests; source archives, hashes, licenses, and transformed outputs

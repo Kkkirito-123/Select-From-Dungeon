@@ -13,7 +13,7 @@
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { StorageLike } from "../../contracts/storage/storageLike";
 import { finalMigrationProgress } from "../../domain/progression/finalMigration";
-import type { GameSession } from "../../domain/session/GameSession";
+import type { GameSession } from "../../features/game-session/GameSession";
 import type { Monster } from "../../domain/shared/types";
 import {
   saveDungeonAgentCheckpoint,

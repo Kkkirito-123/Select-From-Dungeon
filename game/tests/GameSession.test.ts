@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { floorExperience } from "../src/content/world/floorExperience";
-import { ARMORS } from "../src/content/inventory/inventoryCatalog";
 import { WORLD_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
 import { biomeRegionAt } from "../src/domain/exploration/biome";
-import { GameSession, experienceForRank } from "../src/domain/session/GameSession";
+import { GameSession, experienceForRank } from "../src/features/game-session/GameSession";
 import { safeZoneCellKeys } from "../src/domain/exploration/campfire";
 import { advanceCampaignProgress } from "../src/domain/progression/campaign";
 import { migrationStepMarkerIds } from "../src/domain/progression/finalMigration";
@@ -469,10 +468,6 @@ describe("GameSession SQL 魔王城 Run", () => {
     });
     expect(session.snapshot().banner).toBe(bannerBeforeBeds);
 
-    const legacySave = session.toSavedRun();
-    legacySave.banner = "抄写员：这是旧版留在右栏的调查说明。";
-    const restored = new GameSession(legacySave, session.toProfile());
-    expect(restored.snapshot().banner).not.toContain("抄写员：");
   });
 
   it("现场证据只接受当前层 canonical ID，并写入兼容的 Run 标记", () => {
@@ -909,28 +904,6 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(session.advanceFloor()).toBe(false);
   });
 
-  it("旧 v9 存档缺少生态怪物时会按同一 seed 补全，而不会重置进度", () => {
-    const session = new GameSession(null, null, "legacy-biome-v9");
-    const saved = session.toSavedRun();
-    const legacyMonsterIds = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
-    const legacy = {
-      ...saved,
-      monsters: saved.monsters
-        .filter((monster) => legacyMonsterIds.has(monster.id))
-        .map((monster) => monster.id === 2 ? { ...monster, name: "猎犬" } : monster),
-      worldActors: saved.worldActors.filter((actor) => legacyMonsterIds.has(actor.monsterId)),
-    };
-    expect(isSavedRun(legacy)).toBe(true);
-
-    const restored = new GameSession(legacy).snapshot();
-    expect(restored.runSeed).toBe(saved.graph.seed);
-    expect(restored.monsters.map((monster) => monster.id).sort((a, b) => a - b))
-      .toEqual(saved.monsters.map((monster) => monster.id).sort((a, b) => a - b));
-    expect(restored.monsters.find((monster) => monster.id === 2)?.name).toBe("水史莱姆");
-    expect(restored.biomePlan).toEqual(session.snapshot().biomePlan);
-    expect(restored.player).toEqual(saved.player);
-  });
-
   it("错误结果和语法错误各只结算一次确定性反击", () => {
     const session = new GameSession(null, null, "counter");
     enterLesson(session, "select");
@@ -974,68 +947,6 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(new GameSession(session.toSavedRun()).snapshot().battleReview).toEqual(
       session.snapshot().battleReview,
     );
-  });
-
-  it("高层旧战斗会按 canonical 阶段、锁与同一伤害函数恢复", () => {
-    const saved = freshFloorEightRun("canonical-combat-restore");
-    const target = saved.monsters.find((monster) => monster.id === 84);
-    const actor = saved.worldActors.find((entry) => entry.monsterId === 84);
-    if (!target || !actor) throw new Error("第八层缺少 ID #084 战斗锚点");
-    saved.mode = "combat";
-    saved.currentRoomId = actor.roomNodeId;
-    saved.player = {
-      ...saved.player,
-      x: actor.x,
-      y: actor.y,
-      hp: 10,
-      maxHp: 10,
-      armor: { ...ARMORS["bone-armor"] },
-      armorHp: 2,
-    };
-    saved.combat = {
-      targetId: 84,
-      kind: "curriculum",
-      round: 7,
-      successStep: 999,
-      intent: {
-        name: "旧版攻击",
-        damage: 99,
-        locks: ["旧版锁"],
-      },
-    };
-
-    const session = new GameSession(saved);
-    expect(session.snapshot()).toMatchObject({
-      lessonStageIndex: 4,
-      monsters: expect.arrayContaining([
-        expect.objectContaining({ id: 84, damage: 3 }),
-      ]),
-      combat: {
-        targetId: 84,
-        successStep: 4,
-        intent: {
-          damage: 3,
-        },
-      },
-    });
-
-    const wrong = session.resolveQuery(result("SELECT 1", ["1"], [{ "1": 1 }]));
-    expect(wrong).toMatchObject({
-      accepted: false,
-      playerDamage: 1,
-      armorDamage: 2,
-      events: expect.arrayContaining([
-        expect.objectContaining({ type: "enemy-hit", amount: 3 }),
-      ]),
-    });
-    expect(session.registerQueryError("near SELECT：语法错误", "SELEC 1"))
-      .toMatchObject({
-        playerDamage: 3,
-        armorDamage: 0,
-        events: expect.arrayContaining([
-          expect.objectContaining({ type: "enemy-hit", amount: 3 }),
-        ]),
-      });
   });
 
   it("高伤武器也不能跳过第八层 Boss 的剩余阶段", () => {
@@ -1263,7 +1174,8 @@ describe("GameSession SQL 魔王城 Run", () => {
     clearSelect(session);
     const staleProfile = session.toProfile();
     staleProfile.masteredLessons = [];
-    const restored = new GameSession(session.toSavedRun(), staleProfile, "ignored-seed");
+    const saved = session.toSavedRun();
+    const restored = new GameSession(saved, staleProfile, "ignored-seed");
     expect(restored.snapshot().runSeed).toBe("save-run");
     expect(restored.snapshot().roomGraph).toEqual(session.snapshot().roomGraph);
     expect(restored.snapshot().player.weapon.id).toBe("filter-bow");
@@ -1274,6 +1186,7 @@ describe("GameSession SQL 魔王城 Run", () => {
       floor: 1,
       campaign: { currentFloor: 1, status: "active" },
     });
+    expect(restored.toSavedRun()).toEqual(saved);
 
     restored.reset();
     expect(restored.snapshot().runSeed).toBe(WORLD_RUNTIME_CONFIG.fixedWorldSeed);
@@ -1283,45 +1196,6 @@ describe("GameSession SQL 魔王城 Run", () => {
     expect(restored.snapshot().player.weapon.id).toBe("data-blade");
     expect(restored.snapshot().completedLessons).toEqual([]);
     expect(restored.snapshot().profile.masteredLessons).toContain("select");
-  });
-
-  it("v9 存档中的越界巡逻怪会回到房间中心，而不是继续堵门", () => {
-    const session = new GameSession(null, null, "actor-gate-recovery");
-    const saved = session.toSavedRun();
-    const actor = saved.worldActors.find((entry) => entry.behavior !== "anchored");
-    const gate = actor
-      ? saved.mazeFloor.gates.find((entry) => entry.roomNodeId === actor.roomNodeId)
-      : undefined;
-    if (!actor || !gate) throw new Error("缺少可巡逻怪物或房门");
-    actor.x = gate.x;
-    actor.y = gate.y;
-
-    const restoredActor = new GameSession(saved).snapshot().worldActors.find(
-      (entry) => entry.monsterId === actor.monsterId,
-    );
-    expect(restoredActor).toMatchObject(actor.home);
-  });
-
-  it("旧存档中已经巡逻走偏的首课史莱姆会回到 SELECT 石碑", () => {
-    const session = new GameSession(null, null, "tutorial-actor-recovery");
-    const saved = session.toSavedRun();
-    const tutorialRoom = saved.graph.nodes.find((room) => room.type === "tutorial");
-    const actor = saved.worldActors.find((entry) => entry.roomNodeId === tutorialRoom?.id);
-    if (!tutorialRoom || !actor) throw new Error("缺少首课房间或怪物 Actor");
-    actor.behavior = "wander";
-    actor.roamRadius = 3;
-    actor.x += 2;
-    actor.y += 1;
-
-    const restoredActor = new GameSession(saved).snapshot().worldActors.find(
-      (entry) => entry.monsterId === actor.monsterId,
-    );
-    expect(restoredActor).toMatchObject({
-      x: actor.home.x,
-      y: actor.home.y,
-      behavior: "anchored",
-      roamRadius: 0,
-    });
   });
 
   it("Boss 门可用高难 SQL 越级破解，但不会伪造课程、XP 或战利品", () => {

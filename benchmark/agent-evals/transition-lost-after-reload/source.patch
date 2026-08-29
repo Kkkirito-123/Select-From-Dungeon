@@ -1,8 +1,10 @@
-diff --git a/game/src/presentation/dom/AppShell.ts b/game/src/presentation/dom/AppShell.ts
---- a/game/src/presentation/dom/AppShell.ts
-+++ b/game/src/presentation/dom/AppShell.ts
-@@ -2437,3 +2437,3 @@ export class AppShell {
+diff --git a/game/src/presentation/dom/panels/TransitionPanel.ts b/game/src/presentation/dom/panels/TransitionPanel.ts
+--- a/game/src/presentation/dom/panels/TransitionPanel.ts
++++ b/game/src/presentation/dom/panels/TransitionPanel.ts
+@@ -73,5 +73,5 @@ export class TransitionPanel {
+     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+       ? 650
        : 1_500;
--    this.floorTransitionCoordinator.sync(shouldScheduleAdvance, delay);
-+    this.floorTransitionCoordinator.sync(false, delay);
+-    this.floorCoordinator.sync(policy.shouldScheduleAdvance, delay);
++    this.floorCoordinator.sync(false, delay);
   }

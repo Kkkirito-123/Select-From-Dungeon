@@ -2,11 +2,8 @@
 
 export const DATA_DB_NAME = "select-from-dungeon-data";
 export const DATA_DB_VERSION = 1;
-export const OLD_LEARNING_DB = "select-from-dungeon-learning";
-export const OLD_CONTENT_DB = "select-from-dungeon-content";
 
 export const DATA_STORES = {
-  meta: "meta",
   run: "run_nodes",
   floor: "floor_nodes",
   profile: "profile_nodes",
@@ -38,9 +35,6 @@ export function openDataDatabase(factory: IDBFactory): Promise<IDBDatabase> {
   const request = factory.open(DATA_DB_NAME, DATA_DB_VERSION);
   request.onupgradeneeded = () => {
     const database = request.result;
-    if (!database.objectStoreNames.contains(DATA_STORES.meta)) {
-      database.createObjectStore(DATA_STORES.meta, { keyPath: "key" });
-    }
     if (!database.objectStoreNames.contains(DATA_STORES.run)) {
       database.createObjectStore(DATA_STORES.run, { keyPath: "key" });
     }
@@ -104,106 +98,3 @@ export async function deleteNode(
 }
 
 export { transactionDone };
-
-type ListedDb = { name?: string };
-type ListedFactory = IDBFactory & {
-  databases?: () => Promise<readonly ListedDb[]>;
-};
-
-async function oldDbNames(factory: IDBFactory): Promise<Set<string> | null> {
-  const list = await (factory as ListedFactory).databases?.();
-  if (!list) return null;
-  return new Set(
-    list
-      .map((item) => item.name)
-      .filter((name): name is string => Boolean(name)),
-  );
-}
-
-function openOldDatabase(factory: IDBFactory, name: string): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = factory.open(name);
-    request.onupgradeneeded = () => {
-      request.transaction?.abort();
-      reject(new Error(`old database ${name} does not exist`));
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("old database open failed"));
-  });
-}
-
-async function readOldStores(
-  factory: IDBFactory,
-  name: string,
-  stores: readonly string[],
-): Promise<Record<string, unknown[]>> {
-  const database = await openOldDatabase(factory, name);
-  const result: Record<string, unknown[]> = {};
-  try {
-    for (const storeName of stores) {
-      if (!database.objectStoreNames.contains(storeName)) {
-        result[storeName] = [];
-        continue;
-      }
-      const transaction = database.transaction(storeName, "readonly");
-      result[storeName] = await requestResult<unknown[]>(transaction.objectStore(storeName).getAll());
-      await transactionDone(transaction);
-    }
-    return result;
-  } finally {
-    database.close();
-  }
-}
-
-/** 把旧的两个 IndexedDB 复制进统一库，旧库保留作为恢复来源。 */
-export async function migrateOldData(
-  factory: IDBFactory,
-  database: IDBDatabase,
-): Promise<void> {
-  const marker = await readNode<{ key: string }>(
-    database,
-    DATA_STORES.meta,
-    "old-db-v1",
-  );
-  if (marker) return;
-
-  const names = await oldDbNames(factory);
-  const mayExist = (name: string): boolean => names === null || names.has(name);
-  const learning: Record<string, unknown[]> = mayExist(OLD_LEARNING_DB)
-    ? await readOldStores(factory, OLD_LEARNING_DB, [
-      DATA_STORES.attempts,
-      DATA_STORES.questionStats,
-      DATA_STORES.lessonStats,
-    ]).catch(() => ({} as Record<string, unknown[]>))
-    : {};
-  const content: Record<string, unknown[]> = mayExist(OLD_CONTENT_DB)
-    ? await readOldStores(factory, OLD_CONTENT_DB, [DATA_STORES.questionBanks])
-      .catch(() => ({} as Record<string, unknown[]>))
-    : {};
-
-  const values: { store: DataStoreName; value: object }[] = [];
-  for (const value of learning[DATA_STORES.attempts] ?? []) {
-    values.push({ store: DATA_STORES.attempts, value: value as object });
-  }
-  for (const value of learning[DATA_STORES.questionStats] ?? []) {
-    values.push({ store: DATA_STORES.questionStats, value: value as object });
-  }
-  for (const value of learning[DATA_STORES.lessonStats] ?? []) {
-    values.push({ store: DATA_STORES.lessonStats, value: value as object });
-  }
-  for (const value of content[DATA_STORES.questionBanks] ?? []) {
-    values.push({ store: DATA_STORES.questionBanks, value: value as object });
-  }
-  values.push({ store: DATA_STORES.meta, value: { key: "old-db-v1", copied: true } });
-  await writeNodes(
-    database,
-    [
-      DATA_STORES.meta,
-      DATA_STORES.attempts,
-      DATA_STORES.questionStats,
-      DATA_STORES.lessonStats,
-      DATA_STORES.questionBanks,
-    ],
-    values,
-  );
-}

@@ -3,7 +3,7 @@
  * 只计算单个 actor 的下一步和是否接触玩家，GameSession 负责批量应用
  * 结果并决定是否开始战斗。
  */
-import { legacyMonsterIdForCurrent } from "../../content/world/monsterIds";
+import { monsterRandomSeedId } from "../../content/world/monsterIds";
 import type { LessonId, Position } from "../shared/types";
 import { createSeededRandom } from "../progression/runGraph";
 import { isMazeWalkable, type MazeFloor } from "./mazeGenerator";
@@ -87,7 +87,7 @@ export function advanceMonsterPatrol(
   }
   const random = createSeededRandom(
     `select-from-dungeon:patrol:v1:${context.floor.seed}:${
-      legacyMonsterIdForCurrent(actor.monsterId)
+      monsterRandomSeedId(actor.monsterId)
     }:${nextTick}`,
   );
   // 显式加入原地等待，使巡逻节奏清晰，也避免怪物持续追赶玩家。

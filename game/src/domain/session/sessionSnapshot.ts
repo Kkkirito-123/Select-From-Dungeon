@@ -411,7 +411,7 @@ export function createSessionSnapshot(context: SessionSnapshotContext): GameSnap
   };
 }
 
-/** 将会话状态复制成稳定的 v12 SavedRun，不在这里执行校验或迁移。 */
+/** 将会话状态复制成稳定的 v12 SavedRun；校验由存储边界负责。 */
 export function serializeSession(context: SessionSnapshotContext): SavedRun {
   return {
     version: 12,

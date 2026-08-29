@@ -7,7 +7,7 @@ import Phaser from "phaser";
 import { ArcadeAudio } from "../../infrastructure/audio/ArcadeAudio";
 import { biomeEncounterFor } from "../../content/world/biomeContent";
 import { playerActorProfile } from "../../content/world/actorVisuals";
-import { GameSession } from "../../domain/session/GameSession";
+import { GameSession } from "../../features/game-session/GameSession";
 import {
   monsterIdLabel,
   monsterIntentName,

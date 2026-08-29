@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import {
   INTERACTION_LABEL_DISTANCE,
   MONSTER_LABEL_DISTANCE,

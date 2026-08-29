@@ -1,12 +1,6 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import legacyV11Fixture from "./fixtures/legacy-v11-before-mvp2-1.json";
 import {
-  LEGACY_MAZE_CHUNK_SIZE,
-  LEGACY_MAZE_HEIGHT,
-  LEGACY_MAZE_WIDTH,
-  LARGE_MAZE_CHUNK_SIZE,
-  LARGE_MAZE_HEIGHT,
-  LARGE_MAZE_WIDTH,
   MAZE_CHUNK_SIZE,
   MAZE_HEIGHT,
   MAZE_WIDTH,
@@ -17,7 +11,6 @@ import {
   type MazeZone,
 } from "../src/domain/exploration/mazeGenerator";
 import {
-  reachableMazeCells,
   validateMazeFloor,
 } from "../src/domain/exploration/mazeValidation";
 import {
@@ -26,9 +19,19 @@ import {
   type FloorNumber,
   type RoomGraph,
 } from "../src/domain/progression/runGraph";
-import type { Position, SavedRun } from "../src/domain/shared/types";
+import type { Position } from "../src/domain/shared/types";
 
 const FLOORS = [1, 2, 3, 4, 5, 6, 7, 8] as const satisfies readonly FloorNumber[];
+const CANONICAL_FINGERPRINTS = [
+  "5a9ccf24f805fbbdcef388c6760285164e2d83a0a480c1e2addac2985ac3b78e",
+  "a7513cd40c8455e15d1ac600a9e2715c88f4d3c626d85faa518e6a0030ef0f2a",
+  "12abb40295b919d2a5c79c825422c10c1006e7bec86d32def131004f981caf93",
+  "178870ffa4b5b0700162307d4b290ca79493af2beeef367de5083286d9796106",
+  "162da6b3a6fa345d74707fd70cb7eac9c06a6639b61be8c5c6c0ce21bf99a155",
+  "a0331f669e5e2fd44ad3963e9af3d9ea2af8655abcff8e7165f85a22e0811649",
+  "8445996296ca64be8ab08a2c861cef6b16ac6dbc8115bf1651116b71d2c19b14",
+  "ab28e5630c8d8d63381a6ecbd69272198cd5f3ff57979e6217a6b1e0bc6d6f7a",
+] as const;
 const DIRECTIONS = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
@@ -97,36 +100,6 @@ function zoneApertures(
   ));
 }
 
-function asLegacyV4Floor(floor: MazeFloor): MazeFloor {
-  const tiles = floor.tiles.map((row) => row.padEnd(LEGACY_MAZE_WIDTH, "#"));
-  while (tiles.length < LEGACY_MAZE_HEIGHT) {
-    tiles.push("#".repeat(LEGACY_MAZE_WIDTH));
-  }
-  return {
-    ...floor,
-    generatorVersion: 4,
-    width: LEGACY_MAZE_WIDTH,
-    height: LEGACY_MAZE_HEIGHT,
-    chunkSize: LEGACY_MAZE_CHUNK_SIZE,
-    tiles,
-  };
-}
-
-function asLargeV6Floor(floor: MazeFloor): MazeFloor {
-  const tiles = floor.tiles.map((row) => row.padEnd(LARGE_MAZE_WIDTH, "#"));
-  while (tiles.length < LARGE_MAZE_HEIGHT) {
-    tiles.push("#".repeat(LARGE_MAZE_WIDTH));
-  }
-  return {
-    ...floor,
-    generatorVersion: 6,
-    width: LARGE_MAZE_WIDTH,
-    height: LARGE_MAZE_HEIGHT,
-    chunkSize: LARGE_MAZE_CHUNK_SIZE,
-    tiles,
-  };
-}
-
 describe("generateMazeFloor", () => {
   it("同 Seed 完全一致，不同 Seed 改变非关键路线拓扑", () => {
     const graph = generateRoomGraph("maze-repeatable");
@@ -148,8 +121,6 @@ describe("generateMazeFloor", () => {
   });
 
   it("八层固定 Seed 都生成 56×42 v7 图并把课程房分散到全图", () => {
-    expect((MAZE_WIDTH * MAZE_HEIGHT) / (LARGE_MAZE_WIDTH * LARGE_MAZE_HEIGHT))
-      .toBeCloseTo(1 / 3, 1);
     const topologyHashes = new Set<number>();
     FLOORS.forEach((floorNumber) => {
       const graph = generateRoomGraph("mvp2-eight-floors", floorNumber);
@@ -175,6 +146,16 @@ describe("generateMazeFloor", () => {
       topologyHashes.add(floor.topologyHash);
     });
     expect(topologyHashes.size).toBe(8);
+  });
+
+  it("canonical Seed 的八层完整地图指纹保持稳定", () => {
+    const fingerprints = FLOORS.map((floorNumber) => {
+      const graph = generateRoomGraph("mvp2-eight-floors", floorNumber);
+      return createHash("sha256")
+        .update(JSON.stringify(generateMazeFloor(graph)))
+        .digest("hex");
+    });
+    expect(fingerprints).toEqual(CANONICAL_FINGERPRINTS);
   });
 
   it("八层 160 个 Seed 均满足课程可达、门锁不可绕过和环路不变量", () => {
@@ -283,17 +264,11 @@ describe("generateMazeFloor", () => {
     });
   }, 30_000);
 
-  it("校验器同时接受旧 v4/v5/v6 形状和新 v7 形状", () => {
-    const fixture = legacyV11Fixture as unknown as { floor1: SavedRun };
-    const graph = fixture.floor1.graph;
+  it("校验器只接受当前 v7 形状", () => {
+    const graph = generateRoomGraph("current-v7-only");
     const current = generateMazeFloor(graph);
-    const previous = fixture.floor1.mazeFloor;
-    const legacy = asLegacyV4Floor(previous);
-    const large = asLargeV6Floor(current);
     expect(validateMazeFloor(current, graph)).toMatchObject({ valid: true, errors: [] });
-    expect(validateMazeFloor(large, graph)).toMatchObject({ valid: true, errors: [] });
-    expect(validateMazeFloor(previous, graph)).toMatchObject({ valid: true, errors: [] });
-    expect(validateMazeFloor(legacy, graph)).toMatchObject({ valid: true, errors: [] });
-    expect(reachableMazeCells(legacy, new Set(lessonsForFloor(1))).size).toBeGreaterThan(150);
+    const oldVersion = { ...current, generatorVersion: 6 } as unknown as MazeFloor;
+    expect(validateMazeFloor(oldVersion, graph).valid).toBe(false);
   });
 });

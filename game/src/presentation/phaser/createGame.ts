@@ -8,7 +8,7 @@ import Phaser from "phaser";
 import type { ArcadeAudio } from "../../infrastructure/audio/ArcadeAudio";
 import type { FeedbackDirector } from "../../infrastructure/feedback/FeedbackDirector";
 import { MAP_ROWS, TILE_SIZE } from "../../content/curriculum/mvpLevel";
-import { GameSession } from "../../domain/session/GameSession";
+import { GameSession } from "../../features/game-session/GameSession";
 import { BattleScene } from "./BattleScene";
 import { DungeonScene } from "./DungeonScene";
 

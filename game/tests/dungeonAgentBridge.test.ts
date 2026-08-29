@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
 import { createEmptyProfile } from "../src/infrastructure/storage/localProgress";
 import {

@@ -2,7 +2,6 @@
 import {
   normalizeScoreScene,
   type ArcadeMusicMode,
-  type DungeonFloor,
   type ScoreScene,
 } from "./musicScore";
 
@@ -81,12 +80,6 @@ export function runtimeScoreForScene(
     candidate.floor === normalized.floor &&
     candidate.mode === normalized.mode
   )) ?? null;
-}
-
-export function runtimeScoresForFloor(
-  floor: DungeonFloor,
-): readonly RuntimeScoreAsset[] {
-  return RUNTIME_SCORE_ASSETS.filter((candidate) => candidate.floor === floor);
 }
 
 export function resolveRuntimeScoreUrl(

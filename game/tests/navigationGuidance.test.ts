@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NAVIGATION_RUNTIME_CONFIG } from "../src/application/config/runtimeConfig";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { isMazeWalkable } from "../src/domain/exploration/mazeGenerator";
 import { advancePatrolTick } from "../src/presentation/phaser/interaction/PatrolController";
 import type { PatrolBatchResolution } from "../src/contracts/game/results";

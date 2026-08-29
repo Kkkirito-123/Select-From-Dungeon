@@ -36,7 +36,7 @@ export function isFlatBeginnerSelect(sql: string): boolean {
 
 /**
  * 按题目阶段索引读取当前课程阶段。
- * 越界索引会被限制到首尾，保持旧存档和战斗恢复时的兼容行为。
+ * 越界索引会被限制到首尾，保证当前运行态的边界稳定。
  */
 export function stageFor(
   lessonId: LessonId,

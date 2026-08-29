@@ -11,7 +11,7 @@
 [English curriculum blueprint](docs/CURRICULUM.md) |
 [English map direction](docs/FLOOR_THEMES.md)
 
-**包版本：`v2.0.0` · 第一、二层内容候选：`MVP 2.1 RC`** · [游玩指南](GUIDE.md) ·
+**产品版本：`1.0` · 包版本：`1.0.0`** · [游玩指南](GUIDE.md) ·
 [版本记录](CHANGELOG.md) ·
 [发布检查表](docs/RELEASE_CHECKLIST.md)
 
@@ -19,16 +19,15 @@
 实际走过连续迷宫，进入只显示编号的怪物所在格后切换到独立对战，写出一条完整 SQLite 查询，再把
 正确结果变成攻击动画。
 
-## MVP 现在能玩什么
+## 1.0 版本现在能玩什么
 
 - 完成由唯一一套八张确定性 `56×42 / generator v7` 紧凑迷宫组成的 Run。玩家不能输入 Seed 或
   重抽地图；手工房间分散到整张地图，
   配合 DFS 迷宫、约 15% 回环、三个区域、三条钥匙双向捷径与分级导航；远离内容连接骨架的
-  DFS 分支会重新封墙，不再保留纯走路的外围迷宫。generator v6 `96×72`、
-  generator v5 `48×36` 和 generator v4 `64×48` 只保留为旧存档兼容。主线从地下余烬档案依次上升到潮汐群岛、白霜墓原、
+  DFS 分支会重新封墙，不再保留纯走路的外围迷宫。当前校验器只接受 generator v7 地图，历史格式会被忽略。主线从地下余烬档案依次上升到潮汐群岛、白霜墓原、
   元素升炉、黑铁外城、龙脊上城、残照王苑和黑金高堂。
 - 顶栏现在显示当前楼层槽位 `/ 08`。可校验的 Campaign 骨架已经定义八个稳定楼层身份、课程先修、
-  题阶、遭遇角色、主题和内容池；`v0.10` 已经可以完整游玩八层，`v0.11` 已完成低消耗收口。
+  题阶、遭遇角色、主题和内容池；1.0 版本可完整游玩八层，并采用低消耗运行时。
 - 可选在线状态服务可用时，左下角以小绿点和数字显示已连接的游戏标签页数；服务离线时显示不可用
   状态，不用虚假的 `0` 冒充真实人数。
 - 击败第一至七层魔王并拾取钥匙后，会显示金色
@@ -73,7 +72,7 @@
 - 无需离开游戏即可使用内置 `PLAN ASSIST` 补全栈。输入前缀会排序提示 SQL 关键词、函数、
   四张权威表、全部 22 个字段与真实 JOIN 关系；任务面板明确区分主表和明细表，怪物目标统一
   使用从 `1` 到 `89` 连续编号的 `monsters.id`，`monster_id` 仅用于信号/装备明细表的关联。
-  旧 Run 的稀疏编号会在读取时无损迁移。`m.` 等别名会把范围缩到对应表；支持方向键配合
+  当前怪物编号始终是 `1` 到 `89` 的连续 ID。`m.` 等别名会把范围缩到对应表；支持方向键配合
   `Enter`/`Tab`、点击、触控，以及 `Ctrl/Command + Space` 主动唤起。接受建议不会执行查询，
   也不会填完整答案。
 - 永久 `SCHEMA CODEX / 字段图鉴` 会展示字段名、类型、可空性、主键与逻辑 JOIN 关系，四个表
@@ -134,7 +133,7 @@
 - 顶栏管理员模式只保留进入下一层初始位置的内存预览入口，不再提供楼层列表、区域定位或状态预设；
   进入战斗后自动填入正确 SQL，战斗结算和复盘仍走正式流程。
 - 地图和战斗共用低开销程序化角色配方：玩家有四段身份显形，抄写员拥有低帧呼吸 / 翻页表现，
-  每个怪物族群都有明确轮廓。第八层胜利后完成 MVP 2.0 唯一结局 `MIGRATE`，并在《失名录》
+  每个怪物族群都有明确轮廓。第八层胜利后完成 1.0 版本唯一结局 `MIGRATE`，并在《失名录》
   保留历史与回滚路径。
 
 ## 第一层学习路线
@@ -267,10 +266,10 @@ WHERE id = 1;
 
 第一次读代码时，按下面的顺序即可建立主干认识：
 
-1. `src/application/main.ts`：查看启动流程和依赖组装。
-2. `src/domain/shared/types.ts`、`src/domain/session/GameSession.ts`：理解状态契约和唯一游戏状态源。
-3. `src/infrastructure/storage/localProgress.ts`：理解存档校验、迁移调度与恢复；
-   `src/infrastructure/storage/runMigrations.ts` 负责 v4-v12 的内存迁移链。
+1. `src/application/main.ts`、`src/features/game-runtime/GameRuntime.ts`：查看启动流程、依赖组装和销毁。
+2. `src/domain/shared/types.ts`、`src/features/game-session/GameSession.ts`：理解状态契约和唯一游戏状态源。
+3. `src/infrastructure/storage/localProgress.ts`：理解当前 `run:v12` / `profile:v3` 的存档校验、
+   安全读写与恢复。
 4. `src/infrastructure/sql/SqlEngine.ts`、`src/domain/learning/lessonEvaluator.ts`：理解 SQL 执行和判题边界。
 5. `src/presentation/phaser/`、`src/presentation/dom/`：查看 Phaser、DOM 表现层、本地复盘与作者剧情展示。
 
@@ -280,10 +279,11 @@ WHERE id = 1;
 src/
 ├─ contracts/          跨层只读游戏、存档、结果、篝火/抄写员 Agent 与存储契约
 ├─ application/       启动、配置与页面生命周期
+├─ features/           GameSession、终端、剧情、快照、AppShell 与 GameRuntime 功能包
 ├─ content/           课程、世界、剧情、背包与 SQL 内容
 ├─ domain/            Session 门面/辅助模块、战斗、探索、学习、成长与共享规则
-├─ infrastructure/    音频、反馈、SQLite、存档编解码/迁移与浏览器适配器
-└─ presentation/     Phaser 场景、DOM 界面与职责明确的渲染器
+├─ infrastructure/    音频、反馈、SQLite、存档编解码/校验与浏览器适配器
+└─ presentation/      Phaser 场景、DOM 界面与职责明确的渲染器
 ```
 
 门面内部按职责继续细分：`src/presentation/dom/panels/` 负责各个 DOM 交互面板，
@@ -291,7 +291,7 @@ src/
 `src/presentation/phaser/world/` 负责世界绘制判断。学习领域中，
 `src/domain/learning/queryFeatureDetector.ts` 负责 SQL 特征标签，
 `queryIdentityRules.ts` 负责身份字段防火墙，`lessonLocks.ts` 负责阶段选择与基础 SQL 外形限制，
-`lessonResultEvaluator.ts` 负责固定课程结果语义，`lessonEvaluator.ts` 只保留兼容导出与组合。
+`lessonResultEvaluator.ts` 负责固定课程结果语义，`lessonEvaluator.ts` 负责聚合判题规则。
 
 ```text
 AppShell ── HUD、发现式小地图、新手引导、终端、本地复盘与作者剧情
@@ -342,8 +342,7 @@ GameSession ── 物理世界、篝火、安全区、演员、迷雾、战斗�
 探索视图，移动、同格遭遇、拾取与知识门都由 `GameSession` 对照迷宫进行判定。
 
 新 Run 使用唯一一套 generator v7，把八张手工宏观蓝图分散到 `56×42` 紧凑迷宫；玩家不能输入
-Seed 或重抽地图。generator v6 `96×72`、
-generator v5 `48×36` 与 generator v4 `64×48` 地图只为旧 Run 兼容继续读取。迷宫生成器隔离 `topology` 与 `decor` 两条随机流；`GuidedMap` 再从固定迷宫、课程图和篝火
+Seed 或重抽地图。历史 generator 格式会被当前校验器拒绝。迷宫生成器隔离 `topology` 与 `decor` 两条随机流；`GuidedMap` 再从固定迷宫、课程图和篝火
 确定性派生路线信标、死路补给与钥匙捷径。因此调整装饰密度不会改变课程、钥匙或捷径。Actor 与
 固定课程宝箱从课程锚点确定性派生，可选掉落由生态与独立稳定 Hash 判定；生态计划从迷宫、
 篝火、引导地图和 Seed 重建，不重复写进存档。
@@ -355,8 +354,7 @@ generator v5 `48×36` 与 generator v4 `64×48` 地图只为旧 Run 兼容继续
 L3 16 道；第二至八层 L1 包含 40 道本层题与 24 道复习题，L2/L3 都是本层题。固定课程怪和
 层主继续使用作者题；每层 15 个题族各有 8 道基于真实数据参数、可执行且保存精确结果证据的变体，
 普通怪、小精英、区域首领分别抽 1 道 L1、2 道 L2、3 道 L3。加载前通过 Manifest 校验版本、字节数、总数与 SHA-256；新题库
-版本只在新 Run 生效。生成器按 `monstersForFloor(floor)` 为每层建立 SQL fixture，并校验怪物关系引用闭包；绑定 v2 的 v12 Run
-会在内存中迁移为 v1，重置活动练习绑定与牌组游标，同时保留世界状态和答题历史。
+版本只在新 Run 生效。生成器按 `monstersForFloor(floor)` 为每层建立 SQL fixture，并校验怪物关系引用闭包；Run 必须绑定当前题库版本和完整抽题状态，历史绑定会被拒绝。
 
 第一至五层及第七、八层终端每次只接受一条只读 `SELECT` 或 `WITH`，最多显示 50 行结果；第六层允许在
 一次性 `repair_queue` 中执行 1–8 条受控语句。DDL、`PRAGMA`、`ATTACH`、永久课程表和无条件
@@ -374,12 +372,8 @@ L3 16 道；第二至八层 L1 包含 40 道本层题与 24 道复习题，L2/L3
 - 篝火、抄写员、Main Agent 输出和实时日志只存在当前页面内存，不写入 Run、Profile 或 IndexedDB；Python
   服务不保存请求或输出。
 
-旧 localStorage Key 以及旧的学习/题库 IndexedDB 会作为只读迁移来源保留，不会自动删除。
-
-有效的 `run:v11` 会在内存中无损迁移为 v12；有效的 `run:v10` 到 `run:v4` 会继续经过原有迁移
-链进入 v12。旧 Key 不会被删除。更早的
-Run Key 不读取也不删除。
-有效的 `profile:v1` 与 `profile:v2` 会自动迁移到 v3；原学习计数保持，缺失身份记录从空集合开始。
+只加载有效的 `run:v12` 与 `profile:v3`。当前 localStorage 值可以导入统一 IndexedDB，也可在 IndexedDB
+不可用时作为 fallback。历史 Run/Profile Key 与旧 learning/content IndexedDB 保持原样但不读取；不支持数据的恢复路径是开始新 Run。
 `src/infrastructure/storage/progressPersistence.ts` 会合并非关键移动与巡逻快照；查询、战利品、背包、模式和
 拓扑变化仍立即落盘。
 
@@ -409,16 +403,20 @@ GitHub Pages 默认不部署：仓库根 `.github/workflows/deploy-pages.yml` �
 `base: "./"`。当前仓库保持私有；如果 Provider/套餐不允许 workflow-backed Pages，发布状态记为
 `provider-blocked`，变量保持 false 或未设置，没有单独授权不改公开、不换托管商。
 
-MVP 2.0 保留当前 Phaser、SQLite WASM、world-rules 和应用 Chunk 拆分；包体与首帧性能优化
-延后到独立的 MVP 2.1 专项，本内容版不为此改引擎、依赖、Schema 或存档版本。
+1.0 版本保留当前 Phaser、SQLite WASM、world-rules 和应用 Chunk 拆分；包体与首帧性能优化
+延后到独立的性能专项，本版本不为此改引擎、依赖、Schema 或存档版本。
 
 ### 当前验收状态
 
 - **自动化已覆盖**：八层迷宫契约与地图蓝图、47 组必修课程、必经锚点与 Boss 边界、
-  捷径钥匙和隐藏入口、安全区约束、真实 SQLite 参考结果以及兼容存档迁移。
+  捷径钥匙和隐藏入口、安全区约束、真实 SQLite 参考结果以及当前存档损坏拒绝。
 - **浏览器已抽查**：F1、F2、F4、F8 的代表场景，以及 SQL 战斗、机关门、篝火与死亡复盘、
   背包、补全、Schema 图鉴、刷新恢复和楼层转换。已检查桌面、窄屏、触控与 Reduced Motion
   的关键路径；所检查路径无横向溢出和控制台错误。
+- **Benchmark 浏览器 Oracle 已通过**：固定的 7 个修复场景均同时命中注入故障态与修复后干净态（7/7），
+  浏览器错误数为 0。
+- **维护器真实 Agent 回合**：最新维护器分支已到达真实 Provider 边界，但每个模型回合都因 HTTP 402（余额不足）
+  中止；评测器已将其记录为 `infra_error` / infrastructure，代码为 `model-billing-unavailable`，不作为游戏正确性失败。
 - **仍需人工验收**：真人连续八层完整通关、开放安全房边界与巡逻视野细节、少量未覆盖的
   弹层视觉状态、耳机/扬声器疲劳检查，以及受限 iframe 环境。
 
@@ -444,7 +442,7 @@ MVP 2.0 保留当前 Phaser、SQLite WASM、world-rules 和应用 Chunk 拆分�
 
 ## 范围与归属
 
-当前 MVP 覆盖八层 47 组课程，最远到真实 SQLite 执行计划，以及 MVCC、锁、隔离、建模、
+当前 1.0 版本覆盖八层 47 组课程，最远到真实 SQLite 执行计划，以及 MVCC、锁、隔离、建模、
 复制、分片和 SQL 安全的确定性事故分析。分布式记录是教学夹具，不声称 SQLite 实现了这些
 系统。12 格背包、可装备防具、生态种子化多掉落和全部八层生态切片均已实现。
 

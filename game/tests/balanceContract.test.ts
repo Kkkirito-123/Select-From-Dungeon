@@ -19,7 +19,7 @@ import { ROYAL_SWORD } from "../src/content/curriculum/floor8Level";
 import {
   GameSession,
   LEVEL_XP_THRESHOLDS,
-} from "../src/domain/session/GameSession";
+} from "../src/features/game-session/GameSession";
 import {
   AMBUSH_CHANCE,
   AMBUSH_GUARANTEE_AT,

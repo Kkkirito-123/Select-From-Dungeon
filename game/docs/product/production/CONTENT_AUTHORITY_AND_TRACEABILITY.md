@@ -36,7 +36,7 @@
 |---|---|---|---|
 | 怪物 ID、姓名、课程、房间、HP | `src/content/curriculum/mvpLevel.ts`、`floor2Level.ts` 至 `floor8Level.ts`、`biomeContent.ts` | 对应自动化测试 | 新稿必须映射，不得重编号 |
 | SQL 题目、答案与判定 | 各层 Level 内容 + `src/domain/learning/lessonEvaluator.ts` | 真实 SQLite 测试 | 叙事可换说法，不能偷偷改变结果语义 |
-| 楼层标题、展示子区、地标、隐藏区、故事触发 | `src/content/world/floorExperience/floor01.ts` 至 `floor08.ts` | Floor Experience 测试 | 这是玩家看见的地点与事件真源 |
+| 楼层标题、展示子区、地标、隐藏区、故事触发 | `src/content/world/floorExperience/floors/floor01/index.ts` 至 `floor08/index.ts` | Floor Experience 测试 | 这是玩家看见的地点与事件真源 |
 | 三个物理导航区、宏观轮廓 | `src/content/world/floorMapBlueprints.ts` | 迷宫生成 / 可达性测试 | 展示子区可多于三个，必须显式映射 |
 | 入口、出口、Boss 门、捷径、隐藏门、安全房、视野、陷阱 | `src/content/world/floorLabyrinth.ts` | `src/domain/exploration/floorLabyrinth.ts` 与测试 | 保存稳定意图，不保存 Seed 坐标 |
 | 课程顺序与跨层先修 | 当前课程 Level 内容 + `src/domain/progression/runGraph.ts` | Campaign / RunGraph 测试 | `floorContracts.ts` 仅作运行元数据，不是命名文案权威 |

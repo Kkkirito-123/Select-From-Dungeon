@@ -4,7 +4,7 @@ import {
   BONE_BLADE,
   CONSUMABLES,
 } from "../src/content/inventory/inventoryCatalog";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
 import { isSavedRun } from "../src/infrastructure/storage/localProgress";
 import type {
@@ -174,6 +174,36 @@ describe("v0.4 背包、护甲与战利品包", () => {
       "discard:1:slime-gel:0",
       "discard:1:slime-gel:0:2",
     ]);
+    expect(isSavedRun(session.toSavedRun())).toBe(true);
+  });
+
+  it("可以在背包内换装并使用恢复品", () => {
+    const base = new GameSession(null, null, "inventory-use").toSavedRun();
+    base.player.hp = 1;
+    base.equipmentInventory = [{
+      instanceId: "fixture:bone-blade",
+      kind: "weapon",
+      protected: false,
+      weapon: { ...BONE_BLADE },
+    }];
+    base.acquiredUniqueItemIds = [...new Set([
+      ...base.acquiredUniqueItemIds,
+      BONE_BLADE.id,
+    ])];
+    base.consumables = [{
+      item: { ...CONSUMABLES["slime-gel"] },
+      quantity: 1,
+    }];
+    const session = new GameSession(base);
+
+    expect(session.openInventory()).toBe(true);
+    expect(session.equipInventoryItem("fixture:bone-blade")).toMatchObject({ ok: true });
+    expect(session.useConsumable("slime-gel")).toMatchObject({ ok: true });
+    expect(session.snapshot()).toMatchObject({
+      player: { hp: 2, weapon: { id: "bone-blade" } },
+      consumables: [],
+    });
+    expect(session.snapshot().equipmentInventory).toHaveLength(1);
     expect(isSavedRun(session.toSavedRun())).toBe(true);
   });
 

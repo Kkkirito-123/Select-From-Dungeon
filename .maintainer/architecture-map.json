@@ -3,10 +3,11 @@
   "contractId": "dungeon.game.architecture",
   "contractVersion": 1,
   "projectRoot": "game",
-  "boundaryRevision": 3,
+  "boundaryRevision": 6,
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
     { "id": "application", "root": "game/src/application", "responsibility": "启动、用例编排、运行时配置和页面生命周期" },
+    { "id": "features", "root": "game/src/features", "responsibility": "按用户工作流组织的功能门面、窄端口协调器和运行时装配" },
     { "id": "content", "root": "game/src/content", "responsibility": "课程、世界、剧情、背包和 SQL 的作者静态内容" },
     { "id": "domain", "root": "game/src/domain", "responsibility": "不依赖界面的游戏规则、状态和领域计算" },
     { "id": "infrastructure", "root": "game/src/infrastructure", "responsibility": "浏览器、SQLite、存储、音频和外部服务适配" },
@@ -37,7 +38,7 @@
       "parentId": "contracts",
       "root": "game/src/contracts/storage",
       "responsibility": "存档读写端口和持久化数据契约",
-      "notResponsibleFor": ["IndexedDB 实现", "迁移执行"],
+      "notResponsibleFor": ["IndexedDB 实现", "存档转换执行"],
       "signals": ["存储契约", "存档接口", "持久化端口"],
       "neighbors": ["infrastructure.storage", "domain.session"]
     },
@@ -57,7 +58,7 @@
       "responsibility": "游戏内 Agent 场景投影、缓存和生命周期编排",
       "notResponsibleFor": ["模型网络协议", "领域状态写入"],
       "signals": ["篝火 agent", "抄写员", "agent runtime", "agent 缓存"],
-      "neighbors": ["contracts.agent", "infrastructure.agent", "application.triggers"]
+      "neighbors": ["contracts.agent", "infrastructure.agent", "application.triggers", "features.game-runtime"]
     },
     {
       "id": "application.config",
@@ -75,7 +76,7 @@
       "responsibility": "页面运行时服务装配、资源加载和用例协调",
       "notResponsibleFor": ["领域规则", "DOM 细节"],
       "signals": ["启动失败", "资源加载", "运行时", "初始化"],
-      "neighbors": ["domain.session", "infrastructure.storage", "presentation.dom"]
+      "neighbors": ["domain.session", "infrastructure.storage", "presentation.dom", "features.game-runtime"]
     },
     {
       "id": "application.triggers",
@@ -84,7 +85,61 @@
       "responsibility": "把游戏快照变化转换为语义触发事件",
       "notResponsibleFor": ["事件展示", "领域判定"],
       "signals": ["触发器", "事件没有触发", "重复事件", "快照变化"],
-      "neighbors": ["domain.session", "application.agent", "presentation.dom"]
+      "neighbors": ["domain.session", "application.agent", "presentation.dom", "features.narrative"]
+    },
+    {
+      "id": "features.game-session",
+      "parentId": "features",
+      "root": "game/src/features/game-session",
+      "responsibility": "GameSession 唯一可变规则门面、公开动作和快照服务入口",
+      "notResponsibleFor": ["DOM 渲染", "浏览器存储实现", "外部网络调用"],
+      "signals": ["GameSession", "会话状态", "规则状态", "公开动作", "快照服务"],
+      "neighbors": ["domain.session", "contracts.game", "features.app-shell", "features.game-runtime"]
+    },
+    {
+      "id": "features.terminal",
+      "parentId": "features",
+      "root": "game/src/features/terminal",
+      "responsibility": "SQL 终端一次提交的校验、执行、结算动画和忙碌生命周期协调",
+      "notResponsibleFor": ["DOM 节点构造", "判题规则实现", "持久化写入"],
+      "signals": ["终端协调", "SQL 提交", "busy 生命周期", "战斗动画", "机关查询"],
+      "neighbors": ["features.game-session", "features.app-shell", "infrastructure.sql", "presentation.phaser"]
+    },
+    {
+      "id": "features.narrative",
+      "parentId": "features",
+      "root": "game/src/features/narrative",
+      "responsibility": "剧情动作、音频状态、世界效果与证据确认顺序的协调",
+      "notResponsibleFor": ["剧情触发判定", "剧情 DOM 构造", "游戏规则状态计算"],
+      "signals": ["剧情协调", "证据确认", "故事动作", "音乐状态", "世界效果"],
+      "neighbors": ["content.narrative", "domain.progression", "features.app-shell", "application.triggers"]
+    },
+    {
+      "id": "features.snapshot",
+      "parentId": "features",
+      "root": "game/src/features/snapshot",
+      "responsibility": "前后快照到房间、模式、反馈和音频渲染模型的纯投影",
+      "notResponsibleFor": ["DOM/Phaser 写入", "规则状态修改", "存档写入"],
+      "signals": ["快照投影", "渲染模型", "模式进入", "拾取差异", "音频模式"],
+      "neighbors": ["contracts.game", "features.app-shell", "presentation.dom", "presentation.phaser"]
+    },
+    {
+      "id": "features.app-shell",
+      "parentId": "features",
+      "root": "game/src/features/app-shell",
+      "responsibility": "DOM 外壳装配、输入路由、面板生命周期以及快照/剧情/反馈转场工作流门面",
+      "notResponsibleFor": ["领域状态提交", "存档实现", "Phaser 场景构造"],
+      "signals": ["AppShell", "DOM 外壳", "输入路由", "面板生命周期", "快照投影", "剧情工作流", "反馈转场", "界面协调"],
+      "neighbors": ["features.game-session", "features.terminal", "features.narrative", "features.snapshot", "features.game-runtime"]
+    },
+    {
+      "id": "features.game-runtime",
+      "parentId": "features",
+      "root": "game/src/features/game-runtime",
+      "responsibility": "浏览器运行时依赖构造、页面生命周期订阅、启动失败回收和反向销毁",
+      "notResponsibleFor": ["具体游戏规则", "作者内容判定", "单个面板视觉布局"],
+      "signals": ["GameRuntime", "运行时装配", "启动失败清理", "页面隐藏", "反向销毁"],
+      "neighbors": ["features.game-session", "features.app-shell", "application.runtime", "infrastructure.storage", "presentation.dom", "presentation.phaser"]
     },
     {
       "id": "content.curriculum",
@@ -183,7 +238,7 @@
       "responsibility": "GameSession 门面、跨领域状态协调和快照形成",
       "notResponsibleFor": ["DOM 渲染", "浏览器存储实现"],
       "signals": ["game session", "状态没有更新", "刷新后", "状态泄漏", "重复提交", "快照"],
-      "neighbors": ["domain.combat", "domain.exploration", "domain.learning", "domain.progression", "infrastructure.storage"]
+      "neighbors": ["domain.combat", "domain.exploration", "domain.learning", "domain.progression", "infrastructure.storage", "features.game-session"]
     },
     {
       "id": "domain.shared",
@@ -243,10 +298,10 @@
       "id": "infrastructure.storage",
       "parentId": "infrastructure",
       "root": "game/src/infrastructure/storage",
-      "responsibility": "IndexedDB、存档编解码、迁移和持久化实现",
+      "responsibility": "IndexedDB、存档编解码、当前版本校验和持久化实现",
       "notResponsibleFor": ["游戏进度规则", "存储端口定义"],
-      "signals": ["存档", "刷新丢失", "indexeddb", "迁移", "持久化", "reload"],
-      "neighbors": ["contracts.storage", "domain.session", "application.runtime"]
+      "signals": ["存档", "刷新丢失", "indexeddb", "存档校验", "持久化", "reload"],
+      "neighbors": ["contracts.storage", "domain.session", "application.runtime", "features.game-runtime"]
     },
     {
       "id": "presentation.dom",
@@ -255,7 +310,7 @@
       "responsibility": "HUD、面板、终端、背包和 DOM 交互展示",
       "notResponsibleFor": ["游戏规则", "存档访问"],
       "signals": ["界面", "按钮", "面板", "终端", "hud", "显示错误", "点击"],
-      "neighbors": ["domain.session", "domain.learning", "application.runtime"]
+      "neighbors": ["domain.session", "domain.learning", "application.runtime", "features.app-shell", "features.snapshot"]
     },
     {
       "id": "presentation.phaser",
@@ -264,7 +319,7 @@
       "responsibility": "Phaser 场景、世界对象、角色、特效和空间交互展示",
       "notResponsibleFor": ["领域移动规则", "世界作者数据"],
       "signals": ["phaser", "场景", "地图显示", "角色显示", "世界对象", "碰撞画面"],
-      "neighbors": ["domain.exploration", "content.world", "application.runtime"]
+      "neighbors": ["domain.exploration", "content.world", "application.runtime", "features.game-runtime", "features.snapshot", "features.terminal"]
     },
     {
       "id": "presentation.styles",
@@ -308,10 +363,19 @@
       "id": "domain.session.combat",
       "parentId": "domain.session",
       "root": "game/src/domain/session/combat",
-      "responsibility": "GameSession 战斗命中、阶段与生命结算的纯服务",
+      "responsibility": "GameSession 战斗抽题、命中、经验、伤害与复盘的纯服务",
       "notResponsibleFor": ["Session 状态提交", "SQL 执行", "战斗画面"],
-      "signals": ["生命下限", "最终阶段", "combat hit", "remaining hp"],
-      "neighbors": []
+      "signals": ["战斗抽题", "经验结算", "护甲伤害", "战斗复盘", "生命下限", "最终阶段", "combat hit", "remaining hp"],
+      "neighbors": ["domain.session.learning", "domain.session.progression"]
+    },
+    {
+      "id": "domain.session.inventory",
+      "parentId": "domain.session",
+      "root": "game/src/domain/session/inventory",
+      "responsibility": "GameSession 背包、装备、消耗品、战利品与奖励的纯状态转换服务",
+      "notResponsibleFor": ["Session 状态提交", "背包 DOM 展示", "随机掉落生成"],
+      "signals": ["背包转换", "装备替换", "消耗品", "战利品包", "奖励应用", "inventory action"],
+      "neighbors": ["domain.session.progression", "presentation.dom.panels"]
     },
     {
       "id": "domain.session.learning",
@@ -320,7 +384,7 @@
       "responsibility": "GameSession 课程完成、学习事实与奖励前置状态的纯服务",
       "notResponsibleFor": ["SQL 判题", "Session 状态提交", "课程作者正文"],
       "signals": ["课程完成", "奖励缺失", "mastered lesson", "lesson completion"],
-      "neighbors": ["domain.session.combat", "domain.session.progression"]
+      "neighbors": ["domain.session.combat", "domain.session.progression", "domain.session.inventory"]
     },
     {
       "id": "domain.session.progression",
@@ -329,7 +393,7 @@
       "responsibility": "GameSession 楼层门禁、管理员预览和终局提交的纯服务",
       "notResponsibleFor": ["地图绘制", "Session 状态提交", "存储实现"],
       "signals": ["区域首领门禁", "管理员换层", "最终胜利", "重复提交"],
-      "neighbors": ["domain.session.combat", "domain.session.learning"]
+      "neighbors": ["domain.session.combat", "domain.session.learning", "domain.session.inventory"]
     },
     {
       "id": "presentation.dom.focus",
@@ -666,7 +730,7 @@
       "id": "feature.world-navigation",
       "roots": ["domain.exploration", "domain.session", "content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
       "responsibility": "世界移动、区域边界、路径、地标交互与空间表现",
-      "notResponsibleFor": ["课程判题", "存档迁移"],
+      "notResponsibleFor": ["课程判题", "存档读写"],
       "signals": ["地图卡住", "区域边界", "无法移动", "路径错误", "地标无法交互", "world navigation", "portal path"],
       "negativeSignals": ["刷新后丢失"],
       "neighbors": ["content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
@@ -702,7 +766,7 @@
       "responsibility": "在线标签页连接数的同源 SSE 接入、失败降级和左下角状态展示",
       "notResponsibleFor": ["独立玩家去重", "历史分析", "游戏领域状态"],
       "signals": ["在线人数", "绿点", "presence", "SSE", "连接人数", "在线状态不可用"],
-      "negativeSignals": ["怪物生命", "存档迁移"],
+      "negativeSignals": ["怪物生命", "存档读写"],
       "neighbors": ["infrastructure.presence", "application.config", "presentation.dom.panels"],
       "route": {
         "primary": ["infrastructure.presence"],
@@ -730,6 +794,6 @@
   },
   "boundary": {
     "algorithm": "direct-child-v1",
-    "signature": "d0252ca69958eaf254188c80e21d1dd3452baaa7f532cedb4c050f7a60b066b4"
+    "signature": "5e8b74f886443bfef0f093746cfafa9ca8695c2fa32bb0d15a8830f51a0911be"
   }
 }

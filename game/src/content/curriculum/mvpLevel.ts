@@ -1,7 +1,7 @@
 /**
- * 八层课程内容的兼容 registry。
+ * 八层课程内容的统一 registry。
  *
- * 各楼层作者数据位于 `floors/floorNN`，本模块只单向组合并保留既有公开 API；
+ * 各楼层作者数据位于 `floors/floorNN`，本模块只单向组合并提供当前公开 API；
  * 它不拥有楼层实现，也不允许楼层子模块反向导入这里。
  */
 import type {
@@ -9,15 +9,12 @@ import type {
   LessonId,
   LessonStageDefinition,
   Monster,
-  Position,
-  Weapon,
 } from "../../domain/shared/types";
 import {
   AGGREGATE_HAMMER,
   DATA_BLADE,
   FILTER_BOW,
   FLOOR_ONE_LESSONS,
-  FLOOR_ONE_LOOT_AFTER_LESSON,
   FLOOR_ONE_MONSTERS,
   MAP_ROWS,
   NULL_LANTERN,
@@ -26,7 +23,6 @@ import {
 } from "./floors/floor01";
 import {
   FLOOR_TWO_LESSONS,
-  FLOOR_TWO_LOOT_AFTER_LESSON,
   FLOOR_TWO_MONSTERS,
 } from "./floors/floor02";
 import {
@@ -112,11 +108,6 @@ export const LESSONS: readonly LessonDefinition[] = [
   ...FLOOR_SEVEN_LESSON_DEFINITIONS,
   ...FLOOR_EIGHT_LESSON_DEFINITIONS,
 ] as const;
-
-export const LOOT_AFTER_LESSON: Partial<Record<LessonId, { weapon: Weapon; position: Position }>> = {
-  ...FLOOR_ONE_LOOT_AFTER_LESSON,
-  ...FLOOR_TWO_LOOT_AFTER_LESSON,
-};
 
 export function lessonById(id: LessonId): LessonDefinition {
   const lesson = LESSONS.find((entry) => entry.id === id);

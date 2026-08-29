@@ -75,9 +75,9 @@ silently choosing one source.
   administrator answer. The only SQL exception is text already visible in the
   currently open player textarea, within the projection documented by
   `ARCHITECTURE.md`.
-- Preserve deterministic grading, progression, migrations, and authored-content
-  identity. A compatibility or version change needs explicit scope and focused
-  migration evidence.
+- Preserve deterministic grading, progression, current save validation, and
+  authored-content identity. Historical compatibility must not be reintroduced
+  without explicit scope, a version decision, and focused evidence.
 - Do not add third-party art, fonts, audio, copied level text, or runtime
   dependencies without license, attribution, bundle, and security review.
 
