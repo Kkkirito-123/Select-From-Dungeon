@@ -4,19 +4,90 @@
 文件的字段示例。JSON 标准本身不允许 `//` 或 `/* ... */` 注释，因此示例保持合法
 JSON，字段解释写在代码块外。
 
+## 新人先看：一眼定位职责
+
+把 `src/` 先看成八个区域。修改一个功能时，先在“主职责”列找到入口，再沿着箭头查看调用者；
+不要因为某个文件被导入就把规则复制到那里。
+
+```text
+浏览器
+  -> application/main.ts（组装依赖）
+     -> features/game-runtime/GameRuntime（运行时装配与销毁）
+        -> features/game-session/GameSession（唯一可变规则状态）
+        -> features/app-shell/AppShell（DOM 外壳门面）
+           -> features/terminal、narrative、snapshot（窄端口工作流）
+     -> application/（启动、配置、事件和 Agent 编排）
+     -> infrastructure/（存储、SQLite、音频、网络等 IO）
+     -> presentation/（DOM 与 Phaser 的快照渲染、输入转发）
+     -> content/（课程、楼层、剧情、SQL 和物品静态内容）
+     -> devtools/（仅开发态维护器桥）
+```
+
+| 区域 | 主职责 | 明确不做什么 |
+| --- | --- | --- |
+| `contracts/` | 跨层类型、快照、存档和 Agent 协议 | 不计算玩法、不访问浏览器 |
+| `features/` | 按工作流组织的会话、终端、剧情、快照、DOM 外壳和运行时功能包 | 不复制底层规则、作者内容或适配器 |
+| `content/` | 作者维护的课程、世界、剧情、SQL Schema、物品目录 | 不修改运行状态、不执行 SQL |
+| `domain/` | 移动、战斗、遭遇、判题、奖励和推进规则 | 不操作 DOM、网络或 IndexedDB |
+| `application/` | 入口装配、页面生命周期、配置、事件与 Agent 用例 | 不实现具体战斗/地图规则 |
+| `infrastructure/` | SQLite、存储、音频、在线状态和 Agent HTTP 适配 | 不决定课程结果或玩家动作 |
+| `presentation/` | DOM/Phaser 渲染、输入收集和视觉反馈 | 不直接写存档、不拥有规则状态 |
+| `devtools/` | 开发态 Dungeon Maintainer 协议、可见投影和 Trace | 不进入生产、不读取隐藏答案 |
+
+两个最常用的运行流：
+
+```text
+启动：main.ts -> GameRuntime -> DataStore/题库 -> GameSession -> AppShell + DungeonScene
+玩家动作：输入 -> GameSession -> Snapshot/Event -> DOM + Phaser + Persistence
+SQL：TerminalPanel -> SqlEngine -> lessonEvaluator -> GameSession -> Snapshot
+```
+
+快速找文件：规则问题先看 `domain/session` 及对应领域目录；作者内容先看 `content/`；
+“显示不对”看 `presentation/`；“刷新丢失/SQLite/Agent 请求”看 `infrastructure/`；
+维护器工具只看 `devtools/dungeon-agent/`。机器可读的稳定路由以
+`.maintainer/architecture-map.json` 为准，目录职责的完整说明见
+[`ARCHITECTURE.zh-CN.md`](../ARCHITECTURE.zh-CN.md)。
+
+`features/game-session/GameSession.ts` 和 `features/app-shell/AppShell.ts` 是对外门面，
+但不再独占所有工作流：终端、剧情和快照分别位于同名功能包；会话的派生查询、背包和战斗状态转换分别位于
+`domain/session/sessionSelectors.ts`、`domain/session/inventory/` 与 `domain/session/combat/`；AppShell 的快照投影和剧情/反馈/转场/重置编排位于
+`features/app-shell/rendering/` 与 `features/app-shell/workflows/`；运行时装配位于
+`features/game-runtime/GameRuntime.ts`。这些功能包都不保存第二份规则状态，也不新增战斗、地图或判题算法。
+Audio、Presence、持久化和维护器桥的外部资源由 `GameRuntime` 统一释放；`AppShell.destroy()` 只清理
+自己的 DOM 订阅、面板和手势监听。
+需要新增跨模块流程时，先定义窄 Port，再由上层功能包组合；不要让下层反向导入运行时。
+
+### 容易混淆的同名模块
+
+| 看到的名字 | 实际区别 |
+| --- | --- |
+| `content/world/floorLabyrinth.ts` | 八层作者定义的导航契约；只提供静态意图 |
+| `domain/exploration/floorLabyrinth.ts` | 把契约解析到已保存地图的运行时规则 |
+| `content/world/floorExperience/` | 每层地标、剧情和密文门的作者内容 |
+| `domain/progression/floorStory.ts` | 根据进度计算哪些剧情/证据现在可见 |
+| `content/curriculum/floors/` | 每层课程、题目和奖励定义 |
+| `domain/session/inventory/` | 背包、装备、消耗品和战利品状态转换 |
+| `domain/session/combat/` | 战斗抽题、经验结算、护甲伤害和复盘记录 |
+| `domain/session/sessionSelectors.ts` | 从显式会话上下文派生房间、角色、门禁和当前课程等只读查询 |
+| `features/app-shell/rendering/` | AppShell 的快照显示投影 |
+| `features/app-shell/workflows/` | 剧情、反馈卡、楼层转场和 Run 重置的 UI 编排 |
+| `domain/session/` | 把多个领域结果提交成一次会话状态变化 |
+
+同名不代表可以互相替代：作者数据只能放在 `content/`，计算和状态只能放在 `domain/`。
+
 ## 一次启动如何组装游戏
 
-入口是 `src/application/main.ts`，它只做依赖组装，不应该在这里增加战斗规则：
+入口是 `src/application/main.ts`，它只提供环境 loader 并调用 `GameRuntime`，不应该在这里增加战斗规则：
 
 ```text
 index.html
   -> application/main.ts
-     -> 读取 localStorage / 试玩内存存储
-     -> 加载并校验 question-bank-manifest.json
-     -> 创建 GameSession（规则状态）
-     -> 创建 SqlEngine（内存 SQLite）
-     -> 创建 AppShell（DOM）和 Phaser Game（画面）
-     -> 启动持久化、页面可见性和事件总线
+     -> features/game-runtime/GameRuntime
+        -> 读取 localStorage / 试玩内存存储
+        -> 加载并校验 question-bank-manifest.json
+        -> 创建 GameSession、SqlEngine、AppShell 和 Phaser Game
+        -> 启动持久化、页面可见性和事件总线
+        -> 统一反向销毁（含部分初始化失败）
 ```
 
 可以把各层理解为四个方向：
@@ -52,7 +123,7 @@ textarea
 }
 ```
 
-- `bankVersion`：题库内容版本。旧 Run 会保存这个值，保证刷新后仍使用同一套题。
+- `bankVersion`：题库内容版本。当前 Run 保存这个值，保证刷新后仍使用同一套题。
 - `schemaVersion`：SQLite 题库表结构版本，字段改变时必须递增并更新配置。
 - `url`：相对于 Vite `BASE_URL` 的资源路径，不写主机名。
 - `byteLength` 与 `sha256`：下载后分别检查长度和摘要，防止截断或内容替换。
@@ -60,7 +131,7 @@ textarea
 
 生成器按 `monstersForFloor(floor)` 为每层建立独立 SQL fixture，并校验
 `monster_signals.monster_id`、`monster_gear.monster_id` 和 `master_id` 的引用闭包；
-绑定旧 v2 的 v12 Run 在加载时迁移到 v1，清空活动练习绑定并重置牌组游标，同时保留世界状态和答题历史。
+Run 必须绑定当前题库版本；不匹配的旧绑定会被拒绝，由新游戏重新建立牌组状态。
 
 加载顺序在 `questionBankLoader.ts` 中固定为：
 
@@ -108,8 +179,9 @@ textarea
 
 ## Profile 与 Run 的 JSON 边界
 
-`profileCodec.ts` 负责永久 Profile 的编码，`runCodec.ts` 负责 Run 的编码，真正的
-结构验证和旧版本迁移由 `localProgress.ts` 完成。一个 Profile 的字段关系如下：
+`profileCodec.ts` 负责永久 Profile v3 的创建、校验和编码，`runCodec.ts` 负责 Run v12 的
+JSON 编解码，`runValidator.ts` 组合当前结构与领域不变量；`localProgress.ts` 只协调当前键的
+安全读写。一个 Profile 的字段关系如下：
 
 ```json
 {
@@ -133,7 +205,7 @@ textarea
 
 Run 的顶层通常包含 `version`、`graph`、`mazeFloor`、`player`、`monsters`、
 `answerHistory` 等字段。不要直接编辑浏览器中的 Run：读取时会先经过 JSON 解码、
-版本验证和迁移，再交给 `GameSession` 恢复。
+当前 v12 完整验证，再交给 `GameSession` 恢复；历史版本不再读取或迁移。
 
 ## SQL Schema 与 JOIN 关系
 

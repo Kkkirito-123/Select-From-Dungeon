@@ -39,7 +39,7 @@ export function migrationStepMarkerIds(): readonly string[] {
 }
 
 /**
- * 从 Run 的兼容标记中恢复严格的已完成前缀。
+ * 从 Run 的终局标记中恢复严格的已完成前缀。
  *
  * 只有从第一步开始连续存在的标记才算进度；带空洞或未知步骤的存档会由
  * localProgress 的严格校验拒绝，运行时不会猜测或跳步。
@@ -75,8 +75,4 @@ export function migrationMarkersFormPrefix(markerIds: readonly string[]): boolea
     migrationMarkerIds.length,
   );
   return migrationMarkerIds.every((id, index) => id === expectedPrefix[index]);
-}
-
-export function isMigrationMarkerId(markerId: string): boolean {
-  return markerId.startsWith(MIGRATION_MARKER_PREFIX);
 }

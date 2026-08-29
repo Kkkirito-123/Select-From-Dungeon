@@ -2,13 +2,12 @@
  * 物理迷宫的确定性生成与查询。
  *
  * 生成器根据 RoomGraph 和稳定 seed 生成实体格子、区域、门、锚点和装饰；
- * 读取函数只查询/复制地图。旧 generatorVersion 的读取兼容由 storage 层
- * 负责，本模块不能偷偷改变已保存地图的尺寸或拓扑。
+ * 读取函数只查询/复制地图。当前生成器固定为 v7，不能改变其 seed 分相、
+ * 地图尺寸或拓扑身份。
  */
 import {
-  MVP2_MAZE_CHUNK_SIZE,
-  MVP2_MAZE_HEIGHT,
-  MVP2_MAZE_WIDTH,
+  FLOOR_MAP_REFERENCE_HEIGHT,
+  FLOOR_MAP_REFERENCE_WIDTH,
   floorMapBlueprint,
   type FloorMapBlueprint,
   type FloorMapSlot,
@@ -24,19 +23,7 @@ import {
   type RunLessonId,
 } from "../progression/runGraph";
 
-export const LEGACY_MAZE_GENERATOR_VERSION = 4 as const;
-export const PREVIOUS_MAZE_GENERATOR_VERSION = 5 as const;
-export const LARGE_MAZE_GENERATOR_VERSION = 6 as const;
 export const MAZE_GENERATOR_VERSION = 7 as const;
-export const LEGACY_MAZE_WIDTH = 64;
-export const LEGACY_MAZE_HEIGHT = 48;
-export const LEGACY_MAZE_CHUNK_SIZE = 16;
-export const PREVIOUS_MAZE_WIDTH = MVP2_MAZE_WIDTH;
-export const PREVIOUS_MAZE_HEIGHT = MVP2_MAZE_HEIGHT;
-export const PREVIOUS_MAZE_CHUNK_SIZE = MVP2_MAZE_CHUNK_SIZE;
-export const LARGE_MAZE_WIDTH = 96;
-export const LARGE_MAZE_HEIGHT = 72;
-export const LARGE_MAZE_CHUNK_SIZE = 24;
 export const MAZE_WIDTH = WORLD_RUNTIME_CONFIG.width;
 export const MAZE_HEIGHT = WORLD_RUNTIME_CONFIG.height;
 export const MAZE_CHUNK_SIZE = WORLD_RUNTIME_CONFIG.chunkSize;
@@ -69,12 +56,11 @@ export interface MazeDecoration extends Position {
 }
 
 /**
- * 序列化结构没有改变，因此 `version` 继续保持为 4。内部生成器版本用于
- * 区分旧版 64×48、手工 48×36、大型 96×72 与当前紧凑 56×42 迷宫。
+ * 序列化结构没有改变，因此 `version` 继续保持为 4；当前生成器固定为 v7。
  */
 export interface MazeFloor {
   version: 4;
-  generatorVersion: 4 | 5 | 6 | 7;
+  generatorVersion: 7;
   seed: string;
   width: number;
   height: number;
@@ -224,18 +210,8 @@ function assertBlueprint(
   });
 }
 
-export function mazeLayoutNameForVersion(
-  floor: RoomGraph["floor"],
-  generatorVersion: MazeFloor["generatorVersion"],
-): string {
-  const baseName = floorMapBlueprint(floor).layoutName;
-  if (generatorVersion === LARGE_MAZE_GENERATOR_VERSION) {
-    return `${baseName}·96×72大迷宫`;
-  }
-  if (generatorVersion === MAZE_GENERATOR_VERSION) {
-    return `${baseName}·56×42紧凑迷宫`;
-  }
-  return baseName;
+export function mazeLayoutName(floor: RoomGraph["floor"]): string {
+  return `${floorMapBlueprint(floor).layoutName}·56×42紧凑迷宫`;
 }
 
 function compactBlueprint(graph: RoomGraph): FloorMapBlueprint {
@@ -243,8 +219,8 @@ function compactBlueprint(graph: RoomGraph): FloorMapBlueprint {
   const random = createSeededRandom(
     `select-from-dungeon:maze:v7:floor-${graph.floor}:${graph.seed}:phase:rooms`,
   );
-  const scaleX = (MAZE_WIDTH - 2) / (MVP2_MAZE_WIDTH - 2);
-  const scaleY = (MAZE_HEIGHT - 2) / (MVP2_MAZE_HEIGHT - 2);
+  const scaleX = (MAZE_WIDTH - 2) / (FLOOR_MAP_REFERENCE_WIDTH - 2);
+  const scaleY = (MAZE_HEIGHT - 2) / (FLOOR_MAP_REFERENCE_HEIGHT - 2);
   const placed: FloorMapSlot[] = [];
   base.slots.forEach((slot) => {
     const width = slot.width;
@@ -272,7 +248,7 @@ function compactBlueprint(graph: RoomGraph): FloorMapBlueprint {
   });
   return {
     ...base,
-    layoutName: mazeLayoutNameForVersion(graph.floor, MAZE_GENERATOR_VERSION),
+    layoutName: mazeLayoutName(graph.floor),
     slots: placed,
   };
 }
@@ -874,20 +850,6 @@ export function generateMazeFloor(
     decorations: createDecorations(grid, zoneMask, decorRandom, density),
     topologyHash: topologyHash(tiles, gates, blueprint),
   };
-}
-
-export function countMazeDeadEnds(floor: MazeFloor): number {
-  let total = 0;
-  for (let y = 1; y < floor.height - 1; y += 1) {
-    for (let x = 1; x < floor.width - 1; x += 1) {
-      if (mazeTileAt(floor, x, y) !== ".") continue;
-      const neighbors = DIRECTIONS.filter((direction) => (
-        mazeTileAt(floor, x + direction.x, y + direction.y) === "."
-      )).length;
-      if (neighbors === 1) total += 1;
-    }
-  }
-  return total;
 }
 
 export function mazeTileAt(floor: MazeFloor, x: number, y: number): MazeTile | null {

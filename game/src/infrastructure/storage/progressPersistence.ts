@@ -5,7 +5,7 @@
  * 状态变化（查询、模式、物品、背包和地图拓扑）立即落盘，普通移动可
  * 在短窗口内合并；页面隐藏或销毁时由调用方显式 flush/destroy。
  */
-import type { GameSession } from "../../domain/session/GameSession";
+import type { GameSession } from "../../features/game-session/GameSession";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import { STORAGE_RUNTIME_CONFIG } from "../../contracts/config/runtime";
 import {

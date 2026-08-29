@@ -1,0 +1,4 @@
+interface:
+  display_name: "游戏代码调试"
+  short_description: "依据游戏架构地图定位故障职责，并复用已读源码范围完成调试"
+  default_prompt: "使用 $debug-game-code 按游戏架构地图定位并诊断这个故障，只读取未覆盖的最小源码范围。"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import type { GameSnapshot } from "../src/domain/shared/types";
 import { createEmptyProfile, type StorageLike } from "../src/infrastructure/storage/localProgress";
 import {

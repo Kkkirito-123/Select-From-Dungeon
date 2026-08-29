@@ -50,17 +50,6 @@ export type CampfireView = Omit<
   "protocolVersion" | "requestId" | "evidenceHash"
 >;
 
-export interface CampfireAgentOutput {
-  schemaVersion: 1;
-  requestId: string;
-  evidenceHash: string;
-  headline: string;
-  facts: string[];
-  focusConcept: string | null;
-  nextAction: string;
-  message: string;
-}
-
 export interface CampfireAgentContent {
   headline: string;
   facts: string[];

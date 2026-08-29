@@ -54,31 +54,6 @@ export interface ScribePrompt {
   death: ScribeDeathEvidence | null;
 }
 
-export interface ScribeAgentRequest {
-  protocolVersion: 1;
-  requestId: string;
-  evidenceHash: string;
-  floor: number;
-  scene: ScribeScene;
-  scribeId: string;
-  topic: string;
-  authoredMessage: string;
-  learning: ScribeLearningEvidence | null;
-  navigation: ScribeNavigationEvidence | null;
-  death: ScribeDeathEvidence | null;
-}
-
-export interface ScribeAgentOutput {
-  schemaVersion: 1;
-  requestId: string;
-  evidenceHash: string;
-  headline: string;
-  facts: string[];
-  nextAction: string;
-  safeHintId: string | null;
-  message: string;
-}
-
 export interface ScribeAgentContent {
   headline: string;
   facts: string[];

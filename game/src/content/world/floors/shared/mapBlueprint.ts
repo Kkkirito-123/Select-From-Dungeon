@@ -1,10 +1,8 @@
 import type { FloorNumber } from "../../../../domain/progression/runGraph";
 
-// 宏观蓝图使用“块坐标”描述房间位置，迷宫生成器再把这些槽位映射到实际格子。
-// 这里的尺寸是旧版兼容蓝图常量；当前 v7 运行时尺寸由 domain/exploration 提供。
-export const MVP2_MAZE_WIDTH = 48;
-export const MVP2_MAZE_HEIGHT = 36;
-export const MVP2_MAZE_CHUNK_SIZE = 12;
+// 宏观蓝图沿用 48×36 作者坐标，v7 生成器再映射到实际 56×42 格子。
+export const FLOOR_MAP_REFERENCE_WIDTH = 48;
+export const FLOOR_MAP_REFERENCE_HEIGHT = 36;
 
 export type FloorTransitKind =
   | "floodgate"
@@ -68,8 +66,6 @@ export interface FloorMapBlueprint {
   floor: FloorNumber;
   /** 当前发布的布局名；会参与地图身份校验。 */
   layoutName: string;
-  /** 已发布的布局名，只用于只读存档兼容。 */
-  legacyLayoutNames?: readonly string[];
   regionNames: readonly [string, string, string];
   routeTransit: FloorTransitKind;
   ascentTransit: FloorTransitKind;

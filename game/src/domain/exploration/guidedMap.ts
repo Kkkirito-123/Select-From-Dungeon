@@ -213,7 +213,7 @@ function createShortcut(
   keyRoomNodeId: string,
   keyPosition: Position,
 ): GuidedShortcut | null {
-  const minimumDetour = floor.generatorVersion >= 7 ? 12 : 18;
+  const minimumDetour = 12;
   // 捷径必须服务主课程路线；钥匙所在的可选房间可能离出生点很近，
   // 不能再拿“出生点 → 钥匙”这段短路来决定水闸是否存在。
   const route = stitchedCourseRoute(graph, floor);
@@ -334,7 +334,7 @@ function createRegionalShortcut(
   exitProgress: number,
   keyRoomNodeId: string,
 ): GuidedShortcut | null {
-  const minimumDetour = floor.generatorVersion >= 7 ? 12 : 18;
+  const minimumDetour = 12;
   const progressPairs = [
     [Math.max(0.04, entryProgress - 0.16), Math.min(0.97, exitProgress + 0.16)],
     [entryProgress, exitProgress],
@@ -426,7 +426,6 @@ function createShortcuts(
     primaryKeyRoom,
     chooseKeyPosition(graph, floor, campfires, primaryKeyRoom),
   );
-  if (floor.generatorVersion < 6) return primary ? [primary] : [];
   const route = stitchedCourseRoute(graph, floor);
   const excluded = new Set(primary ? [primary.keyRoomNodeId] : []);
   const middleKeyRoom = chooseRegionalKeyRoom(graph, 0.5, excluded);
@@ -651,11 +650,8 @@ export function validateGuidedMapPlan(
   ) {
     errors.push("引导地图版本、Seed 或楼层不匹配。");
   }
-  const expectedShortcutCount = floor.generatorVersion >= 6 ? 3 : 1;
-  if (plan.shortcuts.length !== expectedShortcutCount) {
-    errors.push(floor.generatorVersion >= 6
-      ? "每层三个探索区域必须各生成 1 道钥匙捷径。"
-      : "旧版迷宫必须保留 1 道兼容捷径。");
+  if (plan.shortcuts.length !== 3) {
+    errors.push("每层三个探索区域必须各生成 1 道钥匙捷径。");
   }
   if (
     new Set(plan.shortcuts.map((shortcut) => shortcut.id)).size !== plan.shortcuts.length ||
@@ -670,7 +666,7 @@ export function validateGuidedMapPlan(
     ) {
       errors.push(`捷径 ${shortcut.id} 的端点或钥匙不可达。`);
     }
-    const minimumDetourDistance = floor.generatorVersion >= 7 ? 11 : 17;
+    const minimumDetourDistance = 11;
     if (shortcut.detourDistance < minimumDetourDistance) {
       errors.push(`捷径 ${shortcut.id} 没有形成足够明显的折返缩减。`);
     }

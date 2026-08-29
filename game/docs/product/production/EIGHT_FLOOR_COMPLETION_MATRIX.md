@@ -173,7 +173,7 @@
 
 | 范围 | 主要文件 |
 |---|---|
-| 内容真源 | `src/content/world/floorExperience/floor01.ts` 至 `floor08.ts`、`biomeContent.ts`、`gateChallenges.ts` |
+| 内容真源 | `src/content/world/floorExperience/floors/floor01/index.ts` 至 `floor08/index.ts`、`biomeContent.ts`、`gateChallenges.ts` |
 | 状态与交互 | `src/domain/session/GameSession.ts`、`floorWorldState.ts`、`floorStory.ts`、`biome.ts` |
 | 地图表现 | `src/presentation/phaser/DungeonScene.ts`、`FloorSetpieceLayer.ts`、`PixelActorFactory.ts` |
 | UI/反馈 | `src/presentation/dom/AppShell.ts`、`MonsterCodexView.ts`、`src/presentation/style.css` |

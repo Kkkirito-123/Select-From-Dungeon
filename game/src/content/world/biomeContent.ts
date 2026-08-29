@@ -1,4 +1,4 @@
-/** 生物群系内容的兼容入口；每层作者数据位于 floors/floorXX。 */
+/** 八层生物群系内容聚合入口；每层作者数据位于 floors/floorXX。 */
 import type { Monster } from "../../domain/shared/types";
 import type { FloorNumber } from "../../domain/progression/runGraph";
 import {

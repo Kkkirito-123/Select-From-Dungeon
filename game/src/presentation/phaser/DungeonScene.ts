@@ -11,7 +11,7 @@ import {
   type StoryAction,
 } from "../../content/world/floorExperience";
 import { floorCurrentSightCellKeys } from "../../domain/exploration/floorLabyrinth";
-import { GameSession } from "../../domain/session/GameSession";
+import { GameSession } from "../../features/game-session/GameSession";
 import type { GameSnapshot } from "../../contracts/game/snapshots";
 import type { MoveResolution } from "../../contracts/game/results";
 import type {
@@ -29,7 +29,6 @@ import {
 import { monsterIdentityPresentation } from "../../domain/progression/monsterIdentity";
 import { newlyOpenedGate, pickedItemsBetween } from "./snapshotFeedback";
 import {
-  INTERACTION_LABEL_DISTANCE,
   MONSTER_LABEL_DISTANCE,
   isNearPlayer,
   shouldShowTutorialBeacon,
@@ -42,14 +41,12 @@ import { WorldRenderer } from "./world/WorldRenderer";
 import { WorldObjectRenderer } from "./world/WorldObjectRenderer";
 import { WorldDecorationRenderer } from "./world/WorldDecorationRenderer";
 import { WorldItemRenderer } from "./world/WorldItemRenderer";
+import { WorldRuntimeLayer } from "./world/WorldRuntimeLayer";
 import {
   BIOME_COLORS,
   COLORS,
-  HAZARD_STYLES,
   colorsForFloor,
   zoneColorsForFloor,
-  type HazardKind,
-  type HazardStyle,
 } from "./world/DungeonPalette";
 import { SceneEffects } from "./effects/SceneEffects";
 import { PlayerRenderer } from "./actors/PlayerRenderer";
@@ -67,31 +64,6 @@ interface MonsterView {
   hpFill: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
 }
-
-interface GateView {
-  block: Phaser.GameObjects.Rectangle;
-  label: Phaser.GameObjects.Text;
-  parts?: Phaser.GameObjects.Rectangle[];
-}
-
-interface CampfireView {
-  container: Phaser.GameObjects.Container;
-  checkpointRing: Phaser.GameObjects.Ellipse;
-  label: Phaser.GameObjects.Text;
-  frameTimer?: Phaser.Time.TimerEvent;
-}
-
-interface HazardView {
-  container: Phaser.GameObjects.Container;
-  motion: Phaser.GameObjects.Container;
-  label: Phaser.GameObjects.Text;
-}
-
-interface ZoneLabelView {
-  label: Phaser.GameObjects.Text;
-  roomNodeId: string;
-}
-
 
 function gridToPixels(position: Position): Position {
   return {
@@ -120,15 +92,11 @@ export class DungeonScene extends Phaser.Scene {
   private readonly worldObjectRenderer = new WorldObjectRenderer();
   private readonly worldDecorationRenderer = new WorldDecorationRenderer();
   private readonly worldItemRenderer = new WorldItemRenderer();
+  private worldRuntimeLayer!: WorldRuntimeLayer;
   private readonly playerRenderer = new PlayerRenderer();
   private readonly monsterRenderer = new MonsterRenderer();
   private readonly interactionOverlay = new InteractionOverlay();
   private readonly sceneEffects: SceneEffects;
-  private readonly gateViews = new Map<string, GateView>();
-  private readonly shortcutViews = new Map<string, GateView[]>();
-  private readonly campfireViews = new Map<string, CampfireView>();
-  private readonly hazardViews = new Map<string, HazardView>();
-  private readonly zoneLabelViews: ZoneLabelView[] = [];
   private readonly inputController: DungeonInputController;
   private renderedTopology = -1;
   private moveLocked = false;
@@ -229,6 +197,12 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.void);
     this.terrain = this.add.graphics().setDepth(0);
     this.entityLayer = this.add.container(0, 0).setDepth(10);
+    this.worldRuntimeLayer = new WorldRuntimeLayer(
+      this,
+      this.entityLayer,
+      this.reducedMotion,
+      this.worldObjectRenderer,
+    );
     this.fog = this.add.graphics().setDepth(40);
     this.rebuildWorld();
 
@@ -261,7 +235,7 @@ export class DungeonScene extends Phaser.Scene {
     this.setpieceLayer?.destroy();
     this.setpieceLayer = null;
     this.worldItemRenderer.clear();
-    this.clearCampfireViews();
+    this.worldRuntimeLayer.destroy();
   }
 
   private storyLandmarkPoint(landmarkId: string): Position | null {
@@ -410,7 +384,7 @@ export class DungeonScene extends Phaser.Scene {
       this.objectiveBeacon.destroy(true);
     }
     this.objectiveBeacon = null;
-    this.clearCampfireViews();
+    this.worldRuntimeLayer.destroy();
     this.setpieceLayer?.destroy();
     this.worldItemRenderer.clear();
     this.entityLayer?.removeAll(true);
@@ -420,10 +394,6 @@ export class DungeonScene extends Phaser.Scene {
       this.reducedMotion,
     );
     this.monsterViews.clear();
-    this.gateViews.clear();
-    this.shortcutViews.clear();
-    this.hazardViews.clear();
-    this.zoneLabelViews.length = 0;
 
     const floor = this.snapshot.mazeFloor;
     const worldWidth = floor.width * TILE_SIZE;
@@ -432,11 +402,7 @@ export class DungeonScene extends Phaser.Scene {
     this.drawTerrain();
     this.worldDecorationRenderer.render(this, this.entityLayer, this.snapshot);
     this.setpieceLayer.build(this.snapshot);
-    this.drawZoneLabels();
-    this.createGates();
-    this.createShortcutViews();
-    this.createHazardViews();
-    this.createCampfireViews();
+    this.worldRuntimeLayer.build(this.snapshot);
     this.createPlayer();
     this.createMonsterViews();
     this.createObjectiveBeacon();
@@ -458,391 +424,6 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-
-  private drawZoneLabels(): void {
-    this.snapshot.mazeFloor.zones.forEach((zone) => {
-      const room = this.snapshot.roomGraph.nodes.find((node) => node.id === zone.roomNodeId);
-      const pixel = gridToPixels({ x: zone.x + 0.35, y: zone.y + 0.35 });
-      const label = this.add.text(pixel.x, pixel.y, room?.title ?? "未知区域", {
-        color: zone.type === "boss" ? "#ff978e" : "#e8dfc7",
-        fontFamily: "monospace",
-        fontSize: "7px",
-        backgroundColor: "#08090ca8",
-        padding: { x: 3, y: 2 },
-      }).setOrigin(0, 0).setDepth(15).setVisible(false);
-      this.entityLayer.add(label);
-      this.zoneLabelViews.push({ label, roomNodeId: zone.roomNodeId });
-    });
-  }
-
-  private syncZoneLabels(): void {
-    this.zoneLabelViews.forEach((view) => {
-      const room = this.snapshot.roomGraph.nodes.find(
-        (node) => node.id === view.roomNodeId,
-      );
-      view.label
-        .setText(room?.title ?? "未知区域")
-        .setVisible(view.roomNodeId === this.snapshot.currentRoomId);
-    });
-  }
-
-  private createGates(): void {
-    const colors = colorsForFloor(this.snapshot.floor);
-    this.snapshot.mazeFloor.gates.forEach((gate) => {
-      const pixel = gridToPixels(gate);
-      const block = this.add.rectangle(
-        pixel.x,
-        pixel.y + 2,
-        18,
-        TILE_SIZE - 6,
-        0x15191d,
-        0.94,
-      )
-        .setStrokeStyle(2, colors.gold, 0.86)
-        .setDepth(18);
-      const parts = [-5, 0, 5].map((offset) => this.add.rectangle(
-        pixel.x + offset,
-        pixel.y + 2,
-        2,
-        TILE_SIZE - 12,
-        colors.wallTop,
-        0.7,
-      ).setDepth(19));
-      parts.push(
-        this.add.rectangle(
-          pixel.x,
-          pixel.y + 2,
-          5,
-          5,
-          colors.gold,
-          0.88,
-        ).setAngle(45).setDepth(20),
-      );
-      const label = this.add.text(pixel.x, pixel.y - 22, "", {
-        color: "#f1d28b",
-        fontFamily: "monospace",
-        fontSize: "7px",
-        backgroundColor: "#08090cdd",
-        padding: { x: 3, y: 2 },
-      }).setOrigin(0.5).setDepth(19);
-      this.entityLayer.add([block, ...parts, label]);
-      this.gateViews.set(gate.id, { block, label, parts });
-    });
-  }
-
-  private createShortcutViews(): void {
-    const colors = colorsForFloor(this.snapshot.floor);
-    this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
-      const views = [shortcut.entry, shortcut.exit].map((position, index) => {
-        const pixel = gridToPixels(position);
-        const isPrimaryFloodgate = this.snapshot.floor === 1 && index === 0;
-        const block = this.add.rectangle(
-          pixel.x,
-          pixel.y,
-          isPrimaryFloodgate ? TILE_SIZE - 4 : TILE_SIZE - 12,
-          isPrimaryFloodgate ? TILE_SIZE + 2 : 10,
-          isPrimaryFloodgate ? 0x24313a : colors.plum,
-          isPrimaryFloodgate ? 0.96 : 0.62,
-        ).setStrokeStyle(
-          2,
-          isPrimaryFloodgate ? colors.query : colors.gold,
-          0.9,
-        ).setDepth(18);
-        const parts: Phaser.GameObjects.Rectangle[] = [];
-        if (isPrimaryFloodgate) {
-          [-7, 0, 7].forEach((offset) => {
-            parts.push(
-              this.add.rectangle(
-                pixel.x + offset,
-                pixel.y,
-                3,
-                TILE_SIZE - 5,
-                0xa7b5b8,
-              ).setDepth(19),
-            );
-          });
-          parts.push(
-            this.add.rectangle(
-              pixel.x,
-              pixel.y + 12,
-              TILE_SIZE - 7,
-              5,
-              0x3a91ad,
-              0.78,
-            ).setDepth(19),
-          );
-        }
-        const label = this.add.text(
-          pixel.x,
-          pixel.y - 22,
-          isPrimaryFloodgate ? "E · 排水水闸" : "E · 捷径落点",
-          {
-          color: "#f1d28b",
-          fontFamily: "monospace",
-          fontSize: "7px",
-          backgroundColor: "#08090cdd",
-          padding: { x: 3, y: 2 },
-          },
-        ).setOrigin(0.5).setDepth(20);
-        this.entityLayer.add([block, ...parts, label]);
-        return { block, label, parts };
-      });
-      this.shortcutViews.set(shortcut.id, views);
-    });
-  }
-
-  private createCampfireViews(): void {
-    this.snapshot.campfires.forEach((campfire) => {
-      const pixel = gridToPixels(campfire);
-      const colors = colorsForFloor(this.snapshot.floor);
-      const container = this.add.container(pixel.x, pixel.y).setDepth(23);
-      const checkpointRing = this.add.ellipse(
-        0,
-        7,
-        38,
-        23,
-        colors.query,
-        0.06,
-      ).setStrokeStyle(2, colors.query, 0.95);
-      const stoneRing = this.add.ellipse(0, 8, 31, 17, 0x5a5d62, 1)
-        .setStrokeStyle(2, 0xb3b0a3, 0.84);
-      const coal = this.add.ellipse(0, 7, 21, 10, 0x17100e, 1);
-      const logLeft = this.add.rectangle(0, 7, 23, 5, 0x74442d)
-        .setStrokeStyle(1, 0x2f1a12)
-        .setAngle(27);
-      const logRight = this.add.rectangle(0, 7, 23, 5, 0x8f5735)
-        .setStrokeStyle(1, 0x2f1a12)
-        .setAngle(-27);
-      const flameFrameOne = this.add.container(0, -4, [
-        this.add.triangle(0, 0, -7, 8, 0, -12, 7, 8, 0xe85a35),
-        this.add.triangle(1, 2, -4, 7, 1, -7, 5, 7, 0xffb84a),
-      ]);
-      const flameFrameTwo = this.add.container(0, -3, [
-        this.add.triangle(-1, 0, -6, 7, 3, -13, 7, 7, 0xd9412f),
-        this.add.triangle(-1, 2, -4, 7, -2, -6, 4, 7, 0xffca58),
-      ]).setVisible(false);
-      const label = this.add.text(0, -31, "E · 篝火", {
-        color: "#f1d28b",
-        fontFamily: "monospace",
-        fontSize: "7px",
-        fontStyle: "bold",
-        backgroundColor: "#08090cdd",
-        padding: { x: 4, y: 2 },
-      }).setOrigin(0.5);
-      container.add([
-        checkpointRing,
-        stoneRing,
-        coal,
-        logLeft,
-        logRight,
-        flameFrameOne,
-        flameFrameTwo,
-        label,
-      ]);
-      this.entityLayer.add(container);
-
-      let frameTimer: Phaser.Time.TimerEvent | undefined;
-      if (!this.reducedMotion) {
-        let firstFrame = true;
-        frameTimer = this.time.addEvent({
-          delay: 230,
-          loop: true,
-          callback: () => {
-            firstFrame = !firstFrame;
-            flameFrameOne.setVisible(firstFrame);
-            flameFrameTwo.setVisible(!firstFrame);
-          },
-        });
-      }
-      this.campfireViews.set(campfire.id, {
-        container,
-        checkpointRing,
-        label,
-        frameTimer,
-      });
-    });
-    this.syncCampfireViews();
-    this.setpieceLayer?.sync(this.snapshot);
-  }
-
-  private createHazardViews(): void {
-    this.snapshot.hazards.forEach((hazard) => {
-      const style = HAZARD_STYLES[hazard.kind];
-      const pixel = gridToPixels(hazard);
-      const container = this.add.container(pixel.x, pixel.y).setDepth(22);
-      const shadow = this.add.ellipse(0, 7, 27, 10, 0x020305, 0.55);
-      const motion = this.createHazardSymbol(hazard.kind, style);
-      const label = this.add.text(0, -24, hazard.name, {
-        color: "#f1d28b",
-        fontFamily: "monospace",
-        fontSize: "7px",
-        backgroundColor: "#08090cdd",
-        padding: { x: 3, y: 2 },
-      }).setOrigin(0.5);
-      container.add([shadow, motion, label]);
-      this.entityLayer.add(container);
-      if (!this.reducedMotion) {
-        if (style.motion === "spin") {
-          this.tweens.add({
-            targets: motion,
-            angle: 360,
-            duration: style.duration,
-            repeat: -1,
-            ease: "Linear",
-          });
-        } else if (style.motion === "pulse") {
-          this.tweens.add({
-            targets: motion,
-            scaleX: 1.12,
-            scaleY: 1.12,
-            alpha: 0.72,
-            duration: style.duration,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.InOut",
-          });
-        } else {
-          this.tweens.add({
-            targets: motion,
-            angle: { from: -5, to: 5 },
-            duration: style.duration,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.InOut",
-          });
-        }
-      }
-      this.hazardViews.set(hazard.id, { container, motion, label });
-    });
-  }
-
-  private createHazardSymbol(
-    kind: HazardKind,
-    style: HazardStyle,
-  ): Phaser.GameObjects.Container {
-    const symbol = this.add.container(0, 1);
-    const circleBase = () => this.add.circle(0, 0, 10, style.base, 1)
-      .setStrokeStyle(2, style.accent, 0.95);
-
-    if (kind === "archive-cutter") {
-      symbol.add([
-        circleBase(),
-        this.add.rectangle(0, 0, 26, 4, style.blade, 0.9),
-        this.add.rectangle(0, 0, 4, 26, style.blade, 0.9),
-        this.add.circle(0, 0, 4, style.accent, 1)
-          .setStrokeStyle(1, 0xf1d28b, 0.9),
-      ]);
-      return symbol;
-    }
-
-    if (kind === "tidal-current") {
-      symbol.add([
-        this.add.ellipse(0, 0, 27, 15, style.base, 1)
-          .setStrokeStyle(2, style.accent, 0.95),
-        this.add.ellipse(0, 0, 18, 8, style.base, 0)
-          .setStrokeStyle(2, style.blade, 0.9),
-        this.add.circle(-9, -5, 2, style.blade, 0.9),
-        this.add.circle(8, 5, 2, style.accent, 0.95),
-      ]);
-      return symbol;
-    }
-
-    if (kind === "frost-crack") {
-      symbol.add([
-        this.add.rectangle(0, 0, 18, 18, style.base, 1)
-          .setAngle(45)
-          .setStrokeStyle(2, style.accent, 0.95),
-        this.add.rectangle(-3, -4, 3, 12, style.blade, 0.95).setAngle(-28),
-        this.add.rectangle(3, 4, 3, 12, style.blade, 0.95).setAngle(28),
-        this.add.rectangle(4, -5, 2, 7, style.accent, 0.95).setAngle(62),
-      ]);
-      return symbol;
-    }
-
-    if (kind === "elemental-vent") {
-      symbol.add([
-        circleBase(),
-        this.add.circle(0, -7, 4, style.blade, 0.95),
-        this.add.circle(-7, 5, 4, style.accent, 0.95),
-        this.add.circle(7, 5, 4, 0x78c9b8, 0.95),
-        this.add.circle(0, 0, 3, style.base, 1),
-      ]);
-      return symbol;
-    }
-
-    if (kind === "alarm-wire") {
-      symbol.add([
-        this.add.rectangle(0, 2, 28, 10, style.base, 1)
-          .setStrokeStyle(2, style.accent, 0.95),
-        this.add.rectangle(-11, -2, 3, 22, style.blade, 0.95),
-        this.add.rectangle(11, -2, 3, 22, style.blade, 0.95),
-        this.add.rectangle(0, -5, 21, 2, style.accent, 1),
-        this.add.circle(0, 1, 5, style.accent, 1)
-          .setStrokeStyle(1, style.blade, 0.95),
-        this.add.circle(0, 7, 2, style.blade, 1),
-      ]);
-      return symbol;
-    }
-
-    if (kind === "magma-fissure") {
-      symbol.add([
-        this.add.ellipse(0, 2, 28, 14, style.base, 1)
-          .setStrokeStyle(2, style.accent, 0.95),
-        this.add.rectangle(-6, -3, 4, 11, style.blade, 0.95).setAngle(34),
-        this.add.rectangle(0, 2, 4, 12, style.accent, 1).setAngle(-28),
-        this.add.rectangle(6, 6, 4, 10, style.blade, 0.95).setAngle(38),
-      ]);
-      return symbol;
-    }
-
-    if (kind === "root-snare") {
-      symbol.add([
-        this.add.ellipse(0, 2, 27, 14, style.base, 1)
-          .setStrokeStyle(2, style.accent, 0.95),
-        this.add.ellipse(-6, -2, 5, 24, style.blade, 0.85).setAngle(-28),
-        this.add.ellipse(6, -2, 5, 24, style.accent, 0.9).setAngle(28),
-        this.add.ellipse(0, 3, 5, 20, style.blade, 0.85),
-      ]);
-      return symbol;
-    }
-
-    symbol.add([
-      this.add.rectangle(0, 0, 20, 20, style.base, 1)
-        .setAngle(45)
-        .setStrokeStyle(2, style.accent, 0.95),
-      this.add.rectangle(0, 0, 12, 12, style.base, 0)
-        .setAngle(45)
-        .setStrokeStyle(2, style.blade, 0.95),
-      this.add.rectangle(0, 0, 3, 16, style.accent, 1),
-    ]);
-    return symbol;
-  }
-
-  private syncCampfireViews(): void {
-    const discovered = new Set(this.snapshot.discoveredCells);
-    this.snapshot.campfires.forEach((campfire) => {
-      const view = this.campfireViews.get(campfire.id);
-      if (!view) return;
-      const checkpoint = this.snapshot.respawnCampfireId === campfire.id;
-      const visible = this.worldObjectRenderer.isDiscovered(discovered, campfire);
-      view.container.setVisible(visible);
-      view.checkpointRing.setVisible(checkpoint);
-      view.label.setText(checkpoint ? "复活点 · 篝火" : "E · 篝火");
-      view.label.setColor(checkpoint ? "#8ff5e1" : "#f1d28b");
-      view.label.setVisible(
-        visible &&
-        isNearPlayer(this.snapshot.player, campfire, INTERACTION_LABEL_DISTANCE),
-      );
-    });
-  }
-
-  private clearCampfireViews(): void {
-    this.campfireViews.forEach((view) => {
-      view.frameTimer?.remove(false);
-      if (view.container.active) view.container.destroy(true);
-    });
-    this.campfireViews.clear();
-  }
 
   private createPlayer(): void {
     this.playerView = this.playerRenderer.create(
@@ -1008,128 +589,10 @@ export class DungeonScene extends Phaser.Scene {
       this.reducedMotion,
       this.worldObjectRenderer,
     );
-    this.syncGateViews();
-    this.syncShortcutViews();
-    this.syncCampfireViews();
-    this.syncHazardViews();
+    this.worldRuntimeLayer.sync(this.snapshot);
     this.setpieceLayer?.sync(this.snapshot);
-    this.syncZoneLabels();
     this.drawFog();
   }
-
-  private syncGateViews(): void {
-    const colors = colorsForFloor(this.snapshot.floor);
-    const discovered = new Set(this.snapshot.discoveredCells);
-    this.snapshot.mazeFloor.gates.forEach((gate) => {
-      const view = this.gateViews.get(gate.id);
-      if (!view) return;
-      const missing = gate.requires.filter(
-        (lesson) => !this.snapshot.completedLessons.includes(lesson),
-      );
-      const open = this.snapshot.availableRoomIds.includes(gate.roomNodeId);
-      const challengeGate = gate.id === this.snapshot.challengeGateId;
-      view.block.setFillStyle(
-        open ? colors.query : challengeGate ? colors.plum : 0x15191d,
-        open ? 0.2 : 0.94,
-      );
-      view.block.setStrokeStyle(2, open ? colors.query : colors.gold, 0.82);
-      view.parts?.forEach((part, index) => {
-        part.setVisible(!open && view.block.visible);
-        part.setFillStyle(
-          index === view.parts!.length - 1 ? colors.gold : colors.wallTop,
-          challengeGate ? 0.92 : 0.7,
-        );
-      });
-      view.label.setText(open
-        ? ""
-        : challengeGate
-          ? "E · SQL 密文"
-        : missing.length > 0
-          ? missing.map((lesson) => lesson.toUpperCase()).join(" + ")
-          : "需要聚合战锤");
-      view.block.setVisible(this.worldObjectRenderer.isDiscovered(discovered, gate));
-      view.parts?.forEach((part) => part.setVisible(view.block.visible && !open));
-      view.label.setVisible(
-        view.block.visible &&
-        !open &&
-        isNearPlayer(this.snapshot.player, gate, INTERACTION_LABEL_DISTANCE),
-      );
-    });
-  }
-
-  private syncHazardViews(): void {
-    const discovered = new Set(this.snapshot.discoveredCells);
-    const sight = this.snapshot.adminMode
-      ? discovered
-      : floorCurrentSightCellKeys(
-          this.snapshot.floor,
-          this.snapshot.mazeFloor,
-          this.snapshot.campfires,
-          this.snapshot.player,
-        );
-    this.snapshot.hazards.forEach((hazard) => {
-      const view = this.hazardViews.get(hazard.id);
-      if (!view) return;
-      const triggered = this.snapshot.openedGateIds.includes(hazard.id);
-      const visible = this.worldObjectRenderer.isVisible(discovered, sight, hazard);
-      view.container.setVisible(visible);
-      view.container.setAlpha(triggered ? 0.34 : 1);
-      if (triggered) {
-        this.tweens.killTweensOf(view.motion);
-        view.motion.setAngle(0).setScale(1).setAlpha(1);
-      }
-      view.label.setText(triggered ? "已失效" : hazard.name);
-      view.label.setVisible(
-        visible && isNearPlayer(this.snapshot.player, hazard, INTERACTION_LABEL_DISTANCE),
-      );
-    });
-  }
-
-  private syncShortcutViews(): void {
-    const colors = colorsForFloor(this.snapshot.floor);
-    const discovered = new Set(this.snapshot.discoveredCells);
-    this.snapshot.guidedMap.shortcuts.forEach((shortcut) => {
-      const views = this.shortcutViews.get(shortcut.id);
-      if (!views) return;
-      const open = this.snapshot.openedGateIds.includes(shortcut.id);
-      const hasKey = this.snapshot.keyItems.includes(shortcut.keyId);
-      [shortcut.entry, shortcut.exit].forEach((position, index) => {
-        const view = views[index];
-        if (!view) return;
-        const isPrimaryFloodgate = this.snapshot.floor === 1 && index === 0;
-        view.block.setFillStyle(
-          open ? colors.query : isPrimaryFloodgate ? 0x24313a : colors.plum,
-          open ? 0.28 : isPrimaryFloodgate ? 0.96 : 0.62,
-        );
-        view.block.setStrokeStyle(2, open ? colors.query : colors.gold, 0.9);
-        view.label.setText(
-          isPrimaryFloodgate
-            ? open
-              ? "E · 已开启捷径"
-              : hasKey
-                ? "E · 打开排水水闸"
-                : "E · 需要捷径钥匙"
-            : open
-              ? "E · 穿行捷径"
-              : "捷径落点",
-        );
-        const visible = this.worldObjectRenderer.isDiscovered(discovered, position);
-        view.block.setVisible(visible);
-        view.parts?.forEach((part) => {
-          part.setVisible(visible && !open);
-        });
-        view.label.setVisible(
-          visible &&
-          isNearPlayer(
-            this.snapshot.player,
-            position,
-            INTERACTION_LABEL_DISTANCE,
-          ),
-        );
-      });
-    });
-  }
-
 
   private drawFog(): void {
     this.fogRenderer.render(

@@ -70,7 +70,7 @@ function retargetStage(
 
 /**
  * 设计好的阶段始终具有权威性，只使用已经教授过的复习题补齐缺失的精英或
- * Boss 阶段。稳定阶段 ID 会被保留，使旧答题记录无需迁移存档版本也能读取。
+ * Boss 阶段。
  */
 export function stagesForEncounter(
   monster: Monster,

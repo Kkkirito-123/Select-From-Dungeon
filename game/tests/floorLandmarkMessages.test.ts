@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { floorExperience } from "../src/content/world/floorExperience";
 import { floorLandmarkMessage } from "../src/content/world/floors/landmarkRegistry";
 import type { FloorNumber } from "../src/domain/progression/runGraph";
 
@@ -19,6 +20,32 @@ function message(
 }
 
 describe("floorLandmarkMessage", () => {
+  it("覆盖旧 51 个专用分支，并为普通可调查地标保留内容兜底", () => {
+    const routedIds: string[] = [];
+    const fallbackIds: string[] = [];
+    ([1, 2, 3, 4, 5, 6, 7, 8] as const).forEach((floor) => {
+      const experience = floorExperience(floor);
+      const inspectableIds = [
+        ...experience.npcPlacements.map((npc) => npc.id),
+        ...experience.landmarks
+          .filter((landmark) => (
+            landmark.interaction !== null &&
+            landmark.kind !== "campfire" &&
+            landmark.kind !== "transit" &&
+            landmark.kind !== "sql-seal"
+          ))
+          .map((landmark) => landmark.id),
+      ];
+      inspectableIds.forEach((landmarkId) => {
+        const id = `${floor}:${landmarkId}`;
+        if (message(floor, landmarkId) === null) fallbackIds.push(id);
+        else routedIds.push(id);
+      });
+    });
+    expect(routedIds).toHaveLength(51);
+    expect(fallbackIds).toContain("1:f1-back-shortcut");
+  });
+
   it("按楼层路由文案且未识别地标失败关闭", () => {
     expect(message(1, "npc-scribe-f1")).toContain("SELECT");
     expect(message(2, "npc-scribe-f2")).toContain("ORDER BY");

@@ -10,7 +10,7 @@ import {
   floorOneCurrentSightCellKeys,
   generateFloorOneHazards,
 } from "../src/domain/exploration/floorOneLabyrinth";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { generateGuidedMapPlan } from "../src/domain/exploration/guidedMap";
 import {
   generateMazeFloor,

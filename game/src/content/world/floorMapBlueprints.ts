@@ -1,4 +1,4 @@
-/** 八层宏观布局的兼容入口；楼层作者数据位于 floors/floorXX。 */
+/** 当前八层宏观布局注册表；楼层作者数据位于 floors/floorXX。 */
 import type { FloorNumber } from "../../domain/progression/runGraph";
 import { FLOOR_MAP_BLUEPRINT as FLOOR_01_MAP_BLUEPRINT } from "./floors/floor01/mapBlueprint";
 import { FLOOR_MAP_BLUEPRINT as FLOOR_02_MAP_BLUEPRINT } from "./floors/floor02/mapBlueprint";
@@ -17,9 +17,8 @@ import {
 
 export {
   FLOOR_TRANSIT_PRESENTATIONS,
-  MVP2_MAZE_CHUNK_SIZE,
-  MVP2_MAZE_HEIGHT,
-  MVP2_MAZE_WIDTH,
+  FLOOR_MAP_REFERENCE_HEIGHT,
+  FLOOR_MAP_REFERENCE_WIDTH,
   type FloorMapBlueprint,
   type FloorMapSlot,
   type FloorTransitKind,
@@ -39,11 +38,6 @@ export const FLOOR_MAP_BLUEPRINTS = {
 
 export function floorMapBlueprint(floor: FloorNumber): FloorMapBlueprint {
   return FLOOR_MAP_BLUEPRINTS[floor];
-}
-
-export function compatibleFloorLayoutNames(floor: FloorNumber): readonly string[] {
-  const blueprint = floorMapBlueprint(floor);
-  return [blueprint.layoutName, ...(blueprint.legacyLayoutNames ?? [])];
 }
 
 export function floorTransitPresentation(

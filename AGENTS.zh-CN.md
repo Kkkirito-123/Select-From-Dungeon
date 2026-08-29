@@ -33,13 +33,14 @@ L1/L2 工作契约与恢复检查点。本文件是英文权威 `AGENTS.md` 的�
 
 ## 通过 Skills 路由工作
 
-可复用流程位于 `.agents/skills/`。只有名称和描述匹配当前任务后，才读取选中的英文 `SKILL.md`。
+可复用流程位于 `.agents/skills/`。只有名称和描述匹配当前任务后，才读取选中的 `SKILL.md`。
 
 ```text
 未批准或有歧义的修改 -> $define-requirement -> 用户确认
 首次模板初始化       -> $bootstrap-repository
 已批准的实质交付     -> $deliver-change
 边界明确的实现切片   -> $implement-change
+游戏源码定位 / 调试  -> $debug-game-code
 指南 / 架构 / README -> $sync-project-guide
 明确发布授权         -> $publish-change
 ```

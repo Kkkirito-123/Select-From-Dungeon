@@ -63,12 +63,8 @@ function restPosition(floor: MazeFloor, campfire: Position, zone: MazeZone): Pos
 export function generateCampfires(
   graph: RoomGraph,
   floor: MazeFloor,
-  options: {
-    includeHiddenTreasureRooms?: boolean;
-    useLegacyFloorOnePlacement?: boolean;
-  } = {},
 ): Campfire[] {
-  if (graph.floor === 1 && options.useLegacyFloorOnePlacement !== true) {
+  if (graph.floor === 1) {
     const safeRooms = ["floor-1-entry", "floor-1-rest"] as const;
     const phases = ["front", "rear"] as const;
     return safeRooms.map((roomNodeId, index) => {
@@ -94,8 +90,7 @@ export function generateCampfires(
         room.type !== "boss" &&
         (
           room.type !== "treasure" ||
-          graph.floor > 2 ||
-          options.includeHiddenTreasureRooms === true
+          graph.floor > 2
         ) &&
         !room.lessonId,
       );

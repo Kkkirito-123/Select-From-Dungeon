@@ -1,8 +1,7 @@
 /**
- * 永久 Profile 的 JSON 编码边界。
+ * 永久 Profile 的创建、校验和 JSON 编码边界。
  *
- * Profile 的版本校验和旧版本迁移仍由 localProgress 负责；这里不访问浏览器
- * 存储，只保证写入格式集中，避免入口函数散落 JSON.stringify。
+ * 本模块不访问浏览器存储；localProgress 只负责当前键的读写。
  */
 import type { ProfileProgress } from "../../contracts/game/persistence";
 import type { LessonId } from "../../domain/shared/types";
@@ -76,19 +75,6 @@ export function createEmptyProfile(
   };
 }
 
-/** 根据已经掌握的课程推导永久图鉴中的怪物 ID。 */
-export function discoveredMonsterIdsForLessons(
-  masteredLessons: readonly LessonId[],
-  lessons: readonly Readonly<{ id: LessonId; primaryMonsterId: number }>[],
-): number[] {
-  const mastered = new Set(masteredLessons);
-  return lessons
-    .filter((lesson) => mastered.has(lesson.id))
-    .map((lesson) => lesson.primaryMonsterId)
-    .filter((id, index, values) => values.indexOf(id) === index)
-    .sort((left, right) => left - right);
-}
-
 /** 序列化已经通过校验的 v3 Profile。 */
 export function encodeProfile(profile: ProfileProgress): string {
   return JSON.stringify(profile);
@@ -119,4 +105,21 @@ export function validateProfileProgress(
     rules.isNonNegativeInteger(profile.victories) &&
     (profile.bestRunQueries === null || rules.isNonNegativeInteger(profile.bestRunQueries))
   );
+}
+
+function isLessonId(value: unknown): value is LessonId {
+  return typeof value === "string" && PROFILE_LESSON_IDS.includes(value as LessonId);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+/** 校验 v3 Profile；不合法档案由存储入口回退为空档案。 */
+export function isProfileProgress(value: unknown): value is ProfileProgress {
+  return validateProfileProgress(value, {
+    lessonIds: PROFILE_LESSON_IDS,
+    isLessonId,
+    isNonNegativeInteger,
+  });
 }

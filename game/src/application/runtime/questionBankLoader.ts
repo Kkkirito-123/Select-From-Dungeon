@@ -85,7 +85,7 @@ export async function loadBundledQuestionBank(
       { cache: "no-store" },
     );
     if (!manifestResponse.ok) {
-      // 网络不可用时只允许回退到 Run 明确绑定的 pinnedVersion，避免悄悄换题。
+      // 网络不可用时只允许回退到当前 Run 明确绑定的 pinnedVersion，避免悄悄换题。
       const cached = pinnedVersion ? await cache.get(pinnedVersion) : null;
       return cached ? catalogFromBytes(cached, wasmLocation) : null;
     }
@@ -99,7 +99,7 @@ export async function loadBundledQuestionBank(
       manifest.url !== QUESTION_BANK_CONFIG.databaseUrl
     ) return null;
     if (pinnedVersion && pinnedVersion !== manifest.bankVersion) {
-      // 旧 Run 继续使用原题库，同时在后台缓存最新题库，下一局即可切换。
+      // 当前 Run 继续使用已绑定的题库，同时在后台缓存最新资源，下一局再使用新版本。
       const pinned = await cache.get(pinnedVersion);
       void downloadAndCache(manifest, normalizedBase, fetcher, cache);
       return pinned ? catalogFromBytes(pinned, wasmLocation) : null;

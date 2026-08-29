@@ -4,11 +4,8 @@ import { BIOME_ENCOUNTERS } from "../src/content/world/biomeContent";
 import { FLOOR_ONE_MIMIC_MONSTER_ID } from "../src/domain/exploration/floorOneTreasure";
 import {
   CURRENT_MONSTER_IDS_BY_FLOOR,
-  LEGACY_MONSTER_IDS_BY_FLOOR,
   MONSTER_ID_COUNT,
-  currentMonsterIdForLegacy,
-  detectMonsterIdScheme,
-  legacyMonsterIdForCurrent,
+  monsterRandomSeedId,
 } from "../src/content/world/monsterIds";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
 import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
@@ -71,16 +68,12 @@ describe("MVP 2.0 monster IDs", () => {
     });
   });
 
-  it("旧编号映射覆盖八层且能和新编号集合无歧义地区分", () => {
-    for (let floor = 1; floor <= 8; floor += 1) {
-      const floorNumber = floor as keyof typeof LEGACY_MONSTER_IDS_BY_FLOOR;
-      const legacyIds = LEGACY_MONSTER_IDS_BY_FLOOR[floorNumber];
-      const currentIds = CURRENT_MONSTER_IDS_BY_FLOOR[floorNumber];
-      expect(legacyIds.map(currentMonsterIdForLegacy)).toEqual(currentIds);
-      expect(currentIds.map(legacyMonsterIdForCurrent)).toEqual(legacyIds);
-      expect(detectMonsterIdScheme(floorNumber, legacyIds)).toBe("legacy");
-      expect(detectMonsterIdScheme(floorNumber, currentIds)).toBe("current");
-    }
+  it("当前随机流身份覆盖 1..89 且互不重复", () => {
+    const identities = Array.from(
+      { length: MONSTER_ID_COUNT },
+      (_, index) => monsterRandomSeedId(index + 1),
+    );
+    expect(new Set(identities).size).toBe(MONSTER_ID_COUNT);
   });
 
   it("八层独立 SQLite 的关系表 monster_id 均只关联当前层 monsters.id", async () => {

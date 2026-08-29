@@ -1,6 +1,6 @@
 {
   "name": "select-from-dungeon",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,10 +12,10 @@
     "question-bank:build": "node scripts/build-question-bank.mjs",
     "architecture:check": "node scripts/check-architecture.mjs",
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
+    "build": "node node_modules/typescript/bin/tsc --noEmit && node node_modules/vite/bin/vite.js build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run tests --no-file-parallelism",
-    "test:watch": "vitest",
+    "test": "node node_modules/vitest/vitest.mjs run tests --no-file-parallelism",
+    "test:watch": "node node_modules/vitest/vitest.mjs",
     "check": "pnpm test && pnpm build"
   },
   "dependencies": {

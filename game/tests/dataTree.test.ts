@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { floorKey, joinRun, splitRun } from "../src/infrastructure/storage/dataTree";
 
 describe("数据树", () => {

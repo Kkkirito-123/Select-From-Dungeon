@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { generateMazeFloor } from "../src/domain/exploration/mazeGenerator";
 import {
   advanceMonsterPatrol,

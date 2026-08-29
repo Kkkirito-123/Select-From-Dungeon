@@ -569,6 +569,73 @@ async function sourceFiles(directory) {
   return files;
 }
 
+// 功能包之间只允许沿“下层服务 -> 门面/协调器 -> 运行时”的方向连接。
+// 这里约束的是功能包边，不限制包内部对 contracts/content/domain/infrastructure
+// 的正常依赖；具体适配器仍由各层自己的规则校验。
+const FEATURE_DEPENDENCIES = new Map([
+  ["game-session", new Set()],
+  ["terminal", new Set()],
+  ["narrative", new Set()],
+  ["snapshot", new Set()],
+  ["app-shell", new Set(["game-session", "terminal", "narrative", "snapshot"])],
+  ["game-runtime", new Set(["game-session", "app-shell"])],
+]);
+
+function featurePackageForPath(value) {
+  const match = /^src\/features\/([^/]+)(?:\/|$)/u.exec(value.replaceAll("\\", "/"));
+  return match?.[1] ?? null;
+}
+
+/** 返回功能包的非法跨包边与循环依赖。 */
+async function validateFeatureDependencies() {
+  const graph = new Map(
+    [...FEATURE_DEPENDENCIES.keys()].map((packageName) => [packageName, new Set()]),
+  );
+  const violations = [];
+  const files = await sourceFiles("src/features");
+  for (const file of files) {
+    const sourcePackage = featurePackageForPath(file);
+    if (!sourcePackage) continue;
+    if (!FEATURE_DEPENDENCIES.has(sourcePackage)) {
+      violations.push(`${file}（未登记的 feature 功能包 ${sourcePackage}）`);
+      continue;
+    }
+    const text = await readFile(path.join(root, file), "utf8");
+    for (const specifier of extractModuleSpecifiers(text)) {
+      const targetPackage = featurePackageForPath(
+        resolveModuleSpecifier(file.replaceAll("\\", "/"), specifier),
+      );
+      if (!targetPackage || targetPackage === sourcePackage) continue;
+      graph.get(sourcePackage).add(targetPackage);
+      if (!FEATURE_DEPENDENCIES.get(sourcePackage).has(targetPackage)) {
+        violations.push(
+          `${file}: ${specifier}（feature ${sourcePackage} 不得依赖 feature ${targetPackage}）`,
+        );
+      }
+    }
+  }
+
+  const state = new Map();
+  const stack = [];
+  const visit = (packageName) => {
+    const current = state.get(packageName);
+    if (current === "visiting") {
+      const start = stack.indexOf(packageName);
+      const cycle = [...stack.slice(start), packageName].join(" -> ");
+      violations.push(`feature 功能包存在循环依赖：${cycle}`);
+      return;
+    }
+    if (current === "visited") return;
+    state.set(packageName, "visiting");
+    stack.push(packageName);
+    for (const dependency of graph.get(packageName) ?? []) visit(dependency);
+    stack.pop();
+    state.set(packageName, "visited");
+  };
+  for (const packageName of FEATURE_DEPENDENCIES.keys()) visit(packageName);
+  return violations;
+}
+
 const rules = [
   {
     directory: "src/domain",
@@ -602,6 +669,8 @@ for (const rule of rules) {
     }
   }
 }
+
+violations.push(...await validateFeatureDependencies());
 
 for (const file of await sourceFiles("src")) {
   const normalizedFile = file.replaceAll("\\", "/");

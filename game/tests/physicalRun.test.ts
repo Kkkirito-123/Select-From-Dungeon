@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BIOME_PRACTICE_STAGES } from "../src/content/world/biomeContent";
 import { INITIAL_MONSTERS, LESSONS } from "../src/content/curriculum/mvpLevel";
-import { GameSession } from "../src/domain/session/GameSession";
+import { GameSession } from "../src/features/game-session/GameSession";
 import { biomeGuardianIdForStep } from "../src/domain/exploration/biome";
 import { detectQueryFeatures } from "../src/domain/learning/lessonEvaluator";
 import { isMazeWalkable } from "../src/domain/exploration/mazeGenerator";
