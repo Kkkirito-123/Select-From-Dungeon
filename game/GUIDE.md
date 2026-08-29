@@ -105,11 +105,11 @@ SQLite `EXPLAIN QUERY PLAN`；第八层通过确定性事故数据讲解并发�
 
 ### Dungeon Maintainer 开发桥边界
 
-维护器只在本地开发试玩页加载协议 v3 开发桥，要求同时满足 Vite 开发模式、本机地址
+维护器只在本地开发试玩页加载协议 1.0 开发桥，要求同时满足 Vite 开发模式、本机地址
 （127.0.0.1、localhost 或 [::1]）以及 playtest=agent 查询参数。
 
-桥提供受限的 checkpoint、look、go、use、query、judge、events 能力，维护器只能调用语义动作，
-不能传入 SQL、选择器、鼠标轨迹或任意 JavaScript。检查点只使用临时 sessionStorage，恢复后
+模型只获得受限的 look、act、query 语义动作；prepare、checkpoint、judge、events 只供外层评测与
+验证流程使用。协议不接受选择器、鼠标轨迹或任意 JavaScript。检查点只使用临时 sessionStorage，恢复后
 立即消费；正式 Run、IndexedDB、localStorage 存档和用户 Chrome Profile 不会被维护器读取。
 
 统一 Chromium Shell 会把本游戏嵌入右侧 iframe。生产构建必须移除开发桥全局，发布前在 game/dist

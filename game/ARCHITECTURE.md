@@ -320,7 +320,7 @@ browser state; `PresencePanel` renders only the supplied state.
 It must never contain provider credentials. Content IDs, prose, SQL contracts,
 and save versions remain with their existing authorities.
 
-`src/devtools/dungeon-agent/` owns the sole external maintainer protocol v3 and remains
+`src/devtools/dungeon-agent/` owns the sole external maintainer protocol 1.0 and remains
 development-only. The maintainer rejects every other bridge protocol.
 `protocol.ts` owns types and temporary storage, `actions.ts` owns fixed DOM actions and visible
 overlays, `projection.ts` owns the player-visible view, `navigation.ts` owns internal target/frontier
@@ -545,8 +545,9 @@ service changes only the indicator to unavailable and cannot block startup.
 - The Dungeon Maintainer bridge is installed only when `import.meta.env.DEV`, a localhost
   hostname, and `?playtest=agent` all match. It uses a page-memory DataStore and a temporary
   Chromium `sessionStorage` checkpoint that is deleted immediately after restore. The bridge
-  exposes only `checkpoint/look/go/use/inputSql/query/judge/events`; `inputSql` writes only the
-  current fixed player textarea, while `query` has no SQL parameter. Model-facing projections never
+  exposes only `prepare/checkpoint/look/act/query/judge/events`; `act` accepts only a stable action ID
+  from the matching latest revision, and `query` writes its SQL to the current fixed player textarea
+  before clicking the real submit control. Model-facing projections never
   receive hidden answers, unrevealed hints, complete maps, saves, inventory, identity, or hidden
   Judge details. The fixed Benchmark runner alone may read the bounded `judge` summary described
   above; it is not added to `look`, action results, or model context. The only SQL exception is the

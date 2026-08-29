@@ -1,5 +1,5 @@
 /**
- * SQL Dungeon 专用的开发态协议 v3 浏览器桥装配器。
+ * SQL Dungeon 专用的开发态协议 1.0 浏览器桥装配器。
  *
  * 本文件只把协议方法组合到当前临时 GameSession：它维护快照订阅、一次性检查点、有限
  * Trace、隐藏 judge 缓存和 `window.__DUNGEON_PLAYTEST__` 的安装/清理。DOM 动作、玩家投影、
@@ -62,7 +62,7 @@ export interface DungeonAgentBridgeOptions {
  * 组合隐藏的确定性验证摘要。
  *
  * @param snapshot 当前隔离游戏快照。
- * @returns 只供维护器固定验证层读取的摘要；look/go/use/inputSql/query 不会返回它。
+ * @returns 只供维护器固定验证层读取的摘要；look/act/query 不会返回它。
  */
 function judgeSnapshot(snapshot: GameSnapshot): DungeonAgentJudge {
   const requiredLessons = snapshot.roomGraph.nodes.filter(
@@ -136,7 +136,7 @@ export function dungeonAgentInteractionFingerprint(
 }
 
 /**
- * 安装绑定当前临时 GameSession 的协议 v3 桥。
+ * 安装绑定当前临时 GameSession 的协议 1.0 桥。
  *
  * @param options 已挂载的游戏根节点、Session、SQL 引擎和经三重入口校验的启动参数。
  * @returns 清理函数；调用后取消订阅并仅移除本次安装的全局桥。
@@ -155,6 +155,7 @@ export function installDungeonAgentBridge(
     [snapshot.floor, judgeSnapshot(snapshot)],
   ]);
   const usedInteractions = new Set<string>();
+  let lastNoProgressKey: string | null = null;
   const unsubscribe = options.session.subscribe((nextSnapshot) => {
     snapshot = nextSnapshot;
     judgeByFloor.set(nextSnapshot.floor, judgeSnapshot(nextSnapshot));
@@ -193,8 +194,26 @@ export function installDungeonAgentBridge(
     view: currentView(),
   });
 
+  const noProgressResult = (
+    revision: string,
+    actionId: string,
+    event: string,
+  ): DungeonAgentResult => {
+    const key = `${revision}:${actionId}`;
+    if (lastNoProgressKey === key) {
+      trace.record("act", `action=${actionId} result=stalled`);
+      return result(false, "stalled");
+    }
+    lastNoProgressKey = key;
+    return result(false, event);
+  };
+
+  const markProgress = (): void => {
+    lastNoProgressKey = null;
+  };
+
   const bridge: DungeonPlaytestBridge = {
-    version: 3,
+    version: 1,
     checkpointRestored: options.checkpointRestored,
     prepare(presetId) {
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(presetId)) return false;
@@ -202,6 +221,7 @@ export function installDungeonAgentBridge(
       if (prepared) {
         options.resetSql(options.session.snapshot().monsters);
         usedInteractions.clear();
+        markProgress();
       }
       return prepared;
     },
@@ -222,143 +242,147 @@ export function installDungeonAgentBridge(
       trace.record("look", `floor=${view.floor} mode=${view.mode}`);
       return view;
     },
-    async go(target, rawMaxSteps) {
-      if (isDungeonAgentVisible(options.root, "#inspection-overlay")) {
-        clickDungeonAgentAction(options.root, DUNGEON_AGENT_ACTION_SELECTORS.continue);
-        await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+    async act(revision, actionId, rawMaxSteps) {
+      const visible = currentView();
+      const available = visible.actions.some((action) => (
+        action.id === actionId && action.tool === "act"
+      ));
+      if (revision !== visible.revision) {
+        trace.record("act", `action=${actionId} result=stale-view`);
+        return result(false, "stale-view");
+      }
+      if (!available) {
+        trace.record("act", `action=${actionId} result=action-not-available`);
+        return noProgressResult(revision, actionId, "action-not-available");
       }
       if (!await waitDungeonAgentUiReady(options.root)) {
-        trace.record("go", `target=${target} result=ui-not-ready`);
-        return result(false, "ui-not-ready");
-      }
-      if (snapshot.mode !== "explore") {
-        trace.record("go", `target=${target} result=movement-not-available`);
-        return result(false, "movement-not-available");
+        trace.record("act", `action=${actionId} result=ui-not-ready`);
+        return noProgressResult(revision, actionId, "ui-not-ready");
       }
 
       const maxSteps = Number.isFinite(rawMaxSteps)
         ? Math.max(1, Math.min(MAX_MOVE_STEPS, Math.floor(rawMaxSteps)))
         : 1;
-      let movedSteps = 0;
+      if (actionId === "objective" || actionId === "frontier") {
+        if (snapshot.mode !== "explore") {
+          trace.record("act", `action=${actionId} result=movement-not-available`);
+          return noProgressResult(revision, actionId, "movement-not-available");
+        }
+        let movedSteps = 0;
 
-      while (movedSteps < maxSteps) {
-        const navigation = planDungeonAgentNavigation(snapshot, target);
-        if (!navigation.target) {
-          const event = movedSteps > 0 ? "explored" : "target-not-visible";
-          trace.record("go", `target=${target} steps=${movedSteps} result=${event}`);
-          return result(movedSteps > 0, event, movedSteps);
-        }
-        if (navigation.path.length < 2) {
-          const event = movedSteps > 0 ? "explored" : "no-discovered-path";
-          trace.record("go", `target=${target} steps=${movedSteps} result=${event}`);
-          return result(movedSteps > 0, event, movedSteps);
+        while (movedSteps < maxSteps) {
+          const navigation = planDungeonAgentNavigation(snapshot, actionId);
+          if (!navigation.target) {
+            const event = movedSteps > 0 ? "explored" : "target-not-visible";
+            trace.record("act", `action=${actionId} steps=${movedSteps} result=${event}`);
+            if (movedSteps > 0) markProgress();
+            return movedSteps > 0
+              ? result(true, event, movedSteps)
+              : noProgressResult(revision, actionId, event);
+          }
+          if (navigation.path.length < 2) {
+            const event = movedSteps > 0 ? "explored" : "no-discovered-path";
+            trace.record("act", `action=${actionId} steps=${movedSteps} result=${event}`);
+            if (movedSteps > 0) markProgress();
+            return movedSteps > 0
+              ? result(true, event, movedSteps)
+              : noProgressResult(revision, actionId, event);
+          }
+
+          for (const next of navigation.path.slice(1, maxSteps - movedSteps + 1)) {
+            const before = snapshot;
+            window.dispatchEvent(new CustomEvent("dungeon:move", {
+              detail: {
+                dx: next.x - before.player.x,
+                dy: next.y - before.player.y,
+              },
+            }));
+            await sleepDungeonAgent(dungeonAgentMovementSettleDelay());
+            const stopReason: DungeonAgentMoveStopReason | null = dungeonAgentMoveStopReason(
+              before,
+              snapshot,
+            ) ?? (isDungeonAgentVisible(options.root, "#inspection-overlay") ? "action" : null);
+            if (
+              snapshot.player.x === before.player.x
+              && snapshot.player.y === before.player.y
+            ) {
+              const event = stopReason ?? "blocked";
+              trace.record("act", `action=${actionId} steps=${movedSteps} result=${event}`);
+              return noProgressResult(revision, actionId, event);
+            }
+            movedSteps += 1;
+            if (stopReason) {
+              markProgress();
+              trace.record(
+                "act",
+                `action=${actionId} steps=${movedSteps} result=${stopReason}`,
+              );
+              return result(true, stopReason, movedSteps);
+            }
+          }
         }
 
-        for (const next of navigation.path.slice(1, maxSteps - movedSteps + 1)) {
-          const before = snapshot;
-          window.dispatchEvent(new CustomEvent("dungeon:move", {
-            detail: {
-              dx: next.x - before.player.x,
-              dy: next.y - before.player.y,
-            },
-          }));
-          await sleepDungeonAgent(dungeonAgentMovementSettleDelay());
-          const stopReason: DungeonAgentMoveStopReason | null = dungeonAgentMoveStopReason(
-            before,
-            snapshot,
-          ) ?? (isDungeonAgentVisible(options.root, "#inspection-overlay") ? "action" : null);
-          if (
-            snapshot.player.x === before.player.x
-            && snapshot.player.y === before.player.y
-          ) {
-            const event = stopReason ?? "blocked";
-            trace.record("go", `target=${target} steps=${movedSteps} result=${event}`);
-            return result(stopReason !== null, event, movedSteps);
-          }
-          movedSteps += 1;
-          if (stopReason) {
-            trace.record(
-              "go",
-              `target=${target} steps=${movedSteps} result=${stopReason}`,
-            );
-            return result(true, stopReason, movedSteps);
-          }
-        }
+        markProgress();
+        trace.record("act", `action=${actionId} steps=${movedSteps} result=move-complete`);
+        return result(true, "move-complete", movedSteps);
       }
 
-      trace.record("go", `target=${target} steps=${movedSteps} result=move-complete`);
-      return result(true, "move-complete", movedSteps);
-    },
-    async use(actionId) {
       const selector = DUNGEON_AGENT_ACTION_SELECTORS[actionId];
       const beforeTargetKey = actionId === "interact" ? interactionTargetKey() : null;
-      const beforeFingerprint = actionId === "interact" ? interactionFingerprint() : null;
+      const beforeFingerprint = interactionFingerprint();
       const beforePosition = actionId === "interact"
         ? `${snapshot.floor}:${snapshot.player.x}:${snapshot.player.y}`
         : null;
-      if (!selector) {
-        trace.record("use", `action=${actionId} result=action-not-available`);
-        return result(false, "action-not-available");
+      if (!selector || !clickDungeonAgentAction(options.root, selector)) {
+        trace.record("act", `action=${actionId} result=action-not-available`);
+        return noProgressResult(revision, actionId, "action-not-available");
       }
-      if (!await waitDungeonAgentUiReady(options.root)) {
-        trace.record("use", `action=${actionId} result=ui-not-ready`);
-        return result(false, "ui-not-ready");
+      const actionApplied = await waitDungeonAgentInteractionApplied(
+        interactionFingerprint,
+        beforeFingerprint,
+      );
+      if (!actionApplied) {
+        trace.record("act", `action=${actionId} result=action-not-applied`);
+        return noProgressResult(revision, actionId, "action-not-applied");
       }
-      if (!clickDungeonAgentAction(options.root, selector)) {
-        trace.record("use", `action=${actionId} result=action-not-available`);
-        return result(false, "action-not-available");
-      }
-      if (beforeFingerprint && beforeTargetKey) {
-        const actionApplied = await waitDungeonAgentInteractionApplied(
-          interactionFingerprint,
-          beforeFingerprint,
-        );
-        if (!actionApplied) {
-          trace.record("use", `action=${actionId} result=action-not-applied`);
-          return result(false, "action-not-applied");
-        }
-        // 只在真实语义状态变化后去重；区域门同步传送时再标记目的地。
+      if (beforeTargetKey) {
         usedInteractions.add(beforeTargetKey);
         const afterPosition = `${snapshot.floor}:${snapshot.player.x}:${snapshot.player.y}`;
         if (afterPosition !== beforePosition) usedInteractions.add(interactionTargetKey());
-      } else {
-        await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
       }
-      trace.record("use", `action=${actionId} result=accepted`);
+      markProgress();
+      trace.record("act", `action=${actionId} result=accepted`);
       return result(true, `action:${actionId}`);
     },
-    async inputSql(sql) {
-      const mode = snapshot.mode;
-      if (mode !== "combat" && mode !== "challenge") {
-        trace.record("input-sql", `mode=${mode} result=input-not-available`);
-        return result(false, "input-not-available");
+    async query(revision, sql) {
+      const visible = currentView();
+      if (revision !== visible.revision) {
+        trace.record("query", "result=stale-view");
+        return result(false, "stale-view");
       }
-      if (
-        typeof sql !== "string"
-        || sql.length > DUNGEON_AGENT_SQL_MAX_LENGTH
-        || sql.includes("\u0000")
-      ) {
-        trace.record("input-sql", `mode=${mode} result=input-invalid`);
-        return result(false, "input-invalid");
-      }
-      if (!await waitDungeonAgentUiReady(options.root)) {
-        trace.record("input-sql", `mode=${mode} result=ui-not-ready`);
-        return result(false, "ui-not-ready");
-      }
-      if (!writeDungeonAgentSql(options.root, mode, sql)) {
-        trace.record("input-sql", `mode=${mode} result=terminal-not-open`);
-        return result(false, "terminal-not-open");
-      }
-      await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
-      trace.record("input-sql", `mode=${mode} length=${sql.length} result=input-accepted`);
-      return result(true, "input-accepted");
-    },
-    async query() {
       const modeBeforeQuery = snapshot.mode;
       if (modeBeforeQuery !== "combat" && modeBeforeQuery !== "challenge") {
         trace.record("query", `mode=${modeBeforeQuery} result=query-not-available`);
         return result(false, "query-not-available");
       }
+      if (
+        typeof sql !== "string"
+        || sql.length < 1
+        || sql.length > DUNGEON_AGENT_SQL_MAX_LENGTH
+        || sql.includes("\u0000")
+      ) {
+        trace.record("query", `mode=${modeBeforeQuery} result=input-invalid`);
+        return result(false, "input-invalid");
+      }
+      if (!await waitDungeonAgentUiReady(options.root)) {
+        trace.record("query", `mode=${modeBeforeQuery} result=ui-not-ready`);
+        return result(false, "ui-not-ready");
+      }
+      if (!writeDungeonAgentSql(options.root, modeBeforeQuery, sql)) {
+        trace.record("query", `mode=${modeBeforeQuery} result=terminal-not-open`);
+        return result(false, "terminal-not-open");
+      }
+      await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
 
       const queryResult = await executeDungeonAgentQuery({
         root: options.root,
@@ -371,7 +395,7 @@ export function installDungeonAgentBridge(
       await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
       trace.record(
         "query",
-        `floor=${snapshot.floor} mode=${modeBeforeQuery} result=${queryResult.event}`,
+        `floor=${snapshot.floor} mode=${modeBeforeQuery} length=${sql.length} result=${queryResult.event}`,
       );
       // `ok` 表示真实游戏是否接受本次查询，而不是“桥函数成功返回”。否则重放层
       // 会把 query-rejected 当作修复通过，导致 /verify 产生假阳性。

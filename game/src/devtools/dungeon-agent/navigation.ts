@@ -26,6 +26,14 @@ export interface DungeonAgentNavigationPlan {
   path: readonly DungeonAgentPosition[];
 }
 
+/** 内部目标分类；坐标只供页面内 BFS 使用。 */
+export interface DungeonAgentObjectiveDetails {
+  position: DungeonAgentPosition;
+  kind: "reward" | "prerequisite-reward" | "shortcut-key" | "objective";
+  label: string;
+  prerequisites: readonly string[];
+}
+
 const DIRECTIONS: readonly DungeonAgentPosition[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
@@ -40,9 +48,9 @@ const DIRECTIONS: readonly DungeonAgentPosition[] = [
  * @returns 当前课程奖励、课程怪物、房间锚点或楼层钥匙坐标；无目标时返回 `null`。
  * @remarks 坐标仅在浏览器内部用于寻路，不进入协议投影或 Trace。
  */
-export function findDungeonAgentObjective(
+export function findDungeonAgentObjectiveDetails(
   snapshot: GameSnapshot,
-): DungeonAgentPosition | null {
+): DungeonAgentObjectiveDetails | null {
   const claimableReward = snapshot.claimableReward
     ? snapshot.groundItems.find((item) => (
         item.sourceRoomId === snapshot.currentRoomId
@@ -50,13 +58,65 @@ export function findDungeonAgentObjective(
         && item.rewardId === snapshot.claimableReward?.id
       ))
     : null;
-  if (claimableReward) return { x: claimableReward.x, y: claimableReward.y };
+  if (claimableReward) {
+    return {
+      position: { x: claimableReward.x, y: claimableReward.y },
+      kind: "reward",
+      label: claimableReward.name,
+      prerequisites: [],
+    };
+  }
 
   const objectiveId = snapshot.navigationGuidance.objectiveRoomId;
+  const objectiveRoom = objectiveId
+    ? snapshot.roomGraph.nodes.find((room) => room.id === objectiveId)
+    : null;
+  const prerequisiteReward = objectiveRoom
+    ? snapshot.roomGraph.nodes.find((room) => (
+        room.reward === "aggregate-hammer"
+        && room.next.includes(objectiveRoom.id)
+        && !snapshot.completedRoomIds.includes(room.id)
+      ))
+    : null;
+  const prerequisitePosition = prerequisiteReward
+    ? snapshot.mazeFloor.anchors[prerequisiteReward.id]
+    : null;
+  if (prerequisiteReward && prerequisitePosition) {
+    return {
+      position: { ...prerequisitePosition },
+      kind: "prerequisite-reward",
+      label: prerequisiteReward.title,
+      prerequisites: prerequisiteReward.prerequisiteLessons.map(String),
+    };
+  }
+
+  const lockedShortcut = snapshot.interactionPrompt.startsWith("E")
+    && snapshot.interactionPrompt.includes("检查锁住的")
+    ? snapshot.guidedMap.shortcuts.find((shortcut) => (
+        !snapshot.keyItems.includes(shortcut.keyId)
+        && !snapshot.openedGateIds.includes(shortcut.id)
+      ))
+    : null;
+  if (lockedShortcut) {
+    return {
+      position: { ...lockedShortcut.keyPosition },
+      kind: "shortcut-key",
+      label: lockedShortcut.name,
+      prerequisites: lockedShortcut.requires.map(String),
+    };
+  }
+
   if (objectiveId?.startsWith("area-boss:")) {
     const monsterId = Number(objectiveId.slice("area-boss:".length));
     const actor = snapshot.worldActors.find((entry) => entry.monsterId === monsterId);
-    if (actor) return { x: actor.x, y: actor.y };
+    if (actor) {
+      return {
+        position: { x: actor.x, y: actor.y },
+        kind: "objective",
+        label: snapshot.navigationGuidance.objectiveTitle ?? "区域首领",
+        prerequisites: [],
+      };
+    }
   }
   if (objectiveId) {
     const actor = snapshot.worldActors.find((entry) => (
@@ -65,12 +125,38 @@ export function findDungeonAgentObjective(
         (monster) => monster.id === entry.monsterId && monster.hp > 0,
       )
     ));
-    if (actor) return { x: actor.x, y: actor.y };
+    if (actor) {
+      return {
+        position: { x: actor.x, y: actor.y },
+        kind: "objective",
+        label: snapshot.navigationGuidance.objectiveTitle ?? "当前主线目标",
+        prerequisites: objectiveRoom?.prerequisiteLessons.map(String) ?? [],
+      };
+    }
     const anchor = snapshot.mazeFloor.anchors[objectiveId];
-    if (anchor) return { ...anchor };
+    if (anchor) {
+      return {
+        position: { ...anchor },
+        kind: "objective",
+        label: snapshot.navigationGuidance.objectiveTitle ?? objectiveRoom?.title ?? "当前主线目标",
+        prerequisites: objectiveRoom?.prerequisiteLessons.map(String) ?? [],
+      };
+    }
   }
   const floorKey = snapshot.groundItems.find((item) => item.rewardId === "floor-key");
-  return floorKey ? { x: floorKey.x, y: floorKey.y } : null;
+  return floorKey ? {
+    position: { x: floorKey.x, y: floorKey.y },
+    kind: "reward",
+    label: floorKey.name,
+    prerequisites: [],
+  } : null;
+}
+
+/** 兼容页面内寻路调用，只返回不会进入协议层的目标坐标。 */
+export function findDungeonAgentObjective(
+  snapshot: GameSnapshot,
+): DungeonAgentPosition | null {
+  return findDungeonAgentObjectiveDetails(snapshot)?.position ?? null;
 }
 
 /**
@@ -144,10 +230,9 @@ export function dungeonAgentMoveStopReason(
     || after.missionTitle !== before.missionTitle
     || after.completedLessons.length !== before.completedLessons.length
   ) return "task";
-  if (
-    after.interactionPrompt !== before.interactionPrompt
-    && after.interactionPrompt.startsWith("E")
-  ) return "action";
+  if (before.interactionPrompt.startsWith("E") || after.interactionPrompt.startsWith("E")) {
+    return "action";
+  }
   return null;
 }
 
