@@ -1,7 +1,7 @@
 /**
  * Dungeon Maintainer 与浏览器游戏之间的开发态协议和临时存储边界。
  *
- * 本文件负责三件事：校验 `DEV + 本机地址 + ?playtest=agent` 启动条件、声明协议 v3
+ * 本文件负责三件事：校验 `DEV + 本机地址 + ?playtest=agent` 启动条件、声明协议 1.0
  * 的有限数据结构，以及创建不会接触正式 IndexedDB/localStorage 的页面内存存储。
  * 它不安装全局桥、不执行移动或 SQL，也不启动维护器进程。
  *
@@ -36,10 +36,19 @@ export interface DungeonAgentLaunch {
 /** 当前页面对刷新检查点的消费结果。 */
 export type DungeonAgentCheckpointState = "none" | "restored" | "invalid";
 
-/** 玩家可见的稳定动作入口；`id` 只能交给维护器的 `use` 工具。 */
+/** 玩家可见的稳定动作入口；`tool` 明确该 ID 由 act 还是 query 消费。 */
 export interface DungeonAgentAction {
   id: string;
   label: string;
+  tool: "act" | "query";
+}
+
+/** 不含坐标的当前导航目标和前置依赖说明。 */
+export interface DungeonAgentTargetView {
+  kind: "reward" | "prerequisite-reward" | "shortcut-key" | "objective" | "frontier";
+  label: string;
+  prerequisites: readonly string[];
+  actionId: DungeonAgentMoveTarget;
 }
 
 /** 当前 SQL 终端向玩家展示的查询状态。 */
@@ -92,6 +101,8 @@ export interface DungeonAgentTerminalView {
  * 完整地图、隐藏答案、管理员答案字段、身份档案、背包、正式存档和隐藏裁判结果均不属于该类型。
  */
 export interface DungeonAgentView {
+  /** 绑定当前玩家可见状态和动作集合；状态变化后旧修订必须拒绝执行。 */
+  revision: string;
   floor: number;
   mode: string;
   hp: {
@@ -107,6 +118,7 @@ export interface DungeonAgentView {
     hintLevel: number;
   };
   actions: readonly DungeonAgentAction[];
+  target: DungeonAgentTargetView | null;
   room: string;
   mission: {
     title: string;
@@ -134,7 +146,7 @@ export interface DungeonAgentResult {
 /**
  * 仅供确定性验证层读取的隐藏裁判摘要。
  *
- * `look/go/use/inputSql/query` 不得返回此结构，维护模型也没有直接调用 judge 的工具。
+ * `look/act/query` 不得返回此结构，维护模型也没有直接调用 judge 的工具。
  */
 export interface DungeonAgentJudge {
   floor: number;
@@ -160,25 +172,24 @@ export interface DungeonAgentEvent {
 }
 
 /**
- * `window.__DUNGEON_PLAYTEST__` 暴露的固定协议 v3。
+ * `window.__DUNGEON_PLAYTEST__` 暴露的唯一协议 1.0。
  *
- * 所有方法均不接受 JavaScript、CSS 选择器或鼠标坐标；inputSql 只向当前固定玩家
- * textarea 写入文本，query 仍不接受 SQL 参数。
+ * 所有方法均不接受 JavaScript、CSS 选择器或鼠标坐标。act 只能消费当前 look 返回的
+ * 修订与动作；query 把 SQL 写入当前固定玩家 textarea 后点击真实提交控件。
  */
 export interface DungeonPlaytestBridge {
-  readonly version: 3;
+  readonly version: 1;
   readonly checkpointRestored: boolean;
   /** 仅供游戏拥有的 Benchmark Adapter 建立确定性起点。 */
   prepare(presetId: string): boolean;
   checkpoint(): boolean;
   look(): DungeonAgentView;
-  go(
-    target: DungeonAgentMoveTarget,
+  act(
+    revision: string,
+    actionId: string,
     maxSteps: number,
   ): Promise<DungeonAgentResult>;
-  use(actionId: string): Promise<DungeonAgentResult>;
-  inputSql(sql: string): Promise<DungeonAgentResult>;
-  query(): Promise<DungeonAgentResult>;
+  query(revision: string, sql: string): Promise<DungeonAgentResult>;
   judge(floor: number): DungeonAgentJudge;
   events(afterSequence: number): readonly DungeonAgentEvent[];
 }
