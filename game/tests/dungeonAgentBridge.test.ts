@@ -164,6 +164,23 @@ describe("Dungeon Agent 玩家投影", () => {
     ))).toBe(true);
   });
 
+  it("当前交互已消费后恢复导航动作", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-consumed-interaction");
+    const snapshot = {
+      ...session.snapshot(),
+      interactionPrompt: "E  调查已处理目标",
+    };
+
+    expect(buildDungeonAgentView(snapshot).actions).toContainEqual(
+      expect.objectContaining({ id: "interact" }),
+    );
+    const consumed = buildDungeonAgentView(snapshot, undefined, true);
+    expect(consumed.actions).not.toContainEqual(expect.objectContaining({ id: "interact" }));
+    expect(consumed.actions).toContainEqual(
+      expect.objectContaining({ id: consumed.target?.actionId }),
+    );
+  });
+
   it("只投影当前打开终端的题面、可见 SQL、状态、证据和已解锁提示", () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-terminal-view");
     session.enableAgentPlaytestMode();

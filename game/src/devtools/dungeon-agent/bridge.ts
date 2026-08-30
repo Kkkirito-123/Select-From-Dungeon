@@ -165,8 +165,8 @@ export function installDungeonAgentBridge(
     snapshot.floor,
     snapshot.player.x,
     snapshot.player.y,
-    snapshot.completedLessons.length,
     snapshot.interactionPrompt,
+    interactionFingerprint(),
   ].join(":");
 
   const interactionFingerprint = (): string => dungeonAgentInteractionFingerprint(
@@ -175,12 +175,12 @@ export function installDungeonAgentBridge(
   );
 
   const currentView = (): DungeonAgentView => {
-    const view = buildDungeonAgentView(snapshot, readDungeonAgentOverlay(options.root));
-    if (!usedInteractions.has(interactionTargetKey())) return view;
-    return {
-      ...view,
-      actions: view.actions.filter((entry) => entry.id !== "interact"),
-    };
+    const interactionConsumed = usedInteractions.has(interactionTargetKey());
+    return buildDungeonAgentView(
+      snapshot,
+      readDungeonAgentOverlay(options.root),
+      interactionConsumed,
+    );
   };
 
   const result = (

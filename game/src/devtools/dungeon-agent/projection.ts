@@ -93,11 +93,13 @@ function terminalView(
  *
  * @param snapshot 当前隔离 GameSession 快照，只在函数内部裁剪。
  * @param overlay 当前 DOM 覆盖层的有限可见状态；省略时视为没有覆盖层。
+ * @param interactionConsumed 当前位置的交互已经执行时恢复导航，不再重复暴露交互动作。
  * @returns 不含完整地图、SQL、答案、身份、背包、存档或隐藏裁判的视图。
  */
 export function buildDungeonAgentView(
   snapshot: GameSnapshot,
   overlay: VisibleOverlayState = EMPTY_OVERLAY,
+  interactionConsumed = false,
 ): DungeonAgentView {
   const actions: DungeonAgentAction[] = [];
   const objective = findDungeonAgentObjectiveDetails(snapshot);
@@ -118,7 +120,7 @@ export function buildDungeonAgentView(
   } else if (overlay.reviewOpen || snapshot.mode === "death-review") {
     actions.push(action("close-review", "关闭复盘"));
   } else if (snapshot.mode === "explore") {
-    if (snapshot.interactionPrompt.startsWith("E")) {
+    if (snapshot.interactionPrompt.startsWith("E") && !interactionConsumed) {
       actions.push(action("interact", snapshot.interactionPrompt));
     } else {
       addMovementAction();

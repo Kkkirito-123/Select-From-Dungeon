@@ -46,6 +46,26 @@ Copy `game/.env.example` to `game/.env.local` to enable the single optional
 not project source, is ignored by Git, and can be regenerated from
 `game/pnpm-lock.yaml`.
 
+## Coding-agent benchmark
+
+The game owns seven development-only repair cases under
+[`benchmark/agent-evals/`](benchmark/agent-evals/) and exposes them through the
+stable [`scripts/benchmark-adapter.mjs`](scripts/benchmark-adapter.mjs) JSON
+interface. Dungeon Maintainer reads this adapter from the current working tree,
+so benchmark materialization always uses the current game instead of a frozen
+copy. Materialized targets exclude the benchmark definitions, hidden Oracle
+data, and the adapter itself.
+
+Inspect the public catalog from the repository root:
+
+```bash
+node scripts/benchmark-adapter.mjs catalog
+node scripts/benchmark-adapter.mjs describe --fixture terminal-action-bug --audience public
+```
+
+See [benchmark/README.md](benchmark/README.md) for the materialization command
+and privacy boundary.
+
 ## Validation
 
 ```bash

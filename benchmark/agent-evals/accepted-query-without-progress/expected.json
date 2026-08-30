@@ -3,7 +3,7 @@
   "fixtureId": "accepted-query-without-progress",
   "expectedRouteFeatures": ["feature.lesson-evaluation"],
   "secretInputs": {
-    "first-stage": "SELECT weakness FROM monsters WHERE id = 1;"
+    "first-stage": "SELECT channel, COUNT(*) AS total FROM monster_signals WHERE monster_id = 5 GROUP BY channel HAVING COUNT(*) >= 2;"
   },
   "beforeOracle": "combat-stalled",
   "afterOracle": "combat-progressed",

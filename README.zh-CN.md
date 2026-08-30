@@ -43,6 +43,22 @@ npm start --prefix presence
 `game/node_modules/` 是 pnpm 安装生成的依赖内容，不是项目源码，不会提交到 Git；删除后可根据
 `game/pnpm-lock.yaml` 完整重新生成。
 
+## Coding Agent Benchmark
+
+游戏在 [`benchmark/agent-evals/`](benchmark/agent-evals/) 中维护 7 个仅供开发使用的真实修复场景，
+并通过稳定的 [`scripts/benchmark-adapter.mjs`](scripts/benchmark-adapter.mjs) JSON 接口提供给
+Dungeon Maintainer。维护器从当前工作树读取 Adapter，因此每次物化都以最新游戏为准，不再使用冻结副本。
+物化后的目标仓库不包含 Benchmark 定义、隐藏 Oracle 数据或 Adapter 本身。
+
+在仓库根目录查看公开场景清单：
+
+```bash
+node scripts/benchmark-adapter.mjs catalog
+node scripts/benchmark-adapter.mjs describe --fixture terminal-action-bug --audience public
+```
+
+物化命令和隐私边界见 [benchmark/README.md](benchmark/README.md)。
+
 ## 验证
 
 ```bash

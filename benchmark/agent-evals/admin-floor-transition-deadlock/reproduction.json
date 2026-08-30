@@ -2,13 +2,15 @@
   "schemaVersion": 1,
   "fixtureId": "admin-floor-transition-deadlock",
   "steps": [
+    { "op": "use", "actionId": "continue" },
+    { "op": "use", "actionId": "interact" },
+    { "op": "use", "actionId": "continue" },
     { "op": "go", "target": "objective", "maxSteps": 64 },
     { "op": "use", "actionId": "terminal" },
     { "op": "input-sql", "inputRef": "boss-stage-one" },
     { "op": "query" },
     { "op": "input-sql", "inputRef": "boss-stage-two" },
     { "op": "query" },
-    { "op": "go", "target": "objective", "maxSteps": 64 },
     { "op": "use", "actionId": "interact" },
     { "op": "wait", "milliseconds": 2500 }
   ]
