@@ -5,6 +5,6 @@
   "prompt": "SQL 战斗显示查询已通过并造成命中，但题目仍停在第一阶段，重复提交也无法推进。请修复战斗阶段状态没有随成功查询前进的问题。",
   "evidenceSummary": "查询被接受，怪物受伤，但终端 stageIndex 仍为 0。",
   "startFloor": 1,
-  "startPreset": null,
+  "startPreset": "f1-admin-boss",
   "timeoutMs": 600000
 }

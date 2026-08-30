@@ -13,6 +13,7 @@ import {
   dungeonAgentMoveStopReason,
   findDungeonAgentFrontier,
   findDungeonAgentObjective,
+  findDungeonAgentObjectiveDetails,
 } from "../src/devtools/dungeon-agent/navigation";
 import { buildDungeonAgentView } from "../src/devtools/dungeon-agent/projection";
 import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
@@ -143,15 +144,41 @@ describe("Dungeon Agent 玩家投影", () => {
     const encoded = JSON.stringify(view);
 
     expect(view.floor).toBe(1);
+    expect(view.revision).toMatch(/^[a-f0-9]{8}$/u);
+    expect(view.target).toMatchObject({
+      actionId: "objective",
+      prerequisites: expect.any(Array),
+    });
     expect(encoded).not.toContain("mazeFloor");
     expect(encoded).not.toContain("adminAnswerSql");
     expect(encoded).not.toContain("runInstanceId");
     expect(encoded).not.toContain("equipmentInventory");
     expect(encoded).not.toContain("profile");
     expect(encoded).not.toContain(snapshot.runSeed);
+    expect(encoded).not.toContain('"x":');
+    expect(encoded).not.toContain('"y":');
     expect(view.terminal).toBeNull();
     if (snapshot.adminAnswerSql) expect(encoded).not.toContain(snapshot.adminAnswerSql);
-    expect(view.actions.some((entry) => entry.id === "objective")).toBe(true);
+    expect(view.actions.some((entry) => (
+      entry.id === "objective" || entry.id === "interact"
+    ))).toBe(true);
+  });
+
+  it("当前交互已消费后恢复导航动作", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-consumed-interaction");
+    const snapshot = {
+      ...session.snapshot(),
+      interactionPrompt: "E  调查已处理目标",
+    };
+
+    expect(buildDungeonAgentView(snapshot).actions).toContainEqual(
+      expect.objectContaining({ id: "interact" }),
+    );
+    const consumed = buildDungeonAgentView(snapshot, undefined, true);
+    expect(consumed.actions).not.toContainEqual(expect.objectContaining({ id: "interact" }));
+    expect(consumed.actions).toContainEqual(
+      expect.objectContaining({ id: consumed.target?.actionId }),
+    );
   });
 
   it("只投影当前打开终端的题面、可见 SQL、状态、证据和已解锁提示", () => {
@@ -336,6 +363,54 @@ describe("Dungeon Agent 玩家投影", () => {
     });
   });
 
+  it("下游课程受阻时 objective 先指向必需奖励房", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-prerequisite-reward");
+    const original = session.snapshot();
+    const rewardRoom = original.roomGraph.nodes.find(
+      (room) => room.reward === "aggregate-hammer",
+    );
+    const downstream = rewardRoom
+      ? original.roomGraph.nodes.find((room) => rewardRoom.next.includes(room.id))
+      : null;
+    expect(rewardRoom).toBeDefined();
+    expect(downstream).toBeDefined();
+    const snapshot = {
+      ...original,
+      completedLessons: [...rewardRoom!.prerequisiteLessons],
+      completedRoomIds: original.completedRoomIds.filter((id) => id !== rewardRoom!.id),
+      navigationGuidance: {
+        ...original.navigationGuidance,
+        objectiveRoomId: downstream!.id,
+        objectiveTitle: downstream!.title,
+      },
+    };
+
+    expect(findDungeonAgentObjectiveDetails(snapshot)).toMatchObject({
+      position: original.mazeFloor.anchors[rewardRoom!.id],
+      kind: "prerequisite-reward",
+      label: rewardRoom!.title,
+    });
+  });
+
+  it("检查锁住的捷径后 objective 指向尚未拾取的保证钥匙", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-shortcut-key");
+    const original = session.snapshot();
+    const shortcut = original.guidedMap.shortcuts[0];
+    expect(shortcut).toBeDefined();
+    const snapshot = {
+      ...original,
+      player: { ...original.player, ...shortcut!.entry },
+      interactionPrompt: `E  检查锁住的${shortcut!.name}`,
+      keyItems: original.keyItems.filter((id) => id !== shortcut!.keyId),
+    };
+
+    expect(findDungeonAgentObjectiveDetails(snapshot)).toMatchObject({
+      position: shortcut!.keyPosition,
+      kind: "shortcut-key",
+      label: shortcut!.name,
+    });
+  });
+
   it("模式、生命、楼层、任务和交互提示变化都会停止宏移动", () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-stop");
     const before = session.snapshot();
@@ -351,9 +426,11 @@ describe("Dungeon Agent 玩家投影", () => {
       ...before,
       interactionPrompt: "E  调查",
     })).toBe("action");
+    const alreadyInteractive = { ...before, interactionPrompt: "E  拾取钥匙" };
+    expect(dungeonAgentMoveStopReason(alreadyInteractive, alreadyInteractive)).toBe("action");
   });
 
-  it("inputSql 写入当前 textarea 后，query 走真实终端按钮且规则拒绝时返回 ok=false", async () => {
+  it("query 一次调用写入当前 textarea 并走真实终端按钮，规则拒绝时返回 ok=false", async () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-query-result");
     session.enableAgentPlaytestMode();
     expect(session.adminApplyPreset("f1-admin-dormitory")).toMatchObject({ ok: true });
@@ -423,26 +500,22 @@ describe("Dungeon Agent 玩家投影", () => {
       });
 
       const sql = "SELECT id FROM monsters WHERE id = -1";
-      await expect(window.__DUNGEON_PLAYTEST__?.inputSql(sql)).resolves.toMatchObject({
-        ok: true,
-        event: "input-accepted",
-        view: { terminal: { inputSql: sql } },
-      });
-      await expect(window.__DUNGEON_PLAYTEST__?.query()).resolves.toMatchObject({
+      const revision = window.__DUNGEON_PLAYTEST__?.look().revision;
+      await expect(window.__DUNGEON_PLAYTEST__?.query(revision!, sql)).resolves.toMatchObject({
         ok: false,
         event: "query-rejected",
         view: {
           terminal: {
-            inputSql: editor.value,
+            inputSql: sql,
             status: { kind: "warning" },
           },
         },
       });
-      const inputEvent = window.__DUNGEON_PLAYTEST__?.events(0).find(
-        (entry) => entry.type === "input-sql",
+      const queryEvent = window.__DUNGEON_PLAYTEST__?.events(0).find(
+        (entry) => entry.type === "query",
       );
-      expect(inputEvent?.summary).toContain("length=");
-      expect(inputEvent?.summary).not.toContain(sql);
+      expect(queryEvent?.summary).toContain("length=");
+      expect(queryEvent?.summary).not.toContain(sql);
     } finally {
       removeBridge?.();
       if (previousWindow) {
@@ -453,7 +526,7 @@ describe("Dungeon Agent 玩家投影", () => {
     }
   });
 
-  it("未生效的交互不会被去重", async () => {
+  it("未生效交互会熔断同态重试，状态推进后拒绝旧 revision", async () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-use-settlement");
     session.enableAgentPlaytestMode();
     const selectRoom = session.snapshot().roomGraph.nodes.find(
@@ -525,20 +598,30 @@ describe("Dungeon Agent 玩家投影", () => {
         checkpointRestored: false,
         resetSql: () => undefined,
       });
-      await expect(window.__DUNGEON_PLAYTEST__?.use("interact")).resolves.toMatchObject({
+      let view = window.__DUNGEON_PLAYTEST__!.look();
+      await expect(window.__DUNGEON_PLAYTEST__?.act(view.revision, "interact", 1)).resolves.toMatchObject({
         ok: false,
         event: "action-not-applied",
+      });
+      await expect(window.__DUNGEON_PLAYTEST__?.act(view.revision, "interact", 1)).resolves.toMatchObject({
+        ok: false,
+        event: "stalled",
       });
       expect(window.__DUNGEON_PLAYTEST__?.look().actions).toContainEqual(
         expect.objectContaining({ id: "interact" }),
       );
 
       interactionDelay = 72;
-      await expect(window.__DUNGEON_PLAYTEST__?.use("interact")).resolves.toMatchObject({
+      view = window.__DUNGEON_PLAYTEST__!.look();
+      await expect(window.__DUNGEON_PLAYTEST__?.act(view.revision, "interact", 1)).resolves.toMatchObject({
         ok: true,
         event: "action:interact",
       });
       expect(session.snapshot().groundItems.some((item) => item.id === reward!.id)).toBe(false);
+      await expect(window.__DUNGEON_PLAYTEST__?.act(view.revision, "interact", 1)).resolves.toMatchObject({
+        ok: false,
+        event: "stale-view",
+      });
     } finally {
       removeBridge?.();
       if (previousWindow) {
@@ -577,11 +660,13 @@ describe("Dungeon Agent 桥接边界", () => {
       "utf8",
     );
 
-    expect(protocolSource).toContain("readonly version: 3");
-    expect(protocolSource).toContain("inputSql(sql: string): Promise<DungeonAgentResult>");
-    expect(protocolSource).toContain("query(): Promise<DungeonAgentResult>");
+    expect(protocolSource).toContain("readonly version: 1");
+    expect(protocolSource).toContain("act(");
+    expect(protocolSource).toContain("query(revision: string, sql: string)");
     expect(protocolSource).toContain("events(afterSequence: number)");
-    expect(protocolSource).not.toContain("query(sql");
+    expect(protocolSource).not.toContain("inputSql(sql");
+    expect(protocolSource).not.toContain("go(");
+    expect(protocolSource).not.toContain("use(actionId");
     expect(protocolSource).not.toContain("evaluate(script");
     expect(protocolSource).toContain("inputSql: string");
     expect(actionsSource).toContain('"#sql-editor"');

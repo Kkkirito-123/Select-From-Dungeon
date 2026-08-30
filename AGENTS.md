@@ -52,13 +52,14 @@ recovery checkpoint. `AGENTS.zh-CN.md` is the synchronized Chinese translation.
 ## Route Work Through Skills
 
 Reusable workflows live under `.agents/skills/`. Load only the selected
-English `SKILL.md` after its name and description match the task.
+`SKILL.md` after its name and description match the task.
 
 ```text
 unapproved or ambiguous change -> $define-requirement -> approval
 first template bootstrap       -> $bootstrap-repository
 approved substantive delivery  -> $deliver-change
 bounded implementation slice   -> $implement-change
+game source location / debug   -> $debug-game-code
 guide / architecture / README  -> $sync-project-guide
 explicit publication authority -> $publish-change
 ```

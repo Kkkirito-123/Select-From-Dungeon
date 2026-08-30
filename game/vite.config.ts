@@ -20,6 +20,7 @@ function copyDistributionDocuments(): Plugin {
 
 export default defineConfig({
   base: "./",
+  cacheDir: process.env.DUNGEON_MAINTAINER_VITE_CACHE_DIR || undefined,
   plugins: [copyDistributionDocuments()],
   build: {
     target: "es2022",

@@ -3,7 +3,7 @@
   "contractId": "dungeon.game.architecture",
   "contractVersion": 1,
   "projectRoot": "game",
-  "boundaryRevision": 6,
+  "boundaryRevision": 7,
   "layers": [
     { "id": "contracts", "root": "game/src/contracts", "responsibility": "跨层只读游戏、Agent、存储和结果契约" },
     { "id": "application", "root": "game/src/application", "responsibility": "启动、用例编排、运行时配置和页面生命周期" },
@@ -235,9 +235,9 @@
       "id": "domain.session",
       "parentId": "domain",
       "root": "game/src/domain/session",
-      "responsibility": "GameSession 门面、跨领域状态协调和快照形成",
-      "notResponsibleFor": ["DOM 渲染", "浏览器存储实现"],
-      "signals": ["game session", "状态没有更新", "刷新后", "状态泄漏", "重复提交", "快照"],
+      "responsibility": "供 GameSession 调用的跨领域纯服务、状态转换和会话只读派生",
+      "notResponsibleFor": ["GameSession 公开门面", "DOM 渲染", "浏览器存储实现"],
+      "signals": ["会话服务", "状态转换", "只读派生", "selector", "上下文", "快照形成"],
       "neighbors": ["domain.combat", "domain.exploration", "domain.learning", "domain.progression", "infrastructure.storage", "features.game-session"]
     },
     {
@@ -408,9 +408,9 @@
       "id": "presentation.dom.panels",
       "parentId": "presentation.dom",
       "root": "game/src/presentation/dom/panels",
-      "responsibility": "终端、背包、故事和其他 DOM 面板交互",
+      "responsibility": "终端、背包、故事、管理员、反馈与楼层/区域/死亡转场面板",
       "notResponsibleFor": ["通用快照渲染", "领域状态修改"],
-      "signals": ["面板", "panel", "终端界面", "背包界面", "故事面板"],
+      "signals": ["面板", "panel", "终端界面", "背包界面", "故事面板", "转场面板", "楼层转场", "区域转场", "死亡转场"],
       "neighbors": ["presentation.dom.focus", "presentation.dom.renderers"]
     },
     {
@@ -609,173 +609,173 @@
     },
     {
       "id": "feature.combat-resolution",
-      "roots": ["domain.session.combat", "domain.session", "domain.combat", "domain.learning", "infrastructure.sql", "content.curriculum"],
+      "roots": ["features.game-session", "features.terminal", "domain.session.combat", "domain.session", "domain.combat", "domain.learning", "infrastructure.sql", "content.curriculum"],
       "responsibility": "战斗 SQL 阶段、伤害、生命下限、死亡与胜负状态提交",
       "notResponsibleFor": ["战斗画面", "怪物美术"],
       "signals": ["最终阶段生命下限", "永远剩余 1 HP", "boss hp", "无法结算", "区域层主", "战斗阶段", "boss 无法死亡", "生命下限"],
       "negativeSignals": ["只修改战斗画面", "血条样式"],
       "neighbors": ["domain.learning", "infrastructure.sql", "content.curriculum"],
       "route": {
-        "primary": ["domain.session.combat", "domain.session"],
-        "adjacent": ["domain.combat", "domain.learning", "infrastructure.sql"],
+        "primary": ["features.game-session", "domain.session.combat"],
+        "adjacent": ["features.terminal", "domain.session", "domain.combat", "domain.learning", "infrastructure.sql"],
         "shared": ["content.curriculum"],
         "fallback": []
       },
       "contentRefs": ["content.curriculum"],
-      "serviceProviders": ["domain.session", "domain.combat", "domain.learning"]
+      "serviceProviders": ["features.game-session", "features.terminal", "domain.session.combat", "domain.session", "domain.combat", "domain.learning"]
     },
     {
       "id": "feature.lesson-evaluation",
-      "roots": ["domain.session.combat", "domain.session.learning", "domain.learning", "domain.session", "infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
+      "roots": ["features.terminal", "features.game-session", "domain.session.combat", "domain.session.learning", "domain.learning", "domain.session", "infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
       "responsibility": "题目提示、SQL 判定、正确查询推进与学习记录",
       "notResponsibleFor": ["SQLite 沙箱事务", "终端视觉样式"],
       "signals": ["正确查询没有推进", "答案提示被拒绝", "判题失败", "课程没有完成", "accepted query", "hint rejected", "学习阶段", "查询已通过", "阶段状态"],
       "negativeSignals": ["事务状态泄漏", "执行计划过期"],
       "neighbors": ["infrastructure.sql", "content.curriculum", "presentation.dom.panels"],
       "route": {
-        "primary": ["domain.session.combat", "domain.session.learning"],
-        "adjacent": ["domain.learning", "domain.session", "infrastructure.sql"],
+        "primary": ["features.terminal", "features.game-session"],
+        "adjacent": ["domain.session.combat", "domain.session.learning", "domain.learning", "domain.session", "infrastructure.sql"],
         "shared": ["content.curriculum"],
         "fallback": ["presentation.dom.panels"]
       },
       "contentRefs": ["content.curriculum"],
-      "serviceProviders": ["domain.session.combat", "domain.session.learning", "domain.learning", "domain.session"]
+      "serviceProviders": ["features.terminal", "features.game-session", "domain.session.combat", "domain.session.learning", "domain.learning", "domain.session"]
     },
     {
       "id": "feature.reward-gating",
-      "roots": ["domain.session.learning", "domain.session.progression", "domain.session", "domain.progression", "domain.inventory", "content.inventory", "content.world", "presentation.dom.panels"],
+      "roots": ["features.game-session", "domain.session.learning", "domain.session.progression", "domain.session.inventory", "domain.session", "domain.progression", "domain.inventory", "content.inventory", "content.world", "presentation.dom.panels"],
       "responsibility": "课程奖励、宝箱、钥匙、区域首领与传送门门禁",
       "notResponsibleFor": ["背包视觉布局", "地图绘制"],
       "signals": ["奖励缺失", "宝箱没有出现", "课程完成奖励", "区域首领已死仍阻挡", "传送门仍锁定", "reward missing", "portal blocked"],
       "negativeSignals": ["随机掉落概率"],
       "neighbors": ["domain.inventory", "content.inventory", "content.world"],
       "route": {
-        "primary": ["domain.session.learning", "domain.session.progression"],
-        "adjacent": ["domain.session", "domain.progression", "domain.inventory"],
+        "primary": ["features.game-session", "domain.session.learning", "domain.session.progression"],
+        "adjacent": ["domain.session.inventory", "domain.session", "domain.progression", "domain.inventory"],
         "shared": ["content.inventory", "content.world"],
         "fallback": ["presentation.dom.panels"]
       },
       "contentRefs": ["content.inventory", "content.world"],
-      "serviceProviders": ["domain.session.learning", "domain.session.progression", "domain.session", "domain.progression", "domain.inventory"]
+      "serviceProviders": ["features.game-session", "domain.session.learning", "domain.session.progression", "domain.session.inventory", "domain.session", "domain.progression", "domain.inventory"]
     },
     {
       "id": "feature.transition-persistence",
-      "roots": ["domain.session.progression", "domain.session", "domain.progression", "infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom"],
+      "roots": ["features.game-session", "features.app-shell", "features.game-runtime", "domain.session.progression", "domain.session", "domain.progression", "infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom.panels"],
       "responsibility": "换层状态、自动传送、保存、刷新恢复和重复提交边界",
       "notResponsibleFor": ["楼层作者正文", "IndexedDB UI"],
       "signals": ["切换后丢失", "刷新后回到上一层", "transition lost", "重复最终胜利", "重复提交胜利", "自动传送失败", "reload", "持久化", "管理员辅助", "自动传送", "原层", "传送动画结束", "下一层加载", "胜场计数一次结算增加两次", "幂等性"],
       "negativeSignals": ["地图地标配置"],
       "neighbors": ["infrastructure.storage", "contracts.storage", "application.runtime", "presentation.dom"],
       "route": {
-        "primary": ["domain.session.progression", "domain.session"],
-        "adjacent": ["domain.progression", "infrastructure.storage"],
+        "primary": ["features.game-session", "features.app-shell"],
+        "adjacent": ["presentation.dom.panels", "features.game-runtime", "domain.session.progression", "domain.session", "domain.progression", "infrastructure.storage"],
         "shared": ["contracts.storage"],
-        "fallback": ["application.runtime", "presentation.dom"]
+        "fallback": ["application.runtime"]
       },
       "contentRefs": [],
-      "serviceProviders": ["domain.session.progression", "domain.session", "domain.progression", "contracts.storage"]
+      "serviceProviders": ["features.game-session", "features.app-shell", "features.game-runtime", "domain.session.progression", "domain.session", "domain.progression", "infrastructure.storage"]
     },
     {
       "id": "feature.sql-execution-plan",
-      "roots": ["infrastructure.sql", "domain.learning", "content.sql", "content.curriculum", "domain.session"],
+      "roots": ["features.terminal", "features.game-session", "infrastructure.sql", "domain.learning", "content.sql", "content.curriculum", "domain.session"],
       "responsibility": "SQLite 沙箱事务、查询执行与执行计划证据",
       "notResponsibleFor": ["课程文案", "终端按钮事件"],
       "signals": ["事务沙箱状态泄漏", "transaction sandbox", "执行计划过期", "stale query plan", "query plan", "rollback", "sqlite", "执行计划仍显示 SCAN", "真实查询结果不同步"],
       "negativeSignals": ["终端动作不可用"],
       "neighbors": ["domain.learning", "content.sql", "content.curriculum"],
       "route": {
-        "primary": ["infrastructure.sql", "domain.learning"],
+        "primary": ["features.terminal", "infrastructure.sql", "domain.learning"],
         "adjacent": ["content.sql"],
         "shared": ["content.curriculum"],
-        "fallback": ["domain.session"]
+        "fallback": ["features.game-session", "domain.session"]
       },
       "contentRefs": ["content.sql", "content.curriculum"],
-      "serviceProviders": ["infrastructure.sql", "domain.learning"]
+      "serviceProviders": ["features.terminal", "features.game-session", "infrastructure.sql", "domain.learning"]
     },
     {
       "id": "feature.terminal-action",
-      "roots": ["devtools.dungeon-agent", "domain.session", "presentation.dom.panels", "contracts.game"],
+      "roots": ["devtools.dungeon-agent", "features.app-shell", "features.terminal", "features.game-session", "presentation.dom.panels", "domain.session", "contracts.game"],
       "responsibility": "开发态终端进入、可见 SQL 动作和维护器语义桥",
       "notResponsibleFor": ["隐藏答案", "生产控制入口"],
       "signals": ["终端动作不可用", "terminal action", "点击后不可用", "动作不可用", "维护器工具", "bridge", "SQL 终端"],
       "negativeSignals": ["事务沙箱", "执行计划"],
       "neighbors": ["domain.session", "presentation.dom.panels", "contracts.game"],
       "route": {
-        "primary": ["devtools.dungeon-agent"],
-        "adjacent": ["domain.session", "presentation.dom.panels"],
+        "primary": ["devtools.dungeon-agent", "features.app-shell"],
+        "adjacent": ["features.terminal", "features.game-session", "presentation.dom.panels"],
         "shared": ["contracts.game"],
-        "fallback": []
+        "fallback": ["domain.session"]
       },
       "contentRefs": [],
-      "serviceProviders": ["domain.session", "contracts.game"]
+      "serviceProviders": ["devtools.dungeon-agent", "features.app-shell", "features.terminal", "features.game-session", "domain.session", "contracts.game"]
     },
     {
       "id": "feature.admin-playtest",
-      "roots": ["domain.session.progression", "devtools.dungeon-agent", "domain.session", "application.runtime", "contracts.game", "presentation.dom"],
+      "roots": ["features.game-session", "features.game-runtime", "features.app-shell", "domain.session.progression", "devtools.dungeon-agent", "domain.session", "application.runtime", "contracts.game", "presentation.dom.panels"],
       "responsibility": "管理员/Benchmark 预设、楼层装载与开发态恢复流程",
       "notResponsibleFor": ["生产作弊入口", "任意脚本执行"],
       "signals": ["管理员换层", "admin floor", "admin preset", "管理员模式", "测试预设", "admin transition"],
       "negativeSignals": ["普通玩家换层"],
       "neighbors": ["application.runtime", "contracts.game", "presentation.dom"],
       "route": {
-        "primary": ["domain.session.progression", "devtools.dungeon-agent"],
-        "adjacent": ["domain.session", "application.runtime"],
+        "primary": ["features.game-session", "devtools.dungeon-agent"],
+        "adjacent": ["features.game-runtime", "features.app-shell", "domain.session.progression", "domain.session", "application.runtime"],
         "shared": ["contracts.game"],
-        "fallback": ["presentation.dom"]
+        "fallback": ["presentation.dom.panels"]
       },
       "contentRefs": [],
-      "serviceProviders": ["domain.session.progression", "domain.session", "application.runtime", "contracts.game"]
+      "serviceProviders": ["features.game-session", "features.game-runtime", "features.app-shell", "domain.session.progression", "domain.session", "application.runtime", "contracts.game"]
     },
     {
       "id": "feature.world-navigation",
-      "roots": ["domain.exploration", "domain.session", "content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
+      "roots": ["features.game-session", "domain.exploration", "domain.session", "content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
       "responsibility": "世界移动、区域边界、路径、地标交互与空间表现",
       "notResponsibleFor": ["课程判题", "存档读写"],
       "signals": ["地图卡住", "区域边界", "无法移动", "路径错误", "地标无法交互", "world navigation", "portal path"],
       "negativeSignals": ["刷新后丢失"],
       "neighbors": ["content.world", "presentation.phaser.world", "presentation.phaser.interaction"],
       "route": {
-        "primary": ["domain.exploration", "domain.session"],
-        "adjacent": ["content.world"],
+        "primary": ["features.game-session", "domain.exploration"],
+        "adjacent": ["domain.session", "content.world"],
         "shared": ["presentation.phaser.world", "presentation.phaser.interaction"],
         "fallback": []
       },
       "contentRefs": ["content.world"],
-      "serviceProviders": ["domain.exploration", "domain.session"]
+      "serviceProviders": ["features.game-session", "domain.exploration", "domain.session"]
     },
     {
       "id": "feature.rendering",
-      "roots": ["presentation.phaser.world", "presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.renderers", "presentation.dom.panels", "presentation.styles", "presentation.dom", "presentation.phaser"],
+      "roots": ["features.snapshot", "features.app-shell", "features.narrative", "presentation.phaser.world", "presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.renderers", "presentation.dom.panels", "presentation.styles", "presentation.dom", "presentation.phaser"],
       "responsibility": "Phaser 世界/角色/效果与 DOM 面板的只读快照表现",
       "notResponsibleFor": ["领域状态修改", "存储写入"],
       "signals": ["显示错误", "界面不更新", "phaser 渲染", "hud", "面板显示", "角色显示", "视觉效果"],
       "negativeSignals": ["状态没有更新", "刷新后丢失"],
       "neighbors": ["presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.panels"],
       "route": {
-        "primary": ["presentation.phaser.world", "presentation.dom.renderers"],
-        "adjacent": ["presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.panels"],
+        "primary": ["features.snapshot", "presentation.phaser.world", "presentation.dom.renderers"],
+        "adjacent": ["features.app-shell", "features.narrative", "presentation.phaser.actors", "presentation.phaser.effects", "presentation.phaser.interaction", "presentation.dom.panels"],
         "shared": ["presentation.styles"],
         "fallback": ["presentation.dom", "presentation.phaser"]
       },
       "contentRefs": [],
-      "serviceProviders": ["presentation.dom", "presentation.phaser"]
+      "serviceProviders": ["features.snapshot", "features.app-shell", "features.narrative", "presentation.dom", "presentation.phaser"]
     },
     {
       "id": "feature.live-presence",
-      "roots": ["infrastructure.presence", "application.config", "presentation.dom.panels", "presentation.styles"],
+      "roots": ["features.game-runtime", "features.app-shell", "infrastructure.presence", "application.config", "presentation.dom.panels", "presentation.styles"],
       "responsibility": "在线标签页连接数的同源 SSE 接入、失败降级和左下角状态展示",
       "notResponsibleFor": ["独立玩家去重", "历史分析", "游戏领域状态"],
       "signals": ["在线人数", "绿点", "presence", "SSE", "连接人数", "在线状态不可用"],
       "negativeSignals": ["怪物生命", "存档读写"],
       "neighbors": ["infrastructure.presence", "application.config", "presentation.dom.panels"],
       "route": {
-        "primary": ["infrastructure.presence"],
-        "adjacent": ["application.config", "presentation.dom.panels"],
+        "primary": ["features.game-runtime", "infrastructure.presence"],
+        "adjacent": ["features.app-shell", "application.config", "presentation.dom.panels"],
         "shared": ["presentation.styles"],
         "fallback": []
       },
       "contentRefs": [],
-      "serviceProviders": ["infrastructure.presence"]
+      "serviceProviders": ["features.game-runtime", "features.app-shell", "infrastructure.presence"]
     }
   ],
   "runtime": {
@@ -794,6 +794,6 @@
   },
   "boundary": {
     "algorithm": "direct-child-v1",
-    "signature": "5e8b74f886443bfef0f093746cfafa9ca8695c2fa32bb0d15a8830f51a0911be"
+    "signature": "42971183bbdf9da0872e9145b3d7599e4d47bfd8e58ea1f5d09925600c5849cb"
   }
 }

@@ -10,5 +10,6 @@ node_modules/
 dist/
 coverage/
 .vite/
+.vite-cache/
 output/playwright/
 .playwright-cli/

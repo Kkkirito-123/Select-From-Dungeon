@@ -5,6 +5,6 @@
   "prompt": "游戏中玩家看到终端动作，但点击后不可用。请定位并修复这个问题，保留玩家可见行为和现有安全边界。",
   "evidenceSummary": "首个可见终端动作执行后返回不可用，玩家无法进入 SQL 终端。",
   "startFloor": 1,
-  "startPreset": null,
+  "startPreset": "f1-admin-boss",
   "timeoutMs": 600000
 }
