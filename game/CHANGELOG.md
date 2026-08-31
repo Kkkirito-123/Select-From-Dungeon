@@ -1,6 +1,8 @@
 # 版本记录 / Changelog
 
-本文件记录历史版本的用户可见结果。已移除的设计与发布记录不属于公开下载包；需要追溯时以 Git 历史为准。
+本文件记录每个可归档版本的用户可见结果。详细设计与证据边界见
+[玩法演进总路线图](docs/GAMEPLAY_EVOLUTION_ROADMAP.md) 和
+[发布检查表](docs/RELEASE_CHECKLIST.md)。
 
 ## `Unreleased` — 2026-07-27（第一层交互清理）
 
@@ -64,7 +66,7 @@
   Actor、战斗、复盘和掉落引用，关系表继续用 `monster_id` 指向 `monsters.id`。
 - 保持 47 组课程、真实 SQLite、`run:v10` / `profile:v2`、低概率即时恢复品、三篝火、
   撤退、背包、管理员模式和旧永久掌握进度。
-- 自动化、生产构建与浏览器证据由当时的发布记录承载；该记录不属于公开下载包；
+- 自动化、生产构建与浏览器证据见 [MVP 2.0 发布检查表](docs/RELEASE_CHECKLIST.md)；
   归档候选：[PR #23](https://github.com/Kkkirito-123/select-from-dungeon/pull/23)。
 
 ## `1.1.0` — 2026-07-24
