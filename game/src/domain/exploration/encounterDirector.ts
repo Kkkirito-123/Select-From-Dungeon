@@ -12,7 +12,21 @@ export const INITIAL_SAFE_STEPS: number = ENCOUNTER_RUNTIME_CONFIG.initialSafeSt
 export const POST_BATTLE_SAFE_STEPS: number = ENCOUNTER_RUNTIME_CONFIG.postBattleSafeSteps;
 export const AMBUSH_ROLL_START: number = ENCOUNTER_RUNTIME_CONFIG.ambushRollStart;
 export const AMBUSH_CHANCE: number = ENCOUNTER_RUNTIME_CONFIG.ambushChance;
+export const AMBUSH_CHANCE_MIN: number = ENCOUNTER_RUNTIME_CONFIG.ambushChanceMin;
+export const AMBUSH_ANNEAL_SPAN: number = ENCOUNTER_RUNTIME_CONFIG.ambushAnnealSpan;
 export const AMBUSH_GUARANTEE_AT: number = ENCOUNTER_RUNTIME_CONFIG.ambushGuaranteeAt;
+
+/**
+ * 余弦退火遭遇概率：随累计移动数从 AMBUSH_CHANCE 单调衰减到 AMBUSH_CHANCE_MIN，
+ * 超过退火周期后钳制到最低值。保留确定性（只依赖 totalMoves，不引入随机）。
+ */
+export function ambushChanceAt(totalMoves: number): number {
+  if (totalMoves <= 0) return AMBUSH_CHANCE;
+  if (totalMoves >= AMBUSH_ANNEAL_SPAN) return AMBUSH_CHANCE_MIN;
+  const progress = totalMoves / AMBUSH_ANNEAL_SPAN;
+  const cosine = (1 + Math.cos(Math.PI * progress)) / 2;
+  return AMBUSH_CHANCE_MIN + (AMBUSH_CHANCE - AMBUSH_CHANCE_MIN) * cosine;
+}
 
 export interface EncounterMeter {
   totalMoves: number;
@@ -55,7 +69,7 @@ export function advanceEncounterMeter(
   }
 
   const shouldTrigger = meter.stepsSinceEncounter >= AMBUSH_GUARANTEE_AT ||
-    hashUnit(`${seed}:ambush-roll:${meter.totalMoves}`) < AMBUSH_CHANCE;
+    hashUnit(`${seed}:ambush-roll:${meter.totalMoves}`) < ambushChanceAt(meter.totalMoves);
   if (!shouldTrigger) return { meter, targetId: null };
 
   const ordered = [...candidates]

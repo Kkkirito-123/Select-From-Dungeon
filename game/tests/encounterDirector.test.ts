@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AMBUSH_CHANCE,
+  AMBUSH_CHANCE_MIN,
+  AMBUSH_ANNEAL_SPAN,
   AMBUSH_GUARANTEE_AT,
   INITIAL_SAFE_STEPS,
   POST_BATTLE_SAFE_STEPS,
   advanceEncounterMeter,
+  ambushChanceAt,
   recordSafeZoneMovement,
   suppressThirdConsecutiveEncounter,
 } from "../src/domain/exploration/encounterDirector";
@@ -14,6 +17,16 @@ function candidates(...monsterIds: number[]) {
 }
 
 describe("seeded ambush meter", () => {
+  it("余弦退火让遭遇概率随累计移动数单调下降并钳制到最低值", () => {
+    expect(ambushChanceAt(0)).toBe(AMBUSH_CHANCE);
+    expect(ambushChanceAt(1)).toBeLessThan(AMBUSH_CHANCE);
+    const mid = Math.floor(AMBUSH_ANNEAL_SPAN / 2);
+    expect(ambushChanceAt(1)).toBeGreaterThan(ambushChanceAt(mid));
+    expect(ambushChanceAt(mid)).toBeGreaterThan(ambushChanceAt(AMBUSH_ANNEAL_SPAN));
+    expect(ambushChanceAt(AMBUSH_ANNEAL_SPAN)).toBe(AMBUSH_CHANCE_MIN);
+    expect(ambushChanceAt(AMBUSH_ANNEAL_SPAN + 1000)).toBe(AMBUSH_CHANCE_MIN);
+  });
+
   it("基础遭遇率为 2%，开局 5 步安全且第 30 个可遭遇步强制触发", () => {
     expect(AMBUSH_CHANCE).toBe(0.02);
     expect(INITIAL_SAFE_STEPS).toBe(5);
