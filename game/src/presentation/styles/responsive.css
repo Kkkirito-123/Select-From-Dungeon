@@ -1,8 +1,10 @@
 @media (min-width: 1141px) and (max-height: 800px) {
   .agent-panel {
-    position: relative;
-    top: auto;
-    max-height: none;
+    position: sticky;
+    top: 10px;
+    height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 20px);
+    overflow-y: auto;
   }
 }
 
