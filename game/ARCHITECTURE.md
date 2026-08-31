@@ -404,8 +404,9 @@ Executable monster truth lives in the per-floor level files and
 navigation boundaries live in Floor Labyrinth and Floor Map Blueprints.
 `src/domain/progression/campaign.ts` owns the serializable ordered floor slots and must
 reject skipped, duplicated, or rerolled transitions. This campaign must never
-route a floor through another floor's content. The authority register is
-`docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`.
+route a floor through another floor's content. The former product authority
+register was a development document and is not shipped in the public download;
+executable floor files, tests, and this architecture file are the current evidence.
 
 The V2 eight-floor narrative and monster-distribution contracts now have a
 runtime and automated-test baseline; complete human playthrough, copy/audio
@@ -509,8 +510,8 @@ src/presentation/       Phaser scenes, DOM application views, and focused render
 src/devtools/           Development-only external maintainer bridge; no production import path
 tests/              Vitest tests for rules, maze, roaming, feedback, storage,
                     onboarding, and query policy
-docs/               Current bilingual blueprints, one active roadmap, future
-                    candidate designs under docs/design/, and historical reports
+docs/               Minimal public documentation boundary; retired design and
+                    release records are kept in Git history, not the download
 scripts/            Game asset, question-bank, and architecture scripts
 dist/               Generated static build; ignored and never hand-edited
 ```
