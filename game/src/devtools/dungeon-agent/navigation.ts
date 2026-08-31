@@ -5,8 +5,8 @@
  * BFS 路径；坐标不会进入协议返回值、日志或 Trace。它不触发移动、不访问 DOM、不安装
  * 全局桥，也不判断隐藏裁判结果。真实一步仍由 `bridge.ts` 发出 `dungeon:move` 事件。
  *
- * 路径只允许经过已发现且当前可走的格子。遇到模式、生命、楼层、任务或交互提示变化时，
- * 移动立即停止，让维护器重新 look，防止宏移动跨过真实游戏语义边界。
+ * 路径只允许经过已发现且当前可走的格子。遇到模式、生命、楼层、任务变化，或新的 E
+ * 交互出现时，移动立即停止，让维护器重新 look，防止宏移动跨过真实游戏语义边界。
  */
 
 import type { GameSnapshot } from "../../contracts/game/snapshots";
@@ -81,28 +81,19 @@ export function findDungeonAgentObjectiveDetails(
   const prerequisitePosition = prerequisiteReward
     ? snapshot.mazeFloor.anchors[prerequisiteReward.id]
     : null;
-  if (prerequisiteReward && prerequisitePosition) {
+  if (
+    prerequisiteReward
+    && prerequisitePosition
+    && snapshot.discoveredCells.includes(
+      `${prerequisitePosition.x}:${prerequisitePosition.y}`,
+    )
+    && pathWithinDiscoveredArea(snapshot, prerequisitePosition).length > 0
+  ) {
     return {
       position: { ...prerequisitePosition },
       kind: "prerequisite-reward",
       label: prerequisiteReward.title,
       prerequisites: prerequisiteReward.prerequisiteLessons.map(String),
-    };
-  }
-
-  const lockedShortcut = snapshot.interactionPrompt.startsWith("E")
-    && snapshot.interactionPrompt.includes("检查锁住的")
-    ? snapshot.guidedMap.shortcuts.find((shortcut) => (
-        !snapshot.keyItems.includes(shortcut.keyId)
-        && !snapshot.openedGateIds.includes(shortcut.id)
-      ))
-    : null;
-  if (lockedShortcut) {
-    return {
-      position: { ...lockedShortcut.keyPosition },
-      kind: "shortcut-key",
-      label: lockedShortcut.name,
-      prerequisites: lockedShortcut.requires.map(String),
     };
   }
 
@@ -230,9 +221,10 @@ export function dungeonAgentMoveStopReason(
     || after.missionTitle !== before.missionTitle
     || after.completedLessons.length !== before.completedLessons.length
   ) return "task";
-  if (before.interactionPrompt.startsWith("E") || after.interactionPrompt.startsWith("E")) {
-    return "action";
-  }
+  if (
+    after.interactionPrompt !== before.interactionPrompt
+    && after.interactionPrompt.startsWith("E")
+  ) return "action";
   return null;
 }
 

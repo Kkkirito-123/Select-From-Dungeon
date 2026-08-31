@@ -109,9 +109,8 @@ export function buildDungeonAgentView(
         "objective",
         `沿真实路线前往${objective.label}`,
       ));
-    } else {
-      actions.push(action("frontier", "探索已发现区域旁的未知位置"));
     }
+    actions.push(action("frontier", "探索已发现区域旁的未知位置"));
   };
 
   if (overlay.inspectionOpen) {
@@ -120,10 +119,9 @@ export function buildDungeonAgentView(
   } else if (overlay.reviewOpen || snapshot.mode === "death-review") {
     actions.push(action("close-review", "关闭复盘"));
   } else if (snapshot.mode === "explore") {
+    addMovementAction();
     if (snapshot.interactionPrompt.startsWith("E") && !interactionConsumed) {
       actions.push(action("interact", snapshot.interactionPrompt));
-    } else {
-      addMovementAction();
     }
   } else if (snapshot.mode === "combat") {
     if (overlay.terminal?.kind !== "combat") {
