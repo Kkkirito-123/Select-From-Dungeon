@@ -279,8 +279,8 @@ MVP SQL 词汇中确定性生成提示；只有玩家通过键盘或指针明确
 `AUTH-003` 已由跨真源测试关闭，但它仍不是楼层显示名称、生态或精确怪物名单的玩家文案权威。可执行怪物事实
 属于各层 Level 文件与 `biomeContent.ts`，玩家地点和事件属于 Floor Experience，导航边界属于
 Floor Labyrinth 与 Floor Map Blueprints。`src/domain/progression/campaign.ts` 负责可序列化的有序楼层槽位，
-必须拒绝跳层、重复激活与 Seed 重抽，且不得把一层静默套用到另一层。权威登记表位于
-`docs/product/production/CONTENT_AUTHORITY_AND_TRACEABILITY.md`。
+必须拒绝跳层、重复激活与 Seed 重抽，且不得把一层静默套用到另一层。原产品权威登记表属于开发文档，
+不随公开下载发布；当前事实以可执行楼层文件、测试与本架构文件为证据。
 
 八层剧情与怪物分布 V2 契约已有运行时与自动化基线；完整真人 Run、文字/音频主观 QA 和最终美术仍是独立证据。
 长期稳定契约为：展示子区必须显式映射到 `front` / `middle` / `rear`；怪物 `1–89`、课程/装备/剧情/证据/
@@ -348,7 +348,7 @@ src/infrastructure/     音频、反馈、SQLite、存档编解码/校验、在�
 src/presentation/       Phaser 场景、DOM 应用视图与职责明确的渲染器
 src/devtools/           仅开发态外部维护器桥；生产入口不得导入
 tests/              规则、迷宫、巡逻、反馈、存储、引导与查询策略的 Vitest 测试
-docs/               双语蓝图、活跃路线图、docs/design/ 后续候选设计与历史报告
+docs/               极简公开文档边界；废弃设计与发布记录保留在 Git 历史，不进入下载包
 scripts/            游戏资源、题库和架构脚本
 dist/               生成的静态构建；被忽略且不得手工修改
 ```
