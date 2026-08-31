@@ -14,6 +14,7 @@ import {
   findDungeonAgentFrontier,
   findDungeonAgentObjective,
   findDungeonAgentObjectiveDetails,
+  planDungeonAgentNavigation,
 } from "../src/devtools/dungeon-agent/navigation";
 import { buildDungeonAgentView } from "../src/devtools/dungeon-agent/projection";
 import { SqlEngine } from "../src/infrastructure/sql/SqlEngine";
@@ -171,14 +172,159 @@ describe("Dungeon Agent 玩家投影", () => {
       interactionPrompt: "E  调查已处理目标",
     };
 
-    expect(buildDungeonAgentView(snapshot).actions).toContainEqual(
+    const available = buildDungeonAgentView(snapshot);
+    expect(available.actions).toContainEqual(
       expect.objectContaining({ id: "interact" }),
+    );
+    expect(available.actions).toContainEqual(
+      expect.objectContaining({ id: available.target?.actionId }),
     );
     const consumed = buildDungeonAgentView(snapshot, undefined, true);
     expect(consumed.actions).not.toContainEqual(expect.objectContaining({ id: "interact" }));
     expect(consumed.actions).toContainEqual(
       expect.objectContaining({ id: consumed.target?.actionId }),
     );
+  });
+
+  it("存在主线 objective 时仍保留 frontier 探索动作", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-objective-frontier");
+    const view = buildDungeonAgentView(session.snapshot());
+
+    expect(view.actions).toContainEqual(expect.objectContaining({ id: "objective" }));
+    expect(view.actions).toContainEqual(expect.objectContaining({ id: "frontier" }));
+  });
+
+  it("宏移动会先关闭检查记录面板，再继续使用剩余步数", async () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-close-inspection");
+    const navigation = planDungeonAgentNavigation(session.snapshot(), "objective");
+    expect(navigation.path.length).toBeGreaterThan(1);
+
+    const inspection = {
+      hidden: false,
+      getAttribute: () => null,
+    };
+    let closeClicks = 0;
+    const closeButton = {
+      disabled: false,
+      hidden: false,
+      click: () => {
+        closeClicks += 1;
+        inspection.hidden = true;
+      },
+    };
+    const stage = { classList: { contains: () => false } };
+    const text = (textContent: string) => ({ textContent });
+    const root = {
+      querySelector: (selector: string) => ({
+        ".game-stage": stage,
+        "#inspection-overlay": inspection,
+        "#close-inspection": closeButton,
+        "#inspection-kicker": text("现场记录"),
+        "#inspection-title": text("入口记录"),
+        "#inspection-message": text("继续探索。"),
+      } as Record<string, unknown>)[selector] ?? null,
+    } as unknown as HTMLElement;
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const testWindow = {
+      setTimeout,
+      matchMedia: () => ({ matches: true }),
+      dispatchEvent: (event: CustomEvent<{ dx: number; dy: number }>) => {
+        if (!inspection.hidden) return true;
+        session.attemptPlayerMove(event.detail.dx, event.detail.dy);
+        return true;
+      },
+    } as unknown as Window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: testWindow,
+    });
+    let removeBridge: (() => void) | null = null;
+    try {
+      removeBridge = installDungeonAgentBridge({
+        root,
+        session,
+        launch: { mode: "agent", floor: 1 },
+        checkpointStorage: null,
+        checkpointRestored: false,
+        resetSql: () => undefined,
+      });
+      const before = session.snapshot();
+      const view = window.__DUNGEON_PLAYTEST__!.look();
+
+      await expect(
+        window.__DUNGEON_PLAYTEST__!.act(view.revision, "objective", 1),
+      ).resolves.toMatchObject({ ok: true, steps: 1 });
+      expect(closeClicks).toBe(1);
+      expect(session.snapshot().player).not.toMatchObject({
+        x: before.player.x,
+        y: before.player.y,
+      });
+    } finally {
+      removeBridge?.();
+      if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
+  it("同一 E 交互打开检查记录后不会因 overlay 变化再次暴露", async () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-stable-interaction");
+    const inspection = {
+      hidden: true,
+      getAttribute: () => null,
+    };
+    const stage = { classList: { contains: () => false } };
+    const interactButton = {
+      disabled: false,
+      hidden: false,
+      click: () => {
+        inspection.hidden = false;
+      },
+    };
+    const text = (textContent: string) => ({ textContent });
+    const root = {
+      querySelector: (selector: string) => ({
+        ".game-stage": stage,
+        "#interact": interactButton,
+        "#inspection-overlay": inspection,
+        "#inspection-kicker": text("现场记录"),
+        "#inspection-title": text("入口记录"),
+        "#inspection-message": text("同一交互的可见正文。"),
+      } as Record<string, unknown>)[selector] ?? null,
+    } as unknown as HTMLElement;
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { setTimeout },
+    });
+    let removeBridge: (() => void) | null = null;
+    try {
+      removeBridge = installDungeonAgentBridge({
+        root,
+        session,
+        launch: { mode: "agent", floor: 1 },
+        checkpointStorage: null,
+        checkpointRestored: false,
+        resetSql: () => undefined,
+      });
+      const view = window.__DUNGEON_PLAYTEST__!.look();
+      expect(view.prompt.startsWith("E")).toBe(true);
+      expect(view.actions).toContainEqual(expect.objectContaining({ id: "interact" }));
+
+      await expect(
+        window.__DUNGEON_PLAYTEST__!.act(view.revision, "interact", 1),
+      ).resolves.toMatchObject({ ok: true, event: "action:interact" });
+      const afterInteraction = window.__DUNGEON_PLAYTEST__!.look();
+      expect(afterInteraction.actions).not.toContainEqual(
+        expect.objectContaining({ id: "interact" }),
+      );
+      expect(afterInteraction.actions).toContainEqual(
+        expect.objectContaining({ id: afterInteraction.target?.actionId }),
+      );
+    } finally {
+      removeBridge?.();
+      if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+      else Reflect.deleteProperty(globalThis, "window");
+    }
   });
 
   it("只投影当前打开终端的题面、可见 SQL、状态、证据和已解锁提示", () => {
@@ -363,7 +509,7 @@ describe("Dungeon Agent 玩家投影", () => {
     });
   });
 
-  it("下游课程受阻时 objective 先指向必需奖励房", () => {
+  it("前置依赖说明不会把 objective 重定向到推测奖励房", () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-prerequisite-reward");
     const original = session.snapshot();
     const rewardRoom = original.roomGraph.nodes.find(
@@ -385,18 +531,72 @@ describe("Dungeon Agent 玩家投影", () => {
       },
     };
 
+    const actor = original.worldActors.find((entry) => (
+      entry.roomNodeId === downstream!.id
+      && original.monsters.some(
+        (monster) => monster.id === entry.monsterId && monster.hp > 0,
+      )
+    ));
+    const expectedPosition = actor
+      ? { x: actor.x, y: actor.y }
+      : original.mazeFloor.anchors[downstream!.id];
+    expect(expectedPosition).toBeDefined();
     expect(findDungeonAgentObjectiveDetails(snapshot)).toMatchObject({
-      position: original.mazeFloor.anchors[rewardRoom!.id],
-      kind: "prerequisite-reward",
-      label: rewardRoom!.title,
+      position: expectedPosition,
+      kind: "objective",
+      label: downstream!.title,
+      prerequisites: downstream!.prerequisiteLessons,
     });
   });
 
-  it("检查锁住的捷径后 objective 指向尚未拾取的保证钥匙", () => {
+  it("已发现且可达的必需奖励房会成为 objective", () => {
+    const session = new GameSession(null, createEmptyProfile(), "agent-reachable-prerequisite");
+    const original = session.snapshot();
+    const rewardRoom = original.roomGraph.nodes.find(
+      (room) => room.reward === "aggregate-hammer",
+    );
+    const downstream = rewardRoom
+      ? original.roomGraph.nodes.find((room) => rewardRoom.next.includes(room.id))
+      : null;
+    const rewardPosition = rewardRoom
+      ? original.mazeFloor.anchors[rewardRoom.id]
+      : null;
+    expect(rewardRoom).toBeDefined();
+    expect(downstream).toBeDefined();
+    expect(rewardPosition).toBeDefined();
+    const snapshot = {
+      ...original,
+      player: { ...original.player, ...rewardPosition! },
+      discoveredCells: [
+        ...new Set([
+          ...original.discoveredCells,
+          `${rewardPosition!.x}:${rewardPosition!.y}`,
+        ]),
+      ],
+      completedLessons: [...rewardRoom!.prerequisiteLessons],
+      completedRoomIds: original.completedRoomIds.filter((id) => id !== rewardRoom!.id),
+      navigationGuidance: {
+        ...original.navigationGuidance,
+        objectiveRoomId: downstream!.id,
+        objectiveTitle: downstream!.title,
+      },
+    };
+
+    expect(findDungeonAgentObjectiveDetails(snapshot)).toMatchObject({
+      position: rewardPosition,
+      kind: "prerequisite-reward",
+      label: rewardRoom!.title,
+      prerequisites: rewardRoom!.prerequisiteLessons,
+    });
+  });
+
+  it("检查锁住的捷径不会把主线 objective 改写成未发现钥匙", () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-shortcut-key");
     const original = session.snapshot();
     const shortcut = original.guidedMap.shortcuts[0];
     expect(shortcut).toBeDefined();
+    const baseline = findDungeonAgentObjectiveDetails(original);
+    expect(baseline).not.toBeNull();
     const snapshot = {
       ...original,
       player: { ...original.player, ...shortcut!.entry },
@@ -404,14 +604,11 @@ describe("Dungeon Agent 玩家投影", () => {
       keyItems: original.keyItems.filter((id) => id !== shortcut!.keyId),
     };
 
-    expect(findDungeonAgentObjectiveDetails(snapshot)).toMatchObject({
-      position: shortcut!.keyPosition,
-      kind: "shortcut-key",
-      label: shortcut!.name,
-    });
+    expect(findDungeonAgentObjectiveDetails(snapshot)).toEqual(baseline);
+    expect(findDungeonAgentObjective(snapshot)).toEqual(baseline!.position);
   });
 
-  it("模式、生命、楼层、任务和交互提示变化都会停止宏移动", () => {
+  it("模式、生命、楼层、任务和新出现的交互提示都会停止宏移动", () => {
     const session = new GameSession(null, createEmptyProfile(), "agent-stop");
     const before = session.snapshot();
 
@@ -426,8 +623,15 @@ describe("Dungeon Agent 玩家投影", () => {
       ...before,
       interactionPrompt: "E  调查",
     })).toBe("action");
-    const alreadyInteractive = { ...before, interactionPrompt: "E  拾取钥匙" };
-    expect(dungeonAgentMoveStopReason(alreadyInteractive, alreadyInteractive)).toBe("action");
+    const alreadyInteractive = { ...before, interactionPrompt: "E  调查抄写员" };
+    expect(dungeonAgentMoveStopReason(alreadyInteractive, {
+      ...alreadyInteractive,
+      interactionPrompt: "E  拾取钥匙",
+    })).toBe("action");
+    expect(dungeonAgentMoveStopReason(alreadyInteractive, {
+      ...alreadyInteractive,
+      player: { ...alreadyInteractive.player, x: alreadyInteractive.player.x + 1 },
+    })).toBeNull();
   });
 
   it("query 一次调用写入当前 textarea 并走真实终端按钮，规则拒绝时返回 ok=false", async () => {
@@ -618,6 +822,10 @@ describe("Dungeon Agent 玩家投影", () => {
         event: "action:interact",
       });
       expect(session.snapshot().groundItems.some((item) => item.id === reward!.id)).toBe(false);
+      const afterInteraction = window.__DUNGEON_PLAYTEST__!.look();
+      expect(afterInteraction.actions).toContainEqual(
+        expect.objectContaining({ id: afterInteraction.target?.actionId }),
+      );
       await expect(window.__DUNGEON_PLAYTEST__?.act(view.revision, "interact", 1)).resolves.toMatchObject({
         ok: false,
         event: "stale-view",

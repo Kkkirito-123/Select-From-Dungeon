@@ -165,8 +165,8 @@ export function installDungeonAgentBridge(
     snapshot.floor,
     snapshot.player.x,
     snapshot.player.y,
+    snapshot.completedLessons.length,
     snapshot.interactionPrompt,
-    interactionFingerprint(),
   ].join(":");
 
   const interactionFingerprint = (): string => dungeonAgentInteractionFingerprint(
@@ -244,6 +244,7 @@ export function installDungeonAgentBridge(
     },
     async act(revision, actionId, rawMaxSteps) {
       const visible = currentView();
+      const movement = actionId === "objective" || actionId === "frontier";
       const available = visible.actions.some((action) => (
         action.id === actionId && action.tool === "act"
       ));
@@ -255,6 +256,10 @@ export function installDungeonAgentBridge(
         trace.record("act", `action=${actionId} result=action-not-available`);
         return noProgressResult(revision, actionId, "action-not-available");
       }
+      if (movement && isDungeonAgentVisible(options.root, "#inspection-overlay")) {
+        clickDungeonAgentAction(options.root, DUNGEON_AGENT_ACTION_SELECTORS.continue);
+        await sleepDungeonAgent(UI_POLL_INTERVAL_MS);
+      }
       if (!await waitDungeonAgentUiReady(options.root)) {
         trace.record("act", `action=${actionId} result=ui-not-ready`);
         return noProgressResult(revision, actionId, "ui-not-ready");
@@ -263,7 +268,7 @@ export function installDungeonAgentBridge(
       const maxSteps = Number.isFinite(rawMaxSteps)
         ? Math.max(1, Math.min(MAX_MOVE_STEPS, Math.floor(rawMaxSteps)))
         : 1;
-      if (actionId === "objective" || actionId === "frontier") {
+      if (movement) {
         if (snapshot.mode !== "explore") {
           trace.record("act", `action=${actionId} result=movement-not-available`);
           return noProgressResult(revision, actionId, "movement-not-available");
