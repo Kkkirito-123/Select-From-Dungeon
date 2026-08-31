@@ -14,7 +14,7 @@
   <a href="game/package.json"><img src="https://img.shields.io/badge/Node.js-%3E%3D20.19-78c9b8?style=flat-square" alt="Node.js 版本" /></a>
 </p>
 
-[English](README.md) | **简体中文**
+**简体中文** | [English](README.en.md)
 
 </div>
 
@@ -93,7 +93,7 @@ pnpm dev
 | [`presence/`](presence/) | 可选的 Node.js SSE 在线标签页计数服务 |
 | [`assets/screenshots/`](assets/screenshots/) | 本 README 使用的公开游戏截图 |
 
-可选服务不是完整游玩所必需的。游戏包、构建命令和隐私边界见 [`game/README.zh-CN.md`](game/README.zh-CN.md)。
+可选服务不是完整游玩所必需的。游戏包、构建命令和隐私边界见 [`game/README.md`](game/README.md)。
 
 ## 许可
 

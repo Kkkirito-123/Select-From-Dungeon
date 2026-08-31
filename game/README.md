@@ -1,68 +1,68 @@
-# SQL Demon Castle · SELECT * FROM DUNGEON
+# SQL 魔王城 · SELECT * FROM DUNGEON
 
-[中文说明](README.zh-CN.md) | **English**
+**简体中文** | [English](README.en.md)
 
-The `game/` directory is the standalone browser game. It is an offline-first SQL roguelite built with TypeScript, Vite, Phaser, and SQLite WASM. The game does not require the optional Python Agent or Node.js presence service.
+`game/` 是可独立运行的浏览器游戏，使用 TypeScript、Vite、Phaser 和 SQLite WASM 构建。它离线优先，不依赖可选的 Python Agent 或 Node.js 在线状态服务。
 
-## Run
+## 本地运行
 
-Requirements: Node.js `>=20.19` and pnpm `11.9.0`.
+要求 Node.js `>=20.19`、pnpm `11.9.0`。
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open the Vite URL in a browser. For a production-style local build:
+在浏览器打开 Vite 输出地址。需要本地验收生产构建时：
 
 ```bash
 pnpm build
 pnpm preview
 ```
 
-Do not open `index.html` with `file://`; SQLite WASM must be served over HTTP.
+不要用 `file://` 直接打开 `index.html`，SQLite WASM 必须通过 HTTP 加载。
 
-## Game Loop
+## 游戏流程
 
-1. Explore a deterministic `56x42` floor and reveal the fog.
-2. Touch an ID-labelled monster to enter a single-target SQL encounter.
-3. Read the task and visible schema, then write a complete SQLite statement.
-4. Correct results deal damage; mistakes trigger the announced counterattack.
-5. Rest at campfires, claim course rewards, recover identities, and unlock the next route.
+1. 探索确定性的 `56x42` 楼层并揭开迷雾。
+2. 触碰带编号的怪物，进入单体 SQL 战斗。
+3. 阅读任务和可见 Schema，写出完整的 SQLite 语句。
+4. 正确结果造成伤害；错误结果触发已经预告的反击。
+5. 在篝火休息、领取课程奖励、恢复怪物身份并解锁上行路线。
 
-## Content
+## 内容
 
-The eight-floor curriculum moves from basic filtering to query safety:
+八层课程从基础筛选逐步进入查询安全：
 
-| Floor | Region | Focus |
+| 层 | 地区 | 重点 |
 |---:|---|---|
-| 1 | Ember Archive | `SELECT`, `WHERE`, `IS NULL`, aggregation |
-| 2 | Tidal Archipelago | ordering, distinct values, joins |
-| 3 | Frost Gravefield | relationship and set queries |
-| 4 | Elemental Furnace | subqueries and CTEs |
-| 5 | Black-Iron Order | window functions and ranking |
-| 6 | Dragon Ridge Workshop | controlled DML and transactions |
-| 7 | Sunset Index Garden | indexes and query plans |
-| 8 | Black-Gold High Hall | concurrency, migration, and query safety |
+| 1 | 地下余烬档案 | `SELECT`、`WHERE`、`IS NULL`、聚合 |
+| 2 | 潮汐群岛 | 排序、去重、连接 |
+| 3 | 白霜墓原 | 关系查询与集合查询 |
+| 4 | 元素升炉 | 子查询与 CTE |
+| 5 | 黑铁外城 | 窗口函数与排名 |
+| 6 | 龙脊工坊 | 受控 DML 与事务 |
+| 7 | 残照索引园 | 索引与查询计划 |
+| 8 | 黑金高堂 | 并发、迁移与查询安全 |
 
-The Scribe and the `失名录` connect the lessons into one ascent. The final record is `MIGRATE`.
+抄写员与《失名录》把课程串成一条上行剧情，最终记录是 `MIGRATE`。
 
-## Controls
+## 操作
 
-| Action | Keyboard | Touch |
+| 操作 | 键盘 | 触屏 |
 |---|---|---|
-| Move | `WASD` / arrow keys | Direction buttons |
-| Inspect, rest, open, pick up | `E` | `E` button |
-| Open SQL terminal | `Q + S` | `SQL 战斗` |
-| Execute query | `Ctrl/Cmd + Enter` | Execute button |
-| Inventory | `B` | Inventory button |
-| Close panel | `Esc` | Close button |
+| 移动 | `WASD` / 方向键 | 方向按钮 |
+| 调查、休息、开门、拾取 | `E` | `E` 按钮 |
+| 打开 SQL 终端 | `Q + S` | `SQL 战斗` |
+| 执行查询 | `Ctrl/Cmd + Enter` | 执行按钮 |
+| 背包 | `B` | 背包按钮 |
+| 关闭界面 | `Esc` | 关闭按钮 |
 
-## Data and Privacy
+## 数据与隐私
 
-Run state, mastery, recovered monster names, and up to 200 SQL attempt records are stored in the browser. No account or server is needed. When `VITE_AGENT_URL` is explicitly configured, the optional Agent receives only bounded current-floor evidence; it never receives hidden answers or the full game state.
+本局状态、熟练度、恢复的怪物名字和最多 200 条 SQL 作答记录保存在浏览器本地，无需账号或服务器。只有在明确配置 `VITE_AGENT_URL` 时，可选 Agent 才会收到受限的当前层证据；它不会收到隐藏答案或完整游戏状态。
 
-## Validation
+## 验证
 
 ```bash
 pnpm test
@@ -70,8 +70,8 @@ pnpm architecture:check
 pnpm build
 ```
 
-The public download keeps this package and its runtime assets. Detailed design drafts, production notes, and preview recordings are not part of the game distribution; see [`docs/README.md`](docs/README.md) for the documentation boundary.
+公开下载包只保留本工程和运行时资源；详细设计稿、制作记录和预览录音不随游戏发布。文档边界见 [`docs/README.md`](docs/README.md)。
 
-## License
+## 许可
 
-See the repository root [LICENSE](../LICENSE) and [ATTRIBUTIONS.md](../ATTRIBUTIONS.md).
+见仓库根目录的 [LICENSE](../LICENSE) 与 [ATTRIBUTIONS.md](../ATTRIBUTIONS.md)。
