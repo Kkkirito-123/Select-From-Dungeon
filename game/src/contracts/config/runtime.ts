@@ -19,6 +19,9 @@ export const ENCOUNTER_RUNTIME_CONFIG = {
   postBattleSafeSteps: 5,
   ambushRollStart: 1,
   ambushChance: 0.02,
+  // 余弦退火：遭遇概率随累计移动数从最高点单调衰减到最低点。
+  ambushChanceMin: 0.001,
+  ambushAnnealSpan: 240,
   ambushGuaranteeAt: 30,
 } as const;
 
