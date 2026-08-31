@@ -1,6 +1,6 @@
 # SQL 魔王城 · SELECT * FROM DUNGEON
 
-**简体中文** | [English](README.md)
+**简体中文** | [English](README.en.md)
 
 `game/` 是可独立运行的浏览器游戏，使用 TypeScript、Vite、Phaser 和 SQLite WASM 构建。它离线优先，不依赖可选的 Python Agent 或 Node.js 在线状态服务。
 
