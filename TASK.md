@@ -6,11 +6,11 @@ latest approved contract and latest recovery checkpoint.
 
 ```text
 TASK_ID: client-flow-guide
-STATUS: COMPLETE
+STATUS: IDLE
 CONTRACT_REF: TASK.md
-CONTRACT_REVISION: 1
-APPROVED_REVISION: 1
-APPROVAL: confirmed
+CONTRACT_REVISION: 0
+APPROVED_REVISION: 0
+APPROVAL: not-required
 ARCHITECTURE_REF: game/ARCHITECTURE.md
 EXTERNAL_REF: none
 ```
