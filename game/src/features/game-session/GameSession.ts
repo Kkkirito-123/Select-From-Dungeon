@@ -686,12 +686,14 @@ export class GameSession {
    * 计量；任何阻挡都返回结构化原因，不直接让表现层猜测。
    */
   attemptPlayerMove(dx: number, dy: number): MoveResolution {
+    // 第一步：计算目标格，并在非探索状态下尽早拒绝移动。
     const from = { x: this.player.x, y: this.player.y };
     const to = { x: from.x + dx, y: from.y + dy };
     if (this.adminPanelOpen || movementModeIsBlocked(this.mode)) {
       return this.moveFailure(from, to, "mode", "当前状态不能移动。");
     }
 
+    // 第二步：依次检查知识门、墙体和跨区域首领门禁。
     const gate = mazeGateAt(this.mazeFloor, to);
     if (gate) {
       const gateRoom = this.graph.nodes.find((room) => room.id === gate.roomNodeId);
@@ -738,6 +740,7 @@ export class GameSession {
       return this.moveFailure(from, to, "campfire", message);
     }
 
+    // 第三步：目标格存在活跃怪物时只进入遭遇，不提交玩家坐标。
     const actor = this.livingActorAt(to);
     if (actor) {
       const encounter = this.engageActor(actor.monsterId);
@@ -754,12 +757,15 @@ export class GameSession {
       };
     }
 
+    // 第四步：通过全部阻挡检查后，才提交位置并更新探索派生状态。
     this.player.x = to.x;
     this.player.y = to.y;
     this.revealAt(to);
     this.updateCurrentRoom(to);
     const guidanceRaised = this.advanceGuidanceProgress();
     const pickedItemIds: string[] = [];
+
+    // 第五步：位置提交后统一处理自动拾取、一次性机关和步数伏击。
     const touchItems = this.groundItems.filter(
       (item) => item.collection === "touch" && item.x === to.x && item.y === to.y,
     );
@@ -802,6 +808,8 @@ export class GameSession {
       const biome = biomeRegionAt(this.biomePlan, this.player);
       this.banner = `${biome.name} · ${this.currentRoom().title} · 已探索 ${this.discoveredCells.size} 格。`;
     }
+
+    // 只发布一次完整快照，使 DOM、Phaser 和持久化看到同一时刻的状态。
     this.emit();
     return {
       ok: true,
@@ -1583,9 +1591,12 @@ export class GameSession {
    * 通过一次 emit() 发布，避免 UI 看到半结算状态。
    */
   resolveQuery(result: SqlQueryResult): TurnResolution {
+    // 第一步：只有正在进行的战斗可以消费查询结果。
     if (this.mode !== "combat" || !this.combat) {
       return this.emptyTurn("先触碰当前区域的怪物进入遭遇。", result.targetIds);
     }
+
+    // 第二步：固定本回合的课程、阶段和复盘上下文，再开始修改状态。
     const lesson = this.currentLesson();
     const stageIndex = this.combat.successStep;
     const combatStages = this.currentCombatStages();
@@ -1598,6 +1609,8 @@ export class GameSession {
     const relicCooling = this.relics.reduce((total, relic) => total + relic.heatReduction, 0);
     const heatAdded = Math.max(1, result.baseHeat - this.player.weapon.heatReduction - relicCooling);
     this.player.heat = Math.min(99, this.player.heat + heatAdded);
+
+    // 第三步：身份保护优先；通过后再按课程阶段核对结构、结果和概念锁。
     const identityEvaluation = evaluateUnrevealedIdentityQuery(
       this.floorNumber,
       stage,
@@ -1615,6 +1628,7 @@ export class GameSession {
     let lessonCompleted: LessonId | null = null;
     let experience: ExperienceSettlement | null = null;
 
+    // 第四步：正确结果转换为伤害、阶段推进，并在最终命中时结算课程与奖励。
     if (evaluation.accepted) {
       const target = this.monsters.find((entry) => entry.id === this.combat?.targetId);
       const mimicAccepted = target?.id === FLOOR_ONE_MIMIC_MONSTER_ID && evaluation.accepted;
@@ -1675,6 +1689,7 @@ export class GameSession {
         }
       }
     } else {
+      // 错误结果进入怪物反击分支，护甲和生命仍由统一伤害规则处理。
       const target = this.monsters.find((monster) => monster.id === this.combat?.targetId);
       const incomingDamage = target ? counterDamageForMonster(target) : 1;
       const damage = this.applyPlayerDamage(incomingDamage);
@@ -1698,6 +1713,8 @@ export class GameSession {
         this.combat.round += 1;
       }
     }
+
+    // 第五步：保存本回合复盘证据，内容使用结算后的身份和战斗结果。
     if (reviewTarget) {
       this.appendAnswerRecord({
         id: this.queryCount,
@@ -1722,6 +1739,8 @@ export class GameSession {
         questionId: stage.questionId,
       });
     }
+
+    // 所有字段完成后统一发布快照，再把同一份结算结果交给动画和界面。
     this.emit();
     return {
       accepted: evaluation.accepted,

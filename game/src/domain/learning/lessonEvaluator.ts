@@ -41,11 +41,15 @@ export function evaluateStage(
   stage: LessonStageDefinition,
   result: SqlQueryResult,
 ): QueryEvaluation {
+  // 统一评估器组合三类证据：题库期望、作者定义的阶段语义，以及必须使用的 SQL 概念。
   return evaluateStageResult(stage, result, {
+    // 题库期望负责核对结果列、行值、顺序或计划证据。
     questionExpectationMatches: (currentStage, currentResult) => (
       matchesQuestionExpectation(currentStage, currentResult, isFlatBeginnerSelect)
     ),
+    // 固定课程阶段负责核对当前题目特有的结果语义。
     stageMatches: matchesAuthoredStage,
+    // 判定结果同时携带可直接反馈给玩家的原因，不由表现层重新猜测。
     wrongResultMessage: authoredWrongResultMessage,
     missingConceptMessage: (locks) => (
       `结果可能接近，但还没有使用本回合核心：${locks.join(" + ")}。`

@@ -602,9 +602,15 @@ export class DungeonScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * 把一个方向输入交给 GameSession 判定，再根据结构化结果播放空间反馈。
+   * 场景只负责锁输入、动画和音画效果，不自行判断墙、门、遭遇或伤害。
+   */
   private tryMove(dx: number, dy: number): void {
     if (!canStartMovement(this.moveLocked, this.snapshot.mode)) return;
     this.moveLocked = true;
+
+    // 规则层一次性返回是否移动、阻挡原因、遭遇、拾取和机关结果。
     let resolution: MoveResolution;
     try {
       resolution = this.session.attemptPlayerMove(dx, dy);
@@ -612,6 +618,8 @@ export class DungeonScene extends Phaser.Scene {
       this.moveLocked = false;
       throw error;
     }
+
+    // 阻挡只播放碰撞反馈；玩家坐标仍由 Session 保持不变。
     if (!resolution.ok) {
       this.moveLocked = false;
       if (resolution.blockedBy === "wall" || resolution.blockedBy === "gate") {
@@ -628,6 +636,8 @@ export class DungeonScene extends Phaser.Scene {
       this.moveLocked = false;
       return;
     }
+
+    // 成功移动后，场景消费规则结果并同步音效、镜头和角色补间动画。
     this.feedback.dispatch({ type: "player-step" });
     if (resolution.hazard) {
       this.feedback.dispatch({

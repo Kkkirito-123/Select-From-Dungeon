@@ -5,163 +5,141 @@ approved repository change is active. Do not use it as a log: keep only the
 latest approved contract and latest recovery checkpoint.
 
 ```text
-TASK_ID: gui-agent-tool-convergence
-STATUS: COMPLETE
+TASK_ID: client-flow-guide
+STATUS: IDLE
 CONTRACT_REF: TASK.md
-CONTRACT_REVISION: 1
-APPROVED_REVISION: 1
-APPROVAL: confirmed
+CONTRACT_REVISION: 0
+APPROVED_REVISION: 0
+APPROVAL: not-required
 ARCHITECTURE_REF: game/ARCHITECTURE.md
-EXTERNAL_REF: game/ARCHITECTURE.md
+EXTERNAL_REF: none
 ```
 
 ## Contract
 
 ### Goal
 
-Replace the model-facing VLM-style navigation loop with a bounded textual GUI
-agent contract and reduce Dungeon Maintainer from twelve model-visible tools to
-eight. The new contract must acquire prerequisite items without coordinates,
-stop at real interaction boundaries, detect repeated no-progress actions, and
-keep every source write inside the existing detached-worktree safety boundary.
+Create a self-contained, non-executable Markdown package under
+`client-flow-guide/` that explains the selected game code flows and simulates
+how a user, Dungeon Maintainer, coding agent, local game bridge, and reviewer
+collaborate on a bounded change.
 
 ### Users and stakeholders
 
-- Maintainer users who need the coding agent to reproduce and repair gameplay
-  failures without entering an infinite navigation loop.
-- Maintainer and game engineers who own the tool, replay, browser bridge, and
-  write-security contracts.
-- Players, whose game rules, saves, answers, inventory, and visible interaction
-  behavior must not be exposed or changed by this development-only bridge.
+- Presenters and client reviewers who need a clear end-to-end explanation
+  without operating the real Maintainer or game runtime.
+- Repository maintainers who need the simulation to preserve the real
+  architecture, privacy, isolation, validation, and publication boundaries.
 
 ### MVP
 
-1. Expose exactly eight model tools: `inspect`, `edit`, `check`, `finish`,
-   `workspace`, `look`, `act`, and `query`. Keep `/play`, `/diff`, `/verify`,
-   `/apply`, and `/discard` unchanged.
-2. Merge evidence list/get into `inspect`; merge precise patch and full-file
-   creation/write into the maintainer-owned `edit`; merge worktree operations
-   into `workspace`; merge movement and visible interaction into `act`; and
-   make `query` write the visible textarea then click the real submit control in
-   one call. Load no Pi native write tool.
-3. Make every `look`/action result carry a revision, current target,
-   prerequisite descriptions, and executable action IDs. `act` accepts only an
-   action from the latest matching revision, performs at most 64 real movement
-   steps, and stops whenever an `E` interaction becomes available.
-4. Resolve unclaimed room rewards, the required aggregate-hammer room, and
-   uncollected guaranteed shortcut keys before a blocked downstream objective.
-   Two consecutive no-progress attempts for the same revision and action must
-   return `stalled` instead of continuing the model loop.
-5. Preserve semantic replay using internal movement, interaction, SQL-input,
-   and submit trace primitives even though the model-facing tools are merged.
+1. Provide one entry README with reading order, roles, scope, and a prominent
+   statement that all interactions and outputs are simulated.
+2. Explain SQL judgment/combat, movement/encounters, and
+   snapshot/render/persistence with compact Mermaid sequence diagrams and links
+   to the owning source files.
+3. Explain Maintainer collaboration from repository recognition and bounded
+   case description through isolated materialization, architecture routing,
+   local bridge interaction, source change, validation, Diff review, and
+   explicit human authorization.
+4. Provide one fictional session that shows inputs, decisions, bounded evidence,
+   simulated tool results, stop conditions, and final handoff without exposing
+   hidden Benchmark or player data.
 
 ### Non-goals
 
-- No screenshot/VLM input, arbitrary mouse coordinates, selectors, JavaScript,
-  shell tool, multi-agent runtime, or second autonomous model loop.
-- No gameplay, curriculum, map generation, inventory, save-schema, SQL judging,
-  hidden-judge, or production bridge changes.
-- No changes to the five user commands, automatic apply/commit/push, or formal
-  repository publication.
-- No weakening of path, approval, privacy, replay, or patch-budget boundaries.
+- No executable demo, scripts, application code, live Maintainer/game calls, or
+  claim that the simulated outputs were observed at runtime.
+- No production source, test, README, Architecture, protocol, Benchmark fixture,
+  dependency, or configuration changes.
+- No hidden reproduction, Oracle, answer SQL, complete map, save, inventory,
+  identity, credential, or private endpoint content.
+- No commit, push, merge, apply, release, or deployment.
 
 ### Expected scope
 
-- `dungeon-maintainer/src/pi/**`, `src/game/**`, and the existing workspace
-  write implementation needed to own the eight tools.
-- Focused maintainer tests for registration, editing safety, replay, stale
-  revisions, stalled actions, and merged query behavior.
-- `game/src/devtools/dungeon-agent/**` and focused bridge tests for the v4
-  textual GUI-agent contract and prerequisite navigation.
-- Maintainer and game Architecture/README documentation only where verified
-  public tool, protocol, ownership, or user-facing facts change.
+- `client-flow-guide/README.md`
+- `client-flow-guide/01-game-code-flow.md`
+- `client-flow-guide/02-maintainer-collaboration.md`
+- `client-flow-guide/03-simulated-session.md`
+- `TASK.md` and `TASK.zh-CN.md` only for the required task contract and
+  checkpoint.
+
+Existing uncommitted source-comment changes on
+`docs/client-code-flow-comments` must remain untouched.
 
 ### Acceptance criteria
 
-- AC-1: The model receives exactly the eight named tools and no Pi native
-  `write`; the five user commands remain registered and behave as before.
-- AC-2: `inspect` supports source inspection and evidence list/get. `edit`
-  supports unique replacement, new-file creation, and complete text writes,
-  always requiring a current `baseHash`, exact approved paths, realpath checks,
-  detached worktree isolation, write budgets, refresh/replay, and post-write
-  evidence.
-- AC-3: Protocol 1.0 views include a revision, target, prerequisites, and stable
-  action IDs without coordinates, complete maps, inventory, saves, hidden
-  answers, or judge data. Stale or unavailable actions do not execute.
-- AC-4: Navigation selects a claimable reward, required aggregate-hammer room,
-  or uncollected guaranteed shortcut key when it blocks the next objective.
-  Movement stops at an `E` interaction and never auto-crosses it.
-- AC-5: `act` is capped at 64 real steps. The second consecutive no-progress
-  call for the same state/action returns `stalled` with the latest view.
-- AC-6: `query` first writes the supplied SQL into the currently visible fixed
-  player textarea and then clicks its real submit control. SQL text remains
-  process-local for replay and is absent from persistent events and traces.
-- AC-7: Refresh replay preserves the merged action/query behavior and reports
-  stale, rejected, unavailable, or stalled outcomes rather than treating a
-  banner-only change as success.
-- AC-8: Focused tests, full tests, TypeScript, lint, architecture checks,
-  production builds, `git diff --check`, and the production bridge-symbol check
-  pass in both repositories as applicable, with unrelated user edits preserved.
-
-### Public interface, compatibility, rollout, and recovery
-
-- The development-only browser bridge uses protocol 1.0 and atomically exposes
-  `look/act/query`; the maintainer client and game bridge are delivered together.
-  No compatibility adapter is retained because mismatched versions fail closed at startup.
-- Internal replay records keep their existing low-level semantic action names;
-  no persisted task or save migration is required.
-- Rollout is local through the feature branch. Recovery is to stop the local
-  maintainer runtime and revert this branch; formal repositories and player
-  saves remain untouched until a separately authorized `/apply` or Git action.
+- AC-1: The new directory contains exactly the four named Markdown files and no
+  executable artifact.
+- AC-2: Every file clearly distinguishes verified repository facts from
+  simulated requests, results, and decisions.
+- AC-3: The three game flows use accurate ownership boundaries and clickable
+  repository-relative source references.
+- AC-4: The Maintainer flow accurately covers marker recognition, Adapter
+  discovery/materialization, isolated work, architecture-guided inspection,
+  development-only bridge boundaries, validation, Diff review, and separate
+  apply/publication authority.
+- AC-5: The fictional session contains no hidden or sensitive data and never
+  implies that coordinates, full snapshots, hidden answers, or arbitrary shell
+  access are exposed to the model.
+- AC-6: Existing source changes are unchanged, Markdown structure and local
+  links are statically inspected, and the complete Diff passes
+  `git diff --check`.
 
 ### Risks and trade-offs
 
-- A revision fingerprint that omits action-relevant visible state could accept
-  stale intent; tests must cover state and action changes.
-- Prerequisite selection must not expose coordinates or bypass lesson/guardian
-  gates. Navigation still walks only discovered/currently walkable cells.
-- Full-file writes increase blast radius, so the existing three-file/120-line
-  task budget, hash binding, exact scope, privacy checks, and replay order remain
-  mandatory.
-- Combining SQL input and submit reduces a tool round trip but requires replay
-  to retain the SQL only in process memory and fail explicitly after restart.
+- A simulation can be mistaken for a captured runtime trace; each document must
+  label illustrative content at the point of use.
+- Too much tool detail would distract from the collaboration model, so the guide
+  explains responsibilities and approval gates instead of internal transport.
+- Mermaid support depends on the Markdown viewer; equivalent prose remains next
+  to every diagram.
 
 ### Assumptions and validation
 
-- The user's instruction to start implementation confirms the previously
-  presented eight-tool design, maintainer-owned `edit`, one-call `query`, and
-  unchanged user commands.
-- Existing source and executable tests define gameplay behavior. Focused tests
-  run before broader quality gates; browser/Vite evidence is distinguished from
-  static and mocked evidence.
-- No commit, push, merge, release, deployment, or other publication is
-  authorized.
+- Markdown is the delivery format; no browser app, slide deck, or executable
+  sample is required.
+- The directory name is `client-flow-guide/` and the work remains on the current
+  `docs/client-code-flow-comments` branch.
+- Validation is static only: inspect all new content, verify local link targets,
+  confirm protected terms/data are absent, preserve the pre-existing source
+  Diff, and run `git diff --check`.
+- No publication action is authorized.
 
 ## Recovery Checkpoint
 
-- Current bounded slice: AC-1 through AC-8 are implemented and verified on
-  `feature/gui-agent-tool-convergence` in both repositories; no commit, push,
+- Current bounded slice: AC-1 through AC-6 are complete on
+  `docs/client-code-flow-comments`; no live Maintainer/game call, commit, push,
   merge, apply, release, or deployment was performed.
-- AC-1/AC-2 evidence: maintainer Extension tests register exactly
-  `inspect/edit/check/finish/workspace/look/act/query`; Pi native tools and Bash
-  are not loaded. Edit tests cover current hashes, exact scope, realpath,
-  detached-worktree isolation, three-file/120-line budgets, approval, refresh,
-  replay, and evidence invalidation.
-- AC-3/AC-4/AC-5 evidence: protocol 1.0 types and bridge tests cover revision-bound
-  stable actions, stale rejection, prerequisite reward/aggregate-hammer/shortcut
-  key selection, interaction stops, the 64-step cap, and second-attempt
-  `stalled`, without coordinates or hidden player data.
-- AC-6/AC-7 evidence: maintainer replay and game bridge tests cover merged SQL
-  write-plus-submit, process-local SQL replay, restart failure, stale/unavailable/
-  rejected/stalled outcomes, and post-refresh replay assertions.
-- AC-8 evidence: maintainer lint, TypeScript, build, and 129/129 tests pass; game
-  architecture check, production build, and 558/558 tests pass; both
-  `git diff --check` checks pass, and `game/dist` contains no
-  `__DUNGEON_PLAYTEST__` symbol.
-- Preserved work: the pre-existing maintainer Eval changes remain in place; a
-  mismatched Eval plan-Oracle fixture was aligned with its existing production
-  predicate. Test-generated changes to the frozen Eval Dataset were removed.
-- Still unverified: none within the approved contract.
+- AC-1/AC-2 evidence: `client-flow-guide/` contains exactly the four approved
+  Markdown files and no executable artifact; every file labels its illustrative
+  requests, results, or diagrams as simulated near the point of use.
+- AC-3 evidence: three Mermaid sequence diagrams and equivalent prose describe
+  SQL/combat, movement/encounters, and snapshot/render/persistence with local
+  links to their owning source files.
+- AC-4 evidence: the Maintainer flow covers the fixed marker, Adapter
+  `catalog`/public `describe`/`materialize`, isolated work, schema-v4 routing,
+  the DEV-local bridge boundary, validation, Diff review, and separate human
+  authority for apply and publication.
+- AC-5 evidence: the fictional session uses placeholders, labels its diagnosis
+  and check output as simulated, and contains no executable SQL, credential
+  pattern, hidden answer, Oracle, complete map, save, inventory, or identity
+  data.
+- AC-6 evidence: the four-file structure, headings, disclaimers, code fences,
+  and local links pass a static Node check; no trailing-whitespace or sensitive
+  pattern was found; `git diff --check` passes for tracked changes.
+- Preserved work: the existing seven-file source-comment Diff and branch remain
+  unchanged at the recorded per-file insertion/deletion counts.
+- GUIDE_NO_UPDATE: stable agent permissions, routing, and stop conditions did
+  not change.
+- ARCHITECTURE_NO_UPDATE: the supplemental guide changes no runtime topology,
+  ownership, protocol, data, command, or compatibility fact.
+- README_NO_UPDATE: setup and player-facing behavior did not change; the new
+  package is a scoped client explanation rather than a product entry point.
+- Still unverified: Mermaid rendering in a specific external viewer; no live
+  runtime, tests, or builds were run because the artifact is intentionally
+  non-executable.
 - Blocker: none.
-- Next action: user review and separate authorization for any commit, push,
-  merge, or release action.
+- Next action: user review; any commit, push, merge, apply, release, or
+  deployment requires separate authorization.

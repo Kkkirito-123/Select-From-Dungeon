@@ -103,6 +103,7 @@ export function isCriticalPersistenceChange(
 /**
  * 将移动与巡逻快照合并为一次尾随写入，同时让战斗、背包、战利品、查询和
  * 楼层变化继续立即落盘。
+ * 数据始终由同一个 GameSession 快照导出为 Run 与 Profile，存储层不反向修改规则状态。
  */
 export function startProgressPersistence(
   source: ProgressSource,
@@ -148,6 +149,8 @@ export function startProgressPersistence(
     clearPending();
     timer = timerApi.setTimeout(flush, PROGRESS_SAVE_DEBOUNCE_MS);
   };
+
+  // 持久化与界面共享同一快照发布源，再按变化类型选择立即写入或合并写入。
   const unsubscribe = source.subscribe((snapshot) => {
     if (destroyed) return;
     if (snapshot.adminMode) {
