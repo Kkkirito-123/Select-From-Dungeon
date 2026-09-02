@@ -787,6 +787,7 @@ export class AppShell {
       this.narrativeWorkflow.renderScribeState(state);
       this.agentPanel.render(state);
     }) ?? null;
+    // DOM 只订阅 GameSession 发布的完整快照，不直接读取或修改内部规则字段。
     this.unsubscribeSession = this.session.subscribe((snapshot) => this.render(snapshot));
   }
 
@@ -1337,8 +1338,13 @@ export class AppShell {
     this.audioButton.setAttribute("aria-pressed", String(muted));
   }
 
+  /**
+   * 将一个完整游戏快照更新到 HUD、面板和转场。
+   * 先比较前后快照得到语义投影，再由各渲染器消费；这里不重新计算游戏规则。
+   */
   private render(snapshot: GameSnapshot): void {
     const previousSnapshot = this.lastSnapshot;
+    // 投影层集中识别换层、进战、拾取等状态变化，避免每个面板重复比较快照。
     const projection = this.snapshotRenderer.project(
       previousSnapshot ?? null,
       snapshot,
@@ -1387,6 +1393,7 @@ export class AppShell {
       this.dismissTransientCards(snapshot);
     }
 
+    // 从这里开始只把快照和投影写入稳定 DOM 节点。
     requiredElement(this.root, "#floor-value").textContent =
       `${String(snapshot.floor).padStart(2, "0")} / 08`;
     this.adminPanel.renderToggle(snapshot.adminMode);

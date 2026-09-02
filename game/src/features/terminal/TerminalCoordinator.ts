@@ -86,7 +86,14 @@ export class TerminalCoordinator {
     return this.busy;
   }
 
+  /**
+   * 完成一次 SQL 战斗提交的完整协调。
+   *
+   * 本方法依次连接输入、查询保护、SQLite 执行、规则结算和画面反馈；
+   * 它不实现判题规则，也不直接修改游戏状态。
+   */
   async executeCombat(): Promise<void> {
+    // 第一步：读取当前输入与快照，空查询不会进入执行和结算阶段。
     if (this.busy) return;
     const input = this.ports.getCombatInput();
     const snapshot = this.ports.session.snapshot();
@@ -97,6 +104,7 @@ export class TerminalCoordinator {
       return;
     }
 
+    // 第二步：锁定本次提交，避免动画结束前发生重复查询。
     this.ports.hideCombatAutocomplete();
     this.beginResolution("combat");
     let reopenAfterResolution = false;
@@ -104,6 +112,7 @@ export class TerminalCoordinator {
       let result: SqlQueryResult | null = null;
       let queryError: unknown = null;
       try {
+        // 第三步：先由 Session 执行游戏语义保护，再交给 SqlEngine 运行真实查询。
         const policy = this.ports.session.validateCombatQuery(input);
         if (!policy.ok) throw new Error(policy.message);
         result = this.ports.sql.execute(
@@ -115,6 +124,7 @@ export class TerminalCoordinator {
         queryError = error;
       }
 
+      // 第四步：Session 把查询结果转换为命中、反击、阶段推进和奖励等规则结果。
       let resolution: TurnResolution;
       if (result) {
         resolution = this.ports.session.resolveQuery(result);
@@ -137,6 +147,7 @@ export class TerminalCoordinator {
         this.ports.showNotice({ message: resolution.message, tone: "danger" });
       }
 
+      // 第五步：规则已经提交完成，表现层只消费 resolution 播放反馈和动画。
       if (resolution.accepted && resolution.lessonCompleted) {
         this.ports.onLessonAccepted();
       }
@@ -178,6 +189,7 @@ export class TerminalCoordinator {
       }
       this.ports.closeCombatTerminal(true);
     } finally {
+      // 无论查询、结算或动画是否失败，都必须释放忙碌状态并恢复正确焦点。
       this.endResolution("combat");
       if (reopenAfterResolution) this.ports.openCombatTerminal();
       else this.ports.syncAudioFocus();

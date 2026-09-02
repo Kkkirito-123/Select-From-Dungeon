@@ -92,6 +92,10 @@ export class SqlEngine {
     };
   }
 
+  /**
+   * 将玩家输入路由到对应的 SQLite 执行环境，并返回统一的查询证据。
+   * 返回值包含结果集、目标 ID、执行计划和 SQL 特征；是否答对由领域层判断。
+   */
   execute(input: string, floor: FloorNumber, lessonId?: string): SqlQueryResult {
     // 第六层课程使用 repair_queue 沙箱；其余楼层和非 DML 练习走只读查询路径。
     const usesFloorSixSandbox = floor === 6 && (

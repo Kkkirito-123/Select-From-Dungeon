@@ -4,113 +4,96 @@
 只保留最新已批准契约和最新恢复检查点。
 
 ```text
-TASK_ID: gui-agent-tool-convergence
+TASK_ID: client-flow-guide
 STATUS: COMPLETE
 CONTRACT_REF: TASK.md
 CONTRACT_REVISION: 1
 APPROVED_REVISION: 1
 APPROVAL: confirmed
 ARCHITECTURE_REF: game/ARCHITECTURE.md
-EXTERNAL_REF: game/ARCHITECTURE.md
+EXTERNAL_REF: none
 ```
 
 ## 契约
 
 ### 目标
 
-用有界的文本 GUI Agent 契约替代面向模型的 VLM 式导航循环，并将 Dungeon Maintainer 从 12 个
-模型可见工具收敛为 8 个。新契约必须能在不暴露坐标的前提下取得前置道具，在真实交互边界停止，
-识别重复无进展动作，同时让所有源码写入继续受 detached worktree 安全边界约束。
+在 `client-flow-guide/` 下创建一套独立、不可执行的 Markdown 说明包，介绍选定游戏代码流程，
+并模拟用户、Dungeon Maintainer、Coding Agent、本地游戏桥和评审者如何协同完成一次有界变更。
 
 ### 用户与相关方
 
-- 维护器用户：需要 Coding Agent 在复现和修复玩法故障时不会陷入导航死循环。
-- 维护器与游戏工程师：负责工具、重放、浏览器桥和写入安全契约。
-- 玩家：游戏规则、存档、答案、背包和可见交互行为不得被开发态桥暴露或改变。
+- 介绍人员和甲方评审：无需操作真实维护器或游戏运行时，也能理解完整流程。
+- 仓库维护者：模拟内容必须符合真实架构、隐私、隔离、验证和发布边界。
 
 ### MVP
 
-1. 模型只暴露 8 个工具：`inspect`、`edit`、`check`、`finish`、`workspace`、`look`、
-   `act`、`query`。`/play`、`/diff`、`/verify`、`/apply`、`/discard` 保持不变。
-2. 将证据 list/get 合入 `inspect`；将精确 patch、建文件和整文件写入合入维护器自有 `edit`；
-   将 worktree 操作合入 `workspace`；将移动和可见交互合入 `act`；`query` 一次调用先写可见
-   textarea，再点击真实提交控件。不再加载 Pi 原生 `write`。
-3. 每个 `look`/动作结果携带修订号、当前目标、前置依赖说明和可执行 action ID。`act` 只接受
-   最新匹配修订中的动作，最多执行 64 个真实移动步，出现 `E` 交互时必须停止。
-4. 在下游目标受阻前，优先解析未领取房间奖励、必需的聚合战锤房和未取得的保证捷径钥匙。
-   同一修订和动作连续两次无进展时返回 `stalled`，不得继续模型循环。
-5. 模型工具虽已合并，语义重放仍保留内部移动、交互、SQL 输入和提交原语。
+1. 提供入口 README，说明阅读顺序、角色、范围，并醒目标注所有交互与输出均为模拟。
+2. 使用简洁 Mermaid 时序图和源码链接说明 SQL 判定/战斗、移动/遭遇、快照/渲染/持久化。
+3. 说明维护器协同链：仓库识别、有界案例描述、隔离物化、架构路由、本地桥交互、源码修改、验证、
+   Diff 审查和人工明确授权。
+4. 提供一份虚构会话，展示输入、决策、有界证据、模拟工具结果、停止条件和最终交接，且不暴露隐藏
+   Benchmark 或玩家数据。
 
 ### 非目标
 
-- 不加入截图/VLM 输入、任意鼠标坐标、选择器、JavaScript、Shell 工具、多 Agent 运行时或第二套
-  自主模型循环。
-- 不改变玩法、课程、地图生成、背包、存档 schema、SQL 判定、隐藏裁判或生产桥。
-- 不改变 5 个用户命令，不自动 apply/commit/push，不发布正式仓库。
-- 不削弱路径、审批、隐私、重放或补丁预算边界。
+- 不提供可执行示例、脚本或应用代码，不调用真实维护器/游戏，也不声称模拟输出来自真实运行。
+- 不修改生产源码、测试、README、Architecture、协议、Benchmark fixture、依赖或配置。
+- 不包含隐藏复现、Oracle、答案 SQL、完整地图、存档、背包、身份、凭据或私有端点。
+- 不执行 commit、push、merge、apply、release 或部署。
 
 ### 预计范围
 
-- `dungeon-maintainer/src/pi/**`、`src/game/**`，以及为 8 工具统一写入所需的现有 workspace 实现。
-- 维护器定向测试：工具注册、编辑安全、重放、旧修订、停滞动作和合并 query。
-- `game/src/devtools/dungeon-agent/**` 及其定向桥测试：协议 1.0 文本 GUI Agent 契约和前置导航。
-- 只在公开工具、协议、所有权或用户事实确实改变时更新维护器和游戏的 Architecture/README。
+- `client-flow-guide/README.md`
+- `client-flow-guide/01-game-code-flow.md`
+- `client-flow-guide/02-maintainer-collaboration.md`
+- `client-flow-guide/03-simulated-session.md`
+- `TASK.md` 与 `TASK.zh-CN.md` 仅用于必需的任务契约和检查点。
+
+`docs/client-code-flow-comments` 上已有的未提交源码注释必须保持不变。
 
 ### 验收标准
 
-- AC-1：模型只获得上述 8 个工具，不含 Pi 原生 `write`；5 个用户命令保持注册和原行为。
-- AC-2：`inspect` 支持源码检查和证据 list/get；`edit` 支持唯一替换、创建新文件和整文件文本写入，
-  始终强制当前 `baseHash`、精确批准路径、realpath、隔离 worktree、写入预算、刷新重放和写后证据。
-- AC-3：协议 1.0 视图包含修订号、目标、前置依赖和稳定 action ID，不含坐标、完整地图、背包、
-  存档、隐藏答案或裁判数据；过期或不可用动作不会执行。
-- AC-4：导航在阻塞下一目标时能选择待领取奖励、必需聚合战锤房或未取得的保证捷径钥匙；移动在
-  `E` 交互处停止，绝不自动跨越。
-- AC-5：`act` 最多执行 64 个真实步；同一状态/动作第二次连续无进展时返回带最新视图的 `stalled`。
-- AC-6：`query` 先把 SQL 写入当前可见的固定玩家 textarea，再点击真实提交控件；SQL 只为重放
-  留在进程内存，不进入持久化事件或 Trace。
-- AC-7：刷新重放保留合并后的 act/query 行为，并明确报告过期、拒绝、不可用或停滞，不以仅 banner
-  变化冒充成功。
-- AC-8：两个仓库适用的定向测试、完整测试、TypeScript、lint、架构检查、生产构建、
-  `git diff --check` 与生产桥符号检查通过，且保留无关用户改动。
-
-### 公开接口、兼容、发布与恢复
-
-- 开发态浏览器桥统一使用协议 1.0，并原子提供 `look/act/query`；维护器客户端与游戏桥一起交付。
-  版本不匹配本就会启动失败，因此不保留兼容适配层。
-- 内部重放记录继续使用原有低层语义动作名，不需要迁移持久化任务或玩家存档。
-- 仅在本地功能分支交付。恢复方式是停止本地维护器并回退该分支；在另行授权 `/apply` 或 Git 操作前，
-  正式仓库和玩家存档不受影响。
+- AC-1：新目录恰好包含上述四个 Markdown 文件，不包含可执行产物。
+- AC-2：每个文件均明确区分已验证仓库事实与模拟请求、结果和决策。
+- AC-3：三条游戏流程使用准确职责边界和可点击的仓库相对源码引用。
+- AC-4：维护器流程准确覆盖 marker 识别、Adapter 发现/物化、隔离工作、架构引导检查、开发态桥边界、
+  验证、Diff 审查以及独立的 apply/发布授权。
+- AC-5：虚构会话不含隐藏或敏感数据，也不暗示模型能获得坐标、完整快照、隐藏答案或任意 Shell。
+- AC-6：已有源码变更保持不变；静态检查 Markdown 结构和本地链接；完整 Diff 通过 `git diff --check`。
 
 ### 风险与权衡
 
-- 修订指纹若遗漏动作相关可见状态，可能接受过期意图；测试必须覆盖状态和动作变化。
-- 前置选择不得暴露坐标或绕过课程/区域首领门；导航仍只穿过已发现且当前可走的格子。
-- 整文件写入扩大影响面，因此现有 3 文件/120 行任务预算、Hash 绑定、精确范围、隐私检查和重放顺序
-  继续强制执行。
-- SQL 输入和提交合并减少一次工具往返，但重放只能在进程内保留 SQL，重启后必须明确失败。
+- 模拟内容可能被误认为真实运行记录，因此每个文档都必须在使用处标记说明性内容。
+- 工具细节过多会掩盖协同模型，因此说明以职责和授权门为主，不展开内部传输实现。
+- Mermaid 是否渲染取决于 Markdown 查看器，因此每张图旁边都保留等价文字说明。
 
 ### 假设与验证
 
-- 用户的“开始实现”确认此前给出的 8 工具、自有 `edit`、一次调用 `query` 和用户命令不变方案。
-- 现有源码与可执行测试定义玩法行为；先跑定向测试，再跑完整质量门，并区分浏览器/Vite、静态和 mock 证据。
-- 未授权 commit、push、merge、release、部署或其他发布行为。
+- 交付格式为 Markdown；不需要浏览器应用、幻灯片或可执行样例。
+- 目录名为 `client-flow-guide/`，工作继续保留在当前 `docs/client-code-flow-comments` 分支。
+- 仅做静态验证：审查全部新增内容、校验本地链接目标、确认无受保护数据、保留原有源码 Diff，并运行
+  `git diff --check`。
+- 未授权任何发布动作。
 
 ## 恢复检查点
 
-- 当前有界切片：AC-1 至 AC-8 已在两个仓库的 `feature/gui-agent-tool-convergence`
-  分支实现并验证；未执行 commit、push、merge、apply、release 或部署。
-- AC-1/AC-2 证据：维护器 Extension 测试确认只注册
-  `inspect/edit/check/finish/workspace/look/act/query`，不加载 Pi 原生工具和 Bash；edit 测试覆盖
-  当前 Hash、精确范围、realpath、detached worktree 隔离、3 文件/120 行预算、授权、刷新重放和证据失效。
-- AC-3/AC-4/AC-5 证据：协议 1.0 类型和游戏桥测试覆盖 revision 绑定稳定动作、旧修订拒绝、
-  前置奖励/聚合战锤/捷径钥匙选择、交互停点、64 步上限，以及第二次无进展返回 `stalled`；
-  不暴露坐标或隐藏玩家数据。
-- AC-6/AC-7 证据：维护器重放与游戏桥测试覆盖合并 SQL 写入和提交、进程内 SQL 重放、重启后明确失败、
-  过期/不可用/拒绝/停滞结果，以及刷新后的重放断言。
-- AC-8 证据：维护器 lint、TypeScript、build 和 129/129 测试通过；游戏架构检查、生产构建和
-  558/558 测试通过；两仓库 `git diff --check` 通过，`game/dist` 不含 `__DUNGEON_PLAYTEST__`。
-- 保留工作：维护器原有 Eval 改动保持不变；仅将一个与现有生产谓词不一致的计划 Oracle 测试夹具
-  对齐。全测写入冻结 Eval Dataset 的副作用已清除。
-- 仍待验证：已批准契约范围内无。
+- 当前有界切片：AC-1 至 AC-6 已在 `docs/client-code-flow-comments` 完成；未调用真实维护器或游戏，
+  未执行 commit、push、merge、apply、release 或部署。
+- AC-1/AC-2 证据：`client-flow-guide/` 恰好包含四个已批准 Markdown 文件且无可执行产物；每个文件
+  都在使用位置附近将说明性请求、结果或图标记为模拟。
+- AC-3 证据：三张 Mermaid 时序图和等价文字说明 SQL/战斗、移动/遭遇、快照/渲染/持久化，
+  并通过本地链接指向职责源码。
+- AC-4 证据：维护器流程覆盖固定 marker、Adapter 的 `catalog`/public `describe`/`materialize`、
+  隔离工作、schema-v4 路由、DEV 本地桥边界、验证、Diff 审查以及独立的人工 apply/发布授权。
+- AC-5 证据：虚构会话使用占位内容，将诊断与检查输出标为模拟，不含可执行 SQL、凭据模式、隐藏答案、
+  Oracle、完整地图、存档、背包或身份数据。
+- AC-6 证据：四文件结构、标题、声明、代码围栏和本地链接通过静态 Node 检查；未发现尾随空白或敏感
+  模式；已跟踪变更通过 `git diff --check`。
+- 保留工作：现有七文件源码注释 Diff 和当前分支保持不变。
+- GUIDE_NO_UPDATE：稳定 Agent 权限、路由和停止条件没有变化。
+- ARCHITECTURE_NO_UPDATE：补充说明包不改变运行拓扑、职责、协议、数据、命令或兼容事实。
+- README_NO_UPDATE：安装方式和玩家可见行为没有变化；新目录是有界的甲方说明材料，不是产品入口。
+- 仍待验证：特定外部查看器中的 Mermaid 渲染；该产物刻意不可执行，因此未运行真实流程、测试或构建。
 - 阻塞：无。
-- 下一动作：等待用户审查；任何 commit、push、merge 或发布均需另行授权。
+- 下一动作：等待用户审查；任何 commit、push、merge、apply、release 或部署均需另行授权。
